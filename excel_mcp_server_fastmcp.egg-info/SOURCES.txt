@@ -1,0 +1,8 @@
+README.md
+pyproject.toml
+server.py
+excel_mcp_server_fastmcp.egg-info/PKG-INFO
+excel_mcp_server_fastmcp.egg-info/SOURCES.txt
+excel_mcp_server_fastmcp.egg-info/dependency_links.txt
+excel_mcp_server_fastmcp.egg-info/requires.txt
+excel_mcp_server_fastmcp.egg-info/top_level.txt
