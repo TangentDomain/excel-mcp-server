@@ -687,10 +687,12 @@ class ExcelWriter:
             )
 
     def _basic_formula_parse(self, formula: str, sheet) -> any:
-        """基础公式解析器 - 支持简单的函数"""
+        """增强的基础公式解析器 - 支持numpy统计函数"""
         import re
 
         formula = formula.strip()
+
+        # ==================== 基础统计函数 ====================
 
         # SUM函数
         sum_match = re.match(r'SUM\(([A-Z]+\d+):([A-Z]+\d+)\)', formula, re.IGNORECASE)
@@ -702,15 +704,127 @@ class ExcelWriter:
         avg_match = re.match(r'AVERAGE\(([A-Z]+\d+):([A-Z]+\d+)\)', formula, re.IGNORECASE)
         if avg_match:
             start_cell, end_cell = avg_match.groups()
-            total = self._calculate_range_sum(sheet, start_cell, end_cell)
-            count = self._calculate_range_count(sheet, start_cell, end_cell)
-            return total / count if count > 0 else 0
+            values = self._get_range_values(sheet, start_cell, end_cell)
+            return self._numpy_average(values)
 
         # COUNT函数
         count_match = re.match(r'COUNT\(([A-Z]+\d+):([A-Z]+\d+)\)', formula, re.IGNORECASE)
         if count_match:
             start_cell, end_cell = count_match.groups()
             return self._calculate_range_count(sheet, start_cell, end_cell)
+
+        # MIN函数
+        min_match = re.match(r'MIN\(([A-Z]+\d+):([A-Z]+\d+)\)', formula, re.IGNORECASE)
+        if min_match:
+            start_cell, end_cell = min_match.groups()
+            values = self._get_range_values(sheet, start_cell, end_cell)
+            return self._numpy_min(values)
+
+        # MAX函数
+        max_match = re.match(r'MAX\(([A-Z]+\d+):([A-Z]+\d+)\)', formula, re.IGNORECASE)
+        if max_match:
+            start_cell, end_cell = max_match.groups()
+            values = self._get_range_values(sheet, start_cell, end_cell)
+            return self._numpy_max(values)
+
+        # ==================== 高级统计函数 (numpy支持) ====================
+
+        # MEDIAN函数
+        median_match = re.match(r'MEDIAN\(([A-Z]+\d+):([A-Z]+\d+)\)', formula, re.IGNORECASE)
+        if median_match:
+            start_cell, end_cell = median_match.groups()
+            values = self._get_range_values(sheet, start_cell, end_cell)
+            return self._numpy_median(values)
+
+        # STDEV函数 (样本标准差)
+        stdev_match = re.match(r'STDEV(?:\.S)?\(([A-Z]+\d+):([A-Z]+\d+)\)', formula, re.IGNORECASE)
+        if stdev_match:
+            start_cell, end_cell = stdev_match.groups()
+            values = self._get_range_values(sheet, start_cell, end_cell)
+            return self._numpy_stdev(values)
+
+        # VAR函数 (样本方差)
+        var_match = re.match(r'VAR(?:\.S)?\(([A-Z]+\d+):([A-Z]+\d+)\)', formula, re.IGNORECASE)
+        if var_match:
+            start_cell, end_cell = var_match.groups()
+            values = self._get_range_values(sheet, start_cell, end_cell)
+            return self._numpy_var(values)
+
+        # PERCENTILE函数
+        percentile_match = re.match(r'PERCENTILE\(([A-Z]+\d+):([A-Z]+\d+),\s*([0-9.]+)\)', formula, re.IGNORECASE)
+        if percentile_match:
+            start_cell, end_cell, percentile = percentile_match.groups()
+            values = self._get_range_values(sheet, start_cell, end_cell)
+            return self._numpy_percentile(values, float(percentile))
+
+        # QUARTILE函数
+        quartile_match = re.match(r'QUARTILE\(([A-Z]+\d+):([A-Z]+\d+),\s*([0-3])\)', formula, re.IGNORECASE)
+        if quartile_match:
+            start_cell, end_cell, quartile = quartile_match.groups()
+            values = self._get_range_values(sheet, start_cell, end_cell)
+            return self._numpy_quartile(values, int(quartile))
+
+        # ==================== 条件统计函数 ====================
+
+        # COUNTIF函数
+        countif_match = re.match(r'COUNTIF\(([A-Z]+\d+):([A-Z]+\d+),\s*"?([^"]+)"?\)', formula, re.IGNORECASE)
+        if countif_match:
+            start_cell, end_cell, condition = countif_match.groups()
+            values = self._get_range_values(sheet, start_cell, end_cell)
+            return self._numpy_countif(values, condition)
+
+        # SUMIF函数
+        sumif_match = re.match(r'SUMIF\(([A-Z]+\d+):([A-Z]+\d+),\s*"?([^"]+)"?\)', formula, re.IGNORECASE)
+        if sumif_match:
+            start_cell, end_cell, condition = sumif_match.groups()
+            values = self._get_range_values(sheet, start_cell, end_cell)
+            return self._numpy_sumif(values, condition)
+
+        # AVERAGEIF函数
+        avgif_match = re.match(r'AVERAGEIF\(([A-Z]+\d+):([A-Z]+\d+),\s*"?([^"]+)"?\)', formula, re.IGNORECASE)
+        if avgif_match:
+            start_cell, end_cell, condition = avgif_match.groups()
+            values = self._get_range_values(sheet, start_cell, end_cell)
+            return self._numpy_averageif(values, condition)
+
+        # ==================== 特殊统计函数 ====================
+
+        # MODE函数 (众数)
+        mode_match = re.match(r'MODE(?:\.SNGL)?\(([A-Z]+\d+):([A-Z]+\d+)\)', formula, re.IGNORECASE)
+        if mode_match:
+            start_cell, end_cell = mode_match.groups()
+            values = self._get_range_values(sheet, start_cell, end_cell)
+            return self._numpy_mode(values)
+
+        # SKEW函数 (偏度)
+        skew_match = re.match(r'SKEW\(([A-Z]+\d+):([A-Z]+\d+)\)', formula, re.IGNORECASE)
+        if skew_match:
+            start_cell, end_cell = skew_match.groups()
+            values = self._get_range_values(sheet, start_cell, end_cell)
+            return self._numpy_skew(values)
+
+        # KURT函数 (峰度)
+        kurt_match = re.match(r'KURT\(([A-Z]+\d+):([A-Z]+\d+)\)', formula, re.IGNORECASE)
+        if kurt_match:
+            start_cell, end_cell = kurt_match.groups()
+            values = self._get_range_values(sheet, start_cell, end_cell)
+            return self._numpy_kurtosis(values)
+
+        # GEOMEAN函数 (几何平均数)
+        geomean_match = re.match(r'GEOMEAN\(([A-Z]+\d+):([A-Z]+\d+)\)', formula, re.IGNORECASE)
+        if geomean_match:
+            start_cell, end_cell = geomean_match.groups()
+            values = self._get_range_values(sheet, start_cell, end_cell)
+            return self._numpy_geomean(values)
+
+        # HARMEAN函数 (调和平均数)
+        harmean_match = re.match(r'HARMEAN\(([A-Z]+\d+):([A-Z]+\d+)\)', formula, re.IGNORECASE)
+        if harmean_match:
+            start_cell, end_cell = harmean_match.groups()
+            values = self._get_range_values(sheet, start_cell, end_cell)
+            return self._numpy_harmean(values)
+
+        # ==================== 其他函数 ====================
 
         # 简单的数学表达式
         if re.match(r'^[\d\+\-\*\/\s\(\)\.]+$', formula):
@@ -748,6 +862,284 @@ class ExcelWriter:
             return result
 
         return None
+
+    def _get_range_values(self, sheet, start_cell: str, end_cell: str) -> list:
+        """获取范围内的数值列表"""
+        from openpyxl.utils import range_boundaries
+
+        min_col, min_row, max_col, max_row = range_boundaries(f"{start_cell}:{end_cell}")
+        values = []
+
+        for row in range(min_row, max_row + 1):
+            for col in range(min_col, max_col + 1):
+                cell = sheet.cell(row=row, column=col)
+                if cell.value is not None and isinstance(cell.value, (int, float)):
+                    values.append(float(cell.value))
+
+        return values
+
+    # ==================== Numpy统计函数实现 ====================
+
+    def _numpy_average(self, values: list) -> float:
+        """计算平均值"""
+        try:
+            import numpy as np
+            if not values:
+                return 0
+            return float(np.mean(values))
+        except:
+            return sum(values) / len(values) if values else 0
+
+    def _numpy_min(self, values: list) -> float:
+        """计算最小值"""
+        try:
+            import numpy as np
+            if not values:
+                return 0
+            return float(np.min(values))
+        except:
+            return min(values) if values else 0
+
+    def _numpy_max(self, values: list) -> float:
+        """计算最大值"""
+        try:
+            import numpy as np
+            if not values:
+                return 0
+            return float(np.max(values))
+        except:
+            return max(values) if values else 0
+
+    def _numpy_median(self, values: list) -> float:
+        """计算中位数"""
+        try:
+            import numpy as np
+            if not values:
+                return 0
+            return float(np.median(values))
+        except:
+            sorted_values = sorted(values)
+            n = len(sorted_values)
+            if n == 0:
+                return 0
+            elif n % 2 == 1:
+                return sorted_values[n // 2]
+            else:
+                return (sorted_values[n // 2 - 1] + sorted_values[n // 2]) / 2
+
+    def _numpy_stdev(self, values: list) -> float:
+        """计算样本标准差"""
+        try:
+            import numpy as np
+            if len(values) < 2:
+                return 0
+            return float(np.std(values, ddof=1))
+        except:
+            if len(values) < 2:
+                return 0
+            mean = sum(values) / len(values)
+            variance = sum((x - mean) ** 2 for x in values) / (len(values) - 1)
+            return variance ** 0.5
+
+    def _numpy_var(self, values: list) -> float:
+        """计算样本方差"""
+        try:
+            import numpy as np
+            if len(values) < 2:
+                return 0
+            return float(np.var(values, ddof=1))
+        except:
+            if len(values) < 2:
+                return 0
+            mean = sum(values) / len(values)
+            return sum((x - mean) ** 2 for x in values) / (len(values) - 1)
+
+    def _numpy_percentile(self, values: list, percentile: float) -> float:
+        """计算百分位数"""
+        try:
+            import numpy as np
+            if not values:
+                return 0
+            return float(np.percentile(values, percentile * 100))
+        except:
+            if not values:
+                return 0
+            sorted_values = sorted(values)
+            k = percentile * (len(sorted_values) - 1)
+            f = int(k)
+            c = k - f
+            if f + 1 < len(sorted_values):
+                return sorted_values[f] * (1 - c) + sorted_values[f + 1] * c
+            else:
+                return sorted_values[f]
+
+    def _numpy_quartile(self, values: list, quartile: int) -> float:
+        """计算四分位数"""
+        quartile_map = {0: 0, 1: 0.25, 2: 0.5, 3: 0.75}
+        return self._numpy_percentile(values, quartile_map.get(quartile, 0.5))
+
+    def _numpy_countif(self, values: list, condition: str) -> int:
+        """条件计数"""
+        try:
+            import numpy as np
+            arr = np.array(values)
+
+            if condition.startswith('>'):
+                threshold = float(condition[1:])
+                return int(np.sum(arr > threshold))
+            elif condition.startswith('<'):
+                threshold = float(condition[1:])
+                return int(np.sum(arr < threshold))
+            elif condition.startswith('>='):
+                threshold = float(condition[2:])
+                return int(np.sum(arr >= threshold))
+            elif condition.startswith('<='):
+                threshold = float(condition[2:])
+                return int(np.sum(arr <= threshold))
+            elif condition.startswith('='):
+                threshold = float(condition[1:])
+                return int(np.sum(arr == threshold))
+            else:
+                threshold = float(condition)
+                return int(np.sum(arr == threshold))
+        except:
+            # 回退到基础实现
+            count = 0
+            for value in values:
+                if condition.startswith('>'):
+                    threshold = float(condition[1:])
+                    if value > threshold:
+                        count += 1
+                elif condition.startswith('<'):
+                    threshold = float(condition[1:])
+                    if value < threshold:
+                        count += 1
+                # 添加更多条件...
+            return count
+
+    def _numpy_sumif(self, values: list, condition: str) -> float:
+        """条件求和"""
+        try:
+            import numpy as np
+            arr = np.array(values)
+
+            if condition.startswith('>'):
+                threshold = float(condition[1:])
+                return float(np.sum(arr[arr > threshold]))
+            elif condition.startswith('<'):
+                threshold = float(condition[1:])
+                return float(np.sum(arr[arr < threshold]))
+            elif condition.startswith('>='):
+                threshold = float(condition[2:])
+                return float(np.sum(arr[arr >= threshold]))
+            elif condition.startswith('<='):
+                threshold = float(condition[2:])
+                return float(np.sum(arr[arr <= threshold]))
+            elif condition.startswith('='):
+                threshold = float(condition[1:])
+                return float(np.sum(arr[arr == threshold]))
+            else:
+                threshold = float(condition)
+                return float(np.sum(arr[arr == threshold]))
+        except:
+            # 回退到基础实现
+            total = 0
+            for value in values:
+                if condition.startswith('>'):
+                    threshold = float(condition[1:])
+                    if value > threshold:
+                        total += value
+                # 添加更多条件...
+            return total
+
+    def _numpy_averageif(self, values: list, condition: str) -> float:
+        """条件平均值"""
+        try:
+            import numpy as np
+            arr = np.array(values)
+
+            if condition.startswith('>'):
+                threshold = float(condition[1:])
+                filtered = arr[arr > threshold]
+                return float(np.mean(filtered)) if len(filtered) > 0 else 0
+            elif condition.startswith('<'):
+                threshold = float(condition[1:])
+                filtered = arr[arr < threshold]
+                return float(np.mean(filtered)) if len(filtered) > 0 else 0
+            # 添加更多条件...
+        except:
+            # 回退到基础实现
+            filtered_values = []
+            for value in values:
+                if condition.startswith('>'):
+                    threshold = float(condition[1:])
+                    if value > threshold:
+                        filtered_values.append(value)
+            return sum(filtered_values) / len(filtered_values) if filtered_values else 0
+
+    def _numpy_mode(self, values: list) -> float:
+        """计算众数"""
+        try:
+            from scipy import stats
+            if not values:
+                return 0
+            mode_result = stats.mode(values, keepdims=True)
+            return float(mode_result[0][0])
+        except:
+            # 简单实现：返回最频繁出现的值
+            if not values:
+                return 0
+            from collections import Counter
+            counts = Counter(values)
+            return float(counts.most_common(1)[0][0])
+
+    def _numpy_skew(self, values: list) -> float:
+        """计算偏度"""
+        try:
+            from scipy import stats
+            if len(values) < 3:
+                return 0
+            return float(stats.skew(values))
+        except:
+            return 0
+
+    def _numpy_kurtosis(self, values: list) -> float:
+        """计算峰度"""
+        try:
+            from scipy import stats
+            if len(values) < 4:
+                return 0
+            return float(stats.kurtosis(values))
+        except:
+            return 0
+
+    def _numpy_geomean(self, values: list) -> float:
+        """计算几何平均数"""
+        try:
+            from scipy import stats
+            if not values or any(v <= 0 for v in values):
+                return 0
+            return float(stats.gmean(values))
+        except:
+            if not values or any(v <= 0 for v in values):
+                return 0
+            import math
+            product = 1
+            for v in values:
+                product *= v
+            return product ** (1.0 / len(values))
+
+    def _numpy_harmean(self, values: list) -> float:
+        """计算调和平均数"""
+        try:
+            from scipy import stats
+            if not values or any(v <= 0 for v in values):
+                return 0
+            return float(stats.hmean(values))
+        except:
+            if not values or any(v <= 0 for v in values):
+                return 0
+            return len(values) / sum(1.0 / v for v in values)
 
     def _calculate_range_sum(self, sheet, start_cell: str, end_cell: str) -> float:
         """计算范围求和"""
