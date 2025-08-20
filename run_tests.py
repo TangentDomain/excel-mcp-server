@@ -14,7 +14,7 @@ def run_command(command: str, description: str):
     """运行命令并处理结果"""
     print(f"\n🔄 {description}")
     print(f"命令: {command}")
-    
+
     try:
         result = subprocess.run(
             command,
@@ -40,23 +40,23 @@ def run_command(command: str, description: str):
 def main():
     """主函数"""
     print("🚀 开始运行Excel MCP Server完整测试套件")
-    
+
     tests = [
         ("uv run python tests/test_runner.py", "运行基础功能测试"),
         ("uv run pytest tests/test_parsers.py -v", "运行解析器单元测试"),
         ("uv run pytest tests/test_validators.py -v", "运行验证器单元测试"),
     ]
-    
+
     passed = 0
     total = len(tests)
-    
+
     for command, description in tests:
         if run_command(command, description):
             passed += 1
-    
+
     print(f"\n📊 测试总结:")
     print(f"✅ 通过: {passed}/{total}")
-    
+
     if passed == total:
         print("🎉 所有测试都通过！")
         print("💡 现在可以使用以下命令启动MCP服务器：")
