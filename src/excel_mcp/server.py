@@ -118,48 +118,46 @@ def excel_regex_search(
     """
     在Excel文件中使用正则表达式搜索单元格内容
 
-    支持跨工作表搜索，可以同时搜索单元格值和公式内容。
-    常用正则模式：
+    支持跨工作表搜索，可同时搜索单元格值和公式内容。
+
+    常用正则模式示例：
     - r'\\d+': 匹配数字
     - r'[A-Za-z]+': 匹配字母
-    - r'\\b\\w+@\\w+\\.\\w+\\b': 匹配邮箱格式
-
-    Args:
-        file_path: Excel文件的绝对或相对路径，支持.xlsx和.xlsm格式
-        pattern: 正则表达式模式字符串，使用Python re模块语法
-        flags: 正则表达式修饰符，组合使用：
-            - "i": 忽略大小写匹配
-            - "m": 多行模式，^和$匹配每行的开始和结束
-            - "s": 单行模式，点(.)匹配包括换行符的任意字符
-            - 示例: "im" 表示忽略大小写且多行模式
-        search_values: 是否在单元格的显示值中搜索（默认True）
-        search_formulas: 是否在单元格的公式中搜索（默认False）
+    - r'\\w+@\\w+\\.\\w+': 匹配邮箱格式
+    - r'^总计|合计$': 匹配特定文本
+    - r'\\d{4}-\\d{2}-\\d{2}': 匹配日期格式(YYYY-MM-DD)    Args:
+        file_path: Excel文件路径 (.xlsx/.xlsm)
+        pattern: 正则表达式模式，使用Python re模块语法
+        flags: 正则表达式修饰符，可组合使用：
+            - "i": 忽略大小写
+            - "m": 多行模式
+            - "s": 点号匹配换行符
+            - 示例: "i", "im", "is"
+        search_values: 是否搜索单元格显示值 (默认True)
+        search_formulas: 是否搜索单元格公式 (默认False)
 
     Returns:
         搜索结果字典：
-        - success (bool): 搜索是否成功完成
-        - matches (List[Dict]): 匹配结果列表，每个匹配项包含：
-            - coordinate (str): 单元格坐标，如"A1", "B5"
-            - sheet_name (str): 所在工作表名称
-            - value (Any): 单元格显示值
-            - formula (str): 单元格公式（如果有）
-            - matched_text (str): 实际匹配的文本
-        - match_count (int): 总匹配数量
-        - searched_sheets (List[str]): 已搜索的工作表名称列表
-        - message (str): 操作成功信息
-        - error (str): 错误描述（仅当success=False时存在）
+        - success (bool): 操作是否成功
+        - matches (List[Dict]): 匹配结果，每项包含:
+            - coordinate (str): 单元格坐标 "A1"
+            - sheet_name (str): 工作表名
+            - value (Any): 单元格值
+            - formula (str): 公式(如有)
+            - matched_text (str): 匹配的文本
+        - match_count (int): 匹配总数
+        - searched_sheets (List[str]): 已搜索的工作表
+        - message (str): 成功信息
+        - error (str): 错误信息(失败时)
 
-    Raises:
-        FileNotFoundError: Excel文件不存在或路径无效
-        PermissionError: 文件被占用或无读取权限
-        InvalidPatternError: 正则表达式语法错误
-        UnsupportedFormatError: 不支持的文件格式
+    Note:
+        大文件搜索可能耗时较长，建议先使用简单模式测试
 
     Example:
-        # 搜索所有包含邮箱的单元格
+        # 搜索包含邮箱的单元格
         result = excel_regex_search(
-            file_path="contacts.xlsx",
-            pattern=r"\\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\\.[A-Z|a-z]{2,}\\b",
+            file_path="data.xlsx",
+            pattern=r'\\w+@\\w+\\.\\w+',
             flags="i"
         )
     """
@@ -229,6 +227,11 @@ def excel_update_range(
 
     Returns:
         Dict: 包含 success、updated_cells(int)、message
+
+    Example:
+        # 更新A1:B2范围的数据
+        data = [["姓名", "年龄"], ["张三", 25]]
+        result = excel_update_range("test.xlsx", "A1:B2", data)
     """
     try:
         writer = ExcelWriter(file_path)

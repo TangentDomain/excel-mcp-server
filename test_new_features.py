@@ -47,7 +47,7 @@ def test_new_features():
         else:
             print(f"❌ 设置公式失败: {result.error}")
             return False
-            
+
         # 4. 测试格式化功能
         formatting = {
             'font': {'bold': True, 'size': 14},
