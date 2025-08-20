@@ -93,6 +93,11 @@ def excel_list_sheets(file_path: str) -> Dict[str, Any]:
 
     Returns:
         Dict: 包含 success、sheets(List[str])、active_sheet(str，当前激活的工作表名称)
+
+    Example:
+        # 列出工作表
+        result = excel_list_sheets("data.xlsx")
+        # 返回: {'success': True, 'sheets': ['Sheet1', 'Sheet2'], 'active_sheet': 'Sheet1'}
     """
     try:
         reader = ExcelReader(file_path)
@@ -194,6 +199,12 @@ def excel_get_range(
 
     Returns:
         Dict: 包含 success、data(List[List])、range_info
+
+    Example:
+        # 读取范围数据
+        result = excel_get_range("data.xlsx", "A1:C10")
+        # 读取指定工作表的数据
+        result = excel_get_range("data.xlsx", "Sheet1!A1:C10", include_formatting=True)
     """
     try:
         reader = ExcelReader(file_path)
@@ -265,6 +276,12 @@ def excel_insert_rows(
 
     Returns:
         Dict: 包含 success、inserted_rows(int)、message
+
+    Example:
+        # 在第3行插入1行
+        result = excel_insert_rows("data.xlsx", "Sheet1", 3)
+        # 在第5行插入3行
+        result = excel_insert_rows("data.xlsx", "Sheet1", 5, 3)
     """
     try:
         writer = ExcelWriter(file_path)
@@ -300,6 +317,12 @@ def excel_insert_columns(
 
     Returns:
         Dict: 包含 success、inserted_columns(int)、message
+
+    Example:
+        # 在第2列插入1列
+        result = excel_insert_columns("data.xlsx", "Sheet1", 2)
+        # 在第1列插入2列
+        result = excel_insert_columns("data.xlsx", "Sheet1", 1, 2)
     """
     try:
         writer = ExcelWriter(file_path)
@@ -331,6 +354,12 @@ def excel_create_file(
 
     Returns:
         Dict: 包含 success、file_path(str)、sheets(List[str])
+
+    Example:
+        # 创建简单文件
+        result = excel_create_file("new_file.xlsx")
+        # 创建包含多个工作表的文件
+        result = excel_create_file("report.xlsx", ["数据", "图表", "汇总"])
     """
     try:
         result = ExcelManager.create_file(file_path, sheet_names)
@@ -361,6 +390,12 @@ def excel_create_sheet(
 
     Returns:
         Dict: 包含 success、sheet_name(str)、total_sheets(int)
+
+    Example:
+        # 创建新工作表到末尾
+        result = excel_create_sheet("data.xlsx", "新数据")
+        # 创建新工作表到指定位置
+        result = excel_create_sheet("data.xlsx", "首页", 0)
     """
     try:
         manager = ExcelManager(file_path)
@@ -391,6 +426,10 @@ def excel_delete_sheet(
 
     Returns:
         Dict: 包含 success、deleted_sheet(str)、remaining_sheets(List[str])
+
+    Example:
+        # 删除指定工作表
+        result = excel_delete_sheet("data.xlsx", "临时数据")
     """
     try:
         manager = ExcelManager(file_path)
@@ -422,6 +461,10 @@ def excel_rename_sheet(
 
     Returns:
         Dict: 包含 success、old_name(str)、new_name(str)
+
+    Example:
+        # 重命名工作表
+        result = excel_rename_sheet("data.xlsx", "Sheet1", "主数据")
     """
     try:
         manager = ExcelManager(file_path)
@@ -456,6 +499,12 @@ def excel_delete_rows(
 
     Returns:
         Dict: 包含 success、deleted_rows(int)、message
+
+    Example:
+        # 删除第5行
+        result = excel_delete_rows("data.xlsx", "Sheet1", 5)
+        # 删除第3-5行(3行)
+        result = excel_delete_rows("data.xlsx", "Sheet1", 3, 3)
     """
     try:
         writer = ExcelWriter(file_path)
@@ -491,6 +540,12 @@ def excel_delete_columns(
 
     Returns:
         Dict: 包含 success、deleted_columns(int)、message
+
+    Example:
+        # 删除第2列
+        result = excel_delete_columns("data.xlsx", "Sheet1", 2)
+        # 删除第1-3列(3列)
+        result = excel_delete_columns("data.xlsx", "Sheet1", 1, 3)
     """
     try:
         writer = ExcelWriter(file_path)
@@ -526,6 +581,12 @@ def excel_set_formula(
 
     Returns:
         Dict: 包含 success、formula(str)、calculated_value(Any)、message
+
+    Example:
+        # 设置求和公式
+        result = excel_set_formula("data.xlsx", "Sheet1", "D10", "SUM(D1:D9)")
+        # 设置平均值公式
+        result = excel_set_formula("data.xlsx", "Sheet1", "E1", "AVERAGE(A1:A10)")
     """
     try:
         writer = ExcelWriter(file_path)
@@ -601,6 +662,15 @@ def excel_format_cells(
 
     Returns:
         Dict: 包含 success、formatted_count(int)、message
+
+    Example:
+        # 设置标题样式
+        formatting = {
+            'font': {'name': '微软雅黑', 'size': 14, 'bold': True, 'color': '000080'},
+            'fill': {'color': 'E6F3FF'},
+            'alignment': {'horizontal': 'center', 'vertical': 'middle'}
+        }
+        result = excel_format_cells("data.xlsx", "Sheet1", "A1:D1", formatting)
     """
     try:
         writer = ExcelWriter(file_path)
