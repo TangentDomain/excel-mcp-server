@@ -1,0 +1,18 @@
+{
+  "mcpServers": {
+    "excel-mcp-server": {
+      "command": "uv",
+      "args": [
+        "--directory",
+        "/Users/tangjian/work/excel-mcp-server",
+        "run",
+        "python",
+        "-m",
+        "src.excel_mcp.server"
+      ],
+      "env": {
+        "PYTHONPATH": "/Users/tangjian/work/excel-mcp-server/src"
+      }
+    }
+  }
+}
