@@ -49,3 +49,33 @@ Thumbs.db
 
 # 忽略测试产生的临时文件
 temp_*.xlsx
+
+# 忽略pytest缓存
+.pytest_cache/
+.coverage
+htmlcov/
+
+# 忽略uv生成的锁文件（可选，根据团队需要决定）
+# uv.lock
+
+# 忽略旧的备份文件
+server_backup.py
+*_backup.py
+*_old.py
+
+# 忽略测试数据文件（保留示例数据）
+test-data.xlsx
+test_*.xlsx
+analyze_*.py
+
+# 忽略PowerShell脚本（如果不需要）
+*.ps1
+
+# 忽略临时分析文件
+TrSkill.xlsx
+
+# 忽略归档目录（可选，根据需要决定是否提交）
+# archive/
+
+# 忽略清理脚本生成的文件
+cleanup.py
