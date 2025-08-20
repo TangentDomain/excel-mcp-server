@@ -41,27 +41,25 @@ def test_new_features():
             return False
 
         # 3. 测试公式功能
-        result = writer.set_formula("C1", "A1+B1")
+        result = writer.set_formula("C1", "A1+B1", "测试表")
         if result.success:
             print(f"✅ 公式设置成功: C1 = A1+B1, 计算值: {result.metadata.get('calculated_value')}")
         else:
             print(f"❌ 设置公式失败: {result.error}")
             return False
-
+            
         # 4. 测试格式化功能
         formatting = {
             'font': {'bold': True, 'size': 14},
             'fill': {'color': 'FFFF00'},  # 黄色背景
             'alignment': {'horizontal': 'center'}
         }
-        result = writer.format_cells("A1:C2", formatting)
+        result = writer.format_cells("A1:C2", formatting, "测试表")
         if result.success:
             print(f"✅ 格式化成功: 格式化了 {result.metadata.get('formatted_count')} 个单元格")
         else:
             print(f"❌ 格式化失败: {result.error}")
-            return False
-
-        # 清理临时文件
+            return False        # 清理临时文件
         if os.path.exists(temp_file):
             os.unlink(temp_file)
 
