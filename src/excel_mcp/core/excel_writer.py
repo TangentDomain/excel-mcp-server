@@ -9,7 +9,7 @@ from typing import List, Any, Optional
 from openpyxl import load_workbook
 from openpyxl.utils import range_boundaries
 
-from ..models.types import RangeInfo, ModifiedCell, OperationResult
+from ..models.types import RangeInfo, ModifiedCell, OperationResult, RangeType
 from ..utils.validators import ExcelValidator
 from ..utils.parsers import RangeParser
 from ..utils.exceptions import SheetNotFoundError, DataValidationError
@@ -376,3 +376,193 @@ class ExcelWriter:
                 ))
 
         return modified_cells
+
+    def set_formula(
+        self,
+        cell_address: str,
+        formula: str,
+        sheet_name: Optional[str] = None
+    ) -> OperationResult:
+        """
+        设置单元格公式
+
+        Args:
+            cell_address: 目标单元格地址（如"A1"）
+            formula: Excel公式（不包含等号）
+            sheet_name: 目标工作表名称
+
+        Returns:
+            OperationResult: 公式设置结果
+        """
+        try:
+            # 验证公式格式（简单验证）
+            if not formula.strip():
+                return OperationResult(
+                    success=False,
+                    error="公式不能为空"
+                )
+
+            # 确保公式不以等号开头（openpyxl会自动添加）
+            if formula.startswith('='):
+                formula = formula[1:]
+
+            # 验证单元格地址格式
+            from openpyxl.utils.cell import coordinate_from_string
+            try:
+                coordinate_from_string(cell_address)
+            except ValueError as e:
+                return OperationResult(
+                    success=False,
+                    error=f"单元格地址格式错误: {cell_address}"
+                )
+
+            # 加载工作簿并设置公式
+            workbook = load_workbook(self.file_path)
+            sheet = self._get_worksheet(workbook, sheet_name)
+
+            # 设置公式
+            cell = sheet[cell_address]
+            old_value = cell.value
+            old_formula = cell.formula if hasattr(cell, 'formula') else None
+
+            cell.value = f"={formula}"
+
+            # 保存文件
+            workbook.save(self.file_path)
+            workbook.close()
+
+            # 重新读取以获取计算值
+            workbook_read = load_workbook(self.file_path, data_only=True)
+            sheet_read = self._get_worksheet(workbook_read, sheet_name)
+            calculated_value = sheet_read[cell_address].value
+            workbook_read.close()
+
+            logger.info(f"成功设置公式: {cell_address} = {formula}")
+
+            return OperationResult(
+                success=True,
+                message=f"公式设置成功",
+                metadata={
+                    'file_path': self.file_path,
+                    'sheet_name': sheet.title,
+                    'cell_address': cell_address,
+                    'formula': formula,
+                    'calculated_value': calculated_value,
+                    'old_value': old_value,
+                    'old_formula': old_formula
+                }
+            )
+
+        except Exception as e:
+            logger.error(f"设置公式失败: {e}")
+            return OperationResult(
+                success=False,
+                error=str(e)
+            )
+
+    def format_cells(
+        self,
+        range_expression: str,
+        formatting: dict,
+        sheet_name: Optional[str] = None
+    ) -> OperationResult:
+        """
+        设置单元格格式
+
+        Args:
+            range_expression: 目标范围
+            formatting: 格式配置字典
+            sheet_name: 目标工作表名
+
+        Returns:
+            OperationResult: 格式应用结果
+        """
+        try:
+            from openpyxl.styles import Font, PatternFill, Border, Alignment
+
+            # 解析范围表达式
+            range_info = RangeParser.parse_range_expression(range_expression)
+
+            # 加载工作簿
+            workbook = load_workbook(self.file_path)
+            sheet = self._get_worksheet(workbook, sheet_name or range_info.sheet_name)
+
+            # 获取范围边界
+            if range_info.range_type in [RangeType.COLUMN_RANGE, RangeType.SINGLE_COLUMN, RangeType.ROW_RANGE, RangeType.SINGLE_ROW]:
+                # 处理整行或整列
+                cells_range = sheet[range_expression.replace(f"{sheet.title}!", "")]
+            else:
+                min_col, min_row, max_col, max_row = range_boundaries(range_info.cell_range)
+                cells_range = sheet.iter_rows(
+                    min_row=min_row, max_row=max_row,
+                    min_col=min_col, max_col=max_col
+                )
+
+            formatted_count = 0
+
+            # 应用格式
+            for row in cells_range:
+                if isinstance(row, tuple):
+                    for cell in row:
+                        self._apply_cell_format(cell, formatting)
+                        formatted_count += 1
+                else:
+                    self._apply_cell_format(row, formatting)
+                    formatted_count += 1
+
+            # 保存文件
+            workbook.save(self.file_path)
+            workbook.close()
+
+            logger.info(f"成功格式化{formatted_count}个单元格")
+
+            return OperationResult(
+                success=True,
+                message=f"成功格式化{formatted_count}个单元格",
+                metadata={
+                    'file_path': self.file_path,
+                    'sheet_name': sheet.title,
+                    'range': range_expression,
+                    'formatted_count': formatted_count,
+                    'formatting_applied': formatting
+                }
+            )
+
+        except Exception as e:
+            logger.error(f"格式化失败: {e}")
+            return OperationResult(
+                success=False,
+                error=str(e)
+            )
+
+    def _apply_cell_format(self, cell, formatting: dict):
+        """应用单元格格式"""
+        from openpyxl.styles import Font, PatternFill, Border, Alignment
+
+        # 字体格式
+        if 'font' in formatting:
+            font_config = formatting['font']
+            cell.font = Font(
+                name=font_config.get('name', cell.font.name),
+                size=font_config.get('size', cell.font.size),
+                bold=font_config.get('bold', cell.font.bold),
+                italic=font_config.get('italic', cell.font.italic),
+                color=font_config.get('color', cell.font.color)
+            )
+
+        # 背景颜色
+        if 'fill' in formatting:
+            fill_config = formatting['fill']
+            cell.fill = PatternFill(
+                start_color=fill_config.get('color', 'FFFFFF'),
+                end_color=fill_config.get('color', 'FFFFFF'),
+                fill_type='solid'
+            )
+
+        # 对齐方式
+        if 'alignment' in formatting:
+            align_config = formatting['alignment']
+            cell.alignment = Alignment(
+                horizontal=align_config.get('horizontal', cell.alignment.horizontal),
+                vertical=align_config.get('vertical', cell.alignment.vertical)
+            )
