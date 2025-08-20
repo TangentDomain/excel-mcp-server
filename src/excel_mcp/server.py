@@ -86,13 +86,13 @@ def _format_result(result) -> Dict[str, Any]:
 @mcp.tool()
 def excel_list_sheets(file_path: str) -> Dict[str, Any]:
     """
-    获取Excel文件中所有工作表的名称列表
+    列出Excel文件中所有工作表名称
 
     Args:
-        file_path: Excel文件路径
+        file_path: Excel文件路径 (.xlsx/.xlsm)
 
     Returns:
-        包含所有工作表信息的字典
+        Dict: 包含 success、sheets(List[str])、active_sheet(str)
     """
     try:
         reader = ExcelReader(file_path)
@@ -184,19 +184,18 @@ def excel_get_range(
     include_formatting: bool = False
 ) -> Dict[str, Any]:
     """
-    获取Excel文件中指定范围的数据
-    支持多种范围模式：
-    - 单元格范围: 'A1:C10' 或 'Sheet1!A1:C10'
-    - 整行访问: '1:1' (第1行), '3:5' (第3-5行), '2' (仅第2行)
-    - 整列访问: 'A:A' (A列), 'B:D' (B-D列), 'C' (仅C列)
+    读取Excel指定范围的数据
 
     Args:
-        file_path: Excel文件路径
+        file_path: Excel文件路径 (.xlsx/.xlsm)
         range_expression: 范围表达式
-        include_formatting: 是否包含格式信息
+            - 单元格: "A1:C10", "Sheet1!A1:C10"
+            - 整行: "1:5", "3" (单行)
+            - 整列: "A:C", "B" (单列)
+        include_formatting: 是否包含单元格格式
 
     Returns:
-        包含范围数据的字典
+        Dict: 包含 success、data(List[List])、range_info
     """
     try:
         reader = ExcelReader(file_path)
@@ -220,16 +219,16 @@ def excel_update_range(
     preserve_formulas: bool = True
 ) -> Dict[str, Any]:
     """
-    修改Excel文件中指定范围的数据
+    更新Excel指定范围的数据
 
     Args:
-        file_path: Excel文件路径
-        range_expression: 范围表达式 (如 'A1:C10' 或 'Sheet1!A1:C10')
-        data: 要写入的二维数据数组
-        preserve_formulas: 是否保留现有的公式
+        file_path: Excel文件路径 (.xlsx/.xlsm)
+        range_expression: 目标范围 (如"A1:C10", "Sheet1!A1:C10")
+        data: 二维数组数据 [[row1], [row2], ...]
+        preserve_formulas: 保留已有公式 (默认True)
 
     Returns:
-        修改操作的结果信息
+        Dict: 包含 success、updated_cells(int)、message
     """
     try:
         writer = ExcelWriter(file_path)
@@ -248,21 +247,21 @@ def excel_update_range(
 @mcp.tool()
 def excel_insert_rows(
     file_path: str,
-    sheet_name: Optional[str] = None,
-    row_index: int = 1,
-    count: int = 1
+    row_index: int,
+    count: int = 1,
+    sheet_name: Optional[str] = None
 ) -> Dict[str, Any]:
     """
-    在Excel文件中插入空白行
+    在指定位置插入空行
 
     Args:
-        file_path: Excel文件路径
-        sheet_name: 工作表名称 (可选，默认使用活动工作表)
-        row_index: 插入行的位置（1-based），新行将插入到此位置之前
-        count: 要插入的行数
+        file_path: Excel文件路径 (.xlsx/.xlsm)
+        row_index: 插入位置 (1-based，新行插入到此位置)
+        count: 插入行数 (默认1行)
+        sheet_name: 目标工作表 (默认活动表)
 
     Returns:
-        插入操作的结果信息
+        Dict: 包含 success、inserted_rows(int)、message
     """
     try:
         writer = ExcelWriter(file_path)
@@ -283,21 +282,21 @@ def excel_insert_rows(
 @mcp.tool()
 def excel_insert_columns(
     file_path: str,
-    sheet_name: Optional[str] = None,
-    column_index: int = 1,
-    count: int = 1
+    column_index: int,
+    count: int = 1,
+    sheet_name: Optional[str] = None
 ) -> Dict[str, Any]:
     """
-    在Excel文件中插入空白列
+    在指定位置插入空列
 
     Args:
-        file_path: Excel文件路径
-        sheet_name: 工作表名称 (可选，默认使用活动工作表)
-        column_index: 插入列的位置（1-based），新列将插入到此位置之前
-        count: 要插入的列数
+        file_path: Excel文件路径 (.xlsx/.xlsm)
+        column_index: 插入位置 (1-based，新列插入到此位置)
+        count: 插入列数 (默认1列)
+        sheet_name: 目标工作表 (默认活动表)
 
     Returns:
-        插入操作的结果信息
+        Dict: 包含 success、inserted_columns(int)、message
     """
     try:
         writer = ExcelWriter(file_path)
@@ -324,11 +323,11 @@ def excel_create_file(
     创建新的Excel文件
 
     Args:
-        file_path: 要创建的Excel文件路径
-        sheet_names: 工作表名称列表 (可选，默认创建"Sheet1")
+        file_path: 新文件路径 (必须以.xlsx或.xlsm结尾)
+        sheet_names: 工作表名称列表 (默认["Sheet1"])
 
     Returns:
-        创建操作的结果信息
+        Dict: 包含 success、file_path(str)、sheets(List[str])
     """
     try:
         result = ExcelManager.create_file(file_path, sheet_names)
@@ -350,15 +349,15 @@ def excel_create_sheet(
     index: Optional[int] = None
 ) -> Dict[str, Any]:
     """
-    在Excel文件中创建新工作表
+    在文件中创建新工作表
 
     Args:
-        file_path: Excel文件路径
-        sheet_name: 新工作表名称
-        index: 插入位置索引 (可选，默认在最后添加)
+        file_path: Excel文件路径 (.xlsx/.xlsm)
+        sheet_name: 新工作表名称 (不能与现有重复)
+        index: 插入位置 (0-based，默认末尾)
 
     Returns:
-        创建操作的结果信息
+        Dict: 包含 success、sheet_name(str)、total_sheets(int)
     """
     try:
         manager = ExcelManager(file_path)
@@ -381,14 +380,14 @@ def excel_delete_sheet(
     sheet_name: str
 ) -> Dict[str, Any]:
     """
-    删除Excel文件中的工作表
+    删除指定工作表
 
     Args:
-        file_path: Excel文件路径
+        file_path: Excel文件路径 (.xlsx/.xlsm)
         sheet_name: 要删除的工作表名称
 
     Returns:
-        删除操作的结果信息
+        Dict: 包含 success、deleted_sheet(str)、remaining_sheets(List[str])
     """
     try:
         manager = ExcelManager(file_path)
@@ -411,15 +410,15 @@ def excel_rename_sheet(
     new_name: str
 ) -> Dict[str, Any]:
     """
-    重命名Excel文件中的工作表
+    重命名工作表
 
     Args:
-        file_path: Excel文件路径
-        old_name: 原工作表名称
-        new_name: 新工作表名称
+        file_path: Excel文件路径 (.xlsx/.xlsm)
+        old_name: 当前工作表名称
+        new_name: 新工作表名称 (不能与现有重复)
 
     Returns:
-        重命名操作的结果信息
+        Dict: 包含 success、old_name(str)、new_name(str)
     """
     try:
         manager = ExcelManager(file_path)
@@ -439,25 +438,25 @@ def excel_rename_sheet(
 @mcp.tool()
 def excel_delete_rows(
     file_path: str,
-    sheet_name: Optional[str] = None,
-    start_row: int = 1,
-    count: int = 1
+    row_index: int,
+    count: int = 1,
+    sheet_name: Optional[str] = None
 ) -> Dict[str, Any]:
     """
-    在Excel文件中删除行
+    删除指定行
 
     Args:
-        file_path: Excel文件路径
-        sheet_name: 工作表名称 (可选，默认使用活动工作表)
-        start_row: 开始删除的行号（1-based）
-        count: 要删除的行数
+        file_path: Excel文件路径 (.xlsx/.xlsm)
+        row_index: 起始行号 (1-based)
+        count: 删除行数 (默认1行)
+        sheet_name: 目标工作表 (默认活动表)
 
     Returns:
-        删除操作的结果信息
+        Dict: 包含 success、deleted_rows(int)、message
     """
     try:
         writer = ExcelWriter(file_path)
-        result = writer.delete_rows(sheet_name, start_row, count)
+        result = writer.delete_rows(sheet_name, row_index, count)
         return _format_result(result)
     except Exception as e:
         logger.error(f"删除行失败: {e}")
@@ -466,7 +465,7 @@ def excel_delete_rows(
             'error': str(e),
             'file_path': file_path,
             'sheet_name': sheet_name,
-            'start_row': start_row,
+            'row_index': row_index,
             'count': count
         }
 
@@ -474,25 +473,25 @@ def excel_delete_rows(
 @mcp.tool()
 def excel_delete_columns(
     file_path: str,
-    sheet_name: Optional[str] = None,
-    start_column: int = 1,
-    count: int = 1
+    column_index: int,
+    count: int = 1,
+    sheet_name: Optional[str] = None
 ) -> Dict[str, Any]:
     """
-    在Excel文件中删除列
+    删除指定列
 
     Args:
-        file_path: Excel文件路径
-        sheet_name: 工作表名称 (可选，默认使用活动工作表)
-        start_column: 开始删除的列号（1-based）
-        count: 要删除的列数
+        file_path: Excel文件路径 (.xlsx/.xlsm)
+        column_index: 起始列号 (1-based)
+        count: 删除列数 (默认1列)
+        sheet_name: 目标工作表 (默认活动表)
 
     Returns:
-        删除操作的结果信息
+        Dict: 包含 success、deleted_columns(int)、message
     """
     try:
         writer = ExcelWriter(file_path)
-        result = writer.delete_columns(sheet_name, start_column, count)
+        result = writer.delete_columns(sheet_name, column_index, count)
         return _format_result(result)
     except Exception as e:
         logger.error(f"删除列失败: {e}")
@@ -501,7 +500,7 @@ def excel_delete_columns(
             'error': str(e),
             'file_path': file_path,
             'sheet_name': sheet_name,
-            'start_column': start_column,
+            'column_index': column_index,
             'count': count
         }
 
