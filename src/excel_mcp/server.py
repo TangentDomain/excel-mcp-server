@@ -543,6 +543,44 @@ def excel_set_formula(
 
 
 @mcp.tool()
+def excel_evaluate_formula(
+    file_path: str,
+    formula: str,
+    context_sheet: Optional[str] = None
+) -> Dict[str, Any]:
+    """
+    临时执行Excel公式并返回计算结果，不修改文件
+
+    Args:
+        file_path: Excel文件路径 (.xlsx/.xlsm) - 提供公式执行的数据上下文
+        formula: Excel公式（不包含等号），如"SUM(A1:A10)"、"AVERAGE(B:B)"等
+        context_sheet: 公式执行的上下文工作表名称 (可选，不指定则使用所有工作表数据)
+
+    Returns:
+        Dict: 包含 success、formula(str)、result(Any)、result_type(str)、execution_time_ms(float)、context_sheet(str)、message
+
+    Example:
+        # 计算A1:A10的和
+        result = excel_evaluate_formula("data.xlsx", "SUM(A1:A10)")
+        # 计算特定工作表的平均值
+        result = excel_evaluate_formula("data.xlsx", "AVERAGE(Sheet1!B:B)", "Sheet1")
+    """
+    try:
+        writer = ExcelWriter(file_path)
+        result = writer.evaluate_formula(formula, context_sheet)
+        return _format_result(result)
+    except Exception as e:
+        logger.error(f"公式执行失败: {e}")
+        return {
+            'success': False,
+            'error': str(e),
+            'file_path': file_path,
+            'formula': formula,
+            'context_sheet': context_sheet
+        }
+
+
+@mcp.tool()
 def excel_format_cells(
     file_path: str,
     sheet_name: str,

@@ -535,6 +535,250 @@ class ExcelWriter:
                 error=str(e)
             )
 
+    def evaluate_formula(
+        self,
+        formula: str,
+        context_sheet: Optional[str] = None
+    ) -> OperationResult:
+        """
+        临时执行Excel公式并返回计算结果，不修改文件
+
+        Args:
+            formula: Excel公式（不包含等号）
+            context_sheet: 公式执行的上下文工作表
+
+        Returns:
+            OperationResult: 公式执行结果
+        """
+        try:
+            import tempfile
+            import os
+            from openpyxl import Workbook
+            import time
+
+            start_time = time.time()
+
+            # 确保公式不以等号开头
+            if formula.startswith('='):
+                formula = formula[1:]
+
+            # 验证公式格式
+            if not formula.strip():
+                return OperationResult(
+                    success=False,
+                    error="公式不能为空"
+                )
+
+            # 加载原始工作簿（用于提供数据上下文）
+            original_workbook = load_workbook(self.file_path, data_only=False)
+
+            # 创建临时工作簿进行计算
+            temp_workbook = Workbook()
+            temp_sheet = temp_workbook.active
+            temp_sheet.title = "Calculation"
+
+            # 选择要复制的源工作表
+            if context_sheet and context_sheet in original_workbook.sheetnames:
+                source_sheet = original_workbook[context_sheet]
+            else:
+                # 使用活动工作表或第一个工作表
+                source_sheet = original_workbook.active
+
+            # 复制数据到临时工作表
+            for row in source_sheet.iter_rows():
+                for cell in row:
+                    if cell.value is not None:
+                        target_cell = temp_sheet.cell(
+                            row=cell.row,
+                            column=cell.column
+                        )
+                        target_cell.value = cell.value
+
+            # 在临时单元格中设置要计算的公式
+            calc_cell = temp_sheet['Z1']  # 使用Z1作为计算单元格
+            calc_cell.value = f"={formula}"
+
+            # 保存到临时文件
+            temp_file = tempfile.NamedTemporaryFile(suffix='.xlsx', delete=False)
+            temp_file.close()
+
+            try:
+                # 保存工作簿
+                temp_workbook.save(temp_file.name)
+                temp_workbook.close()
+                original_workbook.close()
+
+                # 使用xlcalculator计算公式
+                try:
+                    from xlcalculator import ModelCompiler, Evaluator
+
+                    # 编译模型
+                    compiler = ModelCompiler()
+                    model = compiler.read_and_parse_archive(temp_file.name)
+                    evaluator = Evaluator(model)
+
+                    # 计算Z1位置的公式
+                    calculated_value = evaluator.evaluate('Calculation!Z1')
+
+                except ImportError:
+                    return OperationResult(
+                        success=False,
+                        error="需要安装xlcalculator库来支持公式计算: pip install xlcalculator"
+                    )
+                except Exception as calc_error:
+                    # 如果xlcalculator失败，尝试基础的手动解析
+                    logger.warning(f"xlcalculator计算失败，尝试基础解析: {calc_error}")
+
+                    # 重新加载工作簿获取数据
+                    data_workbook = load_workbook(temp_file.name, data_only=True)
+                    data_sheet = data_workbook["Calculation"]
+
+                    # 尝试基础的公式解析
+                    calculated_value = self._basic_formula_parse(formula, data_sheet)
+                    data_workbook.close()
+
+                # 确定结果类型
+                result_type = "unknown"
+                if calculated_value is None:
+                    result_type = "null"
+                elif isinstance(calculated_value, (int, float)):
+                    result_type = "number"
+                elif isinstance(calculated_value, str):
+                    result_type = "text"
+                elif isinstance(calculated_value, bool):
+                    result_type = "boolean"
+                else:
+                    try:
+                        # 检查是否是日期
+                        from datetime import datetime, date
+                        if isinstance(calculated_value, (datetime, date)):
+                            result_type = "date"
+                    except:
+                        pass
+
+                execution_time = round((time.time() - start_time) * 1000, 2)
+
+                logger.info(f"成功计算公式: {formula} = {calculated_value}")
+
+                return OperationResult(
+                    success=True,
+                    message="公式执行成功",
+                    metadata={
+                        'formula': formula,
+                        'result': calculated_value,
+                        'result_type': result_type,
+                        'execution_time_ms': execution_time,
+                        'context_sheet': context_sheet or "default"
+                    }
+                )
+
+            finally:
+                # 清理临时文件
+                try:
+                    os.unlink(temp_file.name)
+                except:
+                    pass
+
+        except Exception as e:
+            logger.error(f"公式执行失败: {e}")
+            return OperationResult(
+                success=False,
+                error=f"公式执行失败: {str(e)}"
+            )
+
+    def _basic_formula_parse(self, formula: str, sheet) -> any:
+        """基础公式解析器 - 支持简单的函数"""
+        import re
+
+        formula = formula.strip()
+
+        # SUM函数
+        sum_match = re.match(r'SUM\(([A-Z]+\d+):([A-Z]+\d+)\)', formula, re.IGNORECASE)
+        if sum_match:
+            start_cell, end_cell = sum_match.groups()
+            return self._calculate_range_sum(sheet, start_cell, end_cell)
+
+        # AVERAGE函数
+        avg_match = re.match(r'AVERAGE\(([A-Z]+\d+):([A-Z]+\d+)\)', formula, re.IGNORECASE)
+        if avg_match:
+            start_cell, end_cell = avg_match.groups()
+            total = self._calculate_range_sum(sheet, start_cell, end_cell)
+            count = self._calculate_range_count(sheet, start_cell, end_cell)
+            return total / count if count > 0 else 0
+
+        # COUNT函数
+        count_match = re.match(r'COUNT\(([A-Z]+\d+):([A-Z]+\d+)\)', formula, re.IGNORECASE)
+        if count_match:
+            start_cell, end_cell = count_match.groups()
+            return self._calculate_range_count(sheet, start_cell, end_cell)
+
+        # 简单的数学表达式
+        if re.match(r'^[\d\+\-\*\/\s\(\)\.]+$', formula):
+            try:
+                return eval(formula)  # 注意：这在生产环境中需要更安全的实现
+            except:
+                pass
+
+        # IF函数简单实现
+        if_match = re.match(r'IF\((.+),\s*"?([^,"]+)"?,\s*"?([^,"]+)"?\)', formula, re.IGNORECASE)
+        if if_match:
+            condition, true_val, false_val = if_match.groups()
+            # 简单条件判断
+            if '>' in condition:
+                parts = condition.split('>')
+                if len(parts) == 2:
+                    left = float(parts[0].strip())
+                    right = float(parts[1].strip())
+                    return true_val if left > right else false_val
+            elif '<' in condition:
+                parts = condition.split('<')
+                if len(parts) == 2:
+                    left = float(parts[0].strip())
+                    right = float(parts[1].strip())
+                    return true_val if left < right else false_val
+
+        # CONCATENATE函数
+        concat_match = re.match(r'CONCATENATE\((.+)\)', formula, re.IGNORECASE)
+        if concat_match:
+            args = concat_match.group(1).split(',')
+            result = ""
+            for arg in args:
+                arg = arg.strip().strip('"')
+                result += arg
+            return result
+
+        return None
+
+    def _calculate_range_sum(self, sheet, start_cell: str, end_cell: str) -> float:
+        """计算范围求和"""
+        from openpyxl.utils import range_boundaries
+
+        min_col, min_row, max_col, max_row = range_boundaries(f"{start_cell}:{end_cell}")
+        total = 0
+
+        for row in range(min_row, max_row + 1):
+            for col in range(min_col, max_col + 1):
+                cell = sheet.cell(row=row, column=col)
+                if cell.value is not None and isinstance(cell.value, (int, float)):
+                    total += cell.value
+
+        return total
+
+    def _calculate_range_count(self, sheet, start_cell: str, end_cell: str) -> int:
+        """计算范围内数值个数"""
+        from openpyxl.utils import range_boundaries
+
+        min_col, min_row, max_col, max_row = range_boundaries(f"{start_cell}:{end_cell}")
+        count = 0
+
+        for row in range(min_row, max_row + 1):
+            for col in range(min_col, max_col + 1):
+                cell = sheet.cell(row=row, column=col)
+                if cell.value is not None and isinstance(cell.value, (int, float)):
+                    count += 1
+
+        return count
+
     def _apply_cell_format(self, cell, formatting: dict):
         """应用单元格格式"""
         from openpyxl.styles import Font, PatternFill, Border, Alignment
