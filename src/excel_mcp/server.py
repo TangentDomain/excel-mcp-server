@@ -44,17 +44,17 @@ mcp = FastMCP("excel-mcp-server")
 def _format_result(result) -> Dict[str, Any]:
     """
     格式化操作结果为MCP响应格式
-    
+
     Args:
         result: OperationResult对象
-        
+
     Returns:
         格式化后的字典
     """
     response = {
         'success': result.success,
     }
-    
+
     if result.success:
         if result.data is not None:
             # 处理数据类型转换
@@ -64,20 +64,20 @@ def _format_result(result) -> Dict[str, Any]:
             elif isinstance(result.data, list):
                 # 如果是列表，处理每个元素
                 response['data'] = [
-                    item.__dict__ if hasattr(item, '__dict__') else item 
+                    item.__dict__ if hasattr(item, '__dict__') else item
                     for item in result.data
                 ]
             else:
                 response['data'] = result.data
-        
+
         if result.metadata:
             response.update(result.metadata)
-        
+
         if result.message:
             response['message'] = result.message
     else:
         response['error'] = result.error
-    
+
     return response
 
 
@@ -118,15 +118,50 @@ def excel_regex_search(
     """
     在Excel文件中使用正则表达式搜索单元格内容
 
+    支持跨工作表搜索，可以同时搜索单元格值和公式内容。
+    常用正则模式：
+    - r'\\d+': 匹配数字
+    - r'[A-Za-z]+': 匹配字母
+    - r'\\b\\w+@\\w+\\.\\w+\\b': 匹配邮箱格式
+
     Args:
-        file_path: Excel文件路径
-        pattern: 正则表达式模式
-        flags: 正则表达式标志 (i=忽略大小写, m=多行, s=点匹配换行)
-        search_values: 是否搜索单元格的显示值
-        search_formulas: 是否搜索单元格的公式
+        file_path: Excel文件的绝对或相对路径，支持.xlsx和.xlsm格式
+        pattern: 正则表达式模式字符串，使用Python re模块语法
+        flags: 正则表达式修饰符，组合使用：
+            - "i": 忽略大小写匹配
+            - "m": 多行模式，^和$匹配每行的开始和结束
+            - "s": 单行模式，点(.)匹配包括换行符的任意字符
+            - 示例: "im" 表示忽略大小写且多行模式
+        search_values: 是否在单元格的显示值中搜索（默认True）
+        search_formulas: 是否在单元格的公式中搜索（默认False）
 
     Returns:
-        包含搜索结果的字典，包含匹配的单元格信息
+        搜索结果字典：
+        - success (bool): 搜索是否成功完成
+        - matches (List[Dict]): 匹配结果列表，每个匹配项包含：
+            - coordinate (str): 单元格坐标，如"A1", "B5"
+            - sheet_name (str): 所在工作表名称
+            - value (Any): 单元格显示值
+            - formula (str): 单元格公式（如果有）
+            - matched_text (str): 实际匹配的文本
+        - match_count (int): 总匹配数量
+        - searched_sheets (List[str]): 已搜索的工作表名称列表
+        - message (str): 操作成功信息
+        - error (str): 错误描述（仅当success=False时存在）
+
+    Raises:
+        FileNotFoundError: Excel文件不存在或路径无效
+        PermissionError: 文件被占用或无读取权限
+        InvalidPatternError: 正则表达式语法错误
+        UnsupportedFormatError: 不支持的文件格式
+
+    Example:
+        # 搜索所有包含邮箱的单元格
+        result = excel_regex_search(
+            file_path="contacts.xlsx",
+            pattern=r"\\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\\.[A-Z|a-z]{2,}\\b",
+            flags="i"
+        )
     """
     try:
         searcher = ExcelSearcher(file_path)
