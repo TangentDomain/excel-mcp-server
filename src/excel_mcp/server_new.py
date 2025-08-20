@@ -44,17 +44,17 @@ mcp = FastMCP("excel-mcp-server")
 def _format_result(result) -> Dict[str, Any]:
     """
     格式化操作结果为MCP响应格式
-    
+
     Args:
         result: OperationResult对象
-        
+
     Returns:
         格式化后的字典
     """
     response = {
         'success': result.success,
     }
-    
+
     if result.success:
         if result.data is not None:
             # 处理数据类型转换
@@ -64,20 +64,20 @@ def _format_result(result) -> Dict[str, Any]:
             elif isinstance(result.data, list):
                 # 如果是列表，处理每个元素
                 response['data'] = [
-                    item.__dict__ if hasattr(item, '__dict__') else item 
+                    item.__dict__ if hasattr(item, '__dict__') else item
                     for item in result.data
                 ]
             else:
                 response['data'] = result.data
-        
+
         if result.metadata:
             response.update(result.metadata)
-        
+
         if result.message:
             response['message'] = result.message
     else:
         response['error'] = result.error
-    
+
     return response
 
 
