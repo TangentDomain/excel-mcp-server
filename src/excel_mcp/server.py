@@ -247,18 +247,18 @@ def excel_update_range(
 @mcp.tool()
 def excel_insert_rows(
     file_path: str,
+    sheet_name: str,
     row_index: int,
-    count: int = 1,
-    sheet_name: Optional[str] = None
+    count: int = 1
 ) -> Dict[str, Any]:
     """
     在指定位置插入空行
 
     Args:
         file_path: Excel文件路径 (.xlsx/.xlsm)
+        sheet_name: 目标工作表名称 (必需参数)
         row_index: 插入位置 (1-based，新行插入到此位置)
         count: 插入行数 (默认1行)
-        sheet_name: 目标工作表 (None时使用活动工作表)
 
     Returns:
         Dict: 包含 success、inserted_rows(int)、message
@@ -282,18 +282,18 @@ def excel_insert_rows(
 @mcp.tool()
 def excel_insert_columns(
     file_path: str,
+    sheet_name: str,
     column_index: int,
-    count: int = 1,
-    sheet_name: Optional[str] = None
+    count: int = 1
 ) -> Dict[str, Any]:
     """
     在指定位置插入空列
 
     Args:
         file_path: Excel文件路径 (.xlsx/.xlsm)
+        sheet_name: 目标工作表名称 (必需参数)
         column_index: 插入位置 (1-based，新列插入到此位置)
         count: 插入列数 (默认1列)
-        sheet_name: 目标工作表 (None时使用活动工作表)
 
     Returns:
         Dict: 包含 success、inserted_columns(int)、message
@@ -438,18 +438,18 @@ def excel_rename_sheet(
 @mcp.tool()
 def excel_delete_rows(
     file_path: str,
+    sheet_name: str,
     row_index: int,
-    count: int = 1,
-    sheet_name: Optional[str] = None
+    count: int = 1
 ) -> Dict[str, Any]:
     """
     删除指定行
 
     Args:
         file_path: Excel文件路径 (.xlsx/.xlsm)
+        sheet_name: 目标工作表名称 (必需参数)
         row_index: 起始行号 (1-based)
         count: 删除行数 (默认1行)
-        sheet_name: 目标工作表 (None时使用活动工作表)
 
     Returns:
         Dict: 包含 success、deleted_rows(int)、message
@@ -473,18 +473,18 @@ def excel_delete_rows(
 @mcp.tool()
 def excel_delete_columns(
     file_path: str,
+    sheet_name: str,
     column_index: int,
-    count: int = 1,
-    sheet_name: Optional[str] = None
+    count: int = 1
 ) -> Dict[str, Any]:
     """
     删除指定列
 
     Args:
         file_path: Excel文件路径 (.xlsx/.xlsm)
+        sheet_name: 目标工作表名称 (必需参数)
         column_index: 起始列号 (1-based)
         count: 删除列数 (默认1列)
-        sheet_name: 目标工作表 (None时使用活动工作表)
 
     Returns:
         Dict: 包含 success、deleted_columns(int)、message
@@ -508,18 +508,18 @@ def excel_delete_columns(
 @mcp.tool()
 def excel_set_formula(
     file_path: str,
+    sheet_name: str,
     cell_address: str,
-    formula: str,
-    sheet_name: Optional[str] = None
+    formula: str
 ) -> Dict[str, Any]:
     """
     设置单元格公式
 
     Args:
         file_path: Excel文件路径 (.xlsx/.xlsm)
+        sheet_name: 目标工作表名称 (必需参数)
         cell_address: 目标单元格地址（如"A1"）
         formula: Excel公式（不包含等号）
-        sheet_name: 目标工作表名 (None时使用活动工作表)
 
     Returns:
         Dict: 包含 success、formula(str)、calculated_value(Any)、message
@@ -542,21 +542,21 @@ def excel_set_formula(
 @mcp.tool()
 def excel_format_cells(
     file_path: str,
+    sheet_name: str,
     range_expression: str,
-    formatting: Dict[str, Any],
-    sheet_name: Optional[str] = None
+    formatting: Dict[str, Any]
 ) -> Dict[str, Any]:
     """
     设置单元格格式（字体、颜色、对齐等）
 
     Args:
         file_path: Excel文件路径 (.xlsx/.xlsm)
+        sheet_name: 目标工作表名称 (必需参数)
         range_expression: 目标范围（如"A1:C10"）
         formatting: 格式配置字典，支持以下格式：
             - font: {'name': '宋体', 'size': 12, 'bold': True, 'italic': False, 'color': 'FF0000'}
             - fill: {'color': 'FFFF00'}  # 背景色
             - alignment: {'horizontal': 'center', 'vertical': 'middle'}
-        sheet_name: 目标工作表名 (None时使用活动工作表)
 
     Returns:
         Dict: 包含 success、formatted_count(int)、message
