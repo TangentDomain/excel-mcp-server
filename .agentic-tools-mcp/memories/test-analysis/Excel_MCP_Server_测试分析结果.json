@@ -1,0 +1,8 @@
+{
+  "id": "9246dfc0-1d43-4cad-808a-75334a8f0ae9",
+  "title": "Excel MCP Server 测试分析结果",
+  "details": "Excel MCP Server 单元测试分析结果\n\n**项目概况**：\n- 项目：Excel MCP Server，基于FastMCP和openpyxl\n- 主要功能：Excel文件操作、正则搜索、数据范围管理、工作表管理、公式计算等\n- 核心模块：excel_reader, excel_writer, excel_manager, excel_search\n\n**测试文件分类**：\n\n核心功能测试（保留，6个）：\n1. test_mcp_tools.py - 测试所有15个MCP工具，最完整的功能测试\n2. test_excel_reader.py - ExcelReader模块测试，结构化pytest测试\n3. test_excel_writer.py - ExcelWriter模块测试，结构化pytest测试  \n4. test_edge_cases.py - 边界条件和错误处理测试\n5. test_parsers.py - 解析器模块测试\n6. test_validators.py - 验证器模块测试\n\n过时/重复测试（建议删除，9个）：\n1. test_formula_complete.py - 早期公式测试，功能重复\n2. test_enhanced_formula.py - 增强公式测试，功能重复\n3. test_evaluate_formula.py - 基础公式评估测试，功能重复\n4. test_mcp_formula.py - MCP公式测试，功能重复\n5. test_stats_capability.py - 统计功能测试，功能重复\n6. test_advanced_stats_libs.py - 探索性库测试，已不需要\n7. test_libs_comparison.py - 库对比测试，探索性质\n8. test_calc_engine.py - 计算引擎测试，功能已在其他测试覆盖\n9. test_new_features.py - 早期新功能测试，应该已整合\n\n需要确认测试（2个）：\n1. test_all_features.py - 综合功能测试，可能与test_mcp_tools.py重复\n2. test_runner.py - 测试运行器，更像是调试工具而非单元测试\n\n**删除理由**：\n- 功能重复：多个测试文件测试相同的公式评估功能\n- 探索性质：一些测试是为了研究不同库的能力，现已选定技术栈\n- 早期原型：一些测试是早期开发的原型，已被更完整的测试替代\n- 硬编码路径：部分测试包含硬编码的绝对路径，不便维护",
+  "category": "test-analysis",
+  "dateCreated": "2025-08-21T02:23:15.269Z",
+  "dateUpdated": "2025-08-21T02:23:15.269Z"
+}

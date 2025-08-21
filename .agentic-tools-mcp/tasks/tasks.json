@@ -13,6 +13,13 @@
       "description": "Excel公式计算性能优化项目，主要解决evaluate_formula方法的性能问题。测试显示100次公式计算超过5秒的性能瓶颈，需要通过缓存机制、优化数据复制和减少I/O操作来提升性能。",
       "createdAt": "2025-08-21T01:56:15.362Z",
       "updatedAt": "2025-08-21T01:56:15.362Z"
+    },
+    {
+      "id": "541ef521-eba9-4a8c-9c89-b92e6d386450",
+      "name": "Excel MCP Server 测试清理",
+      "description": "分析和清理excel-mcp-server项目中的单元测试，识别并删除过时的、重复的或不再需要的测试文件，优化测试套件结构",
+      "createdAt": "2025-08-21T02:18:56.407Z",
+      "updatedAt": "2025-08-21T02:18:56.407Z"
     }
   ],
   "tasks": [
@@ -43,11 +50,11 @@
       "projectId": "8884de6a-8d4f-4ba1-881f-09785101722f",
       "completed": false,
       "createdAt": "2025-08-21T01:56:23.098Z",
-      "updatedAt": "2025-08-21T01:56:23.098Z",
+      "updatedAt": "2025-08-21T01:59:50.376Z",
       "dependsOn": [],
       "priority": 9,
       "complexity": 8,
-      "status": "pending",
+      "status": "in-progress",
       "tags": [
         "performance",
         "caching",
@@ -95,6 +102,92 @@
       ],
       "estimatedHours": 2,
       "level": 0
+    },
+    {
+      "id": "f8bb1b54-6201-4111-b418-d26fa27f83da",
+      "name": "分析项目结构和源代码",
+      "details": "分析src/excel_mcp目录结构，了解项目的主要功能模块、API接口、核心组件，为后续测试分析奠定基础。需要查看server.py、core/、models/、utils/等关键模块。",
+      "projectId": "541ef521-eba9-4a8c-9c89-b92e6d386450",
+      "completed": false,
+      "createdAt": "2025-08-21T02:20:06.153Z",
+      "updatedAt": "2025-08-21T02:21:03.177Z",
+      "dependsOn": [],
+      "priority": 9,
+      "complexity": 5,
+      "status": "done",
+      "tags": [
+        "analysis",
+        "code-structure"
+      ],
+      "estimatedHours": 1,
+      "level": 0,
+      "actualHours": 0.5
+    },
+    {
+      "id": "d4eb38b9-73e1-41ff-8b07-67fed4c94a21",
+      "name": "详细分析所有测试文件",
+      "details": "逐个分析tests目录中的17个测试文件，了解每个测试的目的、覆盖的功能、测试方法、依赖关系。记录每个测试文件的创建目的、测试范围、是否有重复功能。",
+      "projectId": "541ef521-eba9-4a8c-9c89-b92e6d386450",
+      "completed": false,
+      "createdAt": "2025-08-21T02:20:12.035Z",
+      "updatedAt": "2025-08-21T02:22:49.041Z",
+      "dependsOn": [
+        "f8bb1b54-6201-4111-b418-d26fa27f83da"
+      ],
+      "priority": 8,
+      "complexity": 7,
+      "status": "done",
+      "tags": [
+        "analysis",
+        "testing"
+      ],
+      "estimatedHours": 3,
+      "level": 0,
+      "actualHours": 2
+    },
+    {
+      "id": "9e5c55ee-613a-46d3-b417-aa292d15b635",
+      "name": "识别过时和重复的测试",
+      "details": "基于源代码分析和测试文件分析的结果，识别哪些测试文件是过时的。判断标准：1)测试的功能已不存在 2)有更新更全面的测试替代 3)测试代码有严重错误且不再维护 4)重复测试相同功能。",
+      "projectId": "541ef521-eba9-4a8c-9c89-b92e6d386450",
+      "completed": false,
+      "createdAt": "2025-08-21T02:20:18.504Z",
+      "updatedAt": "2025-08-21T02:23:41.596Z",
+      "dependsOn": [
+        "d4eb38b9-73e1-41ff-8b07-67fed4c94a21"
+      ],
+      "priority": 8,
+      "complexity": 6,
+      "status": "done",
+      "tags": [
+        "identification",
+        "cleanup"
+      ],
+      "estimatedHours": 2,
+      "level": 0,
+      "actualHours": 1
+    },
+    {
+      "id": "db6b76a5-8963-4f2a-9b81-01591bda47cc",
+      "name": "删除过时测试文件",
+      "details": "根据分析结果，删除已确认过时的测试文件，包括重复的公式测试、探索性测试、早期原型测试等。同时生成删除报告，说明删除的原因。",
+      "projectId": "541ef521-eba9-4a8c-9c89-b92e6d386450",
+      "completed": false,
+      "createdAt": "2025-08-21T02:23:02.142Z",
+      "updatedAt": "2025-08-21T02:24:54.117Z",
+      "dependsOn": [
+        "9e5c55ee-613a-46d3-b417-aa292d15b635"
+      ],
+      "priority": 7,
+      "complexity": 4,
+      "status": "done",
+      "tags": [
+        "cleanup",
+        "deletion"
+      ],
+      "estimatedHours": 1,
+      "level": 0,
+      "actualHours": 0.5
     }
   ],
   "subtasks": [],
