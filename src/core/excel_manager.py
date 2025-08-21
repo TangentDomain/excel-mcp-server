@@ -37,8 +37,8 @@ class ExcelManager:
             OperationResult: 创建操作的结果
         """
         try:
-            # 验证路径
-            validated_path = ExcelValidator.validate_file_for_creation(file_path)
+            # 验证路径，默认允许覆盖已存在的文件
+            validated_path = ExcelValidator.validate_file_for_creation(file_path, overwrite=True)
 
             # 创建工作簿
             workbook = Workbook()
@@ -225,8 +225,22 @@ class ExcelManager:
             # 保存文件
             workbook.save(self.file_path)
 
+            # 返回更新后的工作表信息
+            remaining_sheet_infos = []
+            for i, sheet_name in enumerate(workbook.sheetnames):
+                sheet = workbook[sheet_name]
+                remaining_sheet_infos.append(SheetInfo(
+                    index=i,
+                    name=sheet_name,
+                    is_active=sheet == workbook.active,
+                    max_row=sheet.max_row,
+                    max_column=sheet.max_column,
+                    max_column_letter=get_column_letter(sheet.max_column)
+                ))
+
             return OperationResult(
                 success=True,
+                data=remaining_sheet_infos,  # 添加data字段
                 message=f"成功删除工作表: {sheet_name}",
                 metadata={
                     'file_path': self.file_path,
@@ -292,9 +306,20 @@ class ExcelManager:
             # 保存文件
             workbook.save(self.file_path)
 
+            # 构建重命名后的工作表信息
+            renamed_sheet_info = SheetInfo(
+                index=old_index,
+                name=new_name,
+                is_active=was_active,
+                max_row=sheet.max_row,
+                max_column=sheet.max_column,
+                max_column_letter=get_column_letter(sheet.max_column) if sheet.max_column > 0 else 'A'
+            )
+
             return OperationResult(
                 success=True,
                 message=f"成功将工作表 '{old_name}' 重命名为 '{new_name}'",
+                data=renamed_sheet_info,
                 metadata={
                     'file_path': self.file_path,
                     'old_name': old_name,

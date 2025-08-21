@@ -52,7 +52,7 @@ class CellInfo:
     fill: Optional[str] = None
 
 
-@dataclass
+@dataclass(frozen=True)
 class SheetInfo:
     """工作表信息"""
     index: int

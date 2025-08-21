@@ -663,6 +663,7 @@ class ExcelWriter:
                 return OperationResult(
                     success=True,
                     message="公式执行成功",
+                    data=calculated_value,  # 将结果放在data字段中
                     metadata={
                         'formula': formula,
                         'result': calculated_value,

@@ -116,22 +116,23 @@ class ExcelValidator:
                 )
 
     @classmethod
-    def validate_file_for_creation(cls, file_path: str) -> str:
+    def validate_file_for_creation(cls, file_path: str, overwrite: bool = True) -> str:
         """
         验证新建文件路径
 
         Args:
             file_path: 要创建的文件路径
+            overwrite: 是否允许覆盖已存在的文件
 
         Returns:
             规范化的绝对路径
 
         Raises:
-            FileExistsError: 文件已存在
+            FileExistsError: 文件已存在且不允许覆盖
             InvalidFormatError: 不支持的文件格式
         """
         path = Path(file_path)
-        if path.exists():
+        if path.exists() and not overwrite:
             raise FileExistsError(f"文件已存在: {file_path}")
 
         if path.suffix.lower() not in ['.xlsx', '.xlsm']:
