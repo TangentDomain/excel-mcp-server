@@ -1,0 +1,104 @@
+{
+  "projects": [
+    {
+      "id": "09ecf14e-3b75-41a1-a810-0ab557e821bc",
+      "name": "Excel MCP Server 单元测试执行",
+      "description": "运行excel-mcp-server项目的单元测试套件，包含18个测试文件的完整测试执行、结果分析和问题排查",
+      "createdAt": "2025-08-21T01:35:03.998Z",
+      "updatedAt": "2025-08-21T01:35:03.998Z"
+    },
+    {
+      "id": "8884de6a-8d4f-4ba1-881f-09785101722f",
+      "name": "ExcelWriter性能优化",
+      "description": "Excel公式计算性能优化项目，主要解决evaluate_formula方法的性能问题。测试显示100次公式计算超过5秒的性能瓶颈，需要通过缓存机制、优化数据复制和减少I/O操作来提升性能。",
+      "createdAt": "2025-08-21T01:56:15.362Z",
+      "updatedAt": "2025-08-21T01:56:15.362Z"
+    }
+  ],
+  "tasks": [
+    {
+      "id": "c60b5dbd-9f9b-4a57-8ab0-ba6496db28e0",
+      "name": "环境检查和依赖验证",
+      "details": "检查项目依赖是否已安装，确认虚拟环境状态，验证测试环境配置是否正确",
+      "projectId": "09ecf14e-3b75-41a1-a810-0ab557e821bc",
+      "completed": false,
+      "createdAt": "2025-08-21T01:35:10.782Z",
+      "updatedAt": "2025-08-21T01:36:18.446Z",
+      "dependsOn": [],
+      "priority": 9,
+      "complexity": 6,
+      "status": "in-progress",
+      "tags": [
+        "环境配置",
+        "依赖管理",
+        "前置检查"
+      ],
+      "estimatedHours": 0.5,
+      "level": 0
+    },
+    {
+      "id": "f884bfbe-4897-40ac-8323-880a355428b7",
+      "name": "实现缓存机制",
+      "details": "实现ExcelWriter的缓存机制，避免重复加载工作簿和初始化xlcalculator。包括：\n1. 工作簿对象缓存（基于文件路径+修改时间）\n2. xlcalculator模型和评估器缓存\n3. 缓存失效机制（文件变更时）\n4. 内存使用优化（LRU清理策略）",
+      "projectId": "8884de6a-8d4f-4ba1-881f-09785101722f",
+      "completed": false,
+      "createdAt": "2025-08-21T01:56:23.098Z",
+      "updatedAt": "2025-08-21T01:56:23.098Z",
+      "dependsOn": [],
+      "priority": 9,
+      "complexity": 8,
+      "status": "pending",
+      "tags": [
+        "performance",
+        "caching",
+        "core"
+      ],
+      "estimatedHours": 4,
+      "level": 0
+    },
+    {
+      "id": "557121ce-b192-4a8e-a79e-e0dc27913272",
+      "name": "优化数据复制策略",
+      "details": "优化数据复制策略，只复制公式实际引用的数据范围。包括：\n1. 公式依赖分析（解析公式中的单元格引用）\n2. 智能范围提取（仅复制必要的数据）\n3. 支持跨工作表引用优化\n4. 减少内存占用和复制时间",
+      "projectId": "8884de6a-8d4f-4ba1-881f-09785101722f",
+      "completed": false,
+      "createdAt": "2025-08-21T01:56:29.167Z",
+      "updatedAt": "2025-08-21T01:56:29.167Z",
+      "dependsOn": [],
+      "priority": 8,
+      "complexity": 7,
+      "status": "pending",
+      "tags": [
+        "performance",
+        "optimization",
+        "data"
+      ],
+      "estimatedHours": 3,
+      "level": 0
+    },
+    {
+      "id": "eb55fab0-1f85-4f69-bc29-f5b6e4d91676",
+      "name": "优化临时文件操作",
+      "details": "减少或优化临时文件I/O操作。包括：\n1. 尽量使用内存工作簿操作\n2. 仅在必要时写入临时文件\n3. 优化临时文件的创建和清理\n4. 考虑使用内存映射文件等技术",
+      "projectId": "8884de6a-8d4f-4ba1-881f-09785101722f",
+      "completed": false,
+      "createdAt": "2025-08-21T01:56:34.952Z",
+      "updatedAt": "2025-08-21T01:56:34.952Z",
+      "dependsOn": [],
+      "priority": 7,
+      "complexity": 5,
+      "status": "pending",
+      "tags": [
+        "performance",
+        "io",
+        "temp-files"
+      ],
+      "estimatedHours": 2,
+      "level": 0
+    }
+  ],
+  "subtasks": [],
+  "migration": {
+    "version": "1.8.1"
+  }
+}
