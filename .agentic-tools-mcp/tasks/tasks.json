@@ -419,6 +419,48 @@
       "estimatedHours": 3,
       "level": 0,
       "actualHours": 1
+    },
+    {
+      "id": "acc99b94-de6a-440a-a989-1851a86ca3f2",
+      "name": "修复异常处理和验证逻辑",
+      "details": "修复异常处理和验证逻辑问题，包括FileNotFoundError处理、数据验证逻辑、格式化参数验证等",
+      "projectId": "f418e225-880e-43c6-a065-6d88e71aa0fa",
+      "completed": false,
+      "createdAt": "2025-08-21T04:49:59.529Z",
+      "updatedAt": "2025-08-21T04:54:24.301Z",
+      "dependsOn": [],
+      "priority": 7,
+      "complexity": 7,
+      "status": "done",
+      "tags": [
+        "exception",
+        "validation",
+        "error-handling"
+      ],
+      "estimatedHours": 2,
+      "level": 0,
+      "actualHours": 0.8
+    },
+    {
+      "id": "bafdc54b-ccff-4668-b918-c4916ed43400",
+      "name": "完成最后的测试修复",
+      "details": "正在修复剩余4个测试失败：\n\n已修复：test_update_range_data_mismatch ✅ - 移除严格的数据维度验证，允许Excel自动处理大小不匹配\n\n剩余失败：\n1. test_format_cells - 格式化错误: 'bottom'值不在允许的选项中\n2. test_update_range_large_data - 期望200个单元格，实际199个\n3. test_get_range_simple - result.data没有data属性\n4. test_excel_list_sheets_simple - 返回结果缺少'sheets'字段\n\n当前状态：131 passed, 4 failed (97.0% 通过率)",
+      "projectId": "f418e225-880e-43c6-a065-6d88e71aa0fa",
+      "completed": false,
+      "createdAt": "2025-08-21T04:54:51.016Z",
+      "updatedAt": "2025-08-21T04:56:40.685Z",
+      "dependsOn": [],
+      "priority": 6,
+      "complexity": 5,
+      "status": "in-progress",
+      "tags": [
+        "final",
+        "cleanup",
+        "detail-fixes"
+      ],
+      "estimatedHours": 1,
+      "level": 0,
+      "actualHours": 0.5
     }
   ],
   "subtasks": [],

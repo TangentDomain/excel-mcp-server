@@ -4,7 +4,7 @@ Fixed tests for utility modules - matching actual API implementation
 
 import pytest
 from src.utils.exceptions import (
-    FileNotFoundError, 
+    ExcelFileNotFoundError, 
     SheetNotFoundError, 
     DataValidationError
 )
@@ -14,8 +14,8 @@ class TestExceptions:
     """Test cases for custom exceptions"""
     
     def test_file_not_found_exception(self):
-        """Test FileNotFoundError"""
-        exc = FileNotFoundError("test_file.xlsx")
+        """Test ExcelFileNotFoundError"""
+        exc = ExcelFileNotFoundError("test_file.xlsx")
         assert str(exc) == "test_file.xlsx"
         assert isinstance(exc, Exception)
     
@@ -33,7 +33,7 @@ class TestExceptions:
     
     def test_exceptions_inheritance(self):
         """Test that exceptions inherit from Exception"""
-        assert issubclass(FileNotFoundError, Exception)
+        assert issubclass(ExcelFileNotFoundError, Exception)
         assert issubclass(SheetNotFoundError, Exception)
         assert issubclass(DataValidationError, Exception)
     
@@ -41,7 +41,7 @@ class TestExceptions:
         """Test that exceptions can be raised and caught"""
         
         def raise_file_not_found():
-            raise FileNotFoundError("test.xlsx")
+            raise ExcelFileNotFoundError("test.xlsx")
         
         def raise_sheet_not_found():
             raise SheetNotFoundError("Sheet1")
@@ -49,8 +49,8 @@ class TestExceptions:
         def raise_data_validation():
             raise DataValidationError("Invalid data")
         
-        # Test FileNotFoundError
-        with pytest.raises(FileNotFoundError) as exc_info:
+        # Test ExcelFileNotFoundError
+        with pytest.raises(ExcelFileNotFoundError) as exc_info:
             raise_file_not_found()
         assert str(exc_info.value) == "test.xlsx"
         
@@ -67,7 +67,7 @@ class TestExceptions:
     def test_exceptions_with_different_message_types(self):
         """Test exceptions with different message types"""
         # Test with string message
-        exc1 = FileNotFoundError("string_message")
+        exc1 = ExcelFileNotFoundError("string_message")
         assert str(exc1) == "string_message"
         
         # Test with empty string
@@ -82,17 +82,17 @@ class TestExceptions:
         """Test that exceptions can be pickled (for multiprocessing)"""
         import pickle
         
-        exc = FileNotFoundError("test.xlsx")
+        exc = ExcelFileNotFoundError("test.xlsx")
         pickled = pickle.dumps(exc)
         unpickled = pickle.loads(pickled)
         
-        assert isinstance(unpickled, FileNotFoundError)
+        assert isinstance(unpickled, ExcelFileNotFoundError)
         assert str(unpickled) == "test.xlsx"
     
     def test_exceptions_have_custom_attributes(self):
         """Test that exceptions can have custom attributes"""
         # Create an exception with custom attributes
-        exc = FileNotFoundError("test.xlsx")
+        exc = ExcelFileNotFoundError("test.xlsx")
         exc.custom_attr = "custom_value"
         
         assert exc.custom_attr == "custom_value"

@@ -7,7 +7,7 @@ Excel MCP Server - 验证工具
 from pathlib import Path
 from typing import Optional
 
-from .exceptions import FileNotFoundError, InvalidFormatError, DataValidationError
+from .exceptions import ExcelFileNotFoundError, InvalidFormatError, DataValidationError
 
 
 class ExcelValidator:
@@ -29,12 +29,12 @@ class ExcelValidator:
             规范化的绝对路径
 
         Raises:
-            FileNotFoundError: 文件不存在
+            ExcelFileNotFoundError: 文件不存在
             InvalidFormatError: 不支持的文件格式
         """
         path = Path(file_path)
         if not path.exists():
-            raise FileNotFoundError(f"Excel文件不存在: {file_path}")
+            raise ExcelFileNotFoundError(f"Excel文件不存在: {file_path}")
 
         if path.suffix.lower() not in cls.SUPPORTED_FORMATS:
             raise InvalidFormatError(f"不支持的文件格式: {path.suffix}")

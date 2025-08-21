@@ -30,8 +30,10 @@ class TestServerInterfaces:
         result = excel_list_sheets(sample_excel_file)
         
         assert result['success'] is True
-        assert 'data' in result
-        assert isinstance(result['data'], list)
+        assert 'sheets' in result
+        assert isinstance(result['sheets'], list)
+        assert 'active_sheet' in result
+        assert 'total_sheets' in result
     
     def test_excel_list_sheets_invalid_file(self):
         """Test excel_list_sheets with invalid file"""
@@ -243,8 +245,8 @@ class TestServerInterfaces:
             
             # If successful, should have appropriate data
             if result['success']:
-                # Should have either data, message, or other response fields
-                assert any(key in result for key in ['data', 'message', 'result', 'total_matches'])
+                # Should have either data, message, result, total_matches, or sheets
+                assert any(key in result for key in ['data', 'message', 'result', 'total_matches', 'sheets'])
             else:
                 assert 'error' in result
                 assert isinstance(result['error'], str)

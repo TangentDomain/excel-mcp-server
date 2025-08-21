@@ -102,7 +102,17 @@ def excel_list_sheets(file_path: str) -> Dict[str, Any]:
     try:
         reader = ExcelReader(file_path)
         result = reader.list_sheets()
-        return _format_result(result)
+        
+        # 提取工作表名称列表
+        sheets = [sheet.name for sheet in result.data] if result.data else []
+        
+        return {
+            'success': True,
+            'sheets': sheets,
+            'file_path': file_path,
+            'total_sheets': result.metadata.get('total_sheets', len(sheets)) if result.metadata else len(sheets),
+            'active_sheet': result.metadata.get('active_sheet', '') if result.metadata else ''
+        }
     except Exception as e:
         logger.error(f"列出工作表失败: {e}")
         return {
@@ -658,7 +668,7 @@ def excel_format_cells(
         formatting: 格式配置字典，支持以下格式：
             - font: {'name': '宋体', 'size': 12, 'bold': True, 'italic': False, 'color': 'FF0000'}
             - fill: {'color': 'FFFF00'}  # 背景色
-            - alignment: {'horizontal': 'center', 'vertical': 'middle'}
+            - alignment: {'horizontal': 'center', 'vertical': 'center'}
 
     Returns:
         Dict: 包含 success、formatted_count(int)、message
@@ -668,7 +678,7 @@ def excel_format_cells(
         formatting = {
             'font': {'name': '微软雅黑', 'size': 14, 'bold': True, 'color': '000080'},
             'fill': {'color': 'E6F3FF'},
-            'alignment': {'horizontal': 'center', 'vertical': 'middle'}
+            'alignment': {'horizontal': 'center', 'vertical': 'center'}
         }
         result = excel_format_cells("data.xlsx", "Sheet1", "A1:D1", formatting)
     """
