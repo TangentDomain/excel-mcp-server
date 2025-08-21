@@ -245,6 +245,7 @@ def excel_get_range(
 @unified_error_handler("范围数据更新", extract_file_context, return_dict=True)
 def excel_update_range(
     file_path: str,
+    sheet_name: str,
     range_expression: str,
     data: List[List[Any]],
     preserve_formulas: bool = True
@@ -254,7 +255,8 @@ def excel_update_range(
 
     Args:
         file_path: Excel文件路径 (.xlsx/.xlsm)
-        range_expression: 目标范围 (如"A1:C10", "Sheet1!A1:C10")
+        sheet_name: 工作表名称 (必选)
+        range_expression: 目标范围 (如"A1:C10", 不需要包含工作表名)
         data: 二维数组数据 [[row1], [row2], ...]
         preserve_formulas: 保留已有公式 (默认True)
 
@@ -262,12 +264,14 @@ def excel_update_range(
         Dict: 包含 success、updated_cells(int)、message
 
     Example:
-        # 更新A1:B2范围的数据
+        # 更新Sheet1中A1:B2范围的数据
         data = [["姓名", "年龄"], ["张三", 25]]
-        result = excel_update_range("test.xlsx", "A1:B2", data)
+        result = excel_update_range("test.xlsx", "Sheet1", "A1:B2", data)
     """
     writer = ExcelWriter(file_path)
-    result = writer.update_range(range_expression, data, preserve_formulas)
+    # 组合sheet_name和range_expression
+    full_range_expression = f"{sheet_name}!{range_expression}"
+    result = writer.update_range(full_range_expression, data, preserve_formulas)
     return _format_result(result)
 
 
