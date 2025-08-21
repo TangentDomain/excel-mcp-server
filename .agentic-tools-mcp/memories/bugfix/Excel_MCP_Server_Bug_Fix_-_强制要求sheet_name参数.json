@@ -1,0 +1,8 @@
+{
+  "id": "80fb7a41-0085-4469-bcef-53539f63b260",
+  "title": "Excel MCP Server Bug Fix - 强制要求sheet_name参数",
+  "details": "修复Excel MCP服务器中excel_update_range函数的问题：\n\n问题描述：\n- 原始函数在没有显式传入sheet_name时也能成功修改，违反业务规则\n- RangeParser.parse_range_expression在range_expression不包含'!'时会sheet_name设为None\n- ExcelWriter._get_worksheet方法在sheet_name为None时使用workbook.active，导致意外成功\n\n根源分析：\n1. 当用户只传入\"A553:Z560\"作为range_expression时\n2. RangeParser解析后sheet_name为None\n3. ExcelWriter._get_worksheet在sheet_name为None时返回workbook.active\n4. 因此操作在活动工作表上成功执行，但这违反了业务规则\n\n修复方案：\n1. 修改server.py中excel_update_range函数签名，添加sheet_name为必选参数\n2. 在函数内部手动组合sheet_name和range_expression\n3. 更新文档和示例\n\n修复前API：\nexcel_update_range(file_path, range_expression, data, preserve_formulas=True)\n\n修复后API：\nexcel_update_range(file_path, sheet_name, range_expression, data, preserve_formulas=True)\n\n影响和好处：\n- 强制用户显式指定工作表名，避免意外操作\n- API更加明确和安全\n- 符合\"理论上必须传sheetname\"的业务要求\n- 代码逻辑更清晰\n\n实施完成时间：2025年8月21日",
+  "category": "bugfix",
+  "dateCreated": "2025-08-21T13:30:00.731Z",
+  "dateUpdated": "2025-08-21T13:30:00.731Z"
+}
