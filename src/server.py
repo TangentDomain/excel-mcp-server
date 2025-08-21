@@ -566,7 +566,7 @@ def excel_format_cells(
     Example:
         # 使用预设样式（推荐）
         result = excel_format_cells("data.xlsx", "Sheet1", "A1:D1", preset="title")
-        
+
         # 使用自定义格式
         formatting = {
             'font': {'name': '微软雅黑', 'size': 14, 'bold': True, 'color': '000080'},
@@ -574,10 +574,10 @@ def excel_format_cells(
             'alignment': {'horizontal': 'center', 'vertical': 'center'}
         }
         result = excel_format_cells("data.xlsx", "Sheet1", "A1:D1", formatting=formatting)
-        
+
         # 预设样式 + 自定义修改（预设为基础，自定义覆盖）
-        result = excel_format_cells("data.xlsx", "Sheet1", "A1:D1", 
-                                  formatting={'font': {'color': 'FF0000'}}, 
+        result = excel_format_cells("data.xlsx", "Sheet1", "A1:D1",
+                                  formatting={'font': {'color': 'FF0000'}},
                                   preset="header")
     """
     # 预设样式模板
@@ -605,16 +605,16 @@ def excel_format_cells(
             'alignment': {'horizontal': 'right', 'vertical': 'center'}
         }
     }
-    
+
     # 构建最终格式配置
     final_formatting = {}
-    
+
     # 1. 如果有预设，先应用预设
     if preset:
         if preset not in PRESETS:
             return {"success": False, "error": f"未知的预设样式: {preset}。可选值: {list(PRESETS.keys())}"}
         final_formatting = PRESETS[preset].copy()
-    
+
     # 2. 如果有自定义格式，合并到最终配置（覆盖预设）
     if formatting:
         for key, value in formatting.items():
@@ -623,11 +623,11 @@ def excel_format_cells(
                 final_formatting[key].update(value)
             else:
                 final_formatting[key] = value
-    
+
     # 3. 如果既没有预设也没有自定义格式，返回错误
     if not final_formatting:
         return {"success": False, "error": "必须指定 formatting 或 preset 参数中的至少一个"}
-    
+
     writer = ExcelWriter(file_path)
     result = writer.format_cells(range_expression, final_formatting, sheet_name)
     return _format_result(result)
