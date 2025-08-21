@@ -14,7 +14,7 @@ logger = logging.getLogger(__name__)
 
 
 class ErrorHandler:
-    """统一错误处理器"""
+    """统一错误处理器 - 增强版"""
 
     # 错误代码映射
     ERROR_CODES = {
@@ -25,7 +25,21 @@ class ErrorHandler:
         'ValueError': 'VALUE_ERROR',
         'KeyError': 'KEY_ERROR',
         'ImportError': 'IMPORT_ERROR',
+        'InvalidRangeError': 'INVALID_RANGE',
+        'FormulaCalculationError': 'FORMULA_ERROR',
         'Exception': 'GENERAL_ERROR'
+    }
+
+    # 错误解决方案映射
+    ERROR_SOLUTIONS = {
+        'FILE_NOT_FOUND': '请检查文件路径是否正确，确保文件存在且可访问',
+        'PERMISSION_DENIED': '请检查文件权限，确保有读写权限，或关闭正在使用该文件的程序',
+        'SHEET_NOT_FOUND': '请检查工作表名称是否正确，可使用excel_list_sheets查看所有工作表',
+        'INVALID_RANGE': '请检查范围表达式格式，如"A1:C10"或"Sheet1!A1:C10"',
+        'FORMULA_ERROR': '请检查公式语法是否正确，确保引用的单元格存在',
+        'DATA_VALIDATION_ERROR': '请检查输入数据格式和类型是否符合要求',
+        'VALUE_ERROR': '请检查参数值是否在有效范围内',
+        'PERMISSION_DENIED': '请检查文件是否被其他程序占用，关闭Excel等程序后重试'
     }
 
     @staticmethod
@@ -37,17 +51,29 @@ class ErrorHandler:
     @staticmethod
     def format_error_response(
         error: Exception,
-        context: Optional[Dict[str, Any]] = None
+        context: Optional[Dict[str, Any]] = None,
+        operation: str = None
     ) -> Dict[str, Any]:
-        """格式化错误响应"""
+        """格式化错误响应 - 增强版"""
         error_code = ErrorHandler.get_error_code(error)
+        solution = ErrorHandler.ERROR_SOLUTIONS.get(error_code, '请联系技术支持或查看文档')
 
-        return {
+        response = {
             'code': error_code,
             'message': str(error),
             'type': type(error).__name__,
+            'solution': solution,
+            'severity': 'error' if error_code != 'DATA_VALIDATION_ERROR' else 'warning',
             'details': context or {}
         }
+
+        # 为特定操作提供更详细的建议
+        if operation:
+            response['operation'] = operation
+            if 'file_path' in (context or {}):
+                response['affected_resource'] = context['file_path']
+
+        return response
 
 
 def unified_error_handler(
@@ -116,14 +142,16 @@ def unified_error_handler(
                 })
 
                 # 格式化错误信息
-                error_info = ErrorHandler.format_error_response(e, context)
+                error_info = ErrorHandler.format_error_response(e, context, operation_name)
 
                 # 根据返回类型返回相应格式
                 if return_dict:
                     # 返回字典格式（用于MCP接口）
                     return {
                         'success': False,
-                        'error': error_info
+                        'error': error_info,
+                        'timestamp': time.strftime('%Y-%m-%d %H:%M:%S'),
+                        'execution_time_ms': round((time.time() - start_time) * 1000, 2)
                     }
                 else:
                     # 返回OperationResult（用于内部API）
