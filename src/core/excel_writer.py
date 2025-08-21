@@ -5,8 +5,10 @@ Excel MCP Server - Excel写入模块
 """
 
 import logging
+import tempfile
+import os
 from typing import List, Any, Optional
-from openpyxl import load_workbook
+from openpyxl import load_workbook, Workbook
 from openpyxl.utils import range_boundaries
 
 from ..models.types import RangeInfo, ModifiedCell, OperationResult, RangeType
@@ -542,6 +544,7 @@ class ExcelWriter:
     ) -> OperationResult:
         """
         临时执行Excel公式并返回计算结果，不修改文件
+        使用缓存机制提升性能
 
         Args:
             formula: Excel公式（不包含等号）
@@ -555,6 +558,7 @@ class ExcelWriter:
             import os
             from openpyxl import Workbook
             import time
+            from ..utils.formula_cache import get_formula_cache
 
             start_time = time.time()
 
@@ -569,23 +573,116 @@ class ExcelWriter:
                     error="公式不能为空"
                 )
 
-            # 加载原始工作簿（用于提供数据上下文）
-            original_workbook = load_workbook(self.file_path, data_only=False)
+            # 尝试从缓存获取结果
+            cache = get_formula_cache()
+            cached_result = cache.get(self.file_path, formula, context_sheet)
+            
+            if cached_result is not None:
+                execution_time = round((time.time() - start_time) * 1000, 2)
+                logger.info(f"缓存命中，公式: {formula} = {cached_result}")
+                
+                # 确定结果类型
+                result_type = self._get_result_type(cached_result)
+                
+                return OperationResult(
+                    success=True,
+                    message="公式执行成功（缓存）",
+                    data=cached_result,
+                    metadata={
+                        'formula': formula,
+                        'result': cached_result,
+                        'result_type': result_type,
+                        'execution_time_ms': execution_time,
+                        'context_sheet': context_sheet or "default",
+                        'cached': True,
+                        'cache_stats': cache.get_stats()
+                    }
+                )
 
-            # 创建临时工作簿进行计算
-            temp_workbook = Workbook()
-            temp_sheet = temp_workbook.active
-            temp_sheet.title = "Calculation"
-
-            # 选择要复制的源工作表
-            if context_sheet and context_sheet in original_workbook.sheetnames:
-                source_sheet = original_workbook[context_sheet]
+            # 缓存未命中，尝试获取缓存的工作簿
+            cached_workbook_data = cache.get_cached_workbook(self.file_path)
+            
+            if cached_workbook_data:
+                temp_workbook, temp_file_path = cached_workbook_data
+                logger.debug("使用缓存的工作簿进行计算")
             else:
-                # 使用活动工作表或第一个工作表
-                source_sheet = original_workbook.active
+                # 创建新的临时工作簿
+                temp_workbook, temp_file_path = self._create_temp_workbook(context_sheet, cache)
 
-            # 复制数据到临时工作表
-            for row in source_sheet.iter_rows():
+            try:
+                # 使用xlcalculator计算公式
+                calculated_value = self._calculate_with_xlcalculator(
+                    temp_file_path, formula, temp_workbook
+                )
+
+            except ImportError:
+                return OperationResult(
+                    success=False,
+                    error="需要安装xlcalculator库来支持公式计算: pip install xlcalculator"
+                )
+            except Exception as calc_error:
+                # 如果xlcalculator失败，尝试基础的手动解析
+                logger.warning(f"xlcalculator计算失败，尝试基础解析: {calc_error}")
+                calculated_value = self._fallback_calculation(temp_file_path, formula)
+
+            # 缓存计算结果
+            cache.put(self.file_path, formula, calculated_value, context_sheet)
+            
+            # 确定结果类型
+            result_type = self._get_result_type(calculated_value)
+
+            execution_time = round((time.time() - start_time) * 1000, 2)
+            logger.info(f"成功计算公式: {formula} = {calculated_value}")
+
+            return OperationResult(
+                success=True,
+                message="公式执行成功",
+                data=calculated_value,
+                metadata={
+                    'formula': formula,
+                    'result': calculated_value,
+                    'result_type': result_type,
+                    'execution_time_ms': execution_time,
+                    'context_sheet': context_sheet or "default",
+                    'cached': False,
+                    'cache_stats': cache.get_stats()
+                }
+            )
+
+        except Exception as e:
+            logger.error(f"公式执行失败: {e}")
+            return OperationResult(
+                success=False,
+                error=f"公式执行失败: {str(e)}"
+            )
+
+    def _create_temp_workbook(
+        self, 
+        context_sheet: Optional[str],
+        cache
+    ) -> tuple:
+        """创建临时工作簿用于计算"""
+        # 加载原始工作簿（用于提供数据上下文）
+        original_workbook = load_workbook(self.file_path, data_only=False)
+
+        # 创建临时工作簿进行计算
+        temp_workbook = Workbook()
+        temp_sheet = temp_workbook.active
+        temp_sheet.title = "Calculation"
+
+        # 选择要复制的源工作表
+        if context_sheet and context_sheet in original_workbook.sheetnames:
+            source_sheet = original_workbook[context_sheet]
+        else:
+            # 使用活动工作表或第一个工作表
+            source_sheet = original_workbook.active
+
+        # 复制数据到临时工作表（只复制有数据的区域以提升性能）
+        if source_sheet.max_row > 1 or source_sheet.max_column > 1:
+            for row in source_sheet.iter_rows(
+                max_row=min(source_sheet.max_row, 1000),  # 限制复制范围，提升性能
+                max_col=min(source_sheet.max_column, 100)
+            ):
                 for cell in row:
                     if cell.value is not None:
                         target_cell = temp_sheet.cell(
@@ -594,98 +691,76 @@ class ExcelWriter:
                         )
                         target_cell.value = cell.value
 
-            # 在临时单元格中设置要计算的公式
-            calc_cell = temp_sheet['Z1']  # 使用Z1作为计算单元格
-            calc_cell.value = f"={formula}"
+        # 保存到临时文件
+        temp_file = tempfile.NamedTemporaryFile(suffix='.xlsx', delete=False)
+        temp_file.close()
+        
+        # 保存工作簿
+        temp_workbook.save(temp_file.name)
+        original_workbook.close()
+        
+        # 缓存工作簿
+        cache.cache_workbook(self.file_path, temp_workbook, temp_file.name)
+        
+        return temp_workbook, temp_file.name
 
-            # 保存到临时文件
-            temp_file = tempfile.NamedTemporaryFile(suffix='.xlsx', delete=False)
-            temp_file.close()
+    def _calculate_with_xlcalculator(
+        self,
+        temp_file_path: str,
+        formula: str,
+        temp_workbook
+    ) -> any:
+        """使用xlcalculator进行计算"""
+        from xlcalculator import ModelCompiler, Evaluator
 
+        # 在临时单元格中设置要计算的公式
+        temp_sheet = temp_workbook.active
+        calc_cell = temp_sheet['Z1']  # 使用Z1作为计算单元格
+        calc_cell.value = f"={formula}"
+        
+        # 保存更新后的工作簿
+        temp_workbook.save(temp_file_path)
+        
+        # 编译模型
+        compiler = ModelCompiler()
+        model = compiler.read_and_parse_archive(temp_file_path)
+        evaluator = Evaluator(model)
+
+        # 计算Z1位置的公式
+        calculated_value = evaluator.evaluate('Calculation!Z1')
+        return calculated_value
+
+    def _fallback_calculation(self, temp_file_path: str, formula: str) -> any:
+        """备用计算方法"""
+        # 重新加载工作簿获取数据
+        data_workbook = load_workbook(temp_file_path, data_only=True)
+        data_sheet = data_workbook["Calculation"]
+
+        # 尝试基础的公式解析
+        calculated_value = self._basic_formula_parse(formula, data_sheet)
+        data_workbook.close()
+        
+        return calculated_value
+
+    def _get_result_type(self, value) -> str:
+        """确定结果类型"""
+        if value is None:
+            return "null"
+        elif isinstance(value, (int, float)):
+            return "number"
+        elif isinstance(value, str):
+            return "text"
+        elif isinstance(value, bool):
+            return "boolean"
+        else:
             try:
-                # 保存工作簿
-                temp_workbook.save(temp_file.name)
-                temp_workbook.close()
-                original_workbook.close()
-
-                # 使用xlcalculator计算公式
-                try:
-                    from xlcalculator import ModelCompiler, Evaluator
-
-                    # 编译模型
-                    compiler = ModelCompiler()
-                    model = compiler.read_and_parse_archive(temp_file.name)
-                    evaluator = Evaluator(model)
-
-                    # 计算Z1位置的公式
-                    calculated_value = evaluator.evaluate('Calculation!Z1')
-
-                except ImportError:
-                    return OperationResult(
-                        success=False,
-                        error="需要安装xlcalculator库来支持公式计算: pip install xlcalculator"
-                    )
-                except Exception as calc_error:
-                    # 如果xlcalculator失败，尝试基础的手动解析
-                    logger.warning(f"xlcalculator计算失败，尝试基础解析: {calc_error}")
-
-                    # 重新加载工作簿获取数据
-                    data_workbook = load_workbook(temp_file.name, data_only=True)
-                    data_sheet = data_workbook["Calculation"]
-
-                    # 尝试基础的公式解析
-                    calculated_value = self._basic_formula_parse(formula, data_sheet)
-                    data_workbook.close()
-
-                # 确定结果类型
-                result_type = "unknown"
-                if calculated_value is None:
-                    result_type = "null"
-                elif isinstance(calculated_value, (int, float)):
-                    result_type = "number"
-                elif isinstance(calculated_value, str):
-                    result_type = "text"
-                elif isinstance(calculated_value, bool):
-                    result_type = "boolean"
-                else:
-                    try:
-                        # 检查是否是日期
-                        from datetime import datetime, date
-                        if isinstance(calculated_value, (datetime, date)):
-                            result_type = "date"
-                    except:
-                        pass
-
-                execution_time = round((time.time() - start_time) * 1000, 2)
-
-                logger.info(f"成功计算公式: {formula} = {calculated_value}")
-
-                return OperationResult(
-                    success=True,
-                    message="公式执行成功",
-                    data=calculated_value,  # 将结果放在data字段中
-                    metadata={
-                        'formula': formula,
-                        'result': calculated_value,
-                        'result_type': result_type,
-                        'execution_time_ms': execution_time,
-                        'context_sheet': context_sheet or "default"
-                    }
-                )
-
-            finally:
-                # 清理临时文件
-                try:
-                    os.unlink(temp_file.name)
-                except:
-                    pass
-
-        except Exception as e:
-            logger.error(f"公式执行失败: {e}")
-            return OperationResult(
-                success=False,
-                error=f"公式执行失败: {str(e)}"
-            )
+                # 检查是否是日期
+                from datetime import datetime, date
+                if isinstance(value, (datetime, date)):
+                    return "date"
+            except:
+                pass
+            return "unknown"
 
     def _basic_formula_parse(self, formula: str, sheet) -> any:
         """增强的基础公式解析器 - 支持numpy统计函数"""

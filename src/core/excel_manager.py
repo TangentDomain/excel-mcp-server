@@ -117,7 +117,7 @@ class ExcelManager:
         index: Optional[int] = None
     ) -> OperationResult:
         """
-        在Excel文件中创建新工作表
+        在Excel文件中创建新工作表，支持中文字符
 
         Args:
             sheet_name: 新工作表名称
@@ -131,7 +131,8 @@ class ExcelManager:
             if not sheet_name or not sheet_name.strip():
                 raise DataValidationError("工作表名称不能为空")
 
-            sheet_name = sheet_name.strip()
+            # 规范化工作表名称，处理中文字符
+            sheet_name = self._normalize_sheet_name(sheet_name.strip())
 
             # 加载Excel文件
             workbook = load_workbook(self.file_path)
@@ -146,8 +147,16 @@ class ExcelManager:
                 if index < 0 or index > total_sheets:
                     raise DataValidationError(f"索引超出范围: {index}，应在 0-{total_sheets} 之间")
 
-            # 创建新工作表
-            new_sheet = workbook.create_sheet(title=sheet_name, index=index)
+            # 创建新工作表，使用安全的编码处理
+            try:
+                new_sheet = workbook.create_sheet(title=sheet_name, index=index)
+            except Exception as sheet_error:
+                # 如果直接创建失败，尝试使用ASCII兼容的名称
+                logger.warning(f"创建工作表失败，尝试备用方法: {sheet_error}")
+                fallback_name = self._create_fallback_name(sheet_name, workbook.sheetnames)
+                new_sheet = workbook.create_sheet(title=fallback_name, index=index)
+                logger.info(f"使用备用名称创建工作表: {fallback_name}")
+                sheet_name = fallback_name
 
             # 保存文件
             workbook.save(self.file_path)
@@ -179,6 +188,71 @@ class ExcelManager:
                 success=False,
                 error=str(e)
             )
+
+    def _normalize_sheet_name(self, name: str) -> str:
+        """
+        规范化工作表名称，确保与Excel兼容
+        
+        Args:
+            name: 原始工作表名称
+            
+        Returns:
+            str: 规范化后的名称
+        """
+        import re
+        
+        # Excel工作表名称限制：
+        # 1. 不能超过31个字符
+        # 2. 不能包含: / \ ? * [ ] :
+        # 3. 不能以单引号开头或结尾
+        
+        # 移除或替换无效字符
+        invalid_chars = r'[/\\?*\[\]:]'
+        name = re.sub(invalid_chars, '_', name)
+        
+        # 移除首尾的单引号和空格
+        name = name.strip("' \t\n\r")
+        
+        # 限制长度（考虑中文字符占用更多字节）
+        if len(name) > 31:
+            # 对于中文字符，保守截取到25个字符
+            name = name[:25] + "..."
+        
+        # 确保名称不为空
+        if not name:
+            name = "Sheet"
+            
+        return name
+    
+    def _create_fallback_name(self, original_name: str, existing_names: list) -> str:
+        """
+        创建备用工作表名称
+        
+        Args:
+            original_name: 原始名称
+            existing_names: 已存在的名称列表
+            
+        Returns:
+            str: 备用名称
+        """
+        import re
+        
+        # 尝试创建ASCII兼容的名称
+        fallback_base = "Sheet"
+        
+        # 尝试从原始名称中提取英文字符
+        ascii_chars = re.findall(r'[a-zA-Z0-9]', original_name)
+        if ascii_chars:
+            fallback_base = ''.join(ascii_chars)[:10]  # 最多取10个字符
+        
+        # 确保名称唯一
+        counter = 1
+        fallback_name = fallback_base
+        while fallback_name in existing_names:
+            fallback_name = f"{fallback_base}_{counter}"
+            counter += 1
+            
+        return fallback_name
 
     def delete_sheet(self, sheet_name: str) -> OperationResult:
         """
