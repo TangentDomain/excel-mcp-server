@@ -162,6 +162,101 @@ def excel_regex_search(
 
 
 @mcp.tool()
+@unified_error_handler("目录正则搜索", extract_file_context, return_dict=True)
+def excel_regex_search_directory(
+    directory_path: str,
+    pattern: str,
+    flags: str = "",
+    search_values: bool = True,
+    search_formulas: bool = False,
+    recursive: bool = True,
+    file_extensions: Optional[List[str]] = None,
+    file_pattern: Optional[str] = None,
+    max_files: int = 100
+) -> Dict[str, Any]:
+    """
+    在目录下的所有Excel文件中使用正则表达式搜索单元格内容
+
+    支持跨文件搜索，可配置文件过滤条件和搜索范围，返回聚合的搜索结果。
+
+    Args:
+        directory_path: 目录路径
+        pattern: 正则表达式模式，使用Python re模块语法
+            - r'\\d+': 匹配数字
+            - r'\\w+@\\w+\\.\\w+': 匹配邮箱格式
+            - r'^总计|合计$': 匹配特定文本
+            - r'\\d{4}-\\d{2}-\\d{2}': 匹配日期格式(YYYY-MM-DD)
+        flags: 正则表达式修饰符，可组合使用：
+            - "i": 忽略大小写
+            - "m": 多行模式
+            - "s": 点号匹配换行符
+            - 示例: "i", "im", "is"
+        search_values: 是否搜索单元格显示值 (默认True)
+        search_formulas: 是否搜索单元格公式 (默认False)
+        recursive: 是否递归搜索子目录 (默认True)
+        file_extensions: 文件扩展名过滤，如[".xlsx", ".xlsm"] (默认[".xlsx", ".xlsm"])
+        file_pattern: 文件名正则模式过滤，如r'.*报表.*' (可选)
+        max_files: 最大搜索文件数限制 (默认100，防止搜索过多文件)
+
+    Returns:
+        搜索结果字典：
+        - success (bool): 操作是否成功
+        - matches (List[Dict]): 匹配结果，每项包含:
+            - file_path (str): 文件路径
+            - sheet (str): 工作表名
+            - cell (str): 单元格地址
+            - value (Any): 单元格值
+            - match (str): 匹配的文本
+            - match_start (int): 匹配开始位置
+            - match_end (int): 匹配结束位置
+            - match_type (str): 匹配类型 ("VALUE" 或 "FORMULA")
+        - total_matches (int): 匹配总数
+        - total_files_found (int): 找到的文件总数
+        - searched_files (List[str]): 成功搜索的文件列表
+        - skipped_files (List[str]): 跳过的文件列表
+        - file_errors (List[Dict]): 处理错误的文件信息
+        - directory_path (str): 搜索的目录路径
+        - pattern (str): 使用的正则表达式
+        - error (str): 错误信息(失败时)
+
+    Note:
+        大目录搜索可能耗时较长，建议先使用较小的max_files测试
+
+    Example:
+        # 在目录中搜索包含邮箱的单元格
+        result = excel_regex_search_directory(
+            directory_path="/path/to/excel/files",
+            pattern=r'\\w+@\\w+\\.\\w+',
+            flags="i"
+        )
+
+        # 搜索特定文件名模式的文件中的数据
+        result = excel_regex_search_directory(
+            directory_path="/reports",
+            pattern=r'\\d+',
+            file_pattern=r'.*销售.*',
+            recursive=True,
+            max_files=50
+        )
+
+        # 在当前目录非递归搜索公式
+        result = excel_regex_search_directory(
+            directory_path="./data",
+            pattern=r'SUM\\(',
+            search_formulas=True,
+            recursive=False
+        )
+    """
+    # 临时创建搜索器实例（使用虚拟路径）
+    searcher = ExcelSearcher("dummy.xlsx")
+    result = searcher.regex_search_directory(
+        directory_path, pattern, flags, search_values, search_formulas,
+        recursive, file_extensions, file_pattern, max_files
+    )
+    return _format_result(result)
+
+
+@mcp.tool()
 @unified_error_handler("范围数据读取", extract_file_context, return_dict=True)
 def excel_get_range(
     file_path: str,

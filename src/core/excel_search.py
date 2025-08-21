@@ -4,9 +4,11 @@ Excel MCP Server - Excel搜索模块
 提供Excel文件搜索功能
 """
 
+import os
 import re
 import logging
-from typing import List, Optional
+from pathlib import Path
+from typing import List, Optional, Dict, Any
 from openpyxl import load_workbook
 
 from ..models.types import SearchMatch, MatchType, OperationResult
@@ -143,3 +145,187 @@ class ExcelSearcher:
                             ))
 
         return matches
+
+    def regex_search_directory(
+        self,
+        directory_path: str,
+        pattern: str,
+        flags: str = "",
+        search_values: bool = True,
+        search_formulas: bool = False,
+        recursive: bool = True,
+        file_extensions: Optional[List[str]] = None,
+        file_pattern: Optional[str] = None,
+        max_files: int = 100
+    ) -> OperationResult:
+        """
+        在目录下的所有Excel文件中使用正则表达式搜索单元格内容
+
+        Args:
+            directory_path: 目录路径
+            pattern: 正则表达式模式
+            flags: 正则表达式标志 (i=忽略大小写, m=多行, s=点匹配换行)
+            search_values: 是否搜索单元格的显示值
+            search_formulas: 是否搜索单元格的公式
+            recursive: 是否递归搜索子目录
+            file_extensions: 文件扩展名过滤，如['.xlsx', '.xlsm']
+            file_pattern: 文件名正则模式过滤
+            max_files: 最大搜索文件数限制
+
+        Returns:
+            OperationResult: 包含聚合搜索结果的结果对象
+        """
+        try:
+            # 验证目录路径
+            directory_path = Path(directory_path)
+            if not directory_path.exists():
+                raise ValueError(f"目录不存在: {directory_path}")
+            if not directory_path.is_dir():
+                raise ValueError(f"路径不是目录: {directory_path}")
+
+            # 设置默认文件扩展名
+            if file_extensions is None:
+                file_extensions = ['.xlsx', '.xlsm']
+
+            # 构建正则表达式标志
+            regex_flags = self._build_regex_flags(flags)
+
+            # 编译正则表达式
+            try:
+                regex = re.compile(pattern, regex_flags)
+            except re.error as e:
+                raise ValueError(f"无效的正则表达式: {e}")
+
+            # 编译文件名过滤正则（如果提供）
+            file_regex = None
+            if file_pattern:
+                try:
+                    file_regex = re.compile(file_pattern)
+                except re.error as e:
+                    raise ValueError(f"无效的文件名正则表达式: {e}")
+
+            # 查找Excel文件
+            excel_files = self._find_excel_files(
+                directory_path, file_extensions, file_regex, recursive, max_files
+            )
+
+            # 执行搜索
+            all_matches = []
+            searched_files = []
+            skipped_files = []
+            file_errors = []
+
+            for file_path in excel_files:
+                try:
+                    # 临时创建搜索器实例（使用当前文件路径）
+                    temp_searcher = ExcelSearcher(str(file_path))
+                    result = temp_searcher.regex_search(pattern, flags, search_values, search_formulas)
+
+                    if result.success and result.data:
+                        # 为每个匹配添加文件路径信息
+                        for match in result.data:
+                            match_dict = match.__dict__ if hasattr(match, '__dict__') else match
+                            if isinstance(match_dict, dict):
+                                match_dict['file_path'] = str(file_path)
+                            all_matches.append(match_dict)
+                        searched_files.append(str(file_path))
+                    elif result.success:
+                        # 没有匹配但搜索成功
+                        searched_files.append(str(file_path))
+                    else:
+                        # 搜索失败
+                        file_errors.append({
+                            'file_path': str(file_path),
+                            'error': result.error
+                        })
+                        skipped_files.append(str(file_path))
+
+                except Exception as e:
+                    logger.warning(f"搜索文件 {file_path} 时发生错误: {e}")
+                    file_errors.append({
+                        'file_path': str(file_path),
+                        'error': str(e)
+                    })
+                    skipped_files.append(str(file_path))
+
+            return OperationResult(
+                success=True,
+                data=all_matches,
+                metadata={
+                    'directory_path': str(directory_path),
+                    'pattern': pattern,
+                    'total_matches': len(all_matches),
+                    'total_files_found': len(excel_files),
+                    'searched_files': searched_files,
+                    'skipped_files': skipped_files,
+                    'file_errors': file_errors,
+                    'search_values': search_values,
+                    'search_formulas': search_formulas,
+                    'recursive': recursive,
+                    'file_extensions': file_extensions
+                }
+            )
+
+        except Exception as e:
+            logger.error(f"目录正则搜索失败: {e}")
+            return OperationResult(
+                success=False,
+                error=str(e)
+            )
+
+    def _find_excel_files(
+        self,
+        directory: Path,
+        extensions: List[str],
+        file_regex: Optional[re.Pattern],
+        recursive: bool,
+        max_files: int
+    ) -> List[Path]:
+        """查找目录中的Excel文件"""
+        excel_files = []
+
+        # 构建搜索模式
+        search_patterns = []
+        for ext in extensions:
+            if not ext.startswith('.'):
+                ext = f'.{ext}'
+            search_patterns.append(f"*{ext}")
+
+        try:
+            if recursive:
+                # 递归搜索
+                for pattern in search_patterns:
+                    for file_path in directory.rglob(pattern):
+                        if len(excel_files) >= max_files:
+                            break
+                        if self._should_include_file(file_path, file_regex):
+                            excel_files.append(file_path)
+            else:
+                # 仅搜索当前目录
+                for pattern in search_patterns:
+                    for file_path in directory.glob(pattern):
+                        if len(excel_files) >= max_files:
+                            break
+                        if self._should_include_file(file_path, file_regex):
+                            excel_files.append(file_path)
+
+        except Exception as e:
+            logger.error(f"查找Excel文件时发生错误: {e}")
+
+        return excel_files[:max_files]  # 确保不超过最大限制
+
+    def _should_include_file(self, file_path: Path, file_regex: Optional[re.Pattern]) -> bool:
+        """判断是否应该包含该文件"""
+        # 检查文件是否存在且是文件
+        if not file_path.is_file():
+            return False
+
+        # 如果提供了文件名正则模式，进行匹配
+        if file_regex and not file_regex.search(file_path.name):
+            return False
+
+        # 排除临时文件
+        if file_path.name.startswith('~') or file_path.name.startswith('.'):
+            return False
+
+        return True
