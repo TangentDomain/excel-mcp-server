@@ -8,7 +8,7 @@
 
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
-[![Python Version](https://img.shields.io/badge/python-3.8+-blue.svg)](https://www.python.org/downloads/)
+[![Python Version](https://img.shields.io/badge/python-3.10+-blue.svg)](https://www.python.org/downloads/)
 [![Powered by: FastMCP](https://img.shields.io/badge/Powered%20by-FastMCP-orange)](https://github.com/your-fastmcp-repo)
 [![Status](https://img.shields.io/badge/status-active-success.svg)]()
 
@@ -43,15 +43,15 @@
 Get ExcelMCP running in your favorite MCP client (like VS Code, Cursor, or Claude Desktop) with just a few steps.
 
 **Prerequisites:**
-*   Python 3.8+
+*   Python 3.10+
 *   An MCP-compatible client.
 
 **Installation:**
 
 1.  **Clone the repository:**
     ```bash
-    git clone https://github.com/your-username/excel-mcp.git
-    cd excel-mcp
+    git clone https://github.com/your-username/excel-mcp-server.git
+    cd excel-mcp-server
     ```
 
 2.  **Install dependencies:**

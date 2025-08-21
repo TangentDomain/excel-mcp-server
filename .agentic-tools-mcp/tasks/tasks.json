@@ -83,6 +83,13 @@
       "description": "标准化Excel MCP服务器的所有API参数顺序，统一为 (file_path, sheet_name, target, operation_params...) 的模式，提高接口一致性和易用性",
       "createdAt": "2025-08-21T08:14:29.922Z",
       "updatedAt": "2025-08-21T08:14:29.922Z"
+    },
+    {
+      "id": "8bbfc847-7f8c-4daf-ae0c-3dad365f98ae",
+      "name": "README文档一致性修复",
+      "description": "修复README.zh-CN.md文件中与pyproject.toml不一致的项目信息，包括项目名称、版本要求、描述等内容",
+      "createdAt": "2025-08-21T10:53:42.171Z",
+      "updatedAt": "2025-08-21T10:53:42.171Z"
     }
   ],
   "tasks": [
@@ -859,6 +866,68 @@
       "status": "in-progress",
       "tags": [],
       "estimatedHours": 1,
+      "level": 0
+    },
+    {
+      "id": "7d0e7541-a0bb-40b6-8a9c-2083695aaf97",
+      "name": "检查并记录所有不一致项",
+      "details": "详细对比pyproject.toml和README.zh-CN.md文件，找出所有不一致的地方，包括项目名称、版本要求、描述等",
+      "projectId": "8bbfc847-7f8c-4daf-ae0c-3dad365f98ae",
+      "completed": true,
+      "createdAt": "2025-08-21T10:53:46.947Z",
+      "updatedAt": "2025-08-21T10:55:12.151Z",
+      "dependsOn": [],
+      "priority": 8,
+      "complexity": 3,
+      "status": "done",
+      "tags": [],
+      "level": 0
+    },
+    {
+      "id": "93246ee5-8c35-4c09-8203-9b448b541576",
+      "name": "修复Python版本要求不一致",
+      "details": "修正README.zh-CN.md中的Python版本要求，从3.8+改为3.10+，更新徽章和先决条件部分",
+      "projectId": "8bbfc847-7f8c-4daf-ae0c-3dad365f98ae",
+      "parentId": "7d0e7541-a0bb-40b6-8a9c-2083695aaf97",
+      "completed": false,
+      "createdAt": "2025-08-21T10:54:28.755Z",
+      "updatedAt": "2025-08-21T10:54:49.044Z",
+      "dependsOn": [],
+      "priority": 9,
+      "complexity": 4,
+      "status": "done",
+      "tags": [],
+      "level": 1
+    },
+    {
+      "id": "f9d7f99a-2b76-4107-9b20-d48bd5a3fa74",
+      "name": "修复项目名称和Git仓库信息",
+      "details": "修正项目名称不一致问题。考虑到用户体验，保持显示名称为\"Excel MCP Server\"，但更新相关的技术引用和Git仓库信息",
+      "projectId": "8bbfc847-7f8c-4daf-ae0c-3dad365f98ae",
+      "parentId": "7d0e7541-a0bb-40b6-8a9c-2083695aaf97",
+      "completed": false,
+      "createdAt": "2025-08-21T10:54:54.949Z",
+      "updatedAt": "2025-08-21T10:55:08.685Z",
+      "dependsOn": [],
+      "priority": 8,
+      "complexity": 5,
+      "status": "done",
+      "tags": [],
+      "level": 1
+    },
+    {
+      "id": "f08b174c-116d-441d-9047-cee3e6259675",
+      "name": "修复英文版README.md一致性问题",
+      "details": "检查并修复README.md（英文版）中与pyproject.toml不一致的内容，包括Python版本要求和Git仓库信息",
+      "projectId": "8bbfc847-7f8c-4daf-ae0c-3dad365f98ae",
+      "completed": true,
+      "createdAt": "2025-08-21T10:55:44.692Z",
+      "updatedAt": "2025-08-21T10:56:16.823Z",
+      "dependsOn": [],
+      "priority": 8,
+      "complexity": 5,
+      "status": "done",
+      "tags": [],
       "level": 0
     }
   ],
