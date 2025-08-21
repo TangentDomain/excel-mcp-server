@@ -6,7 +6,7 @@
 # ExcelMCP: 强大的 Excel MCP 服务器 🚀
 
 [![许可证: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
-[![Python 版本](https://img.shields.io/badge/python-3.8+-blue.svg)](https://www.python.org/downloads/)
+[![Python 版本](https://img.shields.io/badge/python-3.10+-blue.svg)](https://www.python.org/downloads/)
 [![技术支持: FastMCP](https://img.shields.io/badge/Powered%20by-FastMCP-orange)](https://github.com/your-fastmcp-repo)
 [![状态](https://img.shields.io/badge/status-active-success.svg)]()
 
@@ -41,15 +41,15 @@
 只需几个步骤，即可在您喜欢的 MCP 客户端（如 VS Code、Cursor 或 Claude Desktop）中运行 ExcelMCP。
 
 **先决条件:**
-*   Python 3.8+
+*   Python 3.10+
 *   一个与 MCP 兼容的客户端。
 
 **安装:**
 
 1.  **克隆存储库:**
     ```bash
-    git clone https://github.com/your-username/excel-mcp.git
-    cd excel-mcp
+    git clone https://github.com/your-username/excel-mcp-server.git
+    cd excel-mcp-server
     ```
 
 2.  **安装依赖项:**
