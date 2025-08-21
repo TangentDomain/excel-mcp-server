@@ -97,6 +97,13 @@
       "description": "使用git mv命令整理项目目录结构，将分散在根目录的测试文件、Excel文件和工具脚本分类移动到合适的目录中",
       "createdAt": "2025-08-21T10:57:43.321Z",
       "updatedAt": "2025-08-21T10:57:43.321Z"
+    },
+    {
+      "id": "a49e3bdb-801c-4d5f-98af-77be147f15ea",
+      "name": "Excel MCP Server Bug Fix",
+      "description": "修复Excel MCP服务器中excel_update_range函数的问题：在没有显式传入sheet_name时也能成功修改。理论上应该强制要求提供sheet_name参数。",
+      "createdAt": "2025-08-21T13:27:25.023Z",
+      "updatedAt": "2025-08-21T13:27:25.023Z"
     }
   ],
   "tasks": [
@@ -987,6 +994,26 @@
       "estimatedHours": 0.3,
       "level": 0,
       "actualHours": 0.2
+    },
+    {
+      "id": "d7376539-85e7-40b4-a413-0f1131b5d6d1",
+      "name": "添加sheet_name必选参数",
+      "details": "修改server.py中的excel_update_range函数签名，添加sheet_name作为必选参数，并更新ExcelWriter.update_range的调用方式。确保只有明确指定工作表名时才能进行范围更新操作。",
+      "projectId": "a49e3bdb-801c-4d5f-98af-77be147f15ea",
+      "completed": false,
+      "createdAt": "2025-08-21T13:27:32.546Z",
+      "updatedAt": "2025-08-21T13:27:32.546Z",
+      "dependsOn": [],
+      "priority": 9,
+      "complexity": 5,
+      "status": "in-progress",
+      "tags": [
+        "bugfix",
+        "api-change",
+        "excel"
+      ],
+      "estimatedHours": 2,
+      "level": 0
     }
   ],
   "subtasks": [],
