@@ -783,18 +783,19 @@
       "projectId": "41ab5fc8-847e-4513-925e-d410abb9c497",
       "completed": false,
       "createdAt": "2025-08-21T07:04:29.656Z",
-      "updatedAt": "2025-08-21T07:04:29.656Z",
+      "updatedAt": "2025-08-21T07:20:09.564Z",
       "dependsOn": [],
       "priority": 8,
       "complexity": 6,
-      "status": "pending",
+      "status": "done",
       "tags": [
         "简化优化",
         "预设模板",
         "用户体验"
       ],
       "estimatedHours": 5,
-      "level": 0
+      "level": 0,
+      "actualHours": 1.5
     },
     {
       "id": "bc240507-9512-4805-a895-e04dfd46d3ee",
@@ -803,18 +804,19 @@
       "projectId": "41ab5fc8-847e-4513-925e-d410abb9c497",
       "completed": false,
       "createdAt": "2025-08-21T07:04:42.811Z",
-      "updatedAt": "2025-08-21T07:04:42.811Z",
+      "updatedAt": "2025-08-21T07:20:14.059Z",
       "dependsOn": [],
       "priority": 7,
       "complexity": 4,
-      "status": "pending",
+      "status": "done",
       "tags": [
         "文档优化",
         "注释标准化",
         "代码质量"
       ],
       "estimatedHours": 2.5,
-      "level": 0
+      "level": 0,
+      "actualHours": 0.5
     },
     {
       "id": "2b9d7b9d-48f9-42b4-8410-a9636dcd730e",
