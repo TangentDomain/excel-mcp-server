@@ -200,9 +200,9 @@ def excel_regex_search_directory(
         # 搜索特定文件名模式
         result = excel_regex_search_directory("./reports", r'\\d+', file_pattern=r'.*销售.*')
     """
-    # 临时创建搜索器实例（使用虚拟路径）
-    searcher = ExcelSearcher("dummy.xlsx")
-    result = searcher.regex_search_directory(
+    # 直接调用ExcelSearcher的静态方法，避免创建需要文件路径的实例
+    from .core.excel_search import ExcelSearcher
+    result = ExcelSearcher.search_directory_static(
         directory_path, pattern, flags, search_values, search_formulas,
         recursive, file_extensions, file_pattern, max_files
     )
