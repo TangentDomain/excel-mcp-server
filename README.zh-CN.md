@@ -3,14 +3,14 @@
 <a href="README.md">English</a> | <a href="README.zh-CN.md">简体中文</a>
 </div>
 
-# SheetPilot: 您的 AI 驱动的 Excel 副驾驶 🚀
+# ExcelMCP: 强大的 Excel MCP 服务器 🚀
 
 [![许可证: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![Python 版本](https://img.shields.io/badge/python-3.8+-blue.svg)](https://www.python.org/downloads/)
 [![技术支持: FastMCP](https://img.shields.io/badge/Powered%20by-FastMCP-orange)](https://github.com/your-fastmcp-repo)
 [![状态](https://img.shields.io/badge/status-active-success.svg)]()
 
-**SheetPilot** 是一个强大的模型上下文协议 (MCP) 服务器，它改变了您与 Excel 电子表格的交互方式。告别复杂的公式和手动数据整理。借助 SheetPilot，您可以使用简单的自然语言命令来管理、查询和自动化您的 Excel 工作流。这就像为您的所有电子表格任务配备了一位 AI 副驾驶。
+**ExcelMCP** 是一个强大的模型上下文协议 (MCP) 服务器，它改变了您与 Excel 电子表格的交互方式。告别复杂的公式和手动数据整理。借助 ExcelMCP，您可以使用简单的自然语言命令来管理、查询和自动化您的 Excel 工作流。让 AI 助手直接操控您的 Excel 文件，实现真正的智能化办公。
 
 ---
 
@@ -38,7 +38,7 @@
 
 ### 🚀 快速入门 (5 分钟设置)
 
-只需几个步骤，即可在您喜欢的 MCP 客户端（如 VS Code、Cursor 或 Claude Desktop）中运行 SheetPilot。
+只需几个步骤，即可在您喜欢的 MCP 客户端（如 VS Code、Cursor 或 Claude Desktop）中运行 ExcelMCP。
 
 **先决条件:**
 *   Python 3.8+
@@ -48,8 +48,8 @@
 
 1.  **克隆存储库:**
     ```bash
-    git clone https://github.com/your-username/sheet-pilot.git
-    cd sheet-pilot
+    git clone https://github.com/your-username/excel-mcp.git
+    cd excel-mcp
     ```
 
 2.  **安装依赖项:**
@@ -65,7 +65,7 @@
     ```json
     {
       "mcpServers": {
-        "sheetpilot": {
+        "excelmcp": {
           "command": "python",
           "args": [
             "-m",
@@ -87,7 +87,7 @@
 
 ### 🛠️ 可用工具
 
-SheetPilot 向您的 AI 助手公开了一套丰富的工具集:
+ExcelMCP 向您的 AI 助手公开了一套丰富的工具集:
 
 | 工具名称                       | 描述                                                                 |
 | ------------------------------ | -------------------------------------------------------------------- |
