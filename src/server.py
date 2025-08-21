@@ -96,7 +96,7 @@ def excel_list_sheets(file_path: str) -> Dict[str, Any]:
         file_path: Excel文件路径 (.xlsx/.xlsm)
 
     Returns:
-        Dict: 包含 success、sheets(List[str])、active_sheet(str，当前激活的工作表名称)
+        Dict: 包含 success、sheets、active_sheet
 
     Example:
         # 列出工作表
@@ -229,12 +229,12 @@ def excel_insert_rows(
 
     Args:
         file_path: Excel文件路径 (.xlsx/.xlsm)
-        sheet_name: 目标工作表名称 (必需参数)
-        row_index: 插入位置 (1-based，新行插入到此位置)
-        count: 插入行数 (默认1行)
+        sheet_name: 工作表名称
+        row_index: 插入位置 (1-based)
+        count: 插入行数
 
     Returns:
-        Dict: 包含 success、inserted_rows(int)、message
+        Dict: 包含 success、inserted_rows、message
 
     Example:
         # 在第3行插入1行
@@ -260,12 +260,12 @@ def excel_insert_columns(
 
     Args:
         file_path: Excel文件路径 (.xlsx/.xlsm)
-        sheet_name: 目标工作表名称 (必需参数)
-        column_index: 插入位置 (1-based，新列插入到此位置)
-        count: 插入列数 (默认1列)
+        sheet_name: 工作表名称  
+        column_index: 插入位置 (1-based)
+        count: 插入列数
 
     Returns:
-        Dict: 包含 success、inserted_columns(int)、message
+        Dict: 包含 success、inserted_columns、message
 
     Example:
         # 在第2列插入1列
@@ -288,11 +288,11 @@ def excel_create_file(
     创建新的Excel文件
 
     Args:
-        file_path: 新文件路径 (必须以.xlsx或.xlsm结尾，如文件已存在会被覆盖)
-        sheet_names: 工作表名称列表 (默认["Sheet1"])
+        file_path: 新文件路径 (必须以.xlsx或.xlsm结尾)
+        sheet_names: 工作表名称列表
 
     Returns:
-        Dict: 包含 success、file_path(str)、sheets(List[str])
+        Dict: 包含 success、file_path、sheets
 
     Example:
         # 创建简单文件
@@ -312,15 +312,15 @@ def excel_create_sheet(
     index: Optional[int] = None
 ) -> Dict[str, Any]:
     """
-    在文件中创建新工作表，支持中文字符
+    在文件中创建新工作表
 
     Args:
         file_path: Excel文件路径 (.xlsx/.xlsm)
-        sheet_name: 新工作表名称 (不能与现有重复，支持中文)
+        sheet_name: 新工作表名称 (不能与现有重复)
         index: 插入位置 (0-based，默认末尾)
 
     Returns:
-        Dict: 包含 success、sheet_name(str)、total_sheets(int)
+        Dict: 包含 success、sheet_name、total_sheets
 
     Example:
         # 创建新工作表到末尾
@@ -347,7 +347,7 @@ def excel_delete_sheet(
         sheet_name: 要删除的工作表名称
 
     Returns:
-        Dict: 包含 success、deleted_sheet(str)、remaining_sheets(List[str])
+        Dict: 包含 success、deleted_sheet、remaining_sheets
 
     Example:
         # 删除指定工作表
@@ -374,7 +374,7 @@ def excel_rename_sheet(
         new_name: 新工作表名称 (不能与现有重复)
 
     Returns:
-        Dict: 包含 success、old_name(str)、new_name(str)
+        Dict: 包含 success、old_name、new_name
 
     Example:
         # 重命名工作表
@@ -398,12 +398,12 @@ def excel_delete_rows(
 
     Args:
         file_path: Excel文件路径 (.xlsx/.xlsm)
-        sheet_name: 目标工作表名称 (必需参数)
+        sheet_name: 工作表名称
         row_index: 起始行号 (1-based)
-        count: 删除行数 (默认1行)
+        count: 删除行数
 
     Returns:
-        Dict: 包含 success、deleted_rows(int)、message
+        Dict: 包含 success、deleted_rows、message
 
     Example:
         # 删除第5行
@@ -429,12 +429,12 @@ def excel_delete_columns(
 
     Args:
         file_path: Excel文件路径 (.xlsx/.xlsm)
-        sheet_name: 目标工作表名称 (必需参数)
+        sheet_name: 工作表名称
         column_index: 起始列号 (1-based)
-        count: 删除列数 (默认1列)
+        count: 删除列数
 
     Returns:
-        Dict: 包含 success、deleted_columns(int)、message
+        Dict: 包含 success、deleted_columns、message
 
     Example:
         # 删除第2列
@@ -460,12 +460,12 @@ def excel_set_formula(
 
     Args:
         file_path: Excel文件路径 (.xlsx/.xlsm)
-        sheet_name: 目标工作表名称 (必需参数)
-        cell_address: 目标单元格地址（如"A1"）
-        formula: Excel公式（不包含等号）
+        sheet_name: 工作表名称
+        cell_address: 单元格地址 (如"A1")
+        formula: Excel公式 (不包含等号)
 
     Returns:
-        Dict: 包含 success、formula(str)、calculated_value(Any)、message
+        Dict: 包含 success、formula、calculated_value
 
     Example:
         # 设置求和公式
@@ -489,18 +489,18 @@ def excel_evaluate_formula(
     临时执行Excel公式并返回计算结果，不修改文件
 
     Args:
-        file_path: Excel文件路径 (.xlsx/.xlsm) - 提供公式执行的数据上下文
-        formula: Excel公式（不包含等号），如"SUM(A1:A10)"、"AVERAGE(B:B)"等
-        context_sheet: 公式执行的上下文工作表名称 (可选，不指定则使用所有工作表数据)
+        file_path: Excel文件路径 (.xlsx/.xlsm) 
+        formula: Excel公式 (不包含等号，如"SUM(A1:A10)")
+        context_sheet: 公式执行的上下文工作表名称
 
     Returns:
-        Dict: 包含 success、formula(str)、result(Any)、result_type(str)、execution_time_ms(float)、context_sheet(str)、message
+        Dict: 包含 success、formula、result、result_type
 
     Example:
         # 计算A1:A10的和
         result = excel_evaluate_formula("data.xlsx", "SUM(A1:A10)")
         # 计算特定工作表的平均值
-        result = excel_evaluate_formula("data.xlsx", "AVERAGE(Sheet1!B:B)", "Sheet1")
+        result = excel_evaluate_formula("data.xlsx", "AVERAGE(B:B)", "Sheet1")
     """
     writer = ExcelWriter(file_path)
     result = writer.evaluate_formula(formula, context_sheet)
@@ -521,38 +521,23 @@ def excel_format_cells(
 
     Args:
         file_path: Excel文件路径 (.xlsx/.xlsm)
-        sheet_name: 目标工作表名称 (必需参数)
-        range_expression: 目标范围（如"A1:C10"）
-        formatting: 自定义格式配置字典，支持以下格式：
-            - font: {'name': '宋体', 'size': 12, 'bold': True, 'italic': False, 'color': 'FF0000'}
-            - fill: {'color': 'FFFF00'}  # 背景色
+        sheet_name: 工作表名称
+        range_expression: 目标范围 (如"A1:C10")
+        formatting: 自定义格式配置字典：
+            - font: {'name': '宋体', 'size': 12, 'bold': True, 'color': 'FF0000'}
+            - fill: {'color': 'FFFF00'}
             - alignment: {'horizontal': 'center', 'vertical': 'center'}
-        preset: 预设样式模板，可选值：
-            - "title": 标题样式（大字体、粗体、居中、蓝色背景）
-            - "header": 表头样式（粗体、灰色背景、居中对齐）
-            - "data": 数据样式（标准字体、边框、左对齐）
-            - "highlight": 突出显示（黄色背景、粗体）
-            - "currency": 货币格式（右对齐、数字格式）
+        preset: 预设样式 ("title", "header", "data", "highlight", "currency")
 
     Returns:
-        Dict: 包含 success、formatted_count(int)、message
+        Dict: 包含 success、formatted_count、message
 
     Example:
-        # 使用预设样式（推荐）
+        # 使用预设样式
         result = excel_format_cells("data.xlsx", "Sheet1", "A1:D1", preset="title")
-
         # 使用自定义格式
-        formatting = {
-            'font': {'name': '微软雅黑', 'size': 14, 'bold': True, 'color': '000080'},
-            'fill': {'color': 'E6F3FF'},
-            'alignment': {'horizontal': 'center', 'vertical': 'center'}
-        }
-        result = excel_format_cells("data.xlsx", "Sheet1", "A1:D1", formatting=formatting)
-
-        # 预设样式 + 自定义修改（预设为基础，自定义覆盖）
-        result = excel_format_cells("data.xlsx", "Sheet1", "A1:D1",
-                                  formatting={'font': {'color': 'FF0000'}},
-                                  preset="header")
+        result = excel_format_cells("data.xlsx", "Sheet1", "A1:D1", 
+                                  formatting={'font': {'bold': True, 'color': '000080'}})
     """
     # 预设样式模板
     PRESETS = {
