@@ -77,9 +77,14 @@ python server.py --help
 {
   "mcpServers": {
     "excel-mcp-server": {
-      "command": "python",
-      "args": ["path/to/excel-mcp-server/server.py"],
-      "cwd": "path/to/excel-mcp-server"
+      "command": "uv",
+      "args": [
+        "--directory",
+        "path/to/excel-mcp-server",
+        "run",
+        "python",
+        "src/server.py"
+      ]
     }
   }
 }
@@ -91,9 +96,14 @@ python server.py --help
 {
   "mcpServers": {
     "excel-mcp-server": {
-      "command": "D:/excel-mcp-server/venv/Scripts/python.exe",
-      "args": ["D:/excel-mcp-server/server.py"],
-      "cwd": "D:/excel-mcp-server"
+      "command": "uv",
+      "args": [
+        "--directory",
+        "D:/excel-mcp-server",
+        "run",
+        "python",
+        "src/server.py"
+      ]
     }
   }
 }
@@ -311,7 +321,7 @@ result = excel_set_formula(
 # 计算公式结果
 result = excel_evaluate_formula(
     file_path="example.xlsx",
-    sheet_name="Sheet1", 
+    sheet_name="Sheet1",
     cell_address="D10"
 )
 ```
@@ -322,13 +332,13 @@ result = excel_evaluate_formula(
 # 设置单元格格式
 formatting = {
     'font': {'name': '微软雅黑', 'size': 14, 'bold': True, 'color': '000080'},
-    'fill': {'color': 'E6F3FF'}, 
+    'fill': {'color': 'E6F3FF'},
     'alignment': {'horizontal': 'center', 'vertical': 'center'}
 }
 result = excel_format_cells(
     file_path="example.xlsx",
     sheet_name="Sheet1",
-    range_expression="A1:D1", 
+    range_expression="A1:D1",
     formatting=formatting
 )
 ```
