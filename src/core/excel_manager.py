@@ -14,7 +14,9 @@ from ..models.types import SheetInfo, OperationResult
 from ..utils.validators import ExcelValidator
 from ..utils.exceptions import SheetNotFoundError, DataValidationError
 
+# 设置日志级别为INFO以便调试
 logger = logging.getLogger(__name__)
+logger.setLevel(logging.INFO)
 
 
 class ExcelManager:
@@ -285,9 +287,15 @@ class ExcelManager:
             # 记录删除前的信息
             deleted_sheet_index = workbook.sheetnames.index(sheet_name)
             was_active = workbook[sheet_name] == workbook.active
+            deleted_sheet_name = sheet_name  # 保存要删除的工作表名称
+            
+            logger.info(f"准备删除工作表: {deleted_sheet_name}, 索引: {deleted_sheet_index}")
+            logger.info(f"删除前工作表列表: {workbook.sheetnames}")
 
             # 删除工作表
             workbook.remove(workbook[sheet_name])
+            
+            logger.info(f"删除后工作表列表: {workbook.sheetnames}")
 
             # 如果删除的是活动工作表，设置新的活动工作表
             if was_active:
@@ -301,11 +309,11 @@ class ExcelManager:
 
             # 返回更新后的工作表信息
             remaining_sheet_infos = []
-            for i, sheet_name in enumerate(workbook.sheetnames):
-                sheet = workbook[sheet_name]
+            for i, sheet_name_iter in enumerate(workbook.sheetnames):
+                sheet = workbook[sheet_name_iter]
                 remaining_sheet_infos.append(SheetInfo(
                     index=i,
-                    name=sheet_name,
+                    name=sheet_name_iter,
                     is_active=sheet == workbook.active,
                     max_row=sheet.max_row,
                     max_column=sheet.max_column,
@@ -315,10 +323,10 @@ class ExcelManager:
             return OperationResult(
                 success=True,
                 data=remaining_sheet_infos,  # 添加data字段
-                message=f"成功删除工作表: {sheet_name}",
+                message=f"成功删除工作表: {deleted_sheet_name}",
                 metadata={
                     'file_path': self.file_path,
-                    'deleted_sheet': sheet_name,
+                    'deleted_sheet': deleted_sheet_name,
                     'deleted_index': deleted_sheet_index,
                     'was_active': was_active,
                     'new_active_sheet': workbook.active.title,
