@@ -1014,6 +1014,26 @@
       ],
       "estimatedHours": 2,
       "level": 0
+    },
+    {
+      "id": "f7b2d3aa-d59e-44f0-b909-55657b9e95aa",
+      "name": "修复excel_get_range函数",
+      "details": "修改server.py中的excel_get_range函数签名，添加sheet_name作为必选参数。与excel_update_range的修复方式保持一致，确保用户必须显式指定工作表名。",
+      "projectId": "a49e3bdb-801c-4d5f-98af-77be147f15ea",
+      "completed": true,
+      "createdAt": "2025-08-21T13:30:50.723Z",
+      "updatedAt": "2025-08-21T13:31:19.037Z",
+      "dependsOn": [],
+      "priority": 8,
+      "complexity": 4,
+      "status": "in-progress",
+      "tags": [
+        "bugfix",
+        "api-change",
+        "excel"
+      ],
+      "estimatedHours": 1,
+      "level": 0
     }
   ],
   "subtasks": [],
