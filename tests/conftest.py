@@ -5,9 +5,30 @@ Test configuration and fixtures for Excel MCP Server tests
 import pytest
 import tempfile
 import shutil
+import uuid
+import time
+import logging
 from pathlib import Path
 from openpyxl import Workbook
 from openpyxl.styles import Font, PatternFill, Alignment
+
+# Set up logging to suppress warnings
+logging.getLogger('openpyxl').setLevel(logging.ERROR)
+
+
+def safe_rmtree(path, max_retries=3, delay=0.1):
+    """Safely remove directory tree with retry mechanism for Windows file locking"""
+    for attempt in range(max_retries):
+        try:
+            shutil.rmtree(path)
+            return
+        except PermissionError as e:
+            if attempt == max_retries - 1:
+                # Last attempt failed, log warning but don't fail test
+                logging.warning(f"Could not remove temp directory {path}: {e}")
+                return
+            time.sleep(delay)
+            delay *= 2  # Exponential backoff
 
 
 @pytest.fixture
@@ -15,13 +36,16 @@ def temp_dir():
     """Create a temporary directory for test files"""
     temp_path = Path(tempfile.mkdtemp())
     yield temp_path
-    shutil.rmtree(temp_path)
+    safe_rmtree(temp_path)
 
 
 @pytest.fixture
-def sample_excel_file(temp_dir):
-    """Create a sample Excel file for testing"""
-    file_path = temp_dir / "test_sample.xlsx"
+def sample_excel_file(temp_dir, request):
+    """Create a sample Excel file for testing with unique name"""
+    # Generate unique filename for each test
+    test_id = str(uuid.uuid4())[:8]
+    test_name = request.node.name
+    file_path = temp_dir / f"test_sample_{test_name}_{test_id}.xlsx"
     
     wb = Workbook()
     ws = wb.active
@@ -63,9 +87,12 @@ def sample_excel_file(temp_dir):
 
 
 @pytest.fixture
-def empty_excel_file(temp_dir):
-    """Create an empty Excel file for testing"""
-    file_path = temp_dir / "test_empty.xlsx"
+def empty_excel_file(temp_dir, request):
+    """Create an empty Excel file for testing with unique name"""
+    # Generate unique filename for each test
+    test_id = str(uuid.uuid4())[:8]
+    test_name = request.node.name
+    file_path = temp_dir / f"test_empty_{test_name}_{test_id}.xlsx"
     
     wb = Workbook()
     wb.save(file_path)
@@ -73,9 +100,12 @@ def empty_excel_file(temp_dir):
 
 
 @pytest.fixture
-def multi_sheet_excel_file(temp_dir):
-    """Create an Excel file with multiple sheets for testing"""
-    file_path = temp_dir / "test_multi_sheet.xlsx"
+def multi_sheet_excel_file(temp_dir, request):
+    """Create an Excel file with multiple sheets for testing with unique name"""
+    # Generate unique filename for each test
+    test_id = str(uuid.uuid4())[:8]
+    test_name = request.node.name
+    file_path = temp_dir / f"test_multi_sheet_{test_name}_{test_id}.xlsx"
     
     wb = Workbook()
     

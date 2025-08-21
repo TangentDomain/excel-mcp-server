@@ -20,6 +20,20 @@
       "description": "分析和清理excel-mcp-server项目中的单元测试，识别并删除过时的、重复的或不再需要的测试文件，优化测试套件结构",
       "createdAt": "2025-08-21T02:18:56.407Z",
       "updatedAt": "2025-08-21T02:18:56.407Z"
+    },
+    {
+      "id": "456dd0e0-f926-4454-a4df-9137afecd983",
+      "name": "Excel MCP服务器测试执行",
+      "description": "在虚拟环境中运行excel-mcp-server项目的测试用例，确保代码质量和功能正确性",
+      "createdAt": "2025-08-21T04:31:32.945Z",
+      "updatedAt": "2025-08-21T04:31:32.945Z"
+    },
+    {
+      "id": "6023eade-a6bd-48f4-8c32-94d34057cf68",
+      "name": "测试文件冲突修复",
+      "description": "解决Excel MCP服务器测试中的文件冲突问题，通过串行执行或独立文件副本来避免并发测试时的文件访问冲突",
+      "createdAt": "2025-08-21T04:34:57.230Z",
+      "updatedAt": "2025-08-21T04:34:57.230Z"
     }
   ],
   "tasks": [
@@ -207,6 +221,70 @@
       ],
       "estimatedHours": 4,
       "level": 0
+    },
+    {
+      "id": "ea5b542d-7eda-442b-b2eb-66ba80080d8d",
+      "name": "激活虚拟环境",
+      "details": "检查并激活虚拟环境，确保依赖包正确安装",
+      "projectId": "456dd0e0-f926-4454-a4df-9137afecd983",
+      "completed": false,
+      "createdAt": "2025-08-21T04:31:38.813Z",
+      "updatedAt": "2025-08-21T04:32:22.503Z",
+      "dependsOn": [],
+      "priority": 8,
+      "complexity": 4,
+      "status": "done",
+      "tags": [
+        "环境配置",
+        "依赖管理"
+      ],
+      "estimatedHours": 0.5,
+      "level": 0,
+      "actualHours": 0.2
+    },
+    {
+      "id": "530ac7a0-a8c2-4d29-8f82-5c4eb4a92e53",
+      "name": "运行测试用例",
+      "details": "运行项目的所有测试用例，包括单元测试和集成测试，生成覆盖率报告",
+      "projectId": "456dd0e0-f926-4454-a4df-9137afecd983",
+      "completed": false,
+      "createdAt": "2025-08-21T04:31:44.652Z",
+      "updatedAt": "2025-08-21T04:33:27.536Z",
+      "dependsOn": [
+        "ea5b542d-7eda-442b-b2eb-66ba80080d8d"
+      ],
+      "priority": 9,
+      "complexity": 6,
+      "status": "done",
+      "tags": [
+        "测试",
+        "质量保证",
+        "覆盖率"
+      ],
+      "estimatedHours": 1,
+      "level": 0,
+      "actualHours": 0.8
+    },
+    {
+      "id": "b15e14d1-403a-4259-9336-534e34e3235a",
+      "name": "实现独立文件副本方案",
+      "details": "修改conftest.py，为每个测试创建唯一的Excel文件名，避免并发访问同一文件导致的冲突",
+      "projectId": "6023eade-a6bd-48f4-8c32-94d34057cf68",
+      "completed": false,
+      "createdAt": "2025-08-21T04:35:03.105Z",
+      "updatedAt": "2025-08-21T04:37:05.151Z",
+      "dependsOn": [],
+      "priority": 8,
+      "complexity": 5,
+      "status": "done",
+      "tags": [
+        "文件处理",
+        "测试优化",
+        "并发安全"
+      ],
+      "estimatedHours": 0.5,
+      "level": 0,
+      "actualHours": 0.3
     }
   ],
   "subtasks": [],
