@@ -58,8 +58,26 @@ class ExcelSearcher:
             except re.error as e:
                 raise ValueError(f"无效的正则表达式: {e}")
 
-            # 加载Excel文件
-            workbook = load_workbook(self.file_path, data_only=not search_formulas)
+            # 加载Excel文件 - 添加兼容性处理
+            try:
+                workbook = load_workbook(
+                    self.file_path, 
+                    data_only=not search_formulas,
+                    keep_vba=False,  # 禁用VBA以避免兼容性问题
+                    read_only=False  # 确保可读写模式
+                )
+            except Exception as e:
+                # 如果加载失败，尝试更保守的加载方式
+                logger.warning(f"使用标准方式加载失败，尝试兼容模式: {e}")
+                try:
+                    workbook = load_workbook(
+                        self.file_path,
+                        data_only=True,  # 强制只读取数据
+                        keep_vba=False,
+                        read_only=True   # 只读模式
+                    )
+                except Exception as e2:
+                    raise ValueError(f"无法加载Excel文件: {e2}")
 
             # 执行搜索
             matches = self._search_workbook(
