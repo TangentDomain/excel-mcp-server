@@ -213,6 +213,7 @@ def excel_regex_search_directory(
 @unified_error_handler("范围数据读取", extract_file_context, return_dict=True)
 def excel_get_range(
     file_path: str,
+    sheet_name: str,
     range_expression: str,
     include_formatting: bool = False
 ) -> Dict[str, Any]:
@@ -221,8 +222,9 @@ def excel_get_range(
 
     Args:
         file_path: Excel文件路径 (.xlsx/.xlsm)
-        range_expression: 范围表达式
-            - 单元格: "A1:C10", "Sheet1!A1:C10"
+        sheet_name: 工作表名称 (必选)
+        range_expression: 范围表达式 (不需要包含工作表名)
+            - 单元格: "A1:C10"
             - 整行: "1:5", "3" (单行)
             - 整列: "A:C", "B" (单列)
         include_formatting: 是否包含单元格格式
@@ -231,13 +233,15 @@ def excel_get_range(
         Dict: 包含 success、data(List[List])、range_info
 
     Example:
-        # 读取范围数据
-        result = excel_get_range("data.xlsx", "A1:C10")
-        # 读取指定工作表的数据
-        result = excel_get_range("data.xlsx", "Sheet1!A1:C10", include_formatting=True)
+        # 读取Sheet1中A1:C10范围数据
+        result = excel_get_range("data.xlsx", "Sheet1", "A1:C10")
+        # 包含格式的读取
+        result = excel_get_range("data.xlsx", "Sheet1", "A1:C10", include_formatting=True)
     """
     reader = ExcelReader(file_path)
-    result = reader.get_range(range_expression, include_formatting)
+    # 组合sheet_name和range_expression
+    full_range_expression = f"{sheet_name}!{range_expression}"
+    result = reader.get_range(full_range_expression, include_formatting)
     return _format_result(result)
 
 
