@@ -52,7 +52,8 @@ class ErrorHandler:
 
 def unified_error_handler(
     operation_name: str,
-    context_extractor: Optional[Callable] = None
+    context_extractor: Optional[Callable] = None,
+    return_dict: bool = False
 ):
     """
     统一错误处理装饰器
@@ -60,15 +61,20 @@ def unified_error_handler(
     Args:
         operation_name: 操作名称，用于日志记录
         context_extractor: 上下文提取函数，用于提供错误详情
+        return_dict: 是否返回字典格式（用于MCP接口）
     """
     def decorator(func: Callable) -> Callable:
         @functools.wraps(func)
-        def wrapper(*args, **kwargs) -> OperationResult:
+        def wrapper(*args, **kwargs):
             start_time = time.time()
             
             try:
                 # 执行原函数
                 result = func(*args, **kwargs)
+                
+                # 如果已经是字典格式（MCP接口），直接返回
+                if return_dict and isinstance(result, dict):
+                    return result
                 
                 # 如果返回的不是OperationResult，包装它
                 if not isinstance(result, OperationResult):
@@ -112,10 +118,19 @@ def unified_error_handler(
                 # 格式化错误信息
                 error_info = ErrorHandler.format_error_response(e, context)
                 
-                return OperationResult(
-                    success=False,
-                    error=error_info
-                )
+                # 根据返回类型返回相应格式
+                if return_dict:
+                    # 返回字典格式（用于MCP接口）
+                    return {
+                        'success': False,
+                        'error': error_info
+                    }
+                else:
+                    # 返回OperationResult（用于内部API）
+                    return OperationResult(
+                        success=False,
+                        error=error_info
+                    )
         
         return wrapper
     return decorator

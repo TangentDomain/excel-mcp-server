@@ -388,7 +388,7 @@ def excel_create_file(
 
 
 @mcp.tool()
-@unified_error_handler("创建工作表", extract_file_context)
+@unified_error_handler("创建工作表", extract_file_context, return_dict=True)
 def excel_create_sheet(
     file_path: str,
     sheet_name: str,
@@ -608,7 +608,7 @@ def excel_set_formula(
 
 
 @mcp.tool()
-@unified_error_handler("公式计算", extract_formula_context)
+@unified_error_handler("公式计算", extract_formula_context, return_dict=True)
 def excel_evaluate_formula(
     file_path: str,
     formula: str,
