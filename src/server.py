@@ -267,7 +267,7 @@ def excel_insert_columns(
 
     Args:
         file_path: Excel文件路径 (.xlsx/.xlsm)
-        sheet_name: 工作表名称  
+        sheet_name: 工作表名称
         column_index: 插入位置 (1-based)
         count: 插入列数
 
@@ -454,7 +454,7 @@ def excel_delete_columns(
     return _format_result(result)
 
 
-@mcp.tool()
+# @mcp.tool()
 @unified_error_handler("设置公式", extract_file_context, return_dict=True)
 def excel_set_formula(
     file_path: str,
@@ -485,7 +485,7 @@ def excel_set_formula(
     return _format_result(result)
 
 
-@mcp.tool()
+# @mcp.tool()
 @unified_error_handler("公式计算", extract_formula_context, return_dict=True)
 def excel_evaluate_formula(
     file_path: str,
@@ -496,7 +496,7 @@ def excel_evaluate_formula(
     临时执行Excel公式并返回计算结果，不修改文件
 
     Args:
-        file_path: Excel文件路径 (.xlsx/.xlsm) 
+        file_path: Excel文件路径 (.xlsx/.xlsm)
         formula: Excel公式 (不包含等号，如"SUM(A1:A10)")
         context_sheet: 公式执行的上下文工作表名称
 
@@ -543,7 +543,7 @@ def excel_format_cells(
         # 使用预设样式
         result = excel_format_cells("data.xlsx", "Sheet1", "A1:D1", preset="title")
         # 使用自定义格式
-        result = excel_format_cells("data.xlsx", "Sheet1", "A1:D1", 
+        result = excel_format_cells("data.xlsx", "Sheet1", "A1:D1",
                                   formatting={'font': {'bold': True, 'color': '000080'}})
     """
     # 预设样式模板
