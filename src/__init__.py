@@ -6,5 +6,3 @@ Excel MCP Server - 基于 FastMCP 和 openpyxl 实现
 
 __version__ = "1.0.0"
 __author__ = "Excel MCP Server Team"
-
-from .server import *
