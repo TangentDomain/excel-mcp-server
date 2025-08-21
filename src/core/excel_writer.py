@@ -576,14 +576,14 @@ class ExcelWriter:
             # 尝试从缓存获取结果
             cache = get_formula_cache()
             cached_result = cache.get(self.file_path, formula, context_sheet)
-            
+
             if cached_result is not None:
                 execution_time = round((time.time() - start_time) * 1000, 2)
                 logger.info(f"缓存命中，公式: {formula} = {cached_result}")
-                
+
                 # 确定结果类型
                 result_type = self._get_result_type(cached_result)
-                
+
                 return OperationResult(
                     success=True,
                     message="公式执行成功（缓存）",
@@ -601,7 +601,7 @@ class ExcelWriter:
 
             # 缓存未命中，尝试获取缓存的工作簿
             cached_workbook_data = cache.get_cached_workbook(self.file_path)
-            
+
             if cached_workbook_data:
                 temp_workbook, temp_file_path = cached_workbook_data
                 logger.debug("使用缓存的工作簿进行计算")
@@ -627,7 +627,7 @@ class ExcelWriter:
 
             # 缓存计算结果
             cache.put(self.file_path, formula, calculated_value, context_sheet)
-            
+
             # 确定结果类型
             result_type = self._get_result_type(calculated_value)
 
@@ -657,7 +657,7 @@ class ExcelWriter:
             )
 
     def _create_temp_workbook(
-        self, 
+        self,
         context_sheet: Optional[str],
         cache
     ) -> tuple:
@@ -694,14 +694,14 @@ class ExcelWriter:
         # 保存到临时文件
         temp_file = tempfile.NamedTemporaryFile(suffix='.xlsx', delete=False)
         temp_file.close()
-        
+
         # 保存工作簿
         temp_workbook.save(temp_file.name)
         original_workbook.close()
-        
+
         # 缓存工作簿
         cache.cache_workbook(self.file_path, temp_workbook, temp_file.name)
-        
+
         return temp_workbook, temp_file.name
 
     def _calculate_with_xlcalculator(
@@ -717,10 +717,10 @@ class ExcelWriter:
         temp_sheet = temp_workbook.active
         calc_cell = temp_sheet['Z1']  # 使用Z1作为计算单元格
         calc_cell.value = f"={formula}"
-        
+
         # 保存更新后的工作簿
         temp_workbook.save(temp_file_path)
-        
+
         # 编译模型
         compiler = ModelCompiler()
         model = compiler.read_and_parse_archive(temp_file_path)
@@ -739,7 +739,7 @@ class ExcelWriter:
         # 尝试基础的公式解析
         calculated_value = self._basic_formula_parse(formula, data_sheet)
         data_workbook.close()
-        
+
         return calculated_value
 
     def _get_result_type(self, value) -> str:
