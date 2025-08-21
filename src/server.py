@@ -130,50 +130,24 @@ def excel_regex_search(
     """
     在Excel文件中使用正则表达式搜索单元格内容
 
-    支持跨工作表搜索，可同时搜索单元格值和公式内容。
-
-    常用正则模式示例：
-    - r'\\d+': 匹配数字
-    - r'[A-Za-z]+': 匹配字母
-    - r'\\w+@\\w+\\.\\w+': 匹配邮箱格式
-    - r'^总计|合计$': 匹配特定文本
-    - r'\\d{4}-\\d{2}-\\d{2}': 匹配日期格式(YYYY-MM-DD)
-
     Args:
         file_path: Excel文件路径 (.xlsx/.xlsm)
-        pattern: 正则表达式模式，使用Python re模块语法
-        flags: 正则表达式修饰符，可组合使用：
-            - "i": 忽略大小写
-            - "m": 多行模式
-            - "s": 点号匹配换行符
-            - 示例: "i", "im", "is"
-        search_values: 是否搜索单元格显示值 (默认True)
-        search_formulas: 是否搜索单元格公式 (默认False)
+        pattern: 正则表达式模式，支持常用格式：
+            - r'\\d+': 匹配数字
+            - r'\\w+@\\w+\\.\\w+': 匹配邮箱
+            - r'^总计|合计$': 匹配特定文本
+        flags: 正则修饰符 ("i"忽略大小写, "m"多行, "s"点号匹配换行)
+        search_values: 是否搜索单元格值
+        search_formulas: 是否搜索公式内容
 
     Returns:
-        搜索结果字典：
-        - success (bool): 操作是否成功
-        - matches (List[Dict]): 匹配结果，每项包含:
-            - coordinate (str): 单元格坐标 "A1"
-            - sheet_name (str): 工作表名
-            - value (Any): 单元格值
-            - formula (str): 公式(如有)
-            - matched_text (str): 匹配的文本
-        - match_count (int): 匹配总数
-        - searched_sheets (List[str]): 已搜索的工作表
-        - message (str): 成功信息
-        - error (str): 错误信息(失败时)
-
-    Note:
-        大文件搜索可能耗时较长，建议先使用简单模式测试
+        Dict: 包含 success、matches(List[Dict])、match_count、searched_sheets
 
     Example:
-        # 搜索包含邮箱的单元格
-        result = excel_regex_search(
-            file_path="data.xlsx",
-            pattern=r'\\w+@\\w+\\.\\w+',
-            flags="i"
-        )
+        # 搜索邮箱格式
+        result = excel_regex_search("data.xlsx", r'\\w+@\\w+\\.\\w+', "i")
+        # 搜索数字并包含公式
+        result = excel_regex_search("data.xlsx", r'\\d+', search_formulas=True)
     """
     searcher = ExcelSearcher(file_path)
     result = searcher.regex_search(pattern, flags, search_values, search_formulas)
