@@ -1,13 +1,14 @@
 {
   "mcpServers": {
-    "excel-mcp-server": {
+    "excel-mcp": {
       "command": "uv",
       "args": [
         "--directory",
         "d:/excel-mcp-server",
         "run",
         "python",
-        "src/server.py"
+        "-m",
+        "src.server"
       ]
     }
   }
