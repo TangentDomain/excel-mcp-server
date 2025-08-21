@@ -5,7 +5,7 @@ Fixed tests for ExcelReader class - matching actual API implementation
 import pytest
 from src.core.excel_reader import ExcelReader
 from src.models.types import OperationResult, SheetInfo, CellInfo
-from src.utils.exceptions import FileNotFoundError
+from src.utils.exceptions import ExcelFileNotFoundError
 
 
 class TestExcelReader:

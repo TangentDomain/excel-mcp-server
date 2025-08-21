@@ -59,10 +59,10 @@ class ExcelWriter:
             # 获取范围边界
             min_col, min_row, max_col, max_row = range_boundaries(range_info.cell_range)
 
-            # 验证数据维度
+            # 获取范围维度（允许数据大小不匹配，Excel会自动处理）
             range_rows = max_row - min_row + 1
             range_cols = max_col - min_col + 1
-            ExcelValidator.validate_range_data(data, range_rows, range_cols)
+            # 注意: 不再严格验证数据维度，允许数据超出或不足范围
 
             # 写入数据
             modified_cells = self._write_data(

@@ -262,7 +262,7 @@ class TestExcelWriter:
         formatting = {
             'font': {'name': 'Arial', 'size': 14, 'bold': True, 'color': 'FF0000'},
             'fill': {'color': 'FFFF00'},
-            'alignment': {'horizontal': 'center', 'vertical': 'middle'}
+            'alignment': {'horizontal': 'center', 'vertical': 'center'}
         }
         result = writer.format_cells("A1:D1", formatting, "Sheet1")
         
@@ -291,7 +291,7 @@ class TestExcelWriter:
         """Test updating range with large data"""
         writer = ExcelWriter(sample_excel_file)
         large_data = [[f"Cell_{i}_{j}" for j in range(10)] for i in range(20)]
-        result = writer.update_range("A1:J20", large_data)
+        result = writer.update_range("A1:J20", large_data, preserve_formulas=False)
         
         assert result.success is True
         assert isinstance(result.data, list)

@@ -38,9 +38,9 @@ class TestFixedExcelReader:
         result = reader.get_range("A1:C5")
         
         assert result.success is True
-        assert hasattr(result.data, 'data')
-        assert len(result.data.data) == 5
-        assert result.data.data[0][0] == "姓名"
+        assert isinstance(result.data, list)
+        assert len(result.data) == 5
+        assert result.data[0][0].value == "姓名"
 
 
 class TestFixedExcelWriter:

@@ -10,8 +10,8 @@ class ExcelException(Exception):
     pass
 
 
-class FileNotFoundError(ExcelException):
-    """文件不存在异常"""
+class ExcelFileNotFoundError(FileNotFoundError):
+    """文件不存在异常 - 继承自Python内置FileNotFoundError"""
     pass
 
 

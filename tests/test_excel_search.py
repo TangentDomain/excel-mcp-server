@@ -5,7 +5,7 @@ Fixed tests for ExcelSearcher class - matching actual API implementation
 import pytest
 from src.core.excel_search import ExcelSearcher
 from src.models.types import OperationResult
-from src.utils.exceptions import FileNotFoundError
+from src.utils.exceptions import ExcelFileNotFoundError
 
 
 class TestExcelSearcher:
