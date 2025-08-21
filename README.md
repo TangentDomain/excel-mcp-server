@@ -1,5 +1,11 @@
 
+
+<div align="center">
+<a href="README.md">English</a> | <a href="README.zh-CN.md">简体中文</a>
+</div>
+
 # SheetPilot: Your AI-Powered Excel Co-pilot 🚀
+
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![Python Version](https://img.shields.io/badge/python-3.8+-blue.svg)](https://www.python.org/downloads/)
