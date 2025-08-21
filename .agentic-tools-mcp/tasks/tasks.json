@@ -90,6 +90,13 @@
       "description": "修复README.zh-CN.md文件中与pyproject.toml不一致的项目信息，包括项目名称、版本要求、描述等内容",
       "createdAt": "2025-08-21T10:53:42.171Z",
       "updatedAt": "2025-08-21T10:53:42.171Z"
+    },
+    {
+      "id": "930302b8-a7ea-4764-b6c4-6108eaeef3fc",
+      "name": "项目目录结构整理",
+      "description": "使用git mv命令整理项目目录结构，将分散在根目录的测试文件、Excel文件和工具脚本分类移动到合适的目录中",
+      "createdAt": "2025-08-21T10:57:43.321Z",
+      "updatedAt": "2025-08-21T10:57:43.321Z"
     }
   ],
   "tasks": [
@@ -929,6 +936,57 @@
       "status": "done",
       "tags": [],
       "level": 0
+    },
+    {
+      "id": "3a706da8-c32d-4960-9297-4d53bd2ae7db",
+      "name": "移动测试Python文件到tests目录",
+      "details": "将根目录下的所有test_*.py文件移动到tests/目录中，保持git历史记录",
+      "projectId": "930302b8-a7ea-4764-b6c4-6108eaeef3fc",
+      "completed": true,
+      "createdAt": "2025-08-21T10:57:48.319Z",
+      "updatedAt": "2025-08-21T10:58:17.199Z",
+      "dependsOn": [],
+      "priority": 8,
+      "complexity": 4,
+      "status": "done",
+      "tags": [],
+      "estimatedHours": 0.5,
+      "level": 0,
+      "actualHours": 0.2
+    },
+    {
+      "id": "02374baa-ea5e-4064-a3a3-924bb482cbfb",
+      "name": "整理Excel测试文件到test_data目录",
+      "details": "将根目录下的Excel测试文件移动到tests/test_data/目录中，确保测试数据文件有序组织",
+      "projectId": "930302b8-a7ea-4764-b6c4-6108eaeef3fc",
+      "completed": true,
+      "createdAt": "2025-08-21T10:58:22.033Z",
+      "updatedAt": "2025-08-21T10:59:00.531Z",
+      "dependsOn": [],
+      "priority": 7,
+      "complexity": 5,
+      "status": "done",
+      "tags": [],
+      "estimatedHours": 0.3,
+      "level": 0,
+      "actualHours": 0.2
+    },
+    {
+      "id": "8445e631-f6a7-4544-8c3f-a2b3359749f2",
+      "name": "整理工具脚本到scripts目录",
+      "details": "将工具脚本如run_tests.py和comprehensive_verification.py移动到scripts/或tools/目录中",
+      "projectId": "930302b8-a7ea-4764-b6c4-6108eaeef3fc",
+      "completed": true,
+      "createdAt": "2025-08-21T10:59:05.733Z",
+      "updatedAt": "2025-08-21T10:59:34.625Z",
+      "dependsOn": [],
+      "priority": 6,
+      "complexity": 3,
+      "status": "done",
+      "tags": [],
+      "estimatedHours": 0.3,
+      "level": 0,
+      "actualHours": 0.2
     }
   ],
   "subtasks": [],

@@ -1,0 +1,8 @@
+{
+  "id": "56705c45-1222-4f4e-a278-c16b995e3400",
+  "title": "Excel MCP Server目录结构重构完成",
+  "details": "Excel MCP Server项目目录结构整理完成：\n\n**移动的文件：**\n1. 测试文件整理：\n   - test_compatibility.py → tests/\n   - test_directory_search.py → tests/\n   - test_optimizations.py → tests/\n   - test_optimizations_improved.py → tests/\n\n2. Excel测试数据整理：\n   - comprehensive_test.xlsx → tests/test_data/\n   - demo_test.xlsx → tests/test_data/\n   - test_demo.xlsx → tests/test_data/ (普通mv，非git追踪)\n\n3. 工具脚本整理：\n   - run_tests.py → scripts/\n   - comprehensive_verification.py → scripts/\n\n**结果：**\n- 根目录变得更加简洁\n- 测试相关文件统一归类\n- 工具脚本有专门目录\n- 所有移动操作使用git mv保持历史记录\n\n**提交信息：** \"refactor: reorganize project structure\"",
+  "category": "project_refactor",
+  "dateCreated": "2025-08-21T11:00:03.344Z",
+  "dateUpdated": "2025-08-21T11:00:03.344Z"
+}
