@@ -62,6 +62,13 @@
       "description": "验证Excel MCP Server的三个关键优化功能：公式计算缓存机制、中文字符处理能力和统一错误处理格式。解决Windows文件锁定问题并建立可靠的测试流程。",
       "createdAt": "2025-08-21T06:08:05.522Z",
       "updatedAt": "2025-08-21T06:08:05.522Z"
+    },
+    {
+      "id": "094f2b52-0c08-4c77-a08d-704e36f71ca5",
+      "name": "Excel MCP API短板补齐",
+      "description": "修复Excel MCP Server API评估中发现的主要短板问题，包括：1.统一错误处理装饰器覆盖 2.删除操作安全确认机制 3.复杂API用户体验优化 4.返回值信息增强",
+      "createdAt": "2025-08-21T06:34:24.526Z",
+      "updatedAt": "2025-08-21T06:34:24.526Z"
     }
   ],
   "tasks": [
@@ -674,6 +681,51 @@
       "estimatedHours": 1,
       "level": 0,
       "actualHours": 0.8
+    },
+    {
+      "id": "ab699067-c28b-4b94-a49a-44e06fd09189",
+      "name": "统一错误处理装饰器覆盖",
+      "details": "为剩余13个API添加@unified_error_handler装饰器，提升错误处理一致性。当前只有excel_evaluate_formula和excel_create_sheet使用了统一错误处理，需要将其扩展到所有API",
+      "projectId": "094f2b52-0c08-4c77-a08d-704e36f71ca5",
+      "completed": false,
+      "createdAt": "2025-08-21T06:34:59.889Z",
+      "updatedAt": "2025-08-21T06:36:13.572Z",
+      "dependsOn": [],
+      "priority": 10,
+      "complexity": 6,
+      "status": "in-progress",
+      "tags": [],
+      "level": 0
+    },
+    {
+      "id": "d27d7a12-029d-4f50-82f7-9f52e7df6bf4",
+      "name": "删除操作安全确认机制",
+      "details": "为4个删除相关API添加confirm参数和安全提示机制：excel_delete_sheet, excel_delete_rows, excel_delete_columns。当前删除操作缺少安全确认，存在误操作风险",
+      "projectId": "094f2b52-0c08-4c77-a08d-704e36f71ca5",
+      "completed": false,
+      "createdAt": "2025-08-21T06:35:05.898Z",
+      "updatedAt": "2025-08-21T06:35:05.898Z",
+      "dependsOn": [],
+      "priority": 9,
+      "complexity": 4,
+      "status": "pending",
+      "tags": [],
+      "level": 0
+    },
+    {
+      "id": "2663d71a-6b47-4882-8955-84bdda87e551",
+      "name": "格式化API简化优化",
+      "details": "为excel_format_cells API添加预设样式模板，降低使用复杂度。当前该API参数配置过于复杂，学习成本高，评分仅73%。需要提供常用的格式预设如：标题样式、数据样式、突出显示等",
+      "projectId": "094f2b52-0c08-4c77-a08d-704e36f71ca5",
+      "completed": false,
+      "createdAt": "2025-08-21T06:35:13.022Z",
+      "updatedAt": "2025-08-21T06:35:13.022Z",
+      "dependsOn": [],
+      "priority": 7,
+      "complexity": 5,
+      "status": "pending",
+      "tags": [],
+      "level": 0
     }
   ],
   "subtasks": [],
