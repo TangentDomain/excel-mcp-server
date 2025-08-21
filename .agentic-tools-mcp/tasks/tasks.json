@@ -69,6 +69,13 @@
       "description": "修复Excel MCP Server API评估中发现的主要短板问题，包括：1.统一错误处理装饰器覆盖 2.删除操作安全确认机制 3.复杂API用户体验优化 4.返回值信息增强",
       "createdAt": "2025-08-21T06:34:24.526Z",
       "updatedAt": "2025-08-21T06:34:24.526Z"
+    },
+    {
+      "id": "41ab5fc8-847e-4513-925e-d410abb9c497",
+      "name": "Excel MCP API设计全面优化",
+      "description": "基于综合评分分析的Excel MCP API设计全面优化项目。重点解决5大核心问题：1)参数设计一致性优化 2)删除操作安全确认机制 3)复杂API简化(特别是format_cells) 4)注释质量标准化 5)返回值结构统一化。目标：将整体评分从76.4分提升到85+分，确保所有API达到良好级以上。",
+      "createdAt": "2025-08-21T07:03:51.592Z",
+      "updatedAt": "2025-08-21T07:03:51.592Z"
     }
   ],
   "tasks": [
@@ -726,6 +733,106 @@
       "complexity": 5,
       "status": "pending",
       "tags": [],
+      "level": 0
+    },
+    {
+      "id": "e3926ee0-3268-4879-8cc0-bb1e650aa986",
+      "name": "参数设计一致性优化",
+      "details": "统一所有API中sheet_name参数的位置，建立一致的参数顺序规范。\n\n🎯 **涉及的API (4个)**：\n- excel_insert_rows: sheet_name位置需调整\n- excel_insert_columns: sheet_name位置需调整  \n- excel_delete_rows: sheet_name位置需调整\n- excel_delete_columns: sheet_name位置需调整\n\n📋 **标准化规则**：\n- sheet_name统一作为第二个参数 (file_path之后)\n- 保持与excel_create_sheet, excel_delete_sheet等一致\n- 更新相关测试用例和文档\n\n🎯 **预期效果**：\n- 提升用户学习体验，减少参数记忆负担\n- 提高API设计一致性评分\n- 目标：相关4个API评分提升5-8分",
+      "projectId": "41ab5fc8-847e-4513-925e-d410abb9c497",
+      "completed": false,
+      "createdAt": "2025-08-21T07:04:04.294Z",
+      "updatedAt": "2025-08-21T07:04:04.294Z",
+      "dependsOn": [],
+      "priority": 9,
+      "complexity": 7,
+      "status": "pending",
+      "tags": [
+        "设计一致性",
+        "用户体验",
+        "参数优化"
+      ],
+      "estimatedHours": 3,
+      "level": 0
+    },
+    {
+      "id": "b8491780-eda6-4518-ac95-98d19d7f9c60",
+      "name": "删除操作安全确认机制",
+      "details": "为所有删除操作API添加安全确认机制，防止误操作导致数据丢失。\n\n🎯 **涉及的API (3个)**：\n- excel_delete_sheet: 添加confirm参数\n- excel_delete_rows: 添加confirm参数\n- excel_delete_columns: 添加confirm参数\n\n🔧 **实现方案**：\n- 添加 `confirm: bool = False` 参数\n- confirm=False时抛出安全提示异常\n- confirm=True时执行删除操作\n- 提供清晰的错误信息和使用指导\n\n📋 **安全提示内容**：\n- 明确说明将要删除的内容\n- 提供confirm=True的使用示例\n- 警告不可恢复的风险\n\n🎯 **预期效果**：\n- 大幅提升删除操作安全性\n- 改善用户体验评分\n- 目标：相关3个API评分提升8-10分",
+      "projectId": "41ab5fc8-847e-4513-925e-d410abb9c497",
+      "completed": false,
+      "createdAt": "2025-08-21T07:04:14.987Z",
+      "updatedAt": "2025-08-21T07:04:14.987Z",
+      "dependsOn": [],
+      "priority": 10,
+      "complexity": 8,
+      "status": "pending",
+      "tags": [
+        "安全性",
+        "删除操作",
+        "用户体验"
+      ],
+      "estimatedHours": 4,
+      "level": 0
+    },
+    {
+      "id": "a1baa037-0865-4333-8b05-df234657aba4",
+      "name": "格式化API简化优化",
+      "details": "优化excel_format_cells API，添加常用格式预设模板，降低使用复杂度。\n\n🎯 **核心问题**：\n- 当前评分62分(最低)，formatting参数过于复杂\n- 学习成本高，需要了解详细的格式配置语法\n- 缺少开箱即用的预设样式\n\n🔧 **解决方案**：\n1. **添加预设模板参数**：\n   - `preset: Optional[str] = None` 参数\n   - 支持预设：\"title\", \"header\", \"data\", \"highlight\", \"currency\"等\n\n2. **预设样式定义**：\n   - title: 标题样式(大字体、粗体、居中、背景色)\n   - header: 表头样式(粗体、背景色、边框)\n   - data: 数据样式(标准字体、边框)\n   - highlight: 突出显示(黄色背景、粗体)\n   - currency: 货币格式(数字格式、右对齐)\n\n3. **向下兼容**：\n   - 保持原有formatting参数功能\n   - preset和formatting可以组合使用\n   - preset优先级低于formatting自定义\n\n🎯 **预期效果**：\n- 评分从62分提升至78+分\n- 90%常用场景可以用预设解决\n- 保持高级用户的自定义能力",
+      "projectId": "41ab5fc8-847e-4513-925e-d410abb9c497",
+      "completed": false,
+      "createdAt": "2025-08-21T07:04:29.656Z",
+      "updatedAt": "2025-08-21T07:04:29.656Z",
+      "dependsOn": [],
+      "priority": 8,
+      "complexity": 6,
+      "status": "pending",
+      "tags": [
+        "简化优化",
+        "预设模板",
+        "用户体验"
+      ],
+      "estimatedHours": 5,
+      "level": 0
+    },
+    {
+      "id": "bc240507-9512-4805-a895-e04dfd46d3ee",
+      "name": "注释质量标准化",
+      "details": "标准化API注释格式，特别是修复excel_regex_search的注释问题。\n\n🎯 **重点问题**：\n- excel_regex_search注释格式混乱(评分仅18/30)\n- 注释中存在格式错误和不规范内容\n- 各API注释风格不够统一\n\n🔧 **标准化内容**：\n1. **修复excel_regex_search注释**：\n   - 清理格式错误的注释内容\n   - 重新组织正则表达式示例\n   - 统一参数说明格式\n\n2. **建立注释规范**：\n   - 统一Args部分格式\n   - 标准化Returns部分结构  \n   - 规范Example部分样式\n\n3. **改进示例质量**：\n   - 确保所有示例可运行\n   - 涵盖常用使用场景\n   - 添加返回值示例\n\n🎯 **涉及的API**：\n- 重点：excel_regex_search (急需修复)\n- 一般：excel_format_cells, excel_set_formula等\n\n🎯 **预期效果**：\n- regex_search评分从68分提升至75+分\n- 整体注释质量标准化\n- 提升文档可读性和准确性",
+      "projectId": "41ab5fc8-847e-4513-925e-d410abb9c497",
+      "completed": false,
+      "createdAt": "2025-08-21T07:04:42.811Z",
+      "updatedAt": "2025-08-21T07:04:42.811Z",
+      "dependsOn": [],
+      "priority": 7,
+      "complexity": 4,
+      "status": "pending",
+      "tags": [
+        "文档优化",
+        "注释标准化",
+        "代码质量"
+      ],
+      "estimatedHours": 2.5,
+      "level": 0
+    },
+    {
+      "id": "2b9d7b9d-48f9-42b4-8410-a9636dcd730e",
+      "name": "返回值结构统一化",
+      "details": "统一所有API的返回值结构和字段命名规范，提升一致性。\n\n🎯 **发现的问题**：\n- 部分API返回字段命名略有差异\n- success字段外的其他字段命名不够统一\n- 缺少统一的返回值结构文档\n\n🔧 **统一规范**：\n1. **基础返回结构**：\n   ```\n   {\n       \"success\": bool,           # 统一必有\n       \"message\": str,           # 成功/错误信息\n       \"data\": Any,              # 核心返回数据\n       \"metadata\": Dict,         # 操作元信息\n       \"error_code\": str,        # 错误代码(失败时)\n   }\n   ```\n\n2. **字段命名标准**：\n   - 计数类字段：统一使用_count后缀\n   - 列表类字段：使用复数形式\n   - 路径类字段：使用_path后缀\n   - 状态类字段：使用_status后缀\n\n3. **检查和修正**：\n   - 检查所有15个API的返回值\n   - 识别不一致的字段命名\n   - 统一修正并更新文档\n\n🎯 **预期效果**：\n- 提升API设计质量评分\n- 改善客户端代码的一致性\n- 降低用户学习成本",
+      "projectId": "41ab5fc8-847e-4513-925e-d410abb9c497",
+      "completed": false,
+      "createdAt": "2025-08-21T07:04:55.897Z",
+      "updatedAt": "2025-08-21T07:04:55.897Z",
+      "dependsOn": [],
+      "priority": 6,
+      "complexity": 3,
+      "status": "pending",
+      "tags": [
+        "结构统一",
+        "返回值优化",
+        "一致性"
+      ],
+      "estimatedHours": 2,
       "level": 0
     }
   ],
