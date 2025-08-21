@@ -137,7 +137,9 @@ def excel_regex_search(
     - r'[A-Za-z]+': 匹配字母
     - r'\\w+@\\w+\\.\\w+': 匹配邮箱格式
     - r'^总计|合计$': 匹配特定文本
-    - r'\\d{4}-\\d{2}-\\d{2}': 匹配日期格式(YYYY-MM-DD)    Args:
+    - r'\\d{4}-\\d{2}-\\d{2}': 匹配日期格式(YYYY-MM-DD)
+
+    Args:
         file_path: Excel文件路径 (.xlsx/.xlsm)
         pattern: 正则表达式模式，使用Python re模块语法
         flags: 正则表达式修饰符，可组合使用：
@@ -537,7 +539,8 @@ def excel_format_cells(
     file_path: str,
     sheet_name: str,
     range_expression: str,
-    formatting: Dict[str, Any]
+    formatting: Optional[Dict[str, Any]] = None,
+    preset: Optional[str] = None
 ) -> Dict[str, Any]:
     """
     设置单元格格式（字体、颜色、对齐等）
@@ -546,25 +549,87 @@ def excel_format_cells(
         file_path: Excel文件路径 (.xlsx/.xlsm)
         sheet_name: 目标工作表名称 (必需参数)
         range_expression: 目标范围（如"A1:C10"）
-        formatting: 格式配置字典，支持以下格式：
+        formatting: 自定义格式配置字典，支持以下格式：
             - font: {'name': '宋体', 'size': 12, 'bold': True, 'italic': False, 'color': 'FF0000'}
             - fill: {'color': 'FFFF00'}  # 背景色
             - alignment: {'horizontal': 'center', 'vertical': 'center'}
+        preset: 预设样式模板，可选值：
+            - "title": 标题样式（大字体、粗体、居中、蓝色背景）
+            - "header": 表头样式（粗体、灰色背景、居中对齐）
+            - "data": 数据样式（标准字体、边框、左对齐）
+            - "highlight": 突出显示（黄色背景、粗体）
+            - "currency": 货币格式（右对齐、数字格式）
 
     Returns:
         Dict: 包含 success、formatted_count(int)、message
 
     Example:
-        # 设置标题样式
+        # 使用预设样式（推荐）
+        result = excel_format_cells("data.xlsx", "Sheet1", "A1:D1", preset="title")
+        
+        # 使用自定义格式
         formatting = {
             'font': {'name': '微软雅黑', 'size': 14, 'bold': True, 'color': '000080'},
             'fill': {'color': 'E6F3FF'},
             'alignment': {'horizontal': 'center', 'vertical': 'center'}
         }
-        result = excel_format_cells("data.xlsx", "Sheet1", "A1:D1", formatting)
+        result = excel_format_cells("data.xlsx", "Sheet1", "A1:D1", formatting=formatting)
+        
+        # 预设样式 + 自定义修改（预设为基础，自定义覆盖）
+        result = excel_format_cells("data.xlsx", "Sheet1", "A1:D1", 
+                                  formatting={'font': {'color': 'FF0000'}}, 
+                                  preset="header")
     """
+    # 预设样式模板
+    PRESETS = {
+        "title": {
+            'font': {'name': '微软雅黑', 'size': 16, 'bold': True, 'color': 'FFFFFF'},
+            'fill': {'color': '4472C4'},
+            'alignment': {'horizontal': 'center', 'vertical': 'center'}
+        },
+        "header": {
+            'font': {'name': '微软雅黑', 'size': 12, 'bold': True, 'color': '000000'},
+            'fill': {'color': 'D9E1F2'},
+            'alignment': {'horizontal': 'center', 'vertical': 'center'}
+        },
+        "data": {
+            'font': {'name': '宋体', 'size': 11, 'color': '000000'},
+            'alignment': {'horizontal': 'left', 'vertical': 'center'}
+        },
+        "highlight": {
+            'font': {'bold': True, 'color': '000000'},
+            'fill': {'color': 'FFFF00'}
+        },
+        "currency": {
+            'font': {'name': '宋体', 'size': 11, 'color': '000000'},
+            'alignment': {'horizontal': 'right', 'vertical': 'center'}
+        }
+    }
+    
+    # 构建最终格式配置
+    final_formatting = {}
+    
+    # 1. 如果有预设，先应用预设
+    if preset:
+        if preset not in PRESETS:
+            return {"success": False, "error": f"未知的预设样式: {preset}。可选值: {list(PRESETS.keys())}"}
+        final_formatting = PRESETS[preset].copy()
+    
+    # 2. 如果有自定义格式，合并到最终配置（覆盖预设）
+    if formatting:
+        for key, value in formatting.items():
+            if key in final_formatting and isinstance(final_formatting[key], dict) and isinstance(value, dict):
+                # 深度合并字典类型的格式设置
+                final_formatting[key].update(value)
+            else:
+                final_formatting[key] = value
+    
+    # 3. 如果既没有预设也没有自定义格式，返回错误
+    if not final_formatting:
+        return {"success": False, "error": "必须指定 formatting 或 preset 参数中的至少一个"}
+    
     writer = ExcelWriter(file_path)
-    result = writer.format_cells(range_expression, formatting, sheet_name)
+    result = writer.format_cells(range_expression, final_formatting, sheet_name)
     return _format_result(result)
 
 
