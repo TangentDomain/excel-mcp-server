@@ -194,7 +194,7 @@ class TestOptimizationFeatures:
 
         # 设置短TTL用于测试（注意：这里只是验证接口，不修改全局TTL）
         formula = "MAX(D2:D5)"
-        
+
         # 第一次计算
         result1 = writer.evaluate_formula(formula)
         assert result1.success is True
@@ -213,13 +213,13 @@ class TestOptimizationFeatures:
         """综合工作流测试：组合使用所有优化功能"""
         # 创建测试文件
         file_path = temp_dir / "综合测试.xlsx"
-        
+
         # 1. 使用中文文件名和工作表
         result = ExcelManager.create_file(str(file_path), ["数据汇总"])
         assert result.success is True
 
         manager = ExcelManager(str(file_path))
-        
+
         # 2. 创建多个中文工作表
         chinese_sheets = ["销售数据", "成本分析", "利润/统计"]
         for sheet_name in chinese_sheets:
@@ -253,7 +253,7 @@ class TestOptimizationFeatures:
             start_time = time.time()
             result = writer.evaluate_formula(formula)
             elapsed = time.time() - start_time
-            
+
             assert result.success is True
             first_results.append(result.data)
             first_times.append(elapsed)
@@ -264,7 +264,7 @@ class TestOptimizationFeatures:
             start_time = time.time()
             result = writer.evaluate_formula(formula)
             elapsed = time.time() - start_time
-            
+
             assert result.success is True
             assert result.data == first_results[i]  # 结果一致
             assert result.metadata['cached'] is True  # 确认使用了缓存
@@ -273,7 +273,7 @@ class TestOptimizationFeatures:
         # 5. 验证整体性能提升
         total_first = sum(first_times)
         total_second = sum(second_times)
-        
+
         if total_first > 0:
             improvement = (total_first - total_second) / total_first * 100
             assert improvement > 0, "缓存应该带来性能提升"
@@ -304,7 +304,7 @@ class TestRegressionPrevention:
     def test_existing_error_scenarios_still_work(self, sample_excel_file):
         """确保现有的错误场景仍然正常工作"""
         writer = ExcelWriter(sample_excel_file)
-        
+
         # 测试明确指定不存在的工作表（使用工作表!范围语法）
         result = writer.update_range("这个工作表确实不存在!A1:A1", [["测试"]])
         assert result.success is False, "应该因为工作表不存在而失败"
@@ -312,7 +312,7 @@ class TestRegressionPrevention:
         # 无效范围格式
         result = writer.update_range("INVALID_RANGE_FORMAT", [["测试"]])
         assert result.success is False, "应该因为范围格式无效而失败"
-        
+
         # 空公式
         result = writer.evaluate_formula("")
         assert result.success is False, "空公式应该失败"

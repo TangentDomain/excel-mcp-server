@@ -192,66 +192,66 @@ class ExcelManager:
     def _normalize_sheet_name(self, name: str) -> str:
         """
         规范化工作表名称，确保与Excel兼容
-        
+
         Args:
             name: 原始工作表名称
-            
+
         Returns:
             str: 规范化后的名称
         """
         import re
-        
+
         # Excel工作表名称限制：
         # 1. 不能超过31个字符
         # 2. 不能包含: / \ ? * [ ] :
         # 3. 不能以单引号开头或结尾
-        
+
         # 移除或替换无效字符
         invalid_chars = r'[/\\?*\[\]:]'
         name = re.sub(invalid_chars, '_', name)
-        
+
         # 移除首尾的单引号和空格
         name = name.strip("' \t\n\r")
-        
+
         # 限制长度（考虑中文字符占用更多字节）
         if len(name) > 31:
             # 对于中文字符，保守截取到25个字符
             name = name[:25] + "..."
-        
+
         # 确保名称不为空
         if not name:
             name = "Sheet"
-            
+
         return name
-    
+
     def _create_fallback_name(self, original_name: str, existing_names: list) -> str:
         """
         创建备用工作表名称
-        
+
         Args:
             original_name: 原始名称
             existing_names: 已存在的名称列表
-            
+
         Returns:
             str: 备用名称
         """
         import re
-        
+
         # 尝试创建ASCII兼容的名称
         fallback_base = "Sheet"
-        
+
         # 尝试从原始名称中提取英文字符
         ascii_chars = re.findall(r'[a-zA-Z0-9]', original_name)
         if ascii_chars:
             fallback_base = ''.join(ascii_chars)[:10]  # 最多取10个字符
-        
+
         # 确保名称唯一
         counter = 1
         fallback_name = fallback_base
         while fallback_name in existing_names:
             fallback_name = f"{fallback_base}_{counter}"
             counter += 1
-            
+
         return fallback_name
 
     def delete_sheet(self, sheet_name: str) -> OperationResult:
