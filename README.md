@@ -4,7 +4,7 @@
 <a href="README.md">English</a> | <a href="README.zh-CN.md">简体中文</a>
 </div>
 
-# SheetPilot: Your AI-Powered Excel Co-pilot 🚀
+# ExcelMCP: Powerful Excel MCP Server 🚀
 
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
@@ -12,7 +12,7 @@
 [![Powered by: FastMCP](https://img.shields.io/badge/Powered%20by-FastMCP-orange)](https://github.com/your-fastmcp-repo)
 [![Status](https://img.shields.io/badge/status-active-success.svg)]()
 
-**SheetPilot** is a powerful Model Context Protocol (MCP) server that transforms how you interact with Excel spreadsheets. Say goodbye to complex formulas and manual data wrangling. With SheetPilot, you can manage, query, and automate your Excel workflows using simple natural language commands. It's like having an AI co-pilot for all your spreadsheet tasks.
+**ExcelMCP** is a powerful Model Context Protocol (MCP) server that transforms how you interact with Excel spreadsheets. Say goodbye to complex formulas and manual data wrangling. With ExcelMCP, you can manage, query, and automate your Excel workflows using simple natural language commands. Let AI assistants directly control your Excel files for truly intelligent office automation.
 
 ---
 
@@ -40,7 +40,7 @@
 
 ### 🚀 Getting Started (5-Minute Setup)
 
-Get SheetPilot running in your favorite MCP client (like VS Code, Cursor, or Claude Desktop) with just a few steps.
+Get ExcelMCP running in your favorite MCP client (like VS Code, Cursor, or Claude Desktop) with just a few steps.
 
 **Prerequisites:**
 *   Python 3.8+
@@ -50,8 +50,8 @@ Get SheetPilot running in your favorite MCP client (like VS Code, Cursor, or Cla
 
 1.  **Clone the repository:**
     ```bash
-    git clone https://github.com/your-username/sheet-pilot.git
-    cd sheet-pilot
+    git clone https://github.com/your-username/excel-mcp.git
+    cd excel-mcp
     ```
 
 2.  **Install dependencies:**
@@ -67,7 +67,7 @@ Get SheetPilot running in your favorite MCP client (like VS Code, Cursor, or Cla
     ```json
     {
       "mcpServers": {
-        "sheetpilot": {
+        "excelmcp": {
           "command": "python",
           "args": [
             "-m",
@@ -89,7 +89,7 @@ Get SheetPilot running in your favorite MCP client (like VS Code, Cursor, or Cla
 
 ### 🛠️ Available Tools
 
-SheetPilot exposes a rich set of tools to your AI assistant:
+ExcelMCP exposes a rich set of tools to your AI assistant:
 
 | Tool Name                      | Description                                                              |
 | ------------------------------ | ------------------------------------------------------------------------ |
