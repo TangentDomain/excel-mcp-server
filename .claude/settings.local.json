@@ -1,7 +1,17 @@
 {
   "permissions": {
     "allow": [
-      "*"
+      "Bash(*)",
+      "Bash(uv:*)",
+      "Bash(python:*)",
+      "Bash(.venvScriptsactivate)",
+      "Bash(source:*)",
+      "Bash(mkdir:*)",
+      "Bash(git commit:*)",
+      "Bash(git add:*)",
+      "Bash(pytest:*)",
+      "Bash(pip install:*)",
+      "Bash(PYTHONPATH=D:\\excel-mcp-server\\src pytest:*)"
     ],
     "deny": [],
     "ask": []
