@@ -87,6 +87,7 @@ def _format_result(result) -> Dict[str, Any]:
 # ==================== MCP 工具定义 ====================
 
 @mcp.tool()
+@unified_error_handler("列出工作表", extract_file_context, return_dict=True)
 def excel_list_sheets(file_path: str) -> Dict[str, Any]:
     """
     列出Excel文件中所有工作表名称
@@ -102,30 +103,23 @@ def excel_list_sheets(file_path: str) -> Dict[str, Any]:
         result = excel_list_sheets("data.xlsx")
         # 返回: {'success': True, 'sheets': ['Sheet1', 'Sheet2'], 'active_sheet': 'Sheet1'}
     """
-    try:
-        reader = ExcelReader(file_path)
-        result = reader.list_sheets()
+    reader = ExcelReader(file_path)
+    result = reader.list_sheets()
 
-        # 提取工作表名称列表
-        sheets = [sheet.name for sheet in result.data] if result.data else []
+    # 提取工作表名称列表
+    sheets = [sheet.name for sheet in result.data] if result.data else []
 
-        return {
-            'success': True,
-            'sheets': sheets,
-            'file_path': file_path,
-            'total_sheets': result.metadata.get('total_sheets', len(sheets)) if result.metadata else len(sheets),
-            'active_sheet': result.metadata.get('active_sheet', '') if result.metadata else ''
-        }
-    except Exception as e:
-        logger.error(f"列出工作表失败: {e}")
-        return {
-            'success': False,
-            'error': str(e),
-            'file_path': file_path
-        }
+    return {
+        'success': True,
+        'sheets': sheets,
+        'file_path': file_path,
+        'total_sheets': result.metadata.get('total_sheets', len(sheets)) if result.metadata else len(sheets),
+        'active_sheet': result.metadata.get('active_sheet', '') if result.metadata else ''
+    }
 
 
 @mcp.tool()
+@unified_error_handler("正则搜索", extract_file_context, return_dict=True)
 def excel_regex_search(
     file_path: str,
     pattern: str,
@@ -179,21 +173,13 @@ def excel_regex_search(
             flags="i"
         )
     """
-    try:
-        searcher = ExcelSearcher(file_path)
-        result = searcher.regex_search(pattern, flags, search_values, search_formulas)
-        return _format_result(result)
-    except Exception as e:
-        logger.error(f"正则搜索失败: {e}")
-        return {
-            'success': False,
-            'error': str(e),
-            'file_path': file_path,
-            'pattern': pattern
-        }
+    searcher = ExcelSearcher(file_path)
+    result = searcher.regex_search(pattern, flags, search_values, search_formulas)
+    return _format_result(result)
 
 
 @mcp.tool()
+@unified_error_handler("范围数据读取", extract_file_context, return_dict=True)
 def excel_get_range(
     file_path: str,
     range_expression: str,
@@ -219,21 +205,13 @@ def excel_get_range(
         # 读取指定工作表的数据
         result = excel_get_range("data.xlsx", "Sheet1!A1:C10", include_formatting=True)
     """
-    try:
-        reader = ExcelReader(file_path)
-        result = reader.get_range(range_expression, include_formatting)
-        return _format_result(result)
-    except Exception as e:
-        logger.error(f"获取范围数据失败: {e}")
-        return {
-            'success': False,
-            'error': str(e),
-            'file_path': file_path,
-            'range': range_expression
-        }
+    reader = ExcelReader(file_path)
+    result = reader.get_range(range_expression, include_formatting)
+    return _format_result(result)
 
 
 @mcp.tool()
+@unified_error_handler("范围数据更新", extract_file_context, return_dict=True)
 def excel_update_range(
     file_path: str,
     range_expression: str,
@@ -257,21 +235,13 @@ def excel_update_range(
         data = [["姓名", "年龄"], ["张三", 25]]
         result = excel_update_range("test.xlsx", "A1:B2", data)
     """
-    try:
-        writer = ExcelWriter(file_path)
-        result = writer.update_range(range_expression, data, preserve_formulas)
-        return _format_result(result)
-    except Exception as e:
-        logger.error(f"更新范围数据失败: {e}")
-        return {
-            'success': False,
-            'error': str(e),
-            'file_path': file_path,
-            'range': range_expression
-        }
+    writer = ExcelWriter(file_path)
+    result = writer.update_range(range_expression, data, preserve_formulas)
+    return _format_result(result)
 
 
 @mcp.tool()
+@unified_error_handler("插入行操作", extract_file_context, return_dict=True)
 def excel_insert_rows(
     file_path: str,
     sheet_name: str,
@@ -296,23 +266,13 @@ def excel_insert_rows(
         # 在第5行插入3行
         result = excel_insert_rows("data.xlsx", "Sheet1", 5, 3)
     """
-    try:
-        writer = ExcelWriter(file_path)
-        result = writer.insert_rows(sheet_name, row_index, count)
-        return _format_result(result)
-    except Exception as e:
-        logger.error(f"插入行失败: {e}")
-        return {
-            'success': False,
-            'error': str(e),
-            'file_path': file_path,
-            'sheet_name': sheet_name,
-            'row_index': row_index,
-            'count': count
-        }
+    writer = ExcelWriter(file_path)
+    result = writer.insert_rows(sheet_name, row_index, count)
+    return _format_result(result)
 
 
 @mcp.tool()
+@unified_error_handler("插入列操作", extract_file_context, return_dict=True)
 def excel_insert_columns(
     file_path: str,
     sheet_name: str,
@@ -337,23 +297,13 @@ def excel_insert_columns(
         # 在第1列插入2列
         result = excel_insert_columns("data.xlsx", "Sheet1", 1, 2)
     """
-    try:
-        writer = ExcelWriter(file_path)
-        result = writer.insert_columns(sheet_name, column_index, count)
-        return _format_result(result)
-    except Exception as e:
-        logger.error(f"插入列失败: {e}")
-        return {
-            'success': False,
-            'error': str(e),
-            'file_path': file_path,
-            'sheet_name': sheet_name,
-            'column_index': column_index,
-            'count': count
-        }
+    writer = ExcelWriter(file_path)
+    result = writer.insert_columns(sheet_name, column_index, count)
+    return _format_result(result)
 
 
 @mcp.tool()
+@unified_error_handler("文件创建", extract_file_context, return_dict=True)
 def excel_create_file(
     file_path: str,
     sheet_names: Optional[List[str]] = None
@@ -374,17 +324,8 @@ def excel_create_file(
         # 创建包含多个工作表的文件
         result = excel_create_file("report.xlsx", ["数据", "图表", "汇总"])
     """
-    try:
-        result = ExcelManager.create_file(file_path, sheet_names)
-        return _format_result(result)
-    except Exception as e:
-        logger.error(f"创建Excel文件失败: {e}")
-        return {
-            'success': False,
-            'error': str(e),
-            'file_path': file_path,
-            'sheet_names': sheet_names
-        }
+    result = ExcelManager.create_file(file_path, sheet_names)
+    return _format_result(result)
 
 
 @mcp.tool()
@@ -417,6 +358,7 @@ def excel_create_sheet(
 
 
 @mcp.tool()
+@unified_error_handler("删除工作表", extract_file_context, return_dict=True)
 def excel_delete_sheet(
     file_path: str,
     sheet_name: str
@@ -435,21 +377,13 @@ def excel_delete_sheet(
         # 删除指定工作表
         result = excel_delete_sheet("data.xlsx", "临时数据")
     """
-    try:
-        manager = ExcelManager(file_path)
-        result = manager.delete_sheet(sheet_name)
-        return _format_result(result)
-    except Exception as e:
-        logger.error(f"删除工作表失败: {e}")
-        return {
-            'success': False,
-            'error': str(e),
-            'file_path': file_path,
-            'sheet_name': sheet_name
-        }
+    manager = ExcelManager(file_path)
+    result = manager.delete_sheet(sheet_name)
+    return _format_result(result)
 
 
 @mcp.tool()
+@unified_error_handler("重命名工作表", extract_file_context, return_dict=True)
 def excel_rename_sheet(
     file_path: str,
     old_name: str,
@@ -470,22 +404,13 @@ def excel_rename_sheet(
         # 重命名工作表
         result = excel_rename_sheet("data.xlsx", "Sheet1", "主数据")
     """
-    try:
-        manager = ExcelManager(file_path)
-        result = manager.rename_sheet(old_name, new_name)
-        return _format_result(result)
-    except Exception as e:
-        logger.error(f"重命名工作表失败: {e}")
-        return {
-            'success': False,
-            'error': str(e),
-            'file_path': file_path,
-            'old_name': old_name,
-            'new_name': new_name
-        }
+    manager = ExcelManager(file_path)
+    result = manager.rename_sheet(old_name, new_name)
+    return _format_result(result)
 
 
 @mcp.tool()
+@unified_error_handler("删除行操作", extract_file_context, return_dict=True)
 def excel_delete_rows(
     file_path: str,
     sheet_name: str,
@@ -510,23 +435,13 @@ def excel_delete_rows(
         # 删除第3-5行(3行)
         result = excel_delete_rows("data.xlsx", "Sheet1", 3, 3)
     """
-    try:
-        writer = ExcelWriter(file_path)
-        result = writer.delete_rows(sheet_name, row_index, count)
-        return _format_result(result)
-    except Exception as e:
-        logger.error(f"删除行失败: {e}")
-        return {
-            'success': False,
-            'error': str(e),
-            'file_path': file_path,
-            'sheet_name': sheet_name,
-            'row_index': row_index,
-            'count': count
-        }
+    writer = ExcelWriter(file_path)
+    result = writer.delete_rows(sheet_name, row_index, count)
+    return _format_result(result)
 
 
 @mcp.tool()
+@unified_error_handler("删除列操作", extract_file_context, return_dict=True)
 def excel_delete_columns(
     file_path: str,
     sheet_name: str,
@@ -551,23 +466,13 @@ def excel_delete_columns(
         # 删除第1-3列(3列)
         result = excel_delete_columns("data.xlsx", "Sheet1", 1, 3)
     """
-    try:
-        writer = ExcelWriter(file_path)
-        result = writer.delete_columns(sheet_name, column_index, count)
-        return _format_result(result)
-    except Exception as e:
-        logger.error(f"删除列失败: {e}")
-        return {
-            'success': False,
-            'error': str(e),
-            'file_path': file_path,
-            'sheet_name': sheet_name,
-            'column_index': column_index,
-            'count': count
-        }
+    writer = ExcelWriter(file_path)
+    result = writer.delete_columns(sheet_name, column_index, count)
+    return _format_result(result)
 
 
 @mcp.tool()
+@unified_error_handler("设置公式", extract_file_context, return_dict=True)
 def excel_set_formula(
     file_path: str,
     sheet_name: str,
@@ -592,19 +497,9 @@ def excel_set_formula(
         # 设置平均值公式
         result = excel_set_formula("data.xlsx", "Sheet1", "E1", "AVERAGE(A1:A10)")
     """
-    try:
-        writer = ExcelWriter(file_path)
-        result = writer.set_formula(cell_address, formula, sheet_name)
-        return _format_result(result)
-    except Exception as e:
-        logger.error(f"设置公式失败: {e}")
-        return {
-            'success': False,
-            'error': str(e),
-            'file_path': file_path,
-            'cell_address': cell_address,
-            'formula': formula
-        }
+    writer = ExcelWriter(file_path)
+    result = writer.set_formula(cell_address, formula, sheet_name)
+    return _format_result(result)
 
 
 @mcp.tool()
@@ -637,6 +532,7 @@ def excel_evaluate_formula(
 
 
 @mcp.tool()
+@unified_error_handler("单元格格式化", extract_file_context, return_dict=True)
 def excel_format_cells(
     file_path: str,
     sheet_name: str,
@@ -667,19 +563,9 @@ def excel_format_cells(
         }
         result = excel_format_cells("data.xlsx", "Sheet1", "A1:D1", formatting)
     """
-    try:
-        writer = ExcelWriter(file_path)
-        result = writer.format_cells(range_expression, formatting, sheet_name)
-        return _format_result(result)
-    except Exception as e:
-        logger.error(f"格式化单元格失败: {e}")
-        return {
-            'success': False,
-            'error': str(e),
-            'file_path': file_path,
-            'range': range_expression,
-            'formatting': formatting
-        }
+    writer = ExcelWriter(file_path)
+    result = writer.format_cells(range_expression, formatting, sheet_name)
+    return _format_result(result)
 
 
 # ==================== 主程序 ====================
