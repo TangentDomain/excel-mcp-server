@@ -102,10 +102,10 @@ def excel_list_sheets(file_path: str) -> Dict[str, Any]:
     try:
         reader = ExcelReader(file_path)
         result = reader.list_sheets()
-        
+
         # 提取工作表名称列表
         sheets = [sheet.name for sheet in result.data] if result.data else []
-        
+
         return {
             'success': True,
             'sheets': sheets,
