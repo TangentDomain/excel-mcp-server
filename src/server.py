@@ -36,7 +36,14 @@ from .core.excel_search import ExcelSearcher
 from .utils.error_handler import unified_error_handler, extract_file_context, extract_formula_context
 
 # ==================== 配置和初始化 ====================
-logging.basicConfig(level=logging.WARNING)
+# 开启详细日志用于调试
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
+    handlers=[
+        logging.StreamHandler(),
+    ]
+)
 logger = logging.getLogger(__name__)
 
 # 创建FastMCP服务器实例
