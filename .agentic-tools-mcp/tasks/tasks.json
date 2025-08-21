@@ -188,6 +188,25 @@
       "estimatedHours": 1,
       "level": 0,
       "actualHours": 0.5
+    },
+    {
+      "id": "a5360295-c762-48c6-ba57-ba4cc307d99f",
+      "name": "修复测试用例以适应当前API",
+      "details": "根据用户要求，不修改API，而是调整测试用例以适应当前的API响应格式。主要需要修复：1)响应字段名不匹配 2)数据结构假设错误 3)metadata字段缺失等问题。",
+      "projectId": "541ef521-eba9-4a8c-9c89-b92e6d386450",
+      "completed": false,
+      "createdAt": "2025-08-21T02:35:14.905Z",
+      "updatedAt": "2025-08-21T02:35:20.508Z",
+      "dependsOn": [],
+      "priority": 9,
+      "complexity": 8,
+      "status": "in-progress",
+      "tags": [
+        "test-fix",
+        "api-compatibility"
+      ],
+      "estimatedHours": 4,
+      "level": 0
     }
   ],
   "subtasks": [],
