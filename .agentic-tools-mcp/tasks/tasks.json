@@ -76,6 +76,13 @@
       "description": "基于综合评分分析的Excel MCP API设计全面优化项目。重点解决5大核心问题：1)参数设计一致性优化 2)删除操作安全确认机制 3)复杂API简化(特别是format_cells) 4)注释质量标准化 5)返回值结构统一化。目标：将整体评分从76.4分提升到85+分，确保所有API达到良好级以上。",
       "createdAt": "2025-08-21T07:03:51.592Z",
       "updatedAt": "2025-08-21T07:03:51.592Z"
+    },
+    {
+      "id": "48500b20-b6df-4b7e-8373-5406f5cda5f1",
+      "name": "Excel MCP API参数顺序标准化",
+      "description": "标准化Excel MCP服务器的所有API参数顺序，统一为 (file_path, sheet_name, target, operation_params...) 的模式，提高接口一致性和易用性",
+      "createdAt": "2025-08-21T08:14:29.922Z",
+      "updatedAt": "2025-08-21T08:14:29.922Z"
     }
   ],
   "tasks": [
@@ -836,6 +843,22 @@
         "一致性"
       ],
       "estimatedHours": 2,
+      "level": 0
+    },
+    {
+      "id": "18355889-6f0e-41f6-8d70-c5571d4f49b4",
+      "name": "制定参数顺序标准",
+      "details": "分析当前15个API的参数顺序，制定统一标准：\n1. file_path: 总是第一位\n2. sheet_name: 如果需要工作表，总是第二位  \n3. target: 操作目标（range_expression, row_index, column_index等）\n4. operation_params: 具体操作参数（data, count, formatting等）",
+      "projectId": "48500b20-b6df-4b7e-8373-5406f5cda5f1",
+      "completed": false,
+      "createdAt": "2025-08-21T08:14:35.733Z",
+      "updatedAt": "2025-08-21T08:14:40.241Z",
+      "dependsOn": [],
+      "priority": 9,
+      "complexity": 6,
+      "status": "in-progress",
+      "tags": [],
+      "estimatedHours": 1,
       "level": 0
     }
   ],
