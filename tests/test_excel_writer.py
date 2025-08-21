@@ -221,7 +221,7 @@ class TestExcelWriter:
         # Verify the formula is set
         wb = load_workbook(sample_excel_file)
         ws = wb.active
-        assert ws["F1"].value == "SUM(A1:A5)"
+        assert ws["F1"].value == "=SUM(A1:A5)"  # Excel存储公式时包含等号
     
     def test_set_formula_invalid_sheet(self, sample_excel_file):
         """Test setting formula in non-existent sheet"""

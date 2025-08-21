@@ -34,6 +34,20 @@
       "description": "解决Excel MCP服务器测试中的文件冲突问题，通过串行执行或独立文件副本来避免并发测试时的文件访问冲突",
       "createdAt": "2025-08-21T04:34:57.230Z",
       "updatedAt": "2025-08-21T04:34:57.230Z"
+    },
+    {
+      "id": "0e009559-0454-45be-9e26-e300bae44732",
+      "name": "测试失败批量修复",
+      "description": "系统性修复Excel MCP服务器项目中的15个测试失败，包括API返回格式、异常处理、业务逻辑和类型设计问题",
+      "createdAt": "2025-08-21T04:41:06.586Z",
+      "updatedAt": "2025-08-21T04:41:06.586Z"
+    },
+    {
+      "id": "f418e225-880e-43c6-a065-6d88e71aa0fa",
+      "name": "Excel MCP Server 测试修复",
+      "description": "系统性修复Excel MCP服务器项目中的13个测试失败，包括API格式一致性、异常处理、模型设计等问题",
+      "createdAt": "2025-08-21T04:45:50.222Z",
+      "updatedAt": "2025-08-21T04:45:50.222Z"
     }
   ],
   "tasks": [
@@ -285,6 +299,126 @@
       "estimatedHours": 0.5,
       "level": 0,
       "actualHours": 0.3
+    },
+    {
+      "id": "abbd69ef-cd7e-48e9-9286-1d1d10a540e9",
+      "name": "修复文件创建验证问题",
+      "details": "修复文件创建验证器，添加validate_file_for_creation方法，允许覆盖已存在的文件",
+      "projectId": "0e009559-0454-45be-9e26-e300bae44732",
+      "completed": false,
+      "createdAt": "2025-08-21T04:41:42.208Z",
+      "updatedAt": "2025-08-21T04:43:01.096Z",
+      "dependsOn": [],
+      "priority": 9,
+      "complexity": 7,
+      "status": "done",
+      "tags": [
+        "API设计",
+        "验证器",
+        "文件操作"
+      ],
+      "estimatedHours": 0.5,
+      "level": 0,
+      "actualHours": 0.2
+    },
+    {
+      "id": "9702118c-8e87-4547-b8f5-e52247c149c7",
+      "name": "修复API返回格式一致性",
+      "details": "修复API返回格式不一致问题，确保delete_sheet和rename_sheet返回正确的data字段",
+      "projectId": "0e009559-0454-45be-9e26-e300bae44732",
+      "completed": false,
+      "createdAt": "2025-08-21T04:41:48.133Z",
+      "updatedAt": "2025-08-21T04:43:05.807Z",
+      "dependsOn": [],
+      "priority": 8,
+      "complexity": 6,
+      "status": "in-progress",
+      "tags": [
+        "API设计",
+        "数据结构"
+      ],
+      "estimatedHours": 0.3,
+      "level": 0
+    },
+    {
+      "id": "09730d35-9bba-4862-8477-5a7b81a305f8",
+      "name": "修复异常处理逻辑",
+      "details": "修复异常处理，确保FileNotFoundError在初始化时被正确处理，修改测试期望或者增加异常捕获",
+      "projectId": "0e009559-0454-45be-9e26-e300bae44732",
+      "completed": false,
+      "createdAt": "2025-08-21T04:41:54.081Z",
+      "updatedAt": "2025-08-21T04:41:54.081Z",
+      "dependsOn": [],
+      "priority": 7,
+      "complexity": 5,
+      "status": "pending",
+      "tags": [
+        "异常处理",
+        "测试设计"
+      ],
+      "estimatedHours": 0.3,
+      "level": 0
+    },
+    {
+      "id": "2eb85317-adba-4e4a-8d07-a0b3ed826a7d",
+      "name": "修复SheetInfo可哈希性",
+      "details": "修复SheetInfo类型，添加__hash__和__eq__方法使其可哈希，解决类型设计问题",
+      "projectId": "0e009559-0454-45be-9e26-e300bae44732",
+      "completed": false,
+      "createdAt": "2025-08-21T04:42:00.253Z",
+      "updatedAt": "2025-08-21T04:42:00.253Z",
+      "dependsOn": [],
+      "priority": 6,
+      "complexity": 4,
+      "status": "pending",
+      "tags": [
+        "类型设计",
+        "哈希支持"
+      ],
+      "estimatedHours": 0.2,
+      "level": 0
+    },
+    {
+      "id": "243c4272-2a82-41cc-bd1c-10bc48c9c15c",
+      "name": "修复模型类型问题",
+      "details": "修复SheetInfo模型的参数错误和缺失字段、添加__hash__和__eq__方法，确保模型可哈希和可比较",
+      "projectId": "f418e225-880e-43c6-a065-6d88e71aa0fa",
+      "completed": false,
+      "createdAt": "2025-08-21T04:46:10.820Z",
+      "updatedAt": "2025-08-21T04:46:39.909Z",
+      "dependsOn": [],
+      "priority": 9,
+      "complexity": 8,
+      "status": "done",
+      "tags": [
+        "models",
+        "hashability",
+        "SheetInfo"
+      ],
+      "estimatedHours": 2,
+      "level": 0,
+      "actualHours": 0.5
+    },
+    {
+      "id": "578885dd-521d-45d8-8a8e-d4a9dfd924fb",
+      "name": "修复API返回格式一致性",
+      "details": "修复API返回格式不一致性问题，确保所有方法返回OperationResult中的data字段格式一致",
+      "projectId": "f418e225-880e-43c6-a065-6d88e71aa0fa",
+      "completed": false,
+      "createdAt": "2025-08-21T04:46:58.965Z",
+      "updatedAt": "2025-08-21T04:49:33.370Z",
+      "dependsOn": [],
+      "priority": 8,
+      "complexity": 6,
+      "status": "done",
+      "tags": [
+        "api",
+        "format",
+        "consistency"
+      ],
+      "estimatedHours": 3,
+      "level": 0,
+      "actualHours": 1
     }
   ],
   "subtasks": [],
