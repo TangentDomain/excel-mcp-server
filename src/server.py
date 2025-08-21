@@ -32,6 +32,9 @@ from .core.excel_writer import ExcelWriter
 from .core.excel_manager import ExcelManager
 from .core.excel_search import ExcelSearcher
 
+# 导入统一错误处理
+from .utils.error_handler import unified_error_handler, extract_file_context, extract_formula_context
+
 # ==================== 配置和初始化 ====================
 logging.basicConfig(level=logging.WARNING)
 logger = logging.getLogger(__name__)
@@ -385,17 +388,18 @@ def excel_create_file(
 
 
 @mcp.tool()
+@unified_error_handler("创建工作表", extract_file_context)
 def excel_create_sheet(
     file_path: str,
     sheet_name: str,
     index: Optional[int] = None
 ) -> Dict[str, Any]:
     """
-    在文件中创建新工作表
+    在文件中创建新工作表，支持中文字符
 
     Args:
         file_path: Excel文件路径 (.xlsx/.xlsm)
-        sheet_name: 新工作表名称 (不能与现有重复)
+        sheet_name: 新工作表名称 (不能与现有重复，支持中文)
         index: 插入位置 (0-based，默认末尾)
 
     Returns:
@@ -407,19 +411,9 @@ def excel_create_sheet(
         # 创建新工作表到指定位置
         result = excel_create_sheet("data.xlsx", "首页", 0)
     """
-    try:
-        manager = ExcelManager(file_path)
-        result = manager.create_sheet(sheet_name, index)
-        return _format_result(result)
-    except Exception as e:
-        logger.error(f"创建工作表失败: {e}")
-        return {
-            'success': False,
-            'error': str(e),
-            'file_path': file_path,
-            'sheet_name': sheet_name,
-            'index': index
-        }
+    manager = ExcelManager(file_path)
+    result = manager.create_sheet(sheet_name, index)
+    return _format_result(result)
 
 
 @mcp.tool()
@@ -614,6 +608,7 @@ def excel_set_formula(
 
 
 @mcp.tool()
+@unified_error_handler("公式计算", extract_formula_context)
 def excel_evaluate_formula(
     file_path: str,
     formula: str,
@@ -636,19 +631,9 @@ def excel_evaluate_formula(
         # 计算特定工作表的平均值
         result = excel_evaluate_formula("data.xlsx", "AVERAGE(Sheet1!B:B)", "Sheet1")
     """
-    try:
-        writer = ExcelWriter(file_path)
-        result = writer.evaluate_formula(formula, context_sheet)
-        return _format_result(result)
-    except Exception as e:
-        logger.error(f"公式执行失败: {e}")
-        return {
-            'success': False,
-            'error': str(e),
-            'file_path': file_path,
-            'formula': formula,
-            'context_sheet': context_sheet
-        }
+    writer = ExcelWriter(file_path)
+    result = writer.evaluate_formula(formula, context_sheet)
+    return _format_result(result)
 
 
 @mcp.tool()
