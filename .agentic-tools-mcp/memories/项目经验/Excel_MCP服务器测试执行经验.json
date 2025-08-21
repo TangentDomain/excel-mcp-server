@@ -1,0 +1,8 @@
+{
+  "id": "3eeafadb-bda6-4538-b447-f9e24b26cdf7",
+  "title": "Excel MCP服务器测试执行经验",
+  "details": "Excel MCP服务器项目测试执行经验总结：\n\n## 环境配置\n- 项目使用uv作为包管理器，比传统pip更快\n- 需要手动添加coverage和pytest-cov依赖：`uv add coverage pytest-cov --dev`\n- 直接使用`uv run python -m pytest`比run_tests.py脚本更稳定\n\n## 测试结果分析\n- 总计135个测试：120个通过(89%)，15个失败，4个错误\n- 代码覆盖率61%，核心模块覆盖率较好(excel_reader 97%, excel_manager 94%)\n- excel_writer模块覆盖率较低(37%)，需要重点改进\n\n## 主要问题类型\n1. Windows文件锁定：临时文件删除时权限错误，建议添加重试机制\n2. API返回格式不一致：部分方法返回data=None但测试期望非空\n3. 类型设计：SheetInfo等类型需要实现__hash__方法\n4. 公式计算：result存储在metadata而非data字段\n5. 单元格格式：openpyxl对齐选项验证过严\n\n## 改进建议\n- 统一API返回格式，确保data字段一致性\n- 实现__hash__方法使模型类可哈希\n- 优化Windows环境下的文件处理\n- 提高excel_writer模块的测试覆盖率",
+  "category": "项目经验",
+  "dateCreated": "2025-08-21T04:33:41.025Z",
+  "dateUpdated": "2025-08-21T04:33:41.025Z"
+}

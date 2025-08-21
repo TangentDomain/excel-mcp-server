@@ -38,3 +38,9 @@ addopts = "-v --tb=short"
 markers = [
     "slow: marks tests as slow (deselect with '-m \"not slow\"')",
 ]
+
+[dependency-groups]
+dev = [
+    "coverage>=7.10.4",
+    "pytest-cov>=6.2.1",
+]
