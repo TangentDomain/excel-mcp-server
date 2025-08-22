@@ -213,6 +213,8 @@ class RowDifference:
     sheet_name: str                 # 所在工作表名称（必选）
     # 保留详细的字段级差异，客户端可按需格式化
     detailed_field_differences: Optional[List[FieldDifference]] = None  # 详细的字段级差异
+    # 新增：未变化的字段信息，用于完整对象重建
+    unchanged_field_differences: Optional[List[FieldDifference]] = None  # 未变化的字段信息
 
 
 @dataclass

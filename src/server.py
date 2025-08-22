@@ -729,20 +729,18 @@ def excel_compare_sheets(
                 "total_differences": 3,
                 "row_differences": [
                     // 字段定义
-                    ["row_id", "difference_type", "row_index1", "row_index2", "sheet_name", "changed_fields", "unchanged_fields"],
+                    ["row_id", "difference_type", "row_index1", "row_index2", "sheet_name", "field_differences"],
 
                     // 新增行
-                    ["100001", "row_added", 0, 5, "TrSkill", null, null],
+                    ["100001", "row_added", 0, 5, "TrSkill", null],
 
                     // 删除行
-                    ["100002", "row_removed", 8, 0, "TrSkill", null, null],
+                    ["100002", "row_removed", 8, 0, "TrSkill", null],
 
-                    // 修改行 - 同时包含变化和不变的字段
+                    // 修改行 - 包含变化的字段
                     ["100003", "row_modified", 10, 10, "TrSkill",
-                        // changed_fields: 变化的字段数组，每个元素格式 [字段名, 旧值, 新值, 变化类型]
-                        [["技能名称", "火球术", "冰球术", "text_change"]],
-                        // unchanged_fields: 不变的字段数组，每个元素格式 [字段名, 当前值]
-                        [["技能ID", 100003], ["技能类型", 1], ["消耗MP", 50]]
+                        // field_differences: 变化的字段数组，每个元素格式 [字段名, 旧值, 新值, 变化类型]
+                        [["技能名称", "火球术", "冰球术", "text_change"]]
                     ]
                 ],
                 "structural_changes": {
@@ -756,16 +754,12 @@ def excel_compare_sheets(
         row_differences[1+] = 实际数据行
 
         对于row_modified类型：
-        - changed_fields: 变化的字段数组
+        - field_differences: 变化的字段数组
           格式：[[字段名, 旧值, 新值, 变化类型], ...]
           变化类型："text_change" | "numeric_change" | "formula_change"
-        - unchanged_fields: 不变的字段数组
-          格式：[[字段名, 当前值], ...]
-          说明：只存储一份值，因为在两个文件中相同
 
         对于row_added/row_removed类型：
-        - changed_fields和unchanged_fields均为null
-        - 因为整行都是变化，没有不变的字段
+        - field_differences为null，因为整行都是变化
 
     Example:
         result = excel_compare_sheets("old.xlsx", "Sheet1", "new.xlsx", "Sheet1")
