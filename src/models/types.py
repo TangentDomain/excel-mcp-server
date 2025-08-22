@@ -162,7 +162,7 @@ class ComparisonOptions:
     game_friendly_format: bool = True     # 游戏开发友好的输出格式
 
 
-@dataclass 
+@dataclass
 class RowDifference:
     """行级差异信息"""
     row_id: Any                     # 行的唯一标识

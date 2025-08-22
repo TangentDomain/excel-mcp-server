@@ -700,7 +700,7 @@ def excel_compare_files(
 ) -> Dict[str, Any]:
     """
     比较两个Excel文件
-    
+
     Args:
         file1_path: 第一个Excel文件路径
         file2_path: 第二个Excel文件路径
@@ -709,12 +709,12 @@ def excel_compare_files(
         compare_formats: 是否比较格式
         ignore_empty_cells: 是否忽略空单元格
         case_sensitive: 是否区分大小写
-        
+
     Returns:
         Dict: 包含比较结果的字典
     """
     from .models.types import ComparisonOptions
-    
+
     # 创建比较选项
     options = ComparisonOptions(
         compare_values=compare_values,
@@ -723,7 +723,7 @@ def excel_compare_files(
         ignore_empty_cells=ignore_empty_cells,
         case_sensitive=case_sensitive
     )
-    
+
     comparer = ExcelComparer(options)
     result = comparer.compare_files(file1_path, file2_path)
     return _format_result(result)
@@ -749,7 +749,7 @@ def excel_compare_sheets(
 ) -> Dict[str, Any]:
     """
     比较两个Excel工作表（游戏开发优化版）
-    
+
     Args:
         file1_path: 第一个Excel文件路径
         sheet1_name: 第一个工作表名称
@@ -765,12 +765,12 @@ def excel_compare_sheets(
         id_column: ID列位置（1-based数字或列名），默认第一列
         show_numeric_changes: 显示数值变化量和百分比
         game_friendly_format: 使用游戏开发友好的输出格式
-        
+
     Returns:
         Dict: 包含比较结果的字典
     """
     from .models.types import ComparisonOptions
-    
+
     # 创建比较选项
     options = ComparisonOptions(
         compare_values=compare_values,
@@ -784,7 +784,7 @@ def excel_compare_sheets(
         show_numeric_changes=show_numeric_changes,
         game_friendly_format=game_friendly_format
     )
-    
+
     comparer = ExcelComparer(options)
     result = comparer.compare_sheets(file1_path, sheet1_name, file2_path, sheet2_name)
     return _format_result(result)
