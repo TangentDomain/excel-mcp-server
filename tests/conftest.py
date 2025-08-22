@@ -40,6 +40,27 @@ def temp_dir():
 
 
 @pytest.fixture
+def temp_dir_with_excel_files(temp_dir):
+    """Create a temporary directory with sample Excel files"""
+    # Create some sample Excel files
+    for i in range(3):
+        wb = Workbook()
+        ws = wb.active
+        ws.title = f"Sheet{i+1}"
+
+        # Add some test data
+        ws['A1'] = f"标题{i+1}"
+        ws['B1'] = f"数据{i+1}"
+        ws['A2'] = f"内容{i+1}"
+        ws['B2'] = i * 100
+
+        file_path = temp_dir / f"test_file_{i+1}.xlsx"
+        wb.save(str(file_path))
+
+    yield str(temp_dir)
+
+
+@pytest.fixture
 def sample_excel_file(temp_dir, request):
     """Create a sample Excel file for testing with unique name"""
     # Generate unique filename for each test
