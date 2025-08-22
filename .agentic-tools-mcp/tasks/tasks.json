@@ -111,6 +111,13 @@
       "description": "检查所有Excel MCP服务器接口的准确性，确保sheet_name等关键参数的强制性，排除上下文依赖和易错点",
       "createdAt": "2025-08-22T02:19:29.050Z",
       "updatedAt": "2025-08-22T02:19:29.050Z"
+    },
+    {
+      "id": "7e71a64e-6a7d-47b8-a837-85a44cd4e315",
+      "name": "Excel比较功能开发",
+      "description": "为Excel MCP服务器添加比较功能，包括Excel文件比较和工作表(sheet)比较。支持数据差异检测、结构差异分析、格式比较等功能。",
+      "createdAt": "2025-08-22T07:10:01.621Z",
+      "updatedAt": "2025-08-22T07:10:01.621Z"
     }
   ],
   "tasks": [
@@ -1055,6 +1062,130 @@
       "complexity": 8,
       "status": "done",
       "tags": [],
+      "estimatedHours": 3,
+      "level": 0
+    },
+    {
+      "id": "55a3445b-ebdd-48a4-9de2-badbfa7c166d",
+      "name": "创建Excel比较核心模块",
+      "details": "创建核心比较模块excel_compare.py，实现Excel文件和工作表比较的核心逻辑。包括：1）数据差异比较；2）结构差异分析（行数、列数、工作表数量）；3）格式差异检测（可选）；4）生成详细的比较报告。需要遵循项目现有的模块化设计模式和错误处理机制。",
+      "projectId": "7e71a64e-6a7d-47b8-a837-85a44cd4e315",
+      "completed": true,
+      "createdAt": "2025-08-22T07:10:30.550Z",
+      "updatedAt": "2025-08-22T07:13:24.603Z",
+      "dependsOn": [],
+      "priority": 9,
+      "complexity": 8,
+      "status": "done",
+      "tags": [
+        "core",
+        "backend",
+        "comparison"
+      ],
+      "estimatedHours": 6,
+      "level": 0
+    },
+    {
+      "id": "35fffb3c-b2eb-43e8-9382-fd64ad276ccc",
+      "name": "扩展数据模型支持比较功能",
+      "details": "为types.py添加比较功能相关的数据模型定义。包括：1）ComparisonResult数据类用于存储比较结果；2）DifferenceType枚举定义差异类型（数据、结构、格式）；3）CellDifference数据类存储单元格级别的差异；4）SheetComparison数据类存储工作表比较结果。",
+      "projectId": "7e71a64e-6a7d-47b8-a837-85a44cd4e315",
+      "completed": true,
+      "createdAt": "2025-08-22T07:10:37.389Z",
+      "updatedAt": "2025-08-22T07:11:55.539Z",
+      "dependsOn": [],
+      "priority": 10,
+      "complexity": 6,
+      "status": "done",
+      "tags": [
+        "models",
+        "data-structure"
+      ],
+      "estimatedHours": 2,
+      "level": 0
+    },
+    {
+      "id": "e514723e-d4ef-428f-8dc4-73149ef4f3f1",
+      "name": "添加Excel比较MCP接口",
+      "details": "在server.py中添加Excel比较功能的MCP接口。包括：1）excel_compare_files - 比较两个Excel文件；2）excel_compare_sheets - 比较两个工作表；3）接口参数设计要与现有API保持一致；4）使用统一的错误处理装饰器；5）返回统一的OperationResult格式。",
+      "projectId": "7e71a64e-6a7d-47b8-a837-85a44cd4e315",
+      "completed": true,
+      "createdAt": "2025-08-22T07:10:44.428Z",
+      "updatedAt": "2025-08-22T07:14:31.744Z",
+      "dependsOn": [
+        "35fffb3c-b2eb-43e8-9382-fd64ad276ccc",
+        "55a3445b-ebdd-48a4-9de2-badbfa7c166d"
+      ],
+      "priority": 8,
+      "complexity": 7,
+      "status": "done",
+      "tags": [
+        "api",
+        "mcp",
+        "interface"
+      ],
+      "estimatedHours": 3,
+      "level": 0
+    },
+    {
+      "id": "1dbac2e3-5538-48c8-bc8a-524e62b9a275",
+      "name": "编写Excel比较功能测试",
+      "details": "为Excel比较功能编写单元测试。包括：1）测试文件比较功能的各种场景；2）测试工作表比较功能；3）测试错误处理情况；4）测试性能表现；5）创建必要的测试数据文件。遵循项目现有的测试模式和pytest框架。",
+      "projectId": "7e71a64e-6a7d-47b8-a837-85a44cd4e315",
+      "completed": false,
+      "createdAt": "2025-08-22T07:10:51.107Z",
+      "updatedAt": "2025-08-22T07:10:51.107Z",
+      "dependsOn": [
+        "e514723e-d4ef-428f-8dc4-73149ef4f3f1"
+      ],
+      "priority": 6,
+      "complexity": 5,
+      "status": "pending",
+      "tags": [
+        "testing",
+        "unittest",
+        "pytest"
+      ],
+      "estimatedHours": 4,
+      "level": 0
+    },
+    {
+      "id": "726014da-0fc2-4d2d-a3e7-0ac31c2effcc",
+      "name": "增强Excel比较 - 支持表格化数据比较",
+      "details": "增强Excel比较功能，支持表格化数据比较。包括：1）支持指定表头行位置（如第二行）；2）支持指定ID列位置用于行匹配；3）实现按行对象比较，将每行视为数据记录；4）提供属性级别的差异检测；5）生成更直观的数据差异报告。这将使比较功能更适合结构化数据分析。",
+      "projectId": "7e71a64e-6a7d-47b8-a837-85a44cd4e315",
+      "completed": true,
+      "createdAt": "2025-08-22T07:16:48.899Z",
+      "updatedAt": "2025-08-22T07:19:03.985Z",
+      "dependsOn": [],
+      "priority": 9,
+      "complexity": 7,
+      "status": "done",
+      "tags": [
+        "enhancement",
+        "structured-data",
+        "comparison"
+      ],
+      "estimatedHours": 4,
+      "level": 0
+    },
+    {
+      "id": "73a65eee-58f0-4e54-b4ab-5c5b63f93277",
+      "name": "游戏开发场景优化 - Excel配置表比较",
+      "details": "针对游戏开发场景优化Excel比较功能。包括：1）将structured_comparison设为默认模式；2）增加游戏配置表的预设模板；3）优化数值类型变化的展示（如攻击力100→120，+20）；4）增加百分比变化计算；5）提供游戏开发友好的差异报告格式；6）考虑常见的游戏配置表结构（装备、技能、角色等）。",
+      "projectId": "7e71a64e-6a7d-47b8-a837-85a44cd4e315",
+      "completed": false,
+      "createdAt": "2025-08-22T07:21:16.198Z",
+      "updatedAt": "2025-08-22T07:21:16.198Z",
+      "dependsOn": [],
+      "priority": 8,
+      "complexity": 6,
+      "status": "in-progress",
+      "tags": [
+        "game-dev",
+        "optimization",
+        "user-experience"
+      ],
       "estimatedHours": 3,
       "level": 0
     }
