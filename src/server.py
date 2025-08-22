@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
 """
-Excel MCP Server - 基于 FastMCP 和 openpyxl 实现
+Excel MCP Server - 基于标准 MCP Python SDK 和 openpyxl 实现
 
-重构后的服务器文件，只包含MCP接口定义，具体实现委托给核心模块
+使用低级MCP API实现的服务器，支持Excel文件操作
 
 主要功能：
 1. 正则搜索：在Excel文件中搜索符合正则表达式的单元格
@@ -12,19 +12,23 @@ Excel MCP Server - 基于 FastMCP 和 openpyxl 实现
 5. 行列操作：插入、删除行列
 
 技术栈：
-- FastMCP: 用于MCP服务器框架
+- mcp: 标准MCP Python SDK
 - openpyxl: 用于Excel文件操作
 """
 
+import asyncio
+import json
 import logging
-from enum import Enum
 from typing import Optional, List, Dict, Any, Union
 
 try:
-    from mcp.server.fastmcp import FastMCP
+    import mcp.server.stdio
+    import mcp.types as types
+    from mcp.server.lowlevel import NotificationOptions, Server
+    from mcp.server.models import InitializationOptions
 except ImportError as e:
     print(f"Error: 缺少必要的依赖包: {e}")
-    print("请运行: pip install fastmcp openpyxl")
+    print("请运行: pip install mcp openpyxl")
     exit(1)
 
 # 导入核心模块
@@ -51,15 +55,133 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
-# 创建FastMCP服务器实例
-mcp = FastMCP("excel-mcp-server")
+# 创建MCP服务器实例
+server = Server("excel-mcp-server")
 
 
-# ==================== MCP 工具定义 ====================
+# ==================== 工具定义 ====================
 
-@mcp.tool()
+@server.list_tools()
+async def handle_list_tools() -> list[types.Tool]:
+    """列出所有可用的Excel操作工具"""
+    return [
+        types.Tool(
+            name="excel_list_sheets",
+            description="列出Excel文件中所有工作表名称",
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "file_path": {"type": "string", "description": "Excel文件路径 (.xlsx/.xlsm)"}
+                },
+                "required": ["file_path"]
+            }
+        ),
+        types.Tool(
+            name="excel_regex_search",
+            description="在Excel文件中使用正则表达式搜索单元格内容",
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "file_path": {"type": "string", "description": "Excel文件路径 (.xlsx/.xlsm)"},
+                    "pattern": {"type": "string", "description": "正则表达式模式"},
+                    "sheet_name": {"type": "string", "description": "工作表名称（可选）"},
+                    "flags": {"type": "string", "description": "正则修饰符", "default": ""},
+                    "search_values": {"type": "boolean", "description": "是否搜索单元格值", "default": True},
+                    "search_formulas": {"type": "boolean", "description": "是否搜索公式内容", "default": False}
+                },
+                "required": ["file_path", "pattern"]
+            }
+        ),
+        types.Tool(
+            name="excel_get_range",
+            description="读取Excel指定范围的数据",
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "file_path": {"type": "string", "description": "Excel文件路径 (.xlsx/.xlsm)"},
+                    "range_expression": {"type": "string", "description": "范围表达式，如 'Sheet1!A1:C10'"},
+                    "include_formatting": {"type": "boolean", "description": "是否包含格式信息", "default": False}
+                },
+                "required": ["file_path", "range_expression"]
+            }
+        ),
+        types.Tool(
+            name="excel_update_range",
+            description="更新Excel指定范围的数据",
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "file_path": {"type": "string", "description": "Excel文件路径 (.xlsx/.xlsm)"},
+                    "range_expression": {"type": "string", "description": "范围表达式，如 'Sheet1!A1:C10'"},
+                    "data": {"type": "array", "description": "二维数组数据", "items": {"type": "array"}},
+                    "preserve_formulas": {"type": "boolean", "description": "保留已有公式", "default": True}
+                },
+                "required": ["file_path", "range_expression", "data"]
+            }
+        ),
+        types.Tool(
+            name="excel_create_file",
+            description="创建新的Excel文件",
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "file_path": {"type": "string", "description": "新文件路径 (.xlsx/.xlsm)"},
+                    "sheet_names": {"type": "array", "description": "工作表名称列表", "items": {"type": "string"}}
+                },
+                "required": ["file_path"]
+            }
+        )
+        # 这里可以继续添加更多工具...
+    ]
+
+
+@server.call_tool()
+async def handle_call_tool(name: str, arguments: dict[str, Any]) -> list[types.TextContent]:
+    """处理工具调用请求"""
+    try:
+        if name == "excel_list_sheets":
+            result = _excel_list_sheets(arguments["file_path"])
+        elif name == "excel_regex_search":
+            result = _excel_regex_search(
+                file_path=arguments["file_path"],
+                pattern=arguments["pattern"],
+                sheet_name=arguments.get("sheet_name"),
+                flags=arguments.get("flags", ""),
+                search_values=arguments.get("search_values", True),
+                search_formulas=arguments.get("search_formulas", False)
+            )
+        elif name == "excel_get_range":
+            result = _excel_get_range(
+                file_path=arguments["file_path"],
+                range_expression=arguments["range_expression"],
+                include_formatting=arguments.get("include_formatting", False)
+            )
+        elif name == "excel_update_range":
+            result = _excel_update_range(
+                file_path=arguments["file_path"],
+                range_expression=arguments["range_expression"],
+                data=arguments["data"],
+                preserve_formulas=arguments.get("preserve_formulas", True)
+            )
+        elif name == "excel_create_file":
+            result = _excel_create_file(
+                file_path=arguments["file_path"],
+                sheet_names=arguments.get("sheet_names")
+            )
+        else:
+            raise ValueError(f"Unknown tool: {name}")
+
+        return [types.TextContent(type="text", text=json.dumps(result, ensure_ascii=False, indent=2))]
+
+    except Exception as e:
+        logger.error(f"Tool {name} failed: {e}")
+        return [types.TextContent(type="text", text=json.dumps({"error": str(e)}, ensure_ascii=False))]
+
+
+# ==================== 工具实现函数 ====================
+
 @unified_error_handler("列出工作表", extract_file_context, return_dict=True)
-def excel_list_sheets(file_path: str) -> Dict[str, Any]:
+def _excel_list_sheets(file_path: str) -> Dict[str, Any]:
     """
     列出Excel文件中所有工作表名称
 
@@ -89,9 +211,9 @@ def excel_list_sheets(file_path: str) -> Dict[str, Any]:
     }
 
 
-@mcp.tool()
+
 @unified_error_handler("正则搜索", extract_file_context, return_dict=True)
-def excel_regex_search(
+def _excel_regex_search(
     file_path: str,
     pattern: str,
     sheet_name: Optional[str] = None,
@@ -129,9 +251,9 @@ def excel_regex_search(
     return format_operation_result(result)
 
 
-@mcp.tool()
+
 @unified_error_handler("目录正则搜索", extract_file_context, return_dict=True)
-def excel_regex_search_directory(
+def _excel_regex_search_directory(
     directory_path: str,
     pattern: str,
     flags: str = "",
@@ -177,9 +299,9 @@ def excel_regex_search_directory(
     return format_operation_result(result)
 
 
-@mcp.tool()
+
 @unified_error_handler("范围数据读取", extract_file_context, return_dict=True)
-def excel_get_range(
+def _excel_get_range(
     file_path: str,
     range_expression: str,
     sheet_name: Optional[str] = None,
@@ -221,9 +343,9 @@ def excel_get_range(
     return format_operation_result(result)
 
 
-@mcp.tool()
+
 @unified_error_handler("范围数据更新", extract_file_context, return_dict=True)
-def excel_update_range(
+def _excel_update_range(
     file_path: str,
     range_expression: str,
     data: List[List[Any]],
@@ -268,9 +390,9 @@ def excel_update_range(
     return format_operation_result(result)
 
 
-@mcp.tool()
+
 @unified_error_handler("插入行操作", extract_file_context, return_dict=True)
-def excel_insert_rows(
+def _excel_insert_rows(
     file_path: str,
     sheet_name: str,
     row_index: int,
@@ -299,9 +421,9 @@ def excel_insert_rows(
     return format_operation_result(result)
 
 
-@mcp.tool()
+
 @unified_error_handler("插入列操作", extract_file_context, return_dict=True)
-def excel_insert_columns(
+def _excel_insert_columns(
     file_path: str,
     sheet_name: str,
     column_index: int,
@@ -330,9 +452,9 @@ def excel_insert_columns(
     return format_operation_result(result)
 
 
-@mcp.tool()
+
 @unified_error_handler("文件创建", extract_file_context, return_dict=True)
-def excel_create_file(
+def _excel_create_file(
     file_path: str,
     sheet_names: Optional[List[str]] = None
 ) -> Dict[str, Any]:
@@ -359,9 +481,9 @@ def excel_create_file(
     return format_operation_result(result)
 
 
-@mcp.tool()
+
 @unified_error_handler("创建工作表", extract_file_context, return_dict=True)
-def excel_create_sheet(
+def _excel_create_sheet(
     file_path: str,
     sheet_name: str,
     index: Optional[int] = None
@@ -391,9 +513,9 @@ def excel_create_sheet(
     return format_operation_result(result)
 
 
-@mcp.tool()
+
 @unified_error_handler("删除工作表", extract_file_context, return_dict=True)
-def excel_delete_sheet(
+def _excel_delete_sheet(
     file_path: str,
     sheet_name: str
 ) -> Dict[str, Any]:
@@ -416,9 +538,9 @@ def excel_delete_sheet(
     return format_operation_result(result)
 
 
-@mcp.tool()
+
 @unified_error_handler("重命名工作表", extract_file_context, return_dict=True)
-def excel_rename_sheet(
+def _excel_rename_sheet(
     file_path: str,
     old_name: str,
     new_name: str
@@ -443,9 +565,9 @@ def excel_rename_sheet(
     return format_operation_result(result)
 
 
-@mcp.tool()
+
 @unified_error_handler("删除行操作", extract_file_context, return_dict=True)
-def excel_delete_rows(
+def _excel_delete_rows(
     file_path: str,
     sheet_name: str,
     row_index: int,
@@ -474,9 +596,9 @@ def excel_delete_rows(
     return format_operation_result(result)
 
 
-@mcp.tool()
+
 @unified_error_handler("删除列操作", extract_file_context, return_dict=True)
-def excel_delete_columns(
+def _excel_delete_columns(
     file_path: str,
     sheet_name: str,
     column_index: int,
@@ -505,9 +627,9 @@ def excel_delete_columns(
     return format_operation_result(result)
 
 
-# @mcp.tool()
+#
 @unified_error_handler("设置公式", extract_file_context, return_dict=True)
-def excel_set_formula(
+def _excel_set_formula(
     file_path: str,
     sheet_name: str,
     cell_address: str,
@@ -536,9 +658,9 @@ def excel_set_formula(
     return format_operation_result(result)
 
 
-# @mcp.tool()
+#
 @unified_error_handler("公式计算", extract_formula_context, return_dict=True)
-def excel_evaluate_formula(
+def _excel_evaluate_formula(
     file_path: str,
     formula: str,
     context_sheet: Optional[str] = None
@@ -565,9 +687,9 @@ def excel_evaluate_formula(
     return format_operation_result(result)
 
 
-@mcp.tool()
+
 @unified_error_handler("单元格格式化", extract_file_context, return_dict=True)
-def excel_format_cells(
+def _excel_format_cells(
     file_path: str,
     sheet_name: str,
     range_expression: str,
@@ -650,9 +772,9 @@ def excel_format_cells(
 
 # ==================== Excel比较功能 ====================
 
-# @mcp.tool()
+#
 @unified_error_handler("Excel文件比较", extract_file_context, return_dict=True)
-def excel_compare_files(
+def _excel_compare_files(
     file1_path: str,
     file2_path: str,
     id_column: Union[int, str] = 1,
@@ -696,9 +818,9 @@ def excel_compare_files(
     comparer = ExcelComparer(options)
     result = comparer.compare_files(file1_path, file2_path)
     return format_operation_result(result)
-@mcp.tool()
+
 @unified_error_handler("Excel工作表比较", extract_file_context, return_dict=True)
-def excel_compare_sheets(
+def _excel_compare_sheets(
     file1_path: str,
     sheet1_name: str,
     file2_path: str,
@@ -790,6 +912,22 @@ def excel_compare_sheets(
     result = comparer.compare_sheets(file1_path, sheet1_name, file2_path, sheet2_name)
     return format_operation_result(result)
 # ==================== 主程序 ====================
+async def run_server():
+    """运行MCP服务器"""
+    async with mcp.server.stdio.stdio_server() as (read_stream, write_stream):
+        await server.run(
+            read_stream,
+            write_stream,
+            InitializationOptions(
+                server_name="excel-mcp-server",
+                server_version="1.0.0",
+                capabilities=server.get_capabilities(
+                    notification_options=NotificationOptions(),
+                    experimental_capabilities={},
+                ),
+            ),
+        )
+
 if __name__ == "__main__":
-    # 运行FastMCP服务器
-    mcp.run()
+    # 运行MCP服务器
+    asyncio.run(run_server())
