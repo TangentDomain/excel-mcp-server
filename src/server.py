@@ -17,6 +17,7 @@ Excel MCP Server - 基于 FastMCP 和 openpyxl 实现
 """
 
 import logging
+from enum import Enum
 from typing import Optional, List, Dict, Any, Union
 
 try:
@@ -56,7 +57,7 @@ def _optimize_for_id_changes(comparison_result: Any, game_friendly: bool) -> Any
     """优化比较结果，专注于ID对象变化"""
     if not hasattr(comparison_result, 'sheet_comparisons'):
         return comparison_result
-    
+
     # 处理每个工作表的比较结果
     for sheet_comp in comparison_result.sheet_comparisons:
         if hasattr(sheet_comp, 'row_differences'):
@@ -68,48 +69,90 @@ def _optimize_for_id_changes(comparison_result: Any, game_friendly: bool) -> Any
                         # 在游戏友好格式中，隐藏位置信息
                         row_diff.row_index1 = None
                         row_diff.row_index2 = None
-    
+
     return comparison_result
 
 
 def _format_result(result) -> Dict[str, Any]:
     """
-    格式化操作结果为MCP响应格式
+    格式化操作结果为MCP响应格式，使用JSON序列化简化方案
 
     Args:
         result: OperationResult对象
 
     Returns:
-        格式化后的字典
+        格式化后的字典，已清理null值
     """
-    response = {
-        'success': result.success,
-    }
+    import json
 
-    if result.success:
-        if result.data is not None:
-            # 处理数据类型转换
-            if hasattr(result.data, '__dict__'):
-                # 如果是数据类，转换为字典
-                response.update(result.data.__dict__)
-            elif isinstance(result.data, list):
-                # 如果是列表，处理每个元素
-                response['data'] = [
-                    item.__dict__ if hasattr(item, '__dict__') else item
-                    for item in result.data
-                ]
+    def _deep_clean_nulls(obj):
+        """递归深度清理对象中的null/None值"""
+        if isinstance(obj, dict):
+            cleaned = {}
+            for key, value in obj.items():
+                if value is not None:
+                    cleaned_value = _deep_clean_nulls(value)
+                    if cleaned_value is not None and cleaned_value != {} and cleaned_value != []:
+                        cleaned[key] = cleaned_value
+            return cleaned
+        elif isinstance(obj, list):
+            cleaned = []
+            for item in obj:
+                if item is not None:
+                    cleaned_item = _deep_clean_nulls(item)
+                    if cleaned_item is not None and cleaned_item != {} and cleaned_item != []:
+                        cleaned.append(cleaned_item)
+            return cleaned
+        else:
+            return obj
+
+    # 步骤1: 先转成JSON字符串（自动处理dataclass）
+    try:
+        def json_serializer(obj):
+            """自定义JSON序列化器，专门处理dataclass和枚举"""
+            if isinstance(obj, Enum):
+                return obj.value
+            elif hasattr(obj, '__dict__'):
+                return obj.__dict__
             else:
-                response['data'] = result.data
+                return str(obj)
 
-        if result.metadata:
-            response.update(result.metadata)
+        json_str = json.dumps(result, default=json_serializer, ensure_ascii=False)
+        # 步骤2: 再转回字典
+        result_dict = json.loads(json_str)
+        # 步骤3: 应用null清理
+        cleaned_dict = _deep_clean_nulls(result_dict)
+        return cleaned_dict
+    except Exception as e:
+        # 如果JSON方案失败，回退到原始方案
+        response = {
+            'success': result.success,
+        }
 
-        if result.message:
-            response['message'] = result.message
-    else:
-        response['error'] = result.error
+        if result.success:
+            if result.data is not None:
+                # 处理数据类型转换
+                if hasattr(result.data, '__dict__'):
+                    # 如果是数据类，转换为字典
+                    response.update(result.data.__dict__)
+                elif isinstance(result.data, list):
+                    # 如果是列表，处理每个元素
+                    response['data'] = [
+                        item.__dict__ if hasattr(item, '__dict__') else item
+                        for item in result.data
+                    ]
+                else:
+                    response['data'] = result.data
 
-    return response
+            if result.metadata:
+                response.update(result.metadata)
+
+            if result.message:
+                response['message'] = result.message
+        else:
+            response['error'] = result.error
+
+        return response
 
 
 # ==================== MCP 工具定义 ====================
@@ -763,11 +806,11 @@ def excel_compare_files(
 
     comparer = ExcelComparer(options)
     result = comparer.compare_files(file1_path, file2_path)
-    
+
     # 如果启用ID变化专注模式，优化输出格式
     if focus_on_id_changes and result.success and result.data:
         result.data = _optimize_for_id_changes(result.data, game_friendly_format)
-    
+
     return _format_result(result)
 
 
@@ -831,11 +874,11 @@ def excel_compare_sheets(
 
     comparer = ExcelComparer(options)
     result = comparer.compare_sheets(file1_path, sheet1_name, file2_path, sheet2_name)
-    
+
     # 如果启用ID变化专注模式，优化输出格式
     if focus_on_id_changes and result.success and result.data:
         result.data = _optimize_for_id_changes(result.data, game_friendly_format)
-    
+
     return _format_result(result)
 
 
