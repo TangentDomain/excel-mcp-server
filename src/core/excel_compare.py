@@ -360,9 +360,10 @@ class ExcelComparer:
         data_rows1 = self._extract_data_rows(sheet1, options.header_row, headers1, options.id_column)
         data_rows2 = self._extract_data_rows(sheet2, options.header_row, headers2, options.id_column)
 
-        # 比较数据行
+        # 比较数据行，传入工作表名称
+        sheet_name = getattr(sheet1, 'title', 'Unknown')
         differences = self._compare_data_rows(
-            data_rows1, data_rows2, headers1, headers2, options
+            data_rows1, data_rows2, headers1, headers2, options, sheet_name
         )
 
         return differences
@@ -496,8 +497,9 @@ class ExcelComparer:
         data_rows1 = self._extract_data_rows(sheet1, options.header_row, headers1, options.id_column)
         data_rows2 = self._extract_data_rows(sheet2, options.header_row, headers2, options.id_column)
 
-        # 比较数据行
-        row_differences = self._compare_data_rows(data_rows1, data_rows2, headers1, headers2, options)
+        # 比较数据行，传入工作表名称
+        sheet_name = getattr(sheet1, 'title', 'Unknown')
+        row_differences = self._compare_data_rows(data_rows1, data_rows2, headers1, headers2, options, sheet_name)
 
         # 统计差异（不再预计算统计信息，减少冗余）
         total_differences = len(row_differences) + len(header_differences)
@@ -602,7 +604,8 @@ class ExcelComparer:
         data_rows2: Dict,
         headers1: List[str],
         headers2: List[str],
-        options: ComparisonOptions
+        options: ComparisonOptions,
+        sheet_name: str
     ) -> List[RowDifference]:
         """比较数据行（ID对象变化优化版）"""
         differences = []
@@ -621,48 +624,33 @@ class ExcelComparer:
                 )
 
                 if detailed_differences:
-                    # 提取对象名称（通常在第2列或名称字段）
-                    object_name = self._extract_object_name(row1['data'], headers1)
-
-                    # 生成ID-based摘要（从详细差异计算）
-                    id_summary = self._generate_id_based_summary_from_detailed(
-                        row_id, object_name, detailed_differences, options.game_friendly_format
-                    )
-
                     differences.append(RowDifference(
                         row_id=row_id,
                         difference_type=DifferenceType.ROW_MODIFIED,
-                        detailed_field_differences=detailed_differences,
-                        row_index1=row1['row_index'] if not options.game_friendly_format else None,
-                        row_index2=row2['row_index'] if not options.game_friendly_format else None,
-                        object_name=object_name,
-                        id_based_summary=id_summary
+                        row_index1=row1['row_index'],
+                        row_index2=row2['row_index'],
+                        sheet_name=sheet_name,
+                        detailed_field_differences=detailed_differences
                     ))
 
             elif row1 and not row2:
                 # 第二个文件中没有这一行
-                object_name = self._extract_object_name(row1['data'], headers1)
-                id_summary = f"🗑️ ID {row_id} ({object_name}) 已被删除" if options.game_friendly_format else f"ID {row_id} removed"
-
                 differences.append(RowDifference(
                     row_id=row_id,
                     difference_type=DifferenceType.ROW_REMOVED,
-                    row_index1=row1['row_index'] if not options.game_friendly_format else None,
-                    object_name=object_name,
-                    id_based_summary=id_summary
+                    row_index1=row1['row_index'],
+                    row_index2=0,  # 不存在于第二个文件，使用0表示
+                    sheet_name=sheet_name
                 ))
 
             elif not row1 and row2:
                 # 第一个文件中没有这一行
-                object_name = self._extract_object_name(row2['data'], headers2)
-                id_summary = f"🆕 ID {row_id} ({object_name}) 已被添加" if options.game_friendly_format else f"ID {row_id} added"
-
                 differences.append(RowDifference(
                     row_id=row_id,
                     difference_type=DifferenceType.ROW_ADDED,
-                    row_index2=row2['row_index'] if not options.game_friendly_format else None,
-                    object_name=object_name,
-                    id_based_summary=id_summary
+                    row_index1=0,  # 不存在于第一个文件，使用0表示
+                    row_index2=row2['row_index'],
+                    sheet_name=sheet_name
                 ))
 
         return differences
