@@ -205,15 +205,14 @@ class FieldDifference:
 
 @dataclass
 class RowDifference:
-    """行级差异信息（精简版 - 仅保留差异信息）"""
+    """行级差异信息（精简版 - 仅保留核心定位信息）"""
     row_id: Any                     # 行的唯一标识（对象ID）
     difference_type: DifferenceType # 差异类型：行增加、删除、修改
-    # 移除冗余的完整行数据，仅保留差异信息
+    row_index1: int                 # 在第一个文件中的行号（必选）
+    row_index2: int                 # 在第二个文件中的行号（必选）
+    sheet_name: str                 # 所在工作表名称（必选）
+    # 保留详细的字段级差异，客户端可按需格式化
     detailed_field_differences: Optional[List[FieldDifference]] = None  # 详细的字段级差异
-    row_index1: Optional[int] = None # 在第一个文件中的行号
-    row_index2: Optional[int] = None # 在第二个文件中的行号
-    object_name: Optional[str] = None # 对象名称（如技能名、道具名等）
-    id_based_summary: Optional[str] = None # ID对象的变化摘要
 
 
 @dataclass
