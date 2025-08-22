@@ -267,17 +267,7 @@ def excel_update_range(
     preserve_formulas: bool = True
 ) -> Dict[str, Any]:
     """
-    更新Excel指定范围的数据
-
-    ⚠️ 重要警告：此操作会覆盖目标范围内的所有现有数据！
-
-    在使用此功能前，请务必考虑以下几点：
-    1. 目标范围内的现有数据将被完全覆盖，无法恢复
-    2. 建议先使用 excel_get_range 查看目标区域是否包含重要数据
-    3. 如有必要，请先备份Excel文件或记录现有数据
-    4. 确认数据范围和目标位置准确无误后再执行操作
-
-    请多多思考是否真的需要覆盖现有数据！
+    更新Excel指定范围的数据。操作会覆盖目标范围内的现有数据。
 
     Args:
         file_path: Excel文件路径 (.xlsx/.xlsm)
@@ -294,10 +284,8 @@ def excel_update_range(
         Dict: 包含 success、updated_cells(int)、message
 
     Example:
-        # 使用包含工作表名的范围表达式（使用默认preserve_formulas=True）
         data = [["姓名", "年龄"], ["张三", 25]]
         result = excel_update_range("test.xlsx", "Sheet1!A1:B2", data)
-        # 使用分离的参数，并强制覆盖所有内容包括公式
         result = excel_update_range("test.xlsx", "A1:B2", data, sheet_name="Sheet1", preserve_formulas=False)
     """
     writer = ExcelWriter(file_path)
@@ -391,7 +379,7 @@ def excel_create_file(
         file_path: 新文件路径 (必须以.xlsx或.xlsm结尾)
         sheet_names: 工作表名称列表 (默认值: None)
             - None: 创建包含一个默认工作表"Sheet1"的文件
-            - []: 创建空的工作簿（不推荐，Excel需要至少一个工作表）
+            - []: 创建空的工作簿
             - ["名称1", "名称2"]: 创建包含指定名称工作表的文件
 
     Returns:
@@ -623,35 +611,25 @@ def excel_format_cells(
     preset: Optional[str] = None
 ) -> Dict[str, Any]:
     """
-    设置单元格格式（字体、颜色、对齐等）
-
-    ⚠️ 参数要求：formatting 和 preset 必须至少指定一个，不能都为空
-
-    如果同时指定两个参数，formatting 会覆盖 preset 中的相同属性
+    设置单元格格式（字体、颜色、对齐等）。formatting 和 preset 必须至少指定一个。
 
     Args:
         file_path: Excel文件路径 (.xlsx/.xlsm)
         sheet_name: 工作表名称
         range_expression: 目标范围 (如"A1:C10")
-        formatting: 自定义格式配置字典（可选，但与preset至少选一个）：
+        formatting: 自定义格式配置字典：
             - font: {'name': '宋体', 'size': 12, 'bold': True, 'color': 'FF0000'}
             - fill: {'color': 'FFFF00'}
             - alignment: {'horizontal': 'center', 'vertical': 'center'}
-        preset: 预设样式（可选，但与formatting至少选一个）
-            可选值: "title", "header", "data", "highlight", "currency"
+        preset: 预设样式，可选值: "title", "header", "data", "highlight", "currency"
 
     Returns:
         Dict: 包含 success、formatted_count、message
 
     Example:
-        # 使用预设样式
         result = excel_format_cells("data.xlsx", "Sheet1", "A1:D1", preset="title")
-        # 使用自定义格式
-        result = excel_format_cells("data.xlsx", "Sheet1", "A1:D1",
-                                  formatting={'font': {'bold': True, 'color': '000080'}})
-        # 组合使用（自定义会覆盖预设中的相同属性）
-        result = excel_format_cells("data.xlsx", "Sheet1", "A1:D1",
-                                  preset="header", formatting={'font': {'size': 14}})
+        result = excel_format_cells("data.xlsx", "Sheet1", "A1:D1", formatting={'font': {'bold': True}})
+        result = excel_format_cells("data.xlsx", "Sheet1", "A1:D1", preset="header", formatting={'font': {'size': 14}})
     """
     # 预设样式模板
     PRESETS = {
