@@ -730,7 +730,7 @@ def excel_format_cells(
 
 # ==================== Excel比较功能 ====================
 
-@mcp.tool()
+# @mcp.tool()
 @unified_error_handler("Excel文件比较", extract_file_context, return_dict=True)
 def excel_compare_files(
     file1_path: str,
