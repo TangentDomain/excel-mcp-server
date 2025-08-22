@@ -52,6 +52,26 @@ mcp = FastMCP("excel-mcp-server")
 
 
 # ==================== 辅助函数 ====================
+def _optimize_for_id_changes(comparison_result: Any, game_friendly: bool) -> Any:
+    """优化比较结果，专注于ID对象变化"""
+    if not hasattr(comparison_result, 'sheet_comparisons'):
+        return comparison_result
+    
+    # 处理每个工作表的比较结果
+    for sheet_comp in comparison_result.sheet_comparisons:
+        if hasattr(sheet_comp, 'row_differences'):
+            # 对于结构化比较结果，使用ID-based摘要
+            for row_diff in sheet_comp.row_differences:
+                if hasattr(row_diff, 'id_based_summary') and row_diff.id_based_summary:
+                    # 将ID-based摘要作为主要显示内容
+                    if game_friendly:
+                        # 在游戏友好格式中，隐藏位置信息
+                        row_diff.row_index1 = None
+                        row_diff.row_index2 = None
+    
+    return comparison_result
+
+
 def _format_result(result) -> Dict[str, Any]:
     """
     格式化操作结果为MCP响应格式
@@ -701,10 +721,11 @@ def excel_compare_files(
     header_row: Optional[int] = 1,       # 默认第一行为表头
     id_column: Optional[Union[int, str]] = 1,  # 默认第一列为ID列
     show_numeric_changes: bool = True,    # 显示数值变化
-    game_friendly_format: bool = True     # 游戏开发友好格式
+    game_friendly_format: bool = True,    # 游戏开发友好格式
+    focus_on_id_changes: bool = True      # 专注于ID对象变化（新增）
 ) -> Dict[str, Any]:
     """
-    比较两个Excel文件（游戏开发优化版）
+    比较两个Excel文件（游戏开发优化版 - 专注ID对象变化）
 
     Args:
         file1_path: 第一个Excel文件路径
@@ -719,6 +740,7 @@ def excel_compare_files(
         id_column: ID列位置（1-based数字或列名），默认第一列
         show_numeric_changes: 显示数值变化量和百分比
         game_friendly_format: 使用游戏开发友好的输出格式
+        focus_on_id_changes: 专注于ID对象变化，隐藏位置信息
 
     Returns:
         Dict: 包含比较结果的字典
@@ -736,11 +758,16 @@ def excel_compare_files(
         header_row=header_row,
         id_column=id_column,
         show_numeric_changes=show_numeric_changes,
-        game_friendly_format=game_friendly_format
+        game_friendly_format=game_friendly_format and focus_on_id_changes  # 结合两个标志
     )
 
     comparer = ExcelComparer(options)
     result = comparer.compare_files(file1_path, file2_path)
+    
+    # 如果启用ID变化专注模式，优化输出格式
+    if focus_on_id_changes and result.success and result.data:
+        result.data = _optimize_for_id_changes(result.data, game_friendly_format)
+    
     return _format_result(result)
 
 
@@ -760,10 +787,11 @@ def excel_compare_sheets(
     header_row: Optional[int] = 1,       # 默认第一行为表头
     id_column: Optional[Union[int, str]] = 1,  # 默认第一列为ID列
     show_numeric_changes: bool = True,    # 显示数值变化
-    game_friendly_format: bool = True     # 游戏开发友好格式
+    game_friendly_format: bool = True,    # 游戏开发友好格式
+    focus_on_id_changes: bool = True      # 专注于ID对象变化（新增）
 ) -> Dict[str, Any]:
     """
-    比较两个Excel工作表（游戏开发优化版）
+    比较两个Excel工作表（游戏开发优化版 - 专注ID对象变化）
 
     Args:
         file1_path: 第一个Excel文件路径
@@ -780,6 +808,7 @@ def excel_compare_sheets(
         id_column: ID列位置（1-based数字或列名），默认第一列
         show_numeric_changes: 显示数值变化量和百分比
         game_friendly_format: 使用游戏开发友好的输出格式
+        focus_on_id_changes: 专注于ID对象变化，隐藏位置信息
 
     Returns:
         Dict: 包含比较结果的字典
@@ -797,11 +826,16 @@ def excel_compare_sheets(
         header_row=header_row,
         id_column=id_column,
         show_numeric_changes=show_numeric_changes,
-        game_friendly_format=game_friendly_format
+        game_friendly_format=game_friendly_format and focus_on_id_changes  # 结合两个标志
     )
 
     comparer = ExcelComparer(options)
     result = comparer.compare_sheets(file1_path, sheet1_name, file2_path, sheet2_name)
+    
+    # 如果启用ID变化专注模式，优化输出格式
+    if focus_on_id_changes and result.success and result.data:
+        result.data = _optimize_for_id_changes(result.data, game_friendly_format)
+    
     return _format_result(result)
 
 

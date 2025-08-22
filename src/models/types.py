@@ -164,14 +164,16 @@ class ComparisonOptions:
 
 @dataclass
 class RowDifference:
-    """行级差异信息"""
-    row_id: Any                     # 行的唯一标识
+    """行级差异信息（ID对象变化优化版）"""
+    row_id: Any                     # 行的唯一标识（对象ID）
     difference_type: DifferenceType # 差异类型：行增加、删除、修改
     row_data1: Optional[Dict[str, Any]] = None  # 第一个文件中的行数据
     row_data2: Optional[Dict[str, Any]] = None  # 第二个文件中的行数据
     field_differences: Optional[List[str]] = None  # 字段级差异列表
     row_index1: Optional[int] = None # 在第一个文件中的行号
     row_index2: Optional[int] = None # 在第二个文件中的行号
+    object_name: Optional[str] = None # 对象名称（如技能名、道具名等）
+    id_based_summary: Optional[str] = None # ID对象的变化摘要
 
 
 @dataclass

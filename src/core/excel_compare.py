@@ -566,7 +566,7 @@ class ExcelComparer:
         headers2: List[str],
         options: ComparisonOptions
     ) -> List[RowDifference]:
-        """比较数据行"""
+        """比较数据行（ID对象变化优化版）"""
         differences = []
 
         # 获取所有行ID
@@ -583,32 +583,52 @@ class ExcelComparer:
                 )
 
                 if field_differences:
+                    # 提取对象名称（通常在第2列或名称字段）
+                    object_name = self._extract_object_name(row1['data'], headers1)
+                    
+                    # 生成ID-based摘要
+                    id_summary = self._generate_id_based_summary(
+                        row_id, object_name, field_differences, options.game_friendly_format
+                    )
+
                     differences.append(RowDifference(
                         row_id=row_id,
                         difference_type=DifferenceType.ROW_MODIFIED,
                         row_data1=row1['data'],
                         row_data2=row2['data'],
                         field_differences=field_differences,
-                        row_index1=row1['row_index'],
-                        row_index2=row2['row_index']
+                        row_index1=row1['row_index'] if not options.game_friendly_format else None,
+                        row_index2=row2['row_index'] if not options.game_friendly_format else None,
+                        object_name=object_name,
+                        id_based_summary=id_summary
                     ))
 
             elif row1 and not row2:
                 # 第二个文件中没有这一行
+                object_name = self._extract_object_name(row1['data'], headers1)
+                id_summary = f"🗑️ ID {row_id} ({object_name}) 已被删除" if options.game_friendly_format else f"ID {row_id} removed"
+                
                 differences.append(RowDifference(
                     row_id=row_id,
                     difference_type=DifferenceType.ROW_REMOVED,
                     row_data1=row1['data'],
-                    row_index1=row1['row_index']
+                    row_index1=row1['row_index'] if not options.game_friendly_format else None,
+                    object_name=object_name,
+                    id_based_summary=id_summary
                 ))
 
             elif not row1 and row2:
                 # 第一个文件中没有这一行
+                object_name = self._extract_object_name(row2['data'], headers2)
+                id_summary = f"🆕 ID {row_id} ({object_name}) 已被添加" if options.game_friendly_format else f"ID {row_id} added"
+                
                 differences.append(RowDifference(
                     row_id=row_id,
                     difference_type=DifferenceType.ROW_ADDED,
                     row_data2=row2['data'],
-                    row_index2=row2['row_index']
+                    row_index2=row2['row_index'] if not options.game_friendly_format else None,
+                    object_name=object_name,
+                    id_based_summary=id_summary
                 ))
 
         return differences
@@ -699,6 +719,49 @@ class ExcelComparer:
             '类型', 'type', '分类', 'category'
         }
         return field.lower() in [f.lower() for f in game_fields]
+
+    def _extract_object_name(self, row_data: Dict[str, Any], headers: List[str]) -> str:
+        """从行数据中提取对象名称"""
+        # 常见的名称字段
+        name_fields = ['名称', 'name', '技能名', '装备名', '道具名', '怪物名', '称号', 'title']
+        
+        # 优先查找专门的名称字段
+        for header in headers:
+            if header and header.lower() in [f.lower() for f in name_fields]:
+                name_value = row_data.get(header)
+                if name_value and str(name_value).strip():
+                    return str(name_value).strip()
+        
+        # 如果没有找到专门的名称字段，尝试使用第2列（通常是名称列）
+        if len(headers) >= 2:
+            second_col_value = row_data.get(headers[1])
+            if second_col_value and str(second_col_value).strip():
+                return str(second_col_value).strip()
+        
+        return "未知对象"
+
+    def _generate_id_based_summary(
+        self, 
+        row_id: Any, 
+        object_name: str, 
+        field_differences: List[str],
+        game_friendly: bool
+    ) -> str:
+        """生成ID对象的变化摘要"""
+        if not game_friendly:
+            return f"ID {row_id} modified: {len(field_differences)} fields changed"
+        
+        # 游戏开发友好格式
+        if len(field_differences) == 1:
+            return f"🔧 ID {row_id} ({object_name}): {field_differences[0]}"
+        else:
+            major_changes = [diff for diff in field_differences[:3]]  # 只显示前3个主要变化
+            summary = f"🔧 ID {row_id} ({object_name}): {len(field_differences)}个属性变化"
+            if len(field_differences) > 3:
+                summary += f"\n   主要变化: {'; '.join(major_changes)}..."
+            else:
+                summary += f"\n   变化: {'; '.join(major_changes)}"
+            return summary
 
     def _is_empty_row(self, row_data: Dict) -> bool:
         """检查行是否为空"""
