@@ -758,7 +758,7 @@ def excel_compare_files(
     # 游戏开发专用配置 - 直接创建固定配置
     from .models.types import ComparisonOptions
     from .core.excel_compare import ExcelComparer
-    
+
     options = ComparisonOptions(
         compare_values=True,
         compare_formulas=False,
@@ -808,7 +808,7 @@ def excel_compare_sheets(
     # 游戏开发专用配置 - 直接创建固定配置
     from .models.types import ComparisonOptions
     from .core.excel_compare import ExcelComparer
-    
+
     options = ComparisonOptions(
         compare_values=True,
         compare_formulas=False,
