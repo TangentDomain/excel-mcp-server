@@ -9,7 +9,15 @@ from dataclasses import dataclass
 from enum import Enum
 
 
-class RangeType(Enum):
+@dataclass
+class FieldDifference:
+    """详细的字段级差异信息（精简版 - 去除计算冗余）"""
+    field_name: str                    # 字段/属性名称
+    old_value: Any                     # 旧值
+    new_value: Any                     # 新值
+    change_type: str                   # 变化类型：数值变化、文本变化等
+    # 已移除冗余字段：numeric_change, percent_change, formatted_change
+    # 这些可以从 old_value 和 new_value 计算得出eType(Enum):
     """范围类型枚举"""
     CELL_RANGE = "cell_range"
     ROW_RANGE = "row_range"
@@ -39,6 +47,15 @@ class DifferenceType(Enum):
     ROW_REMOVED = "row_removed"         # 删除行
     ROW_MODIFIED = "row_modified"       # 行数据修改
     HEADER_CHANGED = "header_changed"   # 表头变化
+
+
+class RangeType(Enum):
+    """范围类型枚举"""
+    CELL = "cell"                       # 单元格范围
+    ROW = "row"                         # 行范围
+    COLUMN = "column"                   # 列范围
+    SHEET = "sheet"                     # 整个工作表
+    CUSTOM = "custom"                   # 自定义范围
 
 
 @dataclass
@@ -188,12 +205,10 @@ class FieldDifference:
 
 @dataclass
 class RowDifference:
-    """行级差异信息（ID对象变化优化版）"""
+    """行级差异信息（精简版 - 仅保留差异信息）"""
     row_id: Any                     # 行的唯一标识（对象ID）
     difference_type: DifferenceType # 差异类型：行增加、删除、修改
-    row_data1: Optional[Dict[str, Any]] = None  # 第一个文件中的行数据
-    row_data2: Optional[Dict[str, Any]] = None  # 第二个文件中的行数据
-    field_differences: Optional[List[str]] = None  # 字段级差异列表（简化版）
+    # 移除冗余的完整行数据，仅保留差异信息
     detailed_field_differences: Optional[List[FieldDifference]] = None  # 详细的字段级差异
     row_index1: Optional[int] = None # 在第一个文件中的行号
     row_index2: Optional[int] = None # 在第二个文件中的行号
@@ -203,7 +218,7 @@ class RowDifference:
 
 @dataclass
 class StructuredSheetComparison:
-    """结构化工作表比较结果"""
+    """结构化工作表比较结果（精简版 - 去除统计冗余）"""
     sheet_name: str
     exists_in_file1: bool
     exists_in_file2: bool
@@ -212,10 +227,8 @@ class StructuredSheetComparison:
     header_differences: Optional[List[str]] = None  # 表头差异
     row_differences: List[RowDifference] = None  # 行级差异
     total_differences: int = 0
-    identical_rows: int = 0         # 完全相同的行数
-    modified_rows: int = 0          # 修改的行数
-    added_rows: int = 0             # 新增的行数
-    removed_rows: int = 0           # 删除的行数
+    # 已移除冗余统计字段：identical_rows, modified_rows, added_rows, removed_rows
+    # 这些可以从 row_differences 计算得出
 
 
 # 类型别名
