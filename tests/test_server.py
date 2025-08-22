@@ -44,7 +44,7 @@ class TestServerInterfaces:
 
     def test_excel_get_range(self, sample_excel_file):
         """Test excel_get_range interface"""
-        result = excel_get_range(sample_excel_file, "A1:C5")
+        result = excel_get_range(sample_excel_file, "Sheet1!A1:C5")
 
         assert result['success'] is True
         assert 'data' in result
@@ -60,7 +60,7 @@ class TestServerInterfaces:
     def test_excel_update_range(self, sample_excel_file):
         """Test excel_update_range interface"""
         data = [["新姓名", "新年龄"], ["测试1", 99]]
-        result = excel_update_range(sample_excel_file, "A1:B2", data)
+        result = excel_update_range(sample_excel_file, "Sheet1!A1:B2", data)
 
         assert result['success'] is True
         # Should have either data or other response fields
@@ -231,7 +231,7 @@ class TestServerInterfaces:
         # Test a few key interfaces
         interfaces = [
             lambda: excel_list_sheets(sample_excel_file),
-            lambda: excel_get_range(sample_excel_file, "A1"),
+            lambda: excel_get_range(sample_excel_file, "Sheet1!A1"),
             lambda: excel_create_sheet(sample_excel_file, "TestSheet"),
             lambda: excel_regex_search(sample_excel_file, r"test")
         ]

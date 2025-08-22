@@ -168,8 +168,8 @@ class TestOptimizationFeatures:
         writer2 = ExcelWriter(str(file2))
 
         # 在两个文件中写入不同数据
-        writer1.update_range("A1:A3", [[10], [20], [30]])
-        writer2.update_range("A1:A3", [[100], [200], [300]])
+        writer1.update_range("Sheet1!A1:A3", [[10], [20], [30]])
+        writer2.update_range("Sheet1!A1:A3", [[100], [200], [300]])
 
         cache = get_formula_cache()
         cache.clear()
@@ -234,7 +234,7 @@ class TestOptimizationFeatures:
             ["项目B", 150000, 100000],
             ["项目C", 120000, 90000]
         ]
-        writer.update_range("A1:C4", test_data)
+        writer.update_range("Sheet1!A1:C4", test_data)
 
         cache = get_formula_cache()
         cache.clear()
@@ -293,7 +293,7 @@ class TestRegressionPrevention:
         """确保基本功能没有被破坏"""
         # 基本读写功能
         writer = ExcelWriter(sample_excel_file)
-        result = writer.update_range("A1", [["测试数据"]])
+        result = writer.update_range("Sheet1!A1", [["测试数据"]])
         assert result.success is True
 
         # 基本公式功能

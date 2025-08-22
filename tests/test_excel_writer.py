@@ -25,7 +25,7 @@ class TestExcelWriter:
     def test_update_range_single_cell(self, sample_excel_file):
         """Test updating a single cell"""
         writer = ExcelWriter(sample_excel_file)
-        result = writer.update_range("A1", [["新标题"]])
+        result = writer.update_range("Sheet1!A1", [["新标题"]])
 
         assert result.success is True
         assert isinstance(result.data, list)
@@ -48,7 +48,7 @@ class TestExcelWriter:
             ["测试1", 99],
             ["测试2", 88]
         ]
-        result = writer.update_range("A1:B3", new_data)
+        result = writer.update_range("Sheet1!A1:B3", new_data)
 
         assert result.success is True
         assert isinstance(result.data, list)
@@ -81,7 +81,7 @@ class TestExcelWriter:
         writer = ExcelWriter(sample_excel_file)
 
         # Update a cell that doesn't contain formula
-        result = writer.update_range("A6", [["总计行"]], preserve_formulas=True)
+        result = writer.update_range("Sheet1!A6", [["总计行"]], preserve_formulas=True)
 
         assert result.success is True
         assert isinstance(result.data, list)
@@ -96,7 +96,7 @@ class TestExcelWriter:
     def test_update_range_overwrite_formulas(self, sample_excel_file):
         """Test updating range and overwriting formulas"""
         writer = ExcelWriter(sample_excel_file)
-        result = writer.update_range("E2", [["手动值"]], preserve_formulas=False)
+        result = writer.update_range("Sheet1!E2", [["手动值"]], preserve_formulas=False)
 
         assert result.success is True
         assert isinstance(result.data, list)
@@ -120,7 +120,7 @@ class TestExcelWriter:
         """Test updating range with data size mismatch"""
         writer = ExcelWriter(sample_excel_file)
         # Range is 1x1 but data is 2x2
-        result = writer.update_range("A1", [["A", "B"], ["C", "D"]])
+        result = writer.update_range("Sheet1!A1", [["A", "B"], ["C", "D"]])
 
         assert result.success is True  # Should still work, may expand or truncate
         assert isinstance(result.data, list)
@@ -291,7 +291,7 @@ class TestExcelWriter:
         """Test updating range with large data"""
         writer = ExcelWriter(sample_excel_file)
         large_data = [[f"Cell_{i}_{j}" for j in range(10)] for i in range(20)]
-        result = writer.update_range("A1:J20", large_data, preserve_formulas=False)
+        result = writer.update_range("Sheet1!A1:J20", large_data, preserve_formulas=False)
 
         assert result.success is True
         assert isinstance(result.data, list)
@@ -300,7 +300,7 @@ class TestExcelWriter:
     def test_update_range_empty_data(self, sample_excel_file):
         """Test updating range with empty data"""
         writer = ExcelWriter(sample_excel_file)
-        result = writer.update_range("A1", [])
+        result = writer.update_range("Sheet1!A1", [])
 
         # Should handle empty data gracefully
         assert isinstance(result, OperationResult)
@@ -312,7 +312,7 @@ class TestExcelWriter:
             ["Text", 123, 45.67, True],
             ["More text", 0, False, None]
         ]
-        result = writer.update_range("A1:D2", mixed_data)
+        result = writer.update_range("Sheet1!A1:D2", mixed_data)
 
         assert result.success is True
         assert isinstance(result.data, list)

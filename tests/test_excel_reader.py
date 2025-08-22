@@ -44,7 +44,7 @@ class TestExcelReader:
     def test_get_range_cell_range(self, sample_excel_file):
         """Test getting a cell range"""
         reader = ExcelReader(sample_excel_file)
-        result = reader.get_range("A1:C5")
+        result = reader.get_range("Sheet1!A1:C5")
 
         assert isinstance(result, OperationResult)
         assert result.success is True
@@ -67,7 +67,7 @@ class TestExcelReader:
     def test_get_range_single_cell(self, sample_excel_file):
         """Test getting a single cell"""
         reader = ExcelReader(sample_excel_file)
-        result = reader.get_range("A1")
+        result = reader.get_range("Sheet1!A1")
 
         assert result.success is True
         assert isinstance(result.data, list)
@@ -90,7 +90,7 @@ class TestExcelReader:
     def test_get_range_entire_row(self, sample_excel_file):
         """Test getting entire row"""
         reader = ExcelReader(sample_excel_file)
-        result = reader.get_range("1:1")
+        result = reader.get_range("Sheet1!1:1")
 
         assert result.success is True
         assert isinstance(result.data, list)
@@ -101,7 +101,7 @@ class TestExcelReader:
     def test_get_range_entire_column(self, sample_excel_file):
         """Test getting entire column"""
         reader = ExcelReader(sample_excel_file)
-        result = reader.get_range("A:A")
+        result = reader.get_range("Sheet1!A:A")
 
         assert result.success is True
         assert isinstance(result.data, list)
@@ -112,7 +112,12 @@ class TestExcelReader:
     def test_get_range_with_formatting(self, sample_excel_file):
         """Test getting range with formatting info"""
         reader = ExcelReader(sample_excel_file)
-        result = reader.get_range("A1:D1", include_formatting=True)
+        result = reader.get_range("Sheet1!A1:D1", include_formatting=True)
+
+        assert result.success is True
+        assert isinstance(result.data, list)
+        assert len(result.data) == 1
+        assert len(result.data[0]) == 4
 
         assert result.success is True
         assert isinstance(result.data, list)
@@ -170,7 +175,7 @@ class TestExcelReader:
     def test_get_range_unicode_content(self, sample_excel_file):
         """Test getting range with unicode content"""
         reader = ExcelReader(sample_excel_file)
-        result = reader.get_range("A1:A5")
+        result = reader.get_range("Sheet1!A1:A5")
 
         assert result.success is True
         assert isinstance(result.data, list)
