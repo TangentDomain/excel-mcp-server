@@ -35,7 +35,7 @@ class TestFixedExcelReader:
     def test_get_range_simple(self, sample_excel_file):
         """Test getting range - fixed for actual API"""
         reader = ExcelReader(sample_excel_file)
-        result = reader.get_range("A1:C5")
+        result = reader.get_range("Sheet1!A1:C5")
 
         assert result.success is True
         assert isinstance(result.data, list)
@@ -49,7 +49,7 @@ class TestFixedExcelWriter:
     def test_update_range_simple(self, sample_excel_file):
         """Test updating range - fixed for actual API"""
         writer = ExcelWriter(sample_excel_file)
-        result = writer.update_range("A1", [["新标题"]])
+        result = writer.update_range("Sheet1!A1", [["新标题"]])
 
         assert result.success is True
         # Check that it has some response structure
@@ -112,7 +112,7 @@ class TestFixedServerInterfaces:
     def test_excel_get_range_simple(self, sample_excel_file):
         """Test excel_get_range - fixed for actual API"""
         from src.server import excel_get_range
-        result = excel_get_range(sample_excel_file, "A1:C5")
+        result = excel_get_range(sample_excel_file, "Sheet1!A1:C5")
 
         assert result['success'] is True
         assert 'data' in result
@@ -120,7 +120,7 @@ class TestFixedServerInterfaces:
     def test_excel_update_range_simple(self, sample_excel_file):
         """Test excel_update_range - fixed for actual API"""
         from src.server import excel_update_range
-        result = excel_update_range(sample_excel_file, "A1", [["测试"]])
+        result = excel_update_range(sample_excel_file, "Sheet1!A1", [["测试"]])
 
         assert result['success'] is True
 
