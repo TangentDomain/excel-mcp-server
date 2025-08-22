@@ -139,6 +139,20 @@
       "description": "使用优化后的excel-mcp工具重新比较TrSkill配置表，验证紧凑数组格式API并生成详细改动分析报告",
       "createdAt": "2025-08-22T11:37:02.931Z",
       "updatedAt": "2025-08-22T11:37:02.931Z"
+    },
+    {
+      "id": "d3956f7d-ffcc-4da5-a94c-9745821ad4d2",
+      "name": "TrSkill配置表比較分析",
+      "description": "比較測試配置/微小目錄和戰斗環境配置目錄中的TrSkill.xlsx文件，分析配置變更內容並生成詳細報告",
+      "createdAt": "2025-08-22T13:10:53.363Z",
+      "updatedAt": "2025-08-22T13:10:53.363Z"
+    },
+    {
+      "id": "fd6c5564-53b2-4642-bd77-4e165fd92ce8",
+      "name": "TrSkill配置表比较分析_20250822",
+      "description": "比较分析测试环境和战斗环境中的TrSkill.xlsx配置表差异，包括8个工作表的对比分析和报告生成（2025年8月22日）",
+      "createdAt": "2025-08-22T13:13:30.704Z",
+      "updatedAt": "2025-08-22T13:13:30.704Z"
     }
   ],
   "tasks": [
