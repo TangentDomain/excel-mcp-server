@@ -160,6 +160,13 @@
       "description": "优化Excel比较结果的数据结构，在保持紧凑格式效率的同时，增加对不变数据的完整支持。设计分区存储方案，实现高效的数据组织和检索机制。",
       "createdAt": "2025-08-22T14:35:49.427Z",
       "updatedAt": "2025-08-22T14:35:49.427Z"
+    },
+    {
+      "id": "854688b8-bbeb-42ed-ae35-1c39305acd29",
+      "name": "Excel MCP Server项目文件整理",
+      "description": "整理项目根目录下的杂乱文件，删除不符合规范的测试代码，归类和清理各种报告文档，建立清晰的项目结构",
+      "createdAt": "2025-08-22T16:46:36.993Z",
+      "updatedAt": "2025-08-22T16:46:36.993Z"
     }
   ],
   "tasks": [
@@ -1348,6 +1355,48 @@
       "tags": [],
       "estimatedHours": 4,
       "level": 0
+    },
+    {
+      "id": "b2b75689-c99b-42e4-8d26-c15ee2f61188",
+      "name": "清理根目录临时测试文件和调试脚本",
+      "details": "删除根目录下所有不符合规范的临时测试文件，包括：test_*.py (约20个文件)、debug_*.py、analyze_*.py等调试脚本。这些文件都是开发过程中的临时测试脚本，不是正式的单元测试，已经有规范的测试在tests/目录下",
+      "projectId": "854688b8-bbeb-42ed-ae35-1c39305acd29",
+      "completed": true,
+      "createdAt": "2025-08-22T16:47:19.650Z",
+      "updatedAt": "2025-08-22T16:49:22.429Z",
+      "dependsOn": [],
+      "priority": 9,
+      "complexity": 6,
+      "status": "done",
+      "tags": [
+        "cleanup",
+        "testing",
+        "refactoring"
+      ],
+      "estimatedHours": 1,
+      "level": 0,
+      "actualHours": 0.5
+    },
+    {
+      "id": "92c3e9d5-e178-4b6e-9dcb-bb0b5efac5f4",
+      "name": "整理和归档报告文档",
+      "details": "整理根目录下的大量报告文件(.md)，将它们分类移动到docs/reports或者archive文件夹中。包括各种TrSkill配置对比报告、分析报告等，这些是项目历史文档，应该归档保存但不应该在根目录",
+      "projectId": "854688b8-bbeb-42ed-ae35-1c39305acd29",
+      "completed": true,
+      "createdAt": "2025-08-22T16:47:26.260Z",
+      "updatedAt": "2025-08-22T16:49:27.167Z",
+      "dependsOn": [],
+      "priority": 7,
+      "complexity": 4,
+      "status": "done",
+      "tags": [
+        "documentation",
+        "cleanup",
+        "organization"
+      ],
+      "estimatedHours": 0.5,
+      "level": 0,
+      "actualHours": 0.3
     }
   ],
   "subtasks": [],
