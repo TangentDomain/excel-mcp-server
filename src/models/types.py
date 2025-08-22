@@ -17,7 +17,10 @@ class FieldDifference:
     new_value: Any                     # 新值
     change_type: str                   # 变化类型：数值变化、文本变化等
     # 已移除冗余字段：numeric_change, percent_change, formatted_change
-    # 这些可以从 old_value 和 new_value 计算得出eType(Enum):
+    # 这些可以从 old_value 和 new_value 计算得出
+
+
+class RangeType(Enum):
     """范围类型枚举"""
     CELL_RANGE = "cell_range"
     ROW_RANGE = "row_range"
@@ -47,15 +50,6 @@ class DifferenceType(Enum):
     ROW_REMOVED = "row_removed"         # 删除行
     ROW_MODIFIED = "row_modified"       # 行数据修改
     HEADER_CHANGED = "header_changed"   # 表头变化
-
-
-class RangeType(Enum):
-    """范围类型枚举"""
-    CELL = "cell"                       # 单元格范围
-    ROW = "row"                         # 行范围
-    COLUMN = "column"                   # 列范围
-    SHEET = "sheet"                     # 整个工作表
-    CUSTOM = "custom"                   # 自定义范围
 
 
 @dataclass
