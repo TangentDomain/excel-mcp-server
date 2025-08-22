@@ -217,8 +217,8 @@ def excel_regex_search_directory(
 @unified_error_handler("范围数据读取", extract_file_context, return_dict=True)
 def excel_get_range(
     file_path: str,
-    sheet_name: str,
     range_expression: str,
+    sheet_name: Optional[str] = None,
     include_formatting: bool = False
 ) -> Dict[str, Any]:
     """
@@ -226,26 +226,34 @@ def excel_get_range(
 
     Args:
         file_path: Excel文件路径 (.xlsx/.xlsm)
-        sheet_name: 工作表名称 (必选)
-        range_expression: 范围表达式 (不需要包含工作表名)
-            - 单元格: "A1:C10"
-            - 整行: "1:5", "3" (单行)
-            - 整列: "A:C", "B" (单列)
+        range_expression: 范围表达式，支持两种格式：
+            - 包含工作表名: "Sheet1!A1:C10"、"TrSkill!A1:Z100"
+            - 不包含工作表名: "A1:C10" (需要同时指定sheet_name参数)
+        sheet_name: 工作表名称 (可选，当range_expression不包含工作表名时必需)
         include_formatting: 是否包含单元格格式
 
     Returns:
         Dict: 包含 success、data(List[List])、range_info
 
     Example:
-        # 读取Sheet1中A1:C10范围数据
-        result = excel_get_range("data.xlsx", "Sheet1", "A1:C10")
-        # 包含格式的读取
-        result = excel_get_range("data.xlsx", "Sheet1", "A1:C10", include_formatting=True)
+        # 使用包含工作表名的范围表达式
+        result = excel_get_range("data.xlsx", "Sheet1!A1:C10")
+        # 使用分离的参数
+        result = excel_get_range("data.xlsx", "A1:C10", sheet_name="Sheet1")
     """
     reader = ExcelReader(file_path)
-    # 组合sheet_name和range_expression
-    full_range_expression = f"{sheet_name}!{range_expression}"
-    result = reader.get_range(full_range_expression, include_formatting)
+
+    # 检查range_expression是否已包含工作表名
+    if '!' in range_expression:
+        # 已包含工作表名，直接使用
+        result = reader.get_range(range_expression, include_formatting)
+    else:
+        # 不包含工作表名，需要sheet_name参数
+        if not sheet_name:
+            return {"success": False, "error": "当range_expression不包含工作表名时，必须提供sheet_name参数"}
+        full_range_expression = f"{sheet_name}!{range_expression}"
+        result = reader.get_range(full_range_expression, include_formatting)
+
     return _format_result(result)
 
 
@@ -253,9 +261,9 @@ def excel_get_range(
 @unified_error_handler("范围数据更新", extract_file_context, return_dict=True)
 def excel_update_range(
     file_path: str,
-    sheet_name: str,
     range_expression: str,
     data: List[List[Any]],
+    sheet_name: Optional[str] = None,
     preserve_formulas: bool = True
 ) -> Dict[str, Any]:
     """
@@ -263,22 +271,35 @@ def excel_update_range(
 
     Args:
         file_path: Excel文件路径 (.xlsx/.xlsm)
-        sheet_name: 工作表名称 (必选)
-        range_expression: 目标范围 (如"A1:C10", 不需要包含工作表名)
+        range_expression: 范围表达式，支持两种格式：
+            - 包含工作表名: "Sheet1!A1:C10"、"TrSkill!A1:Z100"
+            - 不包含工作表名: "A1:C10" (需要同时指定sheet_name参数)
         data: 二维数组数据 [[row1], [row2], ...]
+        sheet_name: 工作表名称 (可选，当range_expression不包含工作表名时必需)
         preserve_formulas: 保留已有公式 (默认True)
 
     Returns:
         Dict: 包含 success、updated_cells(int)、message
 
     Example:
-        # 更新Sheet1中A1:B2范围的数据
+        # 使用包含工作表名的范围表达式
         data = [["姓名", "年龄"], ["张三", 25]]
-        result = excel_update_range("test.xlsx", "Sheet1", "A1:B2", data)
+        result = excel_update_range("test.xlsx", "Sheet1!A1:B2", data)
+        # 使用分离的参数
+        result = excel_update_range("test.xlsx", "A1:B2", data, sheet_name="Sheet1")
     """
     writer = ExcelWriter(file_path)
-    # 组合sheet_name和range_expression
-    full_range_expression = f"{sheet_name}!{range_expression}"
+
+    # 检查range_expression是否已包含工作表名
+    if '!' in range_expression:
+        # 已包含工作表名，直接使用
+        full_range_expression = range_expression
+    else:
+        # 不包含工作表名，需要sheet_name参数
+        if not sheet_name:
+            raise ValueError("当range_expression不包含工作表名时，必须提供sheet_name参数")
+        full_range_expression = f"{sheet_name}!{range_expression}"
+
     result = writer.update_range(full_range_expression, data, preserve_formulas)
     return _format_result(result)
 
