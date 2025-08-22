@@ -269,6 +269,16 @@ def excel_update_range(
     """
     更新Excel指定范围的数据
 
+    ⚠️ 重要警告：此操作会覆盖目标范围内的所有现有数据！
+
+    在使用此功能前，请务必考虑以下几点：
+    1. 目标范围内的现有数据将被完全覆盖，无法恢复
+    2. 建议先使用 excel_get_range 查看目标区域是否包含重要数据
+    3. 如有必要，请先备份Excel文件或记录现有数据
+    4. 确认数据范围和目标位置准确无误后再执行操作
+
+    请多多思考是否真的需要覆盖现有数据！
+
     Args:
         file_path: Excel文件路径 (.xlsx/.xlsm)
         range_expression: 范围表达式，支持两种格式：
@@ -276,17 +286,19 @@ def excel_update_range(
             - 不包含工作表名: "A1:C10" (需要同时指定sheet_name参数)
         data: 二维数组数据 [[row1], [row2], ...]
         sheet_name: 工作表名称 (可选，当range_expression不包含工作表名时必需)
-        preserve_formulas: 保留已有公式 (默认True)
+        preserve_formulas: 保留已有公式 (默认值: True)
+            - True: 如果目标单元格包含公式，则保留公式不覆盖
+            - False: 覆盖所有内容，包括公式
 
     Returns:
         Dict: 包含 success、updated_cells(int)、message
 
     Example:
-        # 使用包含工作表名的范围表达式
+        # 使用包含工作表名的范围表达式（使用默认preserve_formulas=True）
         data = [["姓名", "年龄"], ["张三", 25]]
         result = excel_update_range("test.xlsx", "Sheet1!A1:B2", data)
-        # 使用分离的参数
-        result = excel_update_range("test.xlsx", "A1:B2", data, sheet_name="Sheet1")
+        # 使用分离的参数，并强制覆盖所有内容包括公式
+        result = excel_update_range("test.xlsx", "A1:B2", data, sheet_name="Sheet1", preserve_formulas=False)
     """
     writer = ExcelWriter(file_path)
 
@@ -318,16 +330,16 @@ def excel_insert_rows(
     Args:
         file_path: Excel文件路径 (.xlsx/.xlsm)
         sheet_name: 工作表名称
-        row_index: 插入位置 (1-based)
-        count: 插入行数
+        row_index: 插入位置 (1-based，即第1行对应Excel中的第1行)
+        count: 插入行数 (默认值: 1，即插入1行)
 
     Returns:
         Dict: 包含 success、inserted_rows、message
 
     Example:
-        # 在第3行插入1行
+        # 在第3行插入1行（使用默认count=1）
         result = excel_insert_rows("data.xlsx", "Sheet1", 3)
-        # 在第5行插入3行
+        # 在第5行插入3行（明确指定count）
         result = excel_insert_rows("data.xlsx", "Sheet1", 5, 3)
     """
     writer = ExcelWriter(file_path)
@@ -349,16 +361,16 @@ def excel_insert_columns(
     Args:
         file_path: Excel文件路径 (.xlsx/.xlsm)
         sheet_name: 工作表名称
-        column_index: 插入位置 (1-based)
-        count: 插入列数
+        column_index: 插入位置 (1-based，即第1列对应Excel中的A列)
+        count: 插入列数 (默认值: 1，即插入1列)
 
     Returns:
         Dict: 包含 success、inserted_columns、message
 
     Example:
-        # 在第2列插入1列
+        # 在第2列插入1列（使用默认count=1，即在B列前插入1列）
         result = excel_insert_columns("data.xlsx", "Sheet1", 2)
-        # 在第1列插入2列
+        # 在第1列插入2列（明确指定count，即在A列前插入2列）
         result = excel_insert_columns("data.xlsx", "Sheet1", 1, 2)
     """
     writer = ExcelWriter(file_path)
@@ -377,13 +389,16 @@ def excel_create_file(
 
     Args:
         file_path: 新文件路径 (必须以.xlsx或.xlsm结尾)
-        sheet_names: 工作表名称列表
+        sheet_names: 工作表名称列表 (默认值: None)
+            - None: 创建包含一个默认工作表"Sheet1"的文件
+            - []: 创建空的工作簿（不推荐，Excel需要至少一个工作表）
+            - ["名称1", "名称2"]: 创建包含指定名称工作表的文件
 
     Returns:
         Dict: 包含 success、file_path、sheets
 
     Example:
-        # 创建简单文件
+        # 创建简单文件（使用默认sheet_names=None，会有一个"Sheet1"）
         result = excel_create_file("new_file.xlsx")
         # 创建包含多个工作表的文件
         result = excel_create_file("report.xlsx", ["数据", "图表", "汇总"])
@@ -404,16 +419,19 @@ def excel_create_sheet(
 
     Args:
         file_path: Excel文件路径 (.xlsx/.xlsm)
-        sheet_name: 新工作表名称 (不能与现有重复)
-        index: 插入位置 (0-based，默认末尾)
+        sheet_name: 新工作表名称 (不能与现有工作表重复)
+        index: 插入位置 (0-based，默认值: None)
+            - None: 在所有工作表的最后位置创建
+            - 0: 在第一个位置创建
+            - 1: 在第二个位置创建，以此类推
 
     Returns:
         Dict: 包含 success、sheet_name、total_sheets
 
     Example:
-        # 创建新工作表到末尾
+        # 创建新工作表到末尾（使用默认index=None）
         result = excel_create_sheet("data.xlsx", "新数据")
-        # 创建新工作表到指定位置
+        # 创建新工作表到第一个位置（index=0）
         result = excel_create_sheet("data.xlsx", "首页", 0)
     """
     manager = ExcelManager(file_path)
@@ -487,16 +505,16 @@ def excel_delete_rows(
     Args:
         file_path: Excel文件路径 (.xlsx/.xlsm)
         sheet_name: 工作表名称
-        row_index: 起始行号 (1-based)
-        count: 删除行数
+        row_index: 起始行号 (1-based，即第1行对应Excel中的第1行)
+        count: 删除行数 (默认值: 1，即删除1行)
 
     Returns:
         Dict: 包含 success、deleted_rows、message
 
     Example:
-        # 删除第5行
+        # 删除第5行（使用默认count=1）
         result = excel_delete_rows("data.xlsx", "Sheet1", 5)
-        # 删除第3-5行(3行)
+        # 删除第3-5行（删除3行，从第3行开始）
         result = excel_delete_rows("data.xlsx", "Sheet1", 3, 3)
     """
     writer = ExcelWriter(file_path)
@@ -518,16 +536,16 @@ def excel_delete_columns(
     Args:
         file_path: Excel文件路径 (.xlsx/.xlsm)
         sheet_name: 工作表名称
-        column_index: 起始列号 (1-based)
-        count: 删除列数
+        column_index: 起始列号 (1-based，即第1列对应Excel中的A列)
+        count: 删除列数 (默认值: 1，即删除1列)
 
     Returns:
         Dict: 包含 success、deleted_columns、message
 
     Example:
-        # 删除第2列
+        # 删除第2列（使用默认count=1，即删除B列）
         result = excel_delete_columns("data.xlsx", "Sheet1", 2)
-        # 删除第1-3列(3列)
+        # 删除第1-3列（删除3列，从A列开始删除A、B、C列）
         result = excel_delete_columns("data.xlsx", "Sheet1", 1, 3)
     """
     writer = ExcelWriter(file_path)
@@ -607,15 +625,20 @@ def excel_format_cells(
     """
     设置单元格格式（字体、颜色、对齐等）
 
+    ⚠️ 参数要求：formatting 和 preset 必须至少指定一个，不能都为空
+
+    如果同时指定两个参数，formatting 会覆盖 preset 中的相同属性
+
     Args:
         file_path: Excel文件路径 (.xlsx/.xlsm)
         sheet_name: 工作表名称
         range_expression: 目标范围 (如"A1:C10")
-        formatting: 自定义格式配置字典：
+        formatting: 自定义格式配置字典（可选，但与preset至少选一个）：
             - font: {'name': '宋体', 'size': 12, 'bold': True, 'color': 'FF0000'}
             - fill: {'color': 'FFFF00'}
             - alignment: {'horizontal': 'center', 'vertical': 'center'}
-        preset: 预设样式 ("title", "header", "data", "highlight", "currency")
+        preset: 预设样式（可选，但与formatting至少选一个）
+            可选值: "title", "header", "data", "highlight", "currency"
 
     Returns:
         Dict: 包含 success、formatted_count、message
@@ -626,6 +649,9 @@ def excel_format_cells(
         # 使用自定义格式
         result = excel_format_cells("data.xlsx", "Sheet1", "A1:D1",
                                   formatting={'font': {'bold': True, 'color': '000080'}})
+        # 组合使用（自定义会覆盖预设中的相同属性）
+        result = excel_format_cells("data.xlsx", "Sheet1", "A1:D1",
+                                  preset="header", formatting={'font': {'size': 14}})
     """
     # 预设样式模板
     PRESETS = {
