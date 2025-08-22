@@ -707,14 +707,9 @@ def excel_compare_sheets(
     header_row: int = 1
 ) -> Dict[str, Any]:
     """
-    比较两个Excel工作表 - 游戏开发专用版（紧凑数组格式）
+    比较两个Excel工作表，识别ID对象的新增、删除、修改。
 
-    专注于ID对象的新增、删除、修改检测，自动识别配置表变化。
-
-    ⚡ 优化特性：
-    - 使用紧凑数组格式，减少60-80%的JSON大小
-    - 避免大量重复的键名，提升传输和解析效率
-    - 保持完整的比较信息，无数据丢失
+    专为游戏配置表设计，使用紧凑数组格式提高传输效率。
 
     Args:
         file1_path: 第一个Excel文件路径
@@ -725,56 +720,59 @@ def excel_compare_sheets(
         header_row: 表头行号（1-based），默认第一行
 
     Returns:
-        Dict: 比较结果（紧凑数组格式）
+        Dict: 比较结果
         {
-            "success": bool,
-            "message": str,
+            "success": true,
+            "message": "成功比较工作表，发现3处差异",
             "data": {
-                "sheet_name": "Sheet1 vs Sheet2",
-                "exists_in_file1": bool,
-                "exists_in_file2": bool,
-                "total_differences": int,
-
-                // 🔥 核心优化：数组格式的差异数据
+                "sheet_name": "TrSkill vs TrSkill",
+                "total_differences": 3,
                 "row_differences": [
-                    // 第一行：字段定义（索引说明）
-                    ["row_id", "difference_type", "row_index1", "row_index2", "sheet_name", "field_differences"],
+                    // 字段定义
+                    ["row_id", "difference_type", "row_index1", "row_index2", "sheet_name", "changed_fields", "unchanged_fields"],
 
-                    // 后续行：实际数据（按索引顺序）
-                    ["18300504", "row_added", 0, 663, "TrSkillEffect", null],
-                    ["11002101", "row_removed", 979, 0, "TrSkillEffect", null],
-                    ["100000101", "row_modified", 987, 1000, "TrSkillEffect", [
-                        // 字段差异也使用数组格式：[field_name, old_value, new_value, change_type]
-                        ["初始技能增强ID列表", "", 183002041, "text_change"]
-                    ]]
+                    // 新增行
+                    ["100001", "row_added", 0, 5, "TrSkill", null, null],
+
+                    // 删除行
+                    ["100002", "row_removed", 8, 0, "TrSkill", null, null],
+
+                    // 修改行 - 同时包含变化和不变的字段
+                    ["100003", "row_modified", 10, 10, "TrSkill",
+                        // changed_fields: 变化的字段数组，每个元素格式 [字段名, 旧值, 新值, 变化类型]
+                        [["技能名称", "火球术", "冰球术", "text_change"]],
+                        // unchanged_fields: 不变的字段数组，每个元素格式 [字段名, 当前值]
+                        [["技能ID", 100003], ["技能类型", 1], ["消耗MP", 50]]
+                    ]
                 ],
-
                 "structural_changes": {
-                    "max_row": {"sheet1": 988, "sheet2": 1001, "difference": 13},
-                    "max_column": {"sheet1": 45, "sheet2": 41, "difference": -4}
+                    "max_row": {"sheet1": 100, "sheet2": 101, "difference": 1}
                 }
-            },
-            "metadata": {
-                "file1": str,
-                "sheet1": str,
-                "file2": str,
-                "sheet2": str,
-                "total_differences": int,
-                "comparison_type": "structured"
             }
         }
 
-        � 数据解析说明：
-        - row_differences[0] 是字段定义，说明每列的含义
-        - row_differences[1+] 是实际数据，按字段定义顺序排列
-        - difference_type 值："row_added" | "row_removed" | "row_modified"
-        - field_differences 格式：[[field_name, old_value, new_value, change_type], ...]
-        - change_type 值："text_change" | "numeric_change" | "formula_change"
+    数据解析：
+        row_differences[0] = 字段定义（索引说明）
+        row_differences[1+] = 实际数据行
 
-        🎯 优势对比：
-        - 传统格式：每个差异约150-200字符的键名开销
-        - 数组格式：仅需要6个数组索引，减少80%空间占用
-        - 特别适合大型配置表比较（1000+行差异时效果显著）
+        对于row_modified类型：
+        - changed_fields: 变化的字段数组
+          格式：[[字段名, 旧值, 新值, 变化类型], ...]
+          变化类型："text_change" | "numeric_change" | "formula_change"
+        - unchanged_fields: 不变的字段数组
+          格式：[[字段名, 当前值], ...]
+          说明：只存储一份值，因为在两个文件中相同
+
+        对于row_added/row_removed类型：
+        - changed_fields和unchanged_fields均为null
+        - 因为整行都是变化，没有不变的字段
+
+    Example:
+        result = excel_compare_sheets("old.xlsx", "Sheet1", "new.xlsx", "Sheet1")
+        differences = result['data']['row_differences']
+        for row in differences[1:]:  # 跳过字段定义行
+            row_id, diff_type = row[0], row[1]
+            print(f"{diff_type}: {row_id}")
     """
     # 游戏开发专用配置 - 直接创建固定配置
     from .models.types import ComparisonOptions
