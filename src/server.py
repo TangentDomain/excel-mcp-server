@@ -31,6 +31,7 @@ from .core.excel_reader import ExcelReader
 from .core.excel_writer import ExcelWriter
 from .core.excel_manager import ExcelManager
 from .core.excel_search import ExcelSearcher
+from .core.excel_compare import ExcelComparer
 
 # 导入统一错误处理
 from .utils.error_handler import unified_error_handler, extract_file_context, extract_formula_context
@@ -681,6 +682,111 @@ def excel_format_cells(
 
     writer = ExcelWriter(file_path)
     result = writer.format_cells(range_expression, final_formatting, sheet_name)
+    return _format_result(result)
+
+
+# ==================== Excel比较功能 ====================
+
+@mcp.tool()
+@unified_error_handler("Excel文件比较", extract_file_context, return_dict=True)
+def excel_compare_files(
+    file1_path: str,
+    file2_path: str,
+    compare_values: bool = True,
+    compare_formulas: bool = False,
+    compare_formats: bool = False,
+    ignore_empty_cells: bool = True,
+    case_sensitive: bool = True
+) -> Dict[str, Any]:
+    """
+    比较两个Excel文件
+    
+    Args:
+        file1_path: 第一个Excel文件路径
+        file2_path: 第二个Excel文件路径
+        compare_values: 是否比较单元格值
+        compare_formulas: 是否比较公式
+        compare_formats: 是否比较格式
+        ignore_empty_cells: 是否忽略空单元格
+        case_sensitive: 是否区分大小写
+        
+    Returns:
+        Dict: 包含比较结果的字典
+    """
+    from .models.types import ComparisonOptions
+    
+    # 创建比较选项
+    options = ComparisonOptions(
+        compare_values=compare_values,
+        compare_formulas=compare_formulas,
+        compare_formats=compare_formats,
+        ignore_empty_cells=ignore_empty_cells,
+        case_sensitive=case_sensitive
+    )
+    
+    comparer = ExcelComparer(options)
+    result = comparer.compare_files(file1_path, file2_path)
+    return _format_result(result)
+
+
+@mcp.tool()
+@unified_error_handler("Excel工作表比较", extract_file_context, return_dict=True)
+def excel_compare_sheets(
+    file1_path: str,
+    sheet1_name: str,
+    file2_path: str,
+    sheet2_name: str,
+    compare_values: bool = True,
+    compare_formulas: bool = False,
+    compare_formats: bool = False,
+    ignore_empty_cells: bool = True,
+    case_sensitive: bool = True,
+    structured_comparison: bool = True,  # 游戏开发默认启用结构化比较
+    header_row: Optional[int] = 1,       # 默认第一行为表头
+    id_column: Optional[Union[int, str]] = 1,  # 默认第一列为ID列
+    show_numeric_changes: bool = True,    # 显示数值变化
+    game_friendly_format: bool = True     # 游戏开发友好格式
+) -> Dict[str, Any]:
+    """
+    比较两个Excel工作表（游戏开发优化版）
+    
+    Args:
+        file1_path: 第一个Excel文件路径
+        sheet1_name: 第一个工作表名称
+        file2_path: 第二个Excel文件路径
+        sheet2_name: 第二个工作表名称
+        compare_values: 是否比较单元格值
+        compare_formulas: 是否比较公式
+        compare_formats: 是否比较格式
+        ignore_empty_cells: 是否忽略空单元格
+        case_sensitive: 是否区分大小写
+        structured_comparison: 是否进行结构化数据比较（推荐游戏开发使用）
+        header_row: 表头行号（1-based），默认第一行
+        id_column: ID列位置（1-based数字或列名），默认第一列
+        show_numeric_changes: 显示数值变化量和百分比
+        game_friendly_format: 使用游戏开发友好的输出格式
+        
+    Returns:
+        Dict: 包含比较结果的字典
+    """
+    from .models.types import ComparisonOptions
+    
+    # 创建比较选项
+    options = ComparisonOptions(
+        compare_values=compare_values,
+        compare_formulas=compare_formulas,
+        compare_formats=compare_formats,
+        ignore_empty_cells=ignore_empty_cells,
+        case_sensitive=case_sensitive,
+        structured_comparison=structured_comparison,
+        header_row=header_row,
+        id_column=id_column,
+        show_numeric_changes=show_numeric_changes,
+        game_friendly_format=game_friendly_format
+    )
+    
+    comparer = ExcelComparer(options)
+    result = comparer.compare_sheets(file1_path, sheet1_name, file2_path, sheet2_name)
     return _format_result(result)
 
 
