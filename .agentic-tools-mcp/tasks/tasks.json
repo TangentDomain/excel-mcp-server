@@ -153,6 +153,13 @@
       "description": "比较分析测试环境和战斗环境中的TrSkill.xlsx配置表差异，包括8个工作表的对比分析和报告生成（2025年8月22日）",
       "createdAt": "2025-08-22T13:13:30.704Z",
       "updatedAt": "2025-08-22T13:13:30.704Z"
+    },
+    {
+      "id": "46155b35-6b4a-4159-a0c1-1803436a0f59",
+      "name": "Excel比较数据结构增强",
+      "description": "优化Excel比较结果的数据结构，在保持紧凑格式效率的同时，增加对不变数据的完整支持。设计分区存储方案，实现高效的数据组织和检索机制。",
+      "createdAt": "2025-08-22T14:35:49.427Z",
+      "updatedAt": "2025-08-22T14:35:49.427Z"
     }
   ],
   "tasks": [
@@ -1325,6 +1332,22 @@
       "estimatedHours": 0.5,
       "level": 0,
       "actualHours": 2
+    },
+    {
+      "id": "c22a82f6-ebec-4204-828e-cc9b7826f7c3",
+      "name": "数据结构设计与方案制定",
+      "details": "设计包含不变数据的Excel比较结果数据结构。需要：\n1. 分析当前紧凑数组格式的优缺点\n2. 设计分区存储方案（变化区+不变区）\n3. 保持存储效率，不变数据只存储一份\n4. 提供索引机制方便数据检索\n5. 确保向后兼容性",
+      "projectId": "46155b35-6b4a-4159-a0c1-1803436a0f59",
+      "completed": false,
+      "createdAt": "2025-08-22T14:35:54.954Z",
+      "updatedAt": "2025-08-22T14:35:54.954Z",
+      "dependsOn": [],
+      "priority": 8,
+      "complexity": 7,
+      "status": "pending",
+      "tags": [],
+      "estimatedHours": 4,
+      "level": 0
     }
   ],
   "subtasks": [],
