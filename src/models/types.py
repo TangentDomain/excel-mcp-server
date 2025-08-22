@@ -135,6 +135,17 @@ class SheetComparison:
 
 
 @dataclass
+class StructuredDataComparison:
+    """结构化数据比较结果"""
+    sheet_name: str
+    exists_in_file1: bool
+    exists_in_file2: bool
+    row_differences: List['RowDifference']
+    total_differences: int
+    structural_changes: Dict[str, Any]  # 结构变化信息
+
+
+@dataclass
 class ComparisonResult:
     """Excel比较结果"""
     file1_path: str
@@ -160,6 +171,19 @@ class ComparisonOptions:
     structured_comparison: bool = True    # 默认启用结构化数据比较
     show_numeric_changes: bool = True     # 显示数值变化量和百分比
     game_friendly_format: bool = True     # 游戏开发友好的输出格式
+    focus_on_id_changes: bool = True      # 专注于ID对象变化，隐藏位置信息
+
+
+@dataclass
+class FieldDifference:
+    """字段级差异信息（详细的属性变化）"""
+    field_name: str                    # 字段/属性名称
+    old_value: Any                     # 旧值
+    new_value: Any                     # 新值
+    change_type: str                   # 变化类型：数值变化、文本变化等
+    numeric_change: Optional[float] = None      # 数值变化量
+    percent_change: Optional[float] = None      # 百分比变化
+    formatted_change: Optional[str] = None      # 格式化的变化描述
 
 
 @dataclass
@@ -169,7 +193,8 @@ class RowDifference:
     difference_type: DifferenceType # 差异类型：行增加、删除、修改
     row_data1: Optional[Dict[str, Any]] = None  # 第一个文件中的行数据
     row_data2: Optional[Dict[str, Any]] = None  # 第二个文件中的行数据
-    field_differences: Optional[List[str]] = None  # 字段级差异列表
+    field_differences: Optional[List[str]] = None  # 字段级差异列表（简化版）
+    detailed_field_differences: Optional[List[FieldDifference]] = None  # 详细的字段级差异
     row_index1: Optional[int] = None # 在第一个文件中的行号
     row_index2: Optional[int] = None # 在第二个文件中的行号
     object_name: Optional[str] = None # 对象名称（如技能名、道具名等）
