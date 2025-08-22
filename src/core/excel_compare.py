@@ -619,18 +619,19 @@ class ExcelComparer:
 
             if row1 and row2:
                 # 两个文件都有这一行，比较内容
-                detailed_differences = self._compare_row_data_detailed(
+                changed_differences, unchanged_differences = self._compare_row_data_detailed(
                     row1['data'], row2['data'], headers1, headers2, options
                 )
 
-                if detailed_differences:
+                if changed_differences:
                     differences.append(RowDifference(
                         row_id=row_id,
                         difference_type=DifferenceType.ROW_MODIFIED,
                         row_index1=row1['row_index'],
                         row_index2=row2['row_index'],
                         sheet_name=sheet_name,
-                        detailed_field_differences=detailed_differences
+                        detailed_field_differences=changed_differences,
+                        unchanged_field_differences=unchanged_differences
                     ))
 
             elif row1 and not row2:
@@ -662,9 +663,10 @@ class ExcelComparer:
         headers1: List[str],
         headers2: List[str],
         options: ComparisonOptions
-    ) -> List[FieldDifference]:
-        """比较行数据，返回详细格式的差异（精简版 - 去除字符串格式冗余）"""
-        detailed_differences = []
+    ) -> tuple[List[FieldDifference], List[FieldDifference]]:
+        """比较行数据，返回详细格式的差异和未变化字段（精简版 - 去除字符串格式冗余）"""
+        changed_differences = []
+        unchanged_differences = []
 
         # 获取所有字段名
         all_fields = set(headers1) | set(headers2)
@@ -689,11 +691,20 @@ class ExcelComparer:
 
             # 比较值
             if compare_value1 != compare_value2:
-                # 生成详细的差异对象（不再生成重复的字符串格式）
-                detailed_diff = self._create_field_difference_simplified(field, value1, value2, options)
-                detailed_differences.append(detailed_diff)
+                # 生成变化字段的详细差异对象
+                changed_diff = self._create_field_difference_simplified(field, value1, value2, options)
+                changed_differences.append(changed_diff)
+            else:
+                # 生成未变化字段的信息（使用相同值作为old_value和new_value）
+                unchanged_diff = FieldDifference(
+                    field_name=field,
+                    old_value=value1,
+                    new_value=value1,  # 未变化，所以新旧值相同
+                    change_type="unchanged"
+                )
+                unchanged_differences.append(unchanged_diff)
 
-        return detailed_differences
+        return changed_differences, unchanged_differences
 
     def _create_field_difference_simplified(
         self,
@@ -808,7 +819,7 @@ class ExcelComparer:
         first_col_value = row_data.get(headers[0]) if headers else None
         if first_col_value and str(first_col_value).strip().upper() == "ID":
             return "表头定义"
-        
+
         # 常见的名称字段
         name_fields = ['名称', 'name', '技能名', '装备名', '道具名', '怪物名', '称号', 'title', '备注']
 
