@@ -1188,6 +1188,27 @@
       ],
       "estimatedHours": 3,
       "level": 0
+    },
+    {
+      "id": "597d9f33-2f95-4084-b272-89a2d5cdd763",
+      "name": "为excel_compare_files添加结构化数据比较支持",
+      "details": "为 excel_compare_files 函数添加游戏开发优化的结构化数据比较模式支持，使其与 excel_compare_sheets 保持功能一致性。\n\n实现内容：\n1. 添加游戏开发相关参数：structured_comparison, header_row, id_column, show_numeric_changes, game_friendly_format\n2. 设定游戏开发友好的默认值（结构化比较默认启用）\n3. 通过 ComparisonOptions 传递参数给 ExcelComparer\n4. 保持与现有接口的兼容性\n\n技术要点：\n- 复用已有的 ComparisonOptions 和 ExcelComparer 架构\n- 默认启用结构化比较模式（structured_comparison=True）\n- 支持表头行识别和ID列匹配\n- 提供游戏友好的数值变化格式（emoji + 百分比）",
+      "projectId": "7e71a64e-6a7d-47b8-a837-85a44cd4e315",
+      "completed": false,
+      "createdAt": "2025-08-22T07:28:55.445Z",
+      "updatedAt": "2025-08-22T07:28:55.445Z",
+      "dependsOn": [],
+      "priority": 8,
+      "complexity": 4,
+      "status": "done",
+      "tags": [
+        "excel-compare",
+        "game-development",
+        "structured-data",
+        "interface-enhancement"
+      ],
+      "estimatedHours": 1,
+      "level": 0
     }
   ],
   "subtasks": [],

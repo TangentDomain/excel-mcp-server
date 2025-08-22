@@ -696,10 +696,15 @@ def excel_compare_files(
     compare_formulas: bool = False,
     compare_formats: bool = False,
     ignore_empty_cells: bool = True,
-    case_sensitive: bool = True
+    case_sensitive: bool = True,
+    structured_comparison: bool = True,  # 游戏开发默认启用结构化比较
+    header_row: Optional[int] = 1,       # 默认第一行为表头
+    id_column: Optional[Union[int, str]] = 1,  # 默认第一列为ID列
+    show_numeric_changes: bool = True,    # 显示数值变化
+    game_friendly_format: bool = True     # 游戏开发友好格式
 ) -> Dict[str, Any]:
     """
-    比较两个Excel文件
+    比较两个Excel文件（游戏开发优化版）
 
     Args:
         file1_path: 第一个Excel文件路径
@@ -709,6 +714,11 @@ def excel_compare_files(
         compare_formats: 是否比较格式
         ignore_empty_cells: 是否忽略空单元格
         case_sensitive: 是否区分大小写
+        structured_comparison: 是否进行结构化数据比较（推荐游戏开发使用）
+        header_row: 表头行号（1-based），默认第一行
+        id_column: ID列位置（1-based数字或列名），默认第一列
+        show_numeric_changes: 显示数值变化量和百分比
+        game_friendly_format: 使用游戏开发友好的输出格式
 
     Returns:
         Dict: 包含比较结果的字典
@@ -721,7 +731,12 @@ def excel_compare_files(
         compare_formulas=compare_formulas,
         compare_formats=compare_formats,
         ignore_empty_cells=ignore_empty_cells,
-        case_sensitive=case_sensitive
+        case_sensitive=case_sensitive,
+        structured_comparison=structured_comparison,
+        header_row=header_row,
+        id_column=id_column,
+        show_numeric_changes=show_numeric_changes,
+        game_friendly_format=game_friendly_format
     )
 
     comparer = ExcelComparer(options)
