@@ -63,7 +63,7 @@ class ExcelSearcher:
             # 加载Excel文件 - 添加兼容性处理
             try:
                 workbook = load_workbook(
-                    self.file_path, 
+                    self.file_path,
                     data_only=not search_formulas,
                     keep_vba=False,  # 禁用VBA以避免兼容性问题
                     read_only=False  # 确保可读写模式
@@ -375,7 +375,7 @@ class ExcelSearcher:
     ) -> OperationResult:
         """
         静态方法：在目录下的所有Excel文件中使用正则表达式搜索单元格内容
-        
+
         这是一个静态方法，不需要创建ExcelSearcher实例
         """
         try:
@@ -423,7 +423,7 @@ class ExcelSearcher:
                     # 临时创建搜索器实例（使用当前文件路径）
                     temp_searcher = ExcelSearcher(str(file_path))
                     result = temp_searcher.regex_search(pattern, flags, search_values, search_formulas)
-                    
+
                     if result.success and result.data:
                         # 为每个匹配添加文件路径信息
                         for match in result.data:
