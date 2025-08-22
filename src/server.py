@@ -130,6 +130,7 @@ def excel_list_sheets(file_path: str) -> Dict[str, Any]:
 def excel_regex_search(
     file_path: str,
     pattern: str,
+    sheet_name: Optional[str] = None,
     flags: str = "",
     search_values: bool = True,
     search_formulas: bool = False
@@ -143,6 +144,7 @@ def excel_regex_search(
             - r'\\d+': 匹配数字
             - r'\\w+@\\w+\\.\\w+': 匹配邮箱
             - r'^总计|合计$': 匹配特定文本
+        sheet_name: 工作表名称 (可选，不指定时搜索所有工作表)
         flags: 正则修饰符 ("i"忽略大小写, "m"多行, "s"点号匹配换行)
         search_values: 是否搜索单元格值
         search_formulas: 是否搜索公式内容
@@ -151,13 +153,15 @@ def excel_regex_search(
         Dict: 包含 success、matches(List[Dict])、match_count、searched_sheets
 
     Example:
-        # 搜索邮箱格式
-        result = excel_regex_search("data.xlsx", r'\\w+@\\w+\\.\\w+', "i")
+        # 搜索所有工作表中的邮箱格式
+        result = excel_regex_search("data.xlsx", r'\\w+@\\w+\\.\\w+', flags="i")
+        # 搜索指定工作表中的数字
+        result = excel_regex_search("data.xlsx", r'\\d+', sheet_name="Sheet1")
         # 搜索数字并包含公式
         result = excel_regex_search("data.xlsx", r'\\d+', search_formulas=True)
     """
     searcher = ExcelSearcher(file_path)
-    result = searcher.regex_search(pattern, flags, search_values, search_formulas)
+    result = searcher.regex_search(pattern, flags, search_values, search_formulas, sheet_name)
     return _format_result(result)
 
 

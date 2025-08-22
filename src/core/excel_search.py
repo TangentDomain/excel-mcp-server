@@ -34,7 +34,8 @@ class ExcelSearcher:
         pattern: str,
         flags: str = "",
         search_values: bool = True,
-        search_formulas: bool = False
+        search_formulas: bool = False,
+        sheet_name: Optional[str] = None
     ) -> OperationResult:
         """
         在Excel文件中使用正则表达式搜索单元格内容
@@ -44,6 +45,7 @@ class ExcelSearcher:
             flags: 正则表达式标志 (i=忽略大小写, m=多行, s=点匹配换行)
             search_values: 是否搜索单元格的显示值
             search_formulas: 是否搜索单元格的公式
+            sheet_name: 工作表名称 (可选，不指定时搜索所有工作表)
 
         Returns:
             OperationResult: 包含搜索结果的结果对象
@@ -81,7 +83,7 @@ class ExcelSearcher:
 
             # 执行搜索
             matches = self._search_workbook(
-                workbook, regex, search_values, search_formulas
+                workbook, regex, search_values, search_formulas, sheet_name
             )
 
             return OperationResult(
@@ -119,13 +121,24 @@ class ExcelSearcher:
         workbook,
         regex: re.Pattern,
         search_values: bool,
-        search_formulas: bool
+        search_formulas: bool,
+        sheet_name: Optional[str] = None
     ) -> List[SearchMatch]:
         """在工作簿中搜索"""
         matches = []
 
-        # 遍历所有工作表
-        for sheet_name in workbook.sheetnames:
+        # 确定要搜索的工作表
+        if sheet_name:
+            # 搜索指定工作表
+            if sheet_name not in workbook.sheetnames:
+                raise ValueError(f"工作表 '{sheet_name}' 不存在")
+            sheet_names = [sheet_name]
+        else:
+            # 搜索所有工作表
+            sheet_names = workbook.sheetnames
+
+        # 遍历指定的工作表
+        for sheet_name in sheet_names:
             sheet = workbook[sheet_name]
 
             # 遍历所有单元格
