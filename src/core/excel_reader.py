@@ -123,13 +123,17 @@ class ExcelReader:
             )
 
     def _get_worksheet(self, workbook, sheet_name: Optional[str]):
-        """获取工作表"""
-        if sheet_name:
-            if sheet_name not in workbook.sheetnames:
-                raise SheetNotFoundError(f"工作表不存在: {sheet_name}")
-            return workbook[sheet_name]
-        else:
-            return workbook.active
+        """获取工作表 - 强制要求指定工作表名称"""
+        if not sheet_name or not sheet_name.strip():
+            raise SheetNotFoundError(f"工作表名称不能为空，必须明确指定工作表")
+        
+        if not workbook.sheetnames:
+            raise SheetNotFoundError(f"Excel文件中没有任何工作表")
+            
+        if sheet_name not in workbook.sheetnames:
+            raise SheetNotFoundError(f"工作表不存在: {sheet_name}，可用工作表: {', '.join(workbook.sheetnames)}")
+            
+        return workbook[sheet_name]
 
     def _get_range_data(
         self,
