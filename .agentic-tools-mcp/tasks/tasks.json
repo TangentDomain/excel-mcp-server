@@ -118,6 +118,27 @@
       "description": "为Excel MCP服务器添加比较功能，包括Excel文件比较和工作表(sheet)比较。支持数据差异检测、结构差异分析、格式比较等功能。",
       "createdAt": "2025-08-22T07:10:01.621Z",
       "updatedAt": "2025-08-22T07:10:01.621Z"
+    },
+    {
+      "id": "1bbc1556-0e6d-4a8b-b565-ec01a9e87fee",
+      "name": "TrSkill配置表比较分析",
+      "description": "比较测试配置和战斗环境配置中的TrSkill.xlsx文件，分析具体改动并生成详细报告",
+      "createdAt": "2025-08-22T11:24:39.838Z",
+      "updatedAt": "2025-08-22T11:24:39.838Z"
+    },
+    {
+      "id": "c91e6259-de92-48c2-99e0-15a651278d82",
+      "name": "Excel比较API优化",
+      "description": "优化excel_compare_sheets函数的返回值结构，将对象格式改为数组格式以减少空间占用，并添加详细的API注释说明",
+      "createdAt": "2025-08-22T11:29:06.219Z",
+      "updatedAt": "2025-08-22T11:29:06.219Z"
+    },
+    {
+      "id": "e6532a73-ee2c-492a-accc-b4da7ef181f6",
+      "name": "TrSkill配置表比较验证(优化版)",
+      "description": "使用优化后的excel-mcp工具重新比较TrSkill配置表，验证紧凑数组格式API并生成详细改动分析报告",
+      "createdAt": "2025-08-22T11:37:02.931Z",
+      "updatedAt": "2025-08-22T11:37:02.931Z"
     }
   ],
   "tasks": [
@@ -1209,6 +1230,87 @@
       ],
       "estimatedHours": 1,
       "level": 0
+    },
+    {
+      "id": "54c5ecc9-e9f4-4b5a-a9ec-0349032af757",
+      "name": "文件结构检查",
+      "details": "检查两个TrSkill.xlsx文件的工作表结构，确认可用的sheet名称",
+      "projectId": "1bbc1556-0e6d-4a8b-b565-ec01a9e87fee",
+      "completed": false,
+      "createdAt": "2025-08-22T11:24:44.353Z",
+      "updatedAt": "2025-08-22T11:26:58.809Z",
+      "dependsOn": [],
+      "priority": 8,
+      "complexity": 3,
+      "status": "done",
+      "tags": [],
+      "estimatedHours": 0.25,
+      "level": 0
+    },
+    {
+      "id": "4e8bdf8b-3668-4ab3-b403-ced4a6cadafc",
+      "name": "执行Excel工作表比较",
+      "details": "使用excel比较工具对两个文件的所有工作表进行详细比较，包括TrSkill、TrSkillEffect等8个工作表",
+      "projectId": "1bbc1556-0e6d-4a8b-b565-ec01a9e87fee",
+      "completed": false,
+      "createdAt": "2025-08-22T11:24:58.042Z",
+      "updatedAt": "2025-08-22T11:27:02.995Z",
+      "dependsOn": [],
+      "priority": 9,
+      "complexity": 5,
+      "status": "done",
+      "tags": [],
+      "estimatedHours": 1,
+      "level": 0
+    },
+    {
+      "id": "92a9e02d-bca7-477d-8c1d-7f3e88952b5f",
+      "name": "生成改动分析报告",
+      "details": "根据比较结果生成详细的改动分析报告，包括所有变更的总结和具体分析",
+      "projectId": "1bbc1556-0e6d-4a8b-b565-ec01a9e87fee",
+      "completed": false,
+      "createdAt": "2025-08-22T11:25:55.077Z",
+      "updatedAt": "2025-08-22T11:27:07.511Z",
+      "dependsOn": [],
+      "priority": 8,
+      "complexity": 4,
+      "status": "done",
+      "tags": [],
+      "estimatedHours": 0.5,
+      "level": 0
+    },
+    {
+      "id": "474e3903-0e0c-40dd-89a1-59106daa189a",
+      "name": "优化返回值结构为数组格式",
+      "details": "设计并实现紧凑的数组格式，将row_differences从对象数组改为二维数组，并在函数注释中详细说明返回值结构",
+      "projectId": "c91e6259-de92-48c2-99e0-15a651278d82",
+      "completed": false,
+      "createdAt": "2025-08-22T11:30:32.962Z",
+      "updatedAt": "2025-08-22T11:32:51.000Z",
+      "dependsOn": [],
+      "priority": 9,
+      "complexity": 6,
+      "status": "done",
+      "tags": [],
+      "estimatedHours": 2,
+      "level": 0
+    },
+    {
+      "id": "8413a594-9c09-407c-8cd8-fb20b368d0a3",
+      "name": "TrSkill主表比较验证",
+      "details": "使用优化后的excel_compare_sheets工具比较TrSkill主工作表，验证紧凑数组格式",
+      "projectId": "e6532a73-ee2c-492a-accc-b4da7ef181f6",
+      "completed": true,
+      "createdAt": "2025-08-22T11:37:08.229Z",
+      "updatedAt": "2025-08-22T11:40:08.541Z",
+      "dependsOn": [],
+      "priority": 9,
+      "complexity": 5,
+      "status": "done",
+      "tags": [],
+      "estimatedHours": 0.5,
+      "level": 0,
+      "actualHours": 2
     }
   ],
   "subtasks": [],
