@@ -104,6 +104,13 @@
       "description": "修复Excel MCP服务器中excel_update_range函数的问题：在没有显式传入sheet_name时也能成功修改。理论上应该强制要求提供sheet_name参数。",
       "createdAt": "2025-08-21T13:27:25.023Z",
       "updatedAt": "2025-08-21T13:27:25.023Z"
+    },
+    {
+      "id": "cfd2772a-8879-4445-8919-8e85f409a62b",
+      "name": "Excel MCP接口准确性审查",
+      "description": "检查所有Excel MCP服务器接口的准确性，确保sheet_name等关键参数的强制性，排除上下文依赖和易错点",
+      "createdAt": "2025-08-22T02:19:29.050Z",
+      "updatedAt": "2025-08-22T02:19:29.050Z"
     }
   ],
   "tasks": [
@@ -1033,6 +1040,22 @@
         "excel"
       ],
       "estimatedHours": 1,
+      "level": 0
+    },
+    {
+      "id": "cba11f28-b461-4cd9-a014-f52ef3674ad9",
+      "name": "接口参数设计分析",
+      "details": "分析所有Excel MCP服务器接口的参数设计，重点检查sheet_name等关键参数的强制性，排除上下文依赖和易错点",
+      "projectId": "cfd2772a-8879-4445-8919-8e85f409a62b",
+      "completed": false,
+      "createdAt": "2025-08-22T02:20:29.550Z",
+      "updatedAt": "2025-08-22T02:21:29.024Z",
+      "dependsOn": [],
+      "priority": 9,
+      "complexity": 8,
+      "status": "done",
+      "tags": [],
+      "estimatedHours": 3,
       "level": 0
     }
   ],
