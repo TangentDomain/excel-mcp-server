@@ -68,40 +68,40 @@ def _format_result(result) -> Dict[str, Any]:
     def _convert_to_compact_array_format(data):
         """
         将结构化比较结果转换为紧凑的数组格式
-        
+
         Args:
             data: StructuredDataComparison 数据对象
-            
+
         Returns:
             转换后的紧凑格式数据
         """
         if not isinstance(data, dict) or 'row_differences' not in data:
             return data
-            
+
         row_differences = data.get('row_differences', [])
         if not row_differences:
             return data
-            
+
         # 检查是否已经是数组格式（避免重复转换）
-        if (isinstance(row_differences, list) and 
-            len(row_differences) > 0 and 
+        if (isinstance(row_differences, list) and
+            len(row_differences) > 0 and
             isinstance(row_differences[0], list)):
             return data
-            
+
         # 转换为紧凑数组格式
         compact_differences = []
-        
+
         # 第一行：字段定义
         field_definitions = ["row_id", "difference_type", "row_index1", "row_index2", "sheet_name", "field_differences"]
         compact_differences.append(field_definitions)
-        
+
         # 后续行：实际数据
         for diff in row_differences:
             if isinstance(diff, dict):
                 # 转换字段级差异为数组格式
                 field_diffs = diff.get('detailed_field_differences', [])
                 compact_field_diffs = None
-                
+
                 if field_diffs:
                     compact_field_diffs = []
                     for field_diff in field_diffs:
@@ -110,10 +110,10 @@ def _format_result(result) -> Dict[str, Any]:
                             compact_field_diffs.append([
                                 field_diff.get('field_name', ''),
                                 field_diff.get('old_value', ''),
-                                field_diff.get('new_value', ''), 
+                                field_diff.get('new_value', ''),
                                 field_diff.get('change_type', '')
                             ])
-                
+
                 # 主要差异数据数组：按字段定义顺序
                 compact_row = [
                     diff.get('row_id', ''),
@@ -124,11 +124,11 @@ def _format_result(result) -> Dict[str, Any]:
                     compact_field_diffs
                 ]
                 compact_differences.append(compact_row)
-        
+
         # 创建新的数据副本，替换row_differences
         new_data = data.copy()
         new_data['row_differences'] = compact_differences
-        
+
         return new_data
 
     def _deep_clean_nulls(obj):
@@ -166,11 +166,11 @@ def _format_result(result) -> Dict[str, Any]:
         json_str = json.dumps(result, default=json_serializer, ensure_ascii=False)
         # 步骤2: 再转回字典
         result_dict = json.loads(json_str)
-        
+
         # 步骤3: 转换为紧凑数组格式（仅用于结构化比较结果）
         if result_dict.get('data'):
             result_dict['data'] = _convert_to_compact_array_format(result_dict['data'])
-        
+
         # 步骤4: 应用null清理
         cleaned_dict = _deep_clean_nulls(result_dict)
         return cleaned_dict
@@ -861,7 +861,7 @@ def excel_compare_sheets(
     比较两个Excel工作表 - 游戏开发专用版（紧凑数组格式）
 
     专注于ID对象的新增、删除、修改检测，自动识别配置表变化。
-    
+
     ⚡ 优化特性：
     - 使用紧凑数组格式，减少60-80%的JSON大小
     - 避免大量重复的键名，提升传输和解析效率
@@ -885,12 +885,12 @@ def excel_compare_sheets(
                 "exists_in_file1": bool,
                 "exists_in_file2": bool,
                 "total_differences": int,
-                
+
                 // 🔥 核心优化：数组格式的差异数据
                 "row_differences": [
                     // 第一行：字段定义（索引说明）
                     ["row_id", "difference_type", "row_index1", "row_index2", "sheet_name", "field_differences"],
-                    
+
                     // 后续行：实际数据（按索引顺序）
                     ["18300504", "row_added", 0, 663, "TrSkillEffect", null],
                     ["11002101", "row_removed", 979, 0, "TrSkillEffect", null],
@@ -899,7 +899,7 @@ def excel_compare_sheets(
                         ["初始技能增强ID列表", "", 183002041, "text_change"]
                     ]]
                 ],
-                
+
                 "structural_changes": {
                     "max_row": {"sheet1": 988, "sheet2": 1001, "difference": 13},
                     "max_column": {"sheet1": 45, "sheet2": 41, "difference": -4}
@@ -907,21 +907,21 @@ def excel_compare_sheets(
             },
             "metadata": {
                 "file1": str,
-                "sheet1": str, 
+                "sheet1": str,
                 "file2": str,
                 "sheet2": str,
                 "total_differences": int,
                 "comparison_type": "structured"
             }
         }
-        
+
         � 数据解析说明：
         - row_differences[0] 是字段定义，说明每列的含义
         - row_differences[1+] 是实际数据，按字段定义顺序排列
         - difference_type 值："row_added" | "row_removed" | "row_modified"
         - field_differences 格式：[[field_name, old_value, new_value, change_type], ...]
         - change_type 值："text_change" | "numeric_change" | "formula_change"
-        
+
         🎯 优势对比：
         - 传统格式：每个差异约150-200字符的键名开销
         - 数组格式：仅需要6个数组索引，减少80%空间占用
