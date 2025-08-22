@@ -3,6 +3,7 @@ Fixed tests for ExcelSearcher class - matching actual API implementation
 """
 
 import pytest
+from openpyxl import Workbook
 from src.core.excel_search import ExcelSearcher
 from src.models.types import OperationResult
 from src.utils.exceptions import ExcelFileNotFoundError
@@ -113,3 +114,48 @@ class TestExcelSearcher:
 
         assert result.success is True
         assert result.data is not None
+
+    def test_regex_search_specific_sheet(self, tmp_path):
+        """Test searching in specific sheet only"""
+        # Create test file with multiple sheets
+        file_path = tmp_path / "test_sheets.xlsx"
+        wb = Workbook()
+
+        # Sheet1
+        ws1 = wb.active
+        ws1.title = "Sheet1"
+        ws1["A1"] = "test123"
+        ws1["B1"] = "hello"
+
+        # Sheet2
+        ws2 = wb.create_sheet("Sheet2")
+        ws2["A1"] = "test456"
+        ws2["B1"] = "world"
+
+        wb.save(file_path)
+
+        searcher = ExcelSearcher(str(file_path))
+
+        # Test search all sheets
+        result_all = searcher.regex_search(r"test\d+")
+        assert result_all.success is True
+        assert len(result_all.data) == 2  # Should find both test123 and test456
+
+        # Test search specific sheet (Sheet1)
+        result_sheet1 = searcher.regex_search(r"test\d+", sheet_name="Sheet1")
+        assert result_sheet1.success is True
+        assert len(result_sheet1.data) == 1
+        assert result_sheet1.data[0].match == "test123"
+        assert result_sheet1.data[0].sheet == "Sheet1"
+
+        # Test search specific sheet (Sheet2)
+        result_sheet2 = searcher.regex_search(r"test\d+", sheet_name="Sheet2")
+        assert result_sheet2.success is True
+        assert len(result_sheet2.data) == 1
+        assert result_sheet2.data[0].match == "test456"
+        assert result_sheet2.data[0].sheet == "Sheet2"
+
+        # Test search non-existent sheet
+        result_invalid = searcher.regex_search(r"test\d+", sheet_name="NonExistent")
+        assert result_invalid.success is False
+        assert "不存在" in result_invalid.error
