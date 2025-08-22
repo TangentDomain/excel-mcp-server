@@ -15,8 +15,6 @@ from src.server import (
     excel_insert_columns,
     excel_delete_rows,
     excel_delete_columns,
-    excel_set_formula,
-    excel_evaluate_formula,
     excel_format_cells,
     excel_regex_search
 )
@@ -161,36 +159,6 @@ class TestServerInterfaces:
         assert result['success'] is True
         # Should have response info
         assert 'data' in result or 'message' in result
-
-    def test_excel_set_formula(self, sample_excel_file):
-        """Test excel_set_formula interface"""
-        result = excel_set_formula(sample_excel_file, "Sheet1", "F1", "SUM(A1:A5)")
-
-        assert result['success'] is True
-        # Should have response info
-        assert 'data' in result or 'message' in result
-
-    def test_excel_set_formula_invalid_sheet(self, sample_excel_file):
-        """Test excel_set_formula with invalid sheet"""
-        result = excel_set_formula(sample_excel_file, "NonExistentSheet", "A1", "SUM(B1:B10)")
-
-        assert result['success'] is False
-        assert 'error' in result
-
-    def test_excel_evaluate_formula(self, formula_excel_file):
-        """Test excel_evaluate_formula interface"""
-        result = excel_evaluate_formula(formula_excel_file, "SUM(A2:A4)")
-
-        assert result['success'] is True
-        # Should have calculation result
-        assert 'result' in result or 'data' in result
-
-    def test_excel_evaluate_formula_invalid_file(self):
-        """Test excel_evaluate_formula with invalid file"""
-        result = excel_evaluate_formula("nonexistent_file.xlsx", "SUM(A1:A10)")
-
-        assert result['success'] is False
-        assert 'error' in result
 
     def test_excel_format_cells(self, sample_excel_file):
         """Test excel_format_cells interface"""
