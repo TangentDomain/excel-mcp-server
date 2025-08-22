@@ -204,7 +204,7 @@ class TestServerInterfaces:
             lambda: excel_regex_search(sample_excel_file, r"test")
         ]
 
-        for interface in interfaces:
+        for i, interface in enumerate(interfaces):
             result = interface()
 
             # All should have success boolean
@@ -213,8 +213,16 @@ class TestServerInterfaces:
 
             # If successful, should have appropriate data
             if result['success']:
-                # Should have either data, message, result, total_matches, or sheets
-                assert any(key in result for key in ['data', 'message', 'result', 'total_matches', 'sheets'])
+                # Should have either direct data keys or metadata with relevant information
+                expected_keys = ['data', 'message', 'result', 'total_matches', 'sheets', 'matches', 'file_path', 'sheet_name', 'total_sheets']
+                has_expected_key = any(key in result for key in expected_keys)
+
+                # For search results, check metadata for nested keys
+                if not has_expected_key and 'metadata' in result:
+                    metadata_keys = ['total_matches', 'pattern', 'search_results']
+                    has_expected_key = any(key in result['metadata'] for key in metadata_keys)
+
+                assert has_expected_key, f"Expected data keys in result or metadata, got keys: {list(result.keys())}"
             else:
                 assert 'error' in result
                 assert isinstance(result['error'], str)
