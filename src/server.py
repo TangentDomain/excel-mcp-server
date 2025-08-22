@@ -37,6 +37,9 @@ from .core.excel_compare import ExcelComparer
 # 导入统一错误处理
 from .utils.error_handler import unified_error_handler, extract_file_context, extract_formula_context
 
+# 导入结果格式化工具
+from .utils.formatter import format_operation_result
+
 # ==================== 配置和初始化 ====================
 # 开启详细日志用于调试
 logging.basicConfig(
@@ -50,160 +53,6 @@ logger = logging.getLogger(__name__)
 
 # 创建FastMCP服务器实例
 mcp = FastMCP("excel-mcp-server")
-
-
-# ==================== 辅助函数 ====================
-def _format_result(result) -> Dict[str, Any]:
-    """
-    格式化操作结果为MCP响应格式，使用JSON序列化简化方案
-
-    Args:
-        result: OperationResult对象
-
-    Returns:
-        格式化后的字典，已清理null值，并转换为紧凑数组格式
-    """
-    import json
-
-    def _convert_to_compact_array_format(data):
-        """
-        将结构化比较结果转换为紧凑的数组格式
-
-        Args:
-            data: StructuredDataComparison 数据对象
-
-        Returns:
-            转换后的紧凑格式数据
-        """
-        if not isinstance(data, dict) or 'row_differences' not in data:
-            return data
-
-        row_differences = data.get('row_differences', [])
-        if not row_differences:
-            return data
-
-        # 检查是否已经是数组格式（避免重复转换）
-        if (isinstance(row_differences, list) and
-            len(row_differences) > 0 and
-            isinstance(row_differences[0], list)):
-            return data
-
-        # 转换为紧凑数组格式
-        compact_differences = []
-
-        # 第一行：字段定义
-        field_definitions = ["row_id", "difference_type", "row_index1", "row_index2", "sheet_name", "field_differences"]
-        compact_differences.append(field_definitions)
-
-        # 后续行：实际数据
-        for diff in row_differences:
-            if isinstance(diff, dict):
-                # 转换字段级差异为数组格式
-                field_diffs = diff.get('detailed_field_differences', [])
-                compact_field_diffs = None
-
-                if field_diffs:
-                    compact_field_diffs = []
-                    for field_diff in field_diffs:
-                        if isinstance(field_diff, dict):
-                            # 数组格式：[field_name, old_value, new_value, change_type]
-                            compact_field_diffs.append([
-                                field_diff.get('field_name', ''),
-                                field_diff.get('old_value', ''),
-                                field_diff.get('new_value', ''),
-                                field_diff.get('change_type', '')
-                            ])
-
-                # 主要差异数据数组：按字段定义顺序
-                compact_row = [
-                    diff.get('row_id', ''),
-                    diff.get('difference_type', ''),
-                    diff.get('row_index1', 0),
-                    diff.get('row_index2', 0),
-                    diff.get('sheet_name', ''),
-                    compact_field_diffs
-                ]
-                compact_differences.append(compact_row)
-
-        # 创建新的数据副本，替换row_differences
-        new_data = data.copy()
-        new_data['row_differences'] = compact_differences
-
-        return new_data
-
-    def _deep_clean_nulls(obj):
-        """递归深度清理对象中的null/None值"""
-        if isinstance(obj, dict):
-            cleaned = {}
-            for key, value in obj.items():
-                if value is not None:
-                    cleaned_value = _deep_clean_nulls(value)
-                    if cleaned_value is not None and cleaned_value != {} and cleaned_value != []:
-                        cleaned[key] = cleaned_value
-            return cleaned
-        elif isinstance(obj, list):
-            cleaned = []
-            for item in obj:
-                if item is not None:
-                    cleaned_item = _deep_clean_nulls(item)
-                    if cleaned_item is not None and cleaned_item != {} and cleaned_item != []:
-                        cleaned.append(cleaned_item)
-            return cleaned
-        else:
-            return obj
-
-    # 步骤1: 先转成JSON字符串（自动处理dataclass）
-    try:
-        def json_serializer(obj):
-            """自定义JSON序列化器，专门处理dataclass和枚举"""
-            if isinstance(obj, Enum):
-                return obj.value
-            elif hasattr(obj, '__dict__'):
-                return obj.__dict__
-            else:
-                return str(obj)
-
-        json_str = json.dumps(result, default=json_serializer, ensure_ascii=False)
-        # 步骤2: 再转回字典
-        result_dict = json.loads(json_str)
-
-        # 步骤3: 转换为紧凑数组格式（仅用于结构化比较结果）
-        if result_dict.get('data'):
-            result_dict['data'] = _convert_to_compact_array_format(result_dict['data'])
-
-        # 步骤4: 应用null清理
-        cleaned_dict = _deep_clean_nulls(result_dict)
-        return cleaned_dict
-    except Exception as e:
-        # 如果JSON方案失败，回退到原始方案
-        response = {
-            'success': result.success,
-        }
-
-        if result.success:
-            if result.data is not None:
-                # 处理数据类型转换
-                if hasattr(result.data, '__dict__'):
-                    # 如果是数据类，转换为字典
-                    response.update(result.data.__dict__)
-                elif isinstance(result.data, list):
-                    # 如果是列表，处理每个元素
-                    response['data'] = [
-                        item.__dict__ if hasattr(item, '__dict__') else item
-                        for item in result.data
-                    ]
-                else:
-                    response['data'] = result.data
-
-            if result.metadata:
-                response.update(result.metadata)
-
-            if result.message:
-                response['message'] = result.message
-        else:
-            response['error'] = result.error
-
-        return response
 
 
 # ==================== MCP 工具定义 ====================
@@ -277,7 +126,7 @@ def excel_regex_search(
     """
     searcher = ExcelSearcher(file_path)
     result = searcher.regex_search(pattern, flags, search_values, search_formulas, sheet_name)
-    return _format_result(result)
+    return format_operation_result(result)
 
 
 @mcp.tool()
@@ -325,7 +174,7 @@ def excel_regex_search_directory(
         directory_path, pattern, flags, search_values, search_formulas,
         recursive, file_extensions, file_pattern, max_files
     )
-    return _format_result(result)
+    return format_operation_result(result)
 
 
 @mcp.tool()
@@ -369,7 +218,7 @@ def excel_get_range(
         full_range_expression = f"{sheet_name}!{range_expression}"
         result = reader.get_range(full_range_expression, include_formatting)
 
-    return _format_result(result)
+    return format_operation_result(result)
 
 
 @mcp.tool()
@@ -416,7 +265,7 @@ def excel_update_range(
         full_range_expression = f"{sheet_name}!{range_expression}"
 
     result = writer.update_range(full_range_expression, data, preserve_formulas)
-    return _format_result(result)
+    return format_operation_result(result)
 
 
 @mcp.tool()
@@ -447,7 +296,7 @@ def excel_insert_rows(
     """
     writer = ExcelWriter(file_path)
     result = writer.insert_rows(sheet_name, row_index, count)
-    return _format_result(result)
+    return format_operation_result(result)
 
 
 @mcp.tool()
@@ -478,7 +327,7 @@ def excel_insert_columns(
     """
     writer = ExcelWriter(file_path)
     result = writer.insert_columns(sheet_name, column_index, count)
-    return _format_result(result)
+    return format_operation_result(result)
 
 
 @mcp.tool()
@@ -507,7 +356,7 @@ def excel_create_file(
         result = excel_create_file("report.xlsx", ["数据", "图表", "汇总"])
     """
     result = ExcelManager.create_file(file_path, sheet_names)
-    return _format_result(result)
+    return format_operation_result(result)
 
 
 @mcp.tool()
@@ -539,7 +388,7 @@ def excel_create_sheet(
     """
     manager = ExcelManager(file_path)
     result = manager.create_sheet(sheet_name, index)
-    return _format_result(result)
+    return format_operation_result(result)
 
 
 @mcp.tool()
@@ -564,7 +413,7 @@ def excel_delete_sheet(
     """
     manager = ExcelManager(file_path)
     result = manager.delete_sheet(sheet_name)
-    return _format_result(result)
+    return format_operation_result(result)
 
 
 @mcp.tool()
@@ -591,7 +440,7 @@ def excel_rename_sheet(
     """
     manager = ExcelManager(file_path)
     result = manager.rename_sheet(old_name, new_name)
-    return _format_result(result)
+    return format_operation_result(result)
 
 
 @mcp.tool()
@@ -622,7 +471,7 @@ def excel_delete_rows(
     """
     writer = ExcelWriter(file_path)
     result = writer.delete_rows(sheet_name, row_index, count)
-    return _format_result(result)
+    return format_operation_result(result)
 
 
 @mcp.tool()
@@ -653,7 +502,7 @@ def excel_delete_columns(
     """
     writer = ExcelWriter(file_path)
     result = writer.delete_columns(sheet_name, column_index, count)
-    return _format_result(result)
+    return format_operation_result(result)
 
 
 # @mcp.tool()
@@ -684,7 +533,7 @@ def excel_set_formula(
     """
     writer = ExcelWriter(file_path)
     result = writer.set_formula(cell_address, formula, sheet_name)
-    return _format_result(result)
+    return format_operation_result(result)
 
 
 # @mcp.tool()
@@ -713,7 +562,7 @@ def excel_evaluate_formula(
     """
     writer = ExcelWriter(file_path)
     result = writer.evaluate_formula(formula, context_sheet)
-    return _format_result(result)
+    return format_operation_result(result)
 
 
 @mcp.tool()
@@ -796,7 +645,7 @@ def excel_format_cells(
 
     writer = ExcelWriter(file_path)
     result = writer.format_cells(range_expression, final_formatting, sheet_name)
-    return _format_result(result)
+    return format_operation_result(result)
 
 
 # ==================== Excel比较功能 ====================
@@ -846,7 +695,7 @@ def excel_compare_files(
 
     comparer = ExcelComparer(options)
     result = comparer.compare_files(file1_path, file2_path)
-    return _format_result(result)
+    return format_operation_result(result)
 @mcp.tool()
 @unified_error_handler("Excel工作表比较", extract_file_context, return_dict=True)
 def excel_compare_sheets(
@@ -947,7 +796,7 @@ def excel_compare_sheets(
 
     comparer = ExcelComparer(options)
     result = comparer.compare_sheets(file1_path, sheet1_name, file2_path, sheet2_name)
-    return _format_result(result)
+    return format_operation_result(result)
 # ==================== 主程序 ====================
 if __name__ == "__main__":
     # 运行FastMCP服务器
