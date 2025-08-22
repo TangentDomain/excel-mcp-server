@@ -10,8 +10,7 @@ from pathlib import Path
 
 from src.core.excel_writer import ExcelWriter
 from src.core.excel_manager import ExcelManager
-from src.utils.formula_cache import get_formula_cache
-from src.server import excel_create_sheet, excel_evaluate_formula
+from src.server import excel_create_sheet
 from src.models.types import OperationResult
 
 
