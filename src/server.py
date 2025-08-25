@@ -52,7 +52,7 @@ logging.basicConfig(
 logger = logging.getLogger(__name__)
 
 # 创建FastMCP服务器实例
-mcp = FastMCP("excel-mcp-server")
+mcp = FastMCP("excel-mcp")
 
 
 # ==================== MCP 工具定义 ====================
