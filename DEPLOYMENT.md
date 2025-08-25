@@ -17,7 +17,7 @@ src/
 ├── server.py              # FastMCP服务器主入口
 ├── core/                  # 核心功能模块
 │   ├── excel_reader.py    # Excel读取操作
-│   ├── excel_writer.py    # Excel写入操作  
+│   ├── excel_writer.py    # Excel写入操作
 │   ├── excel_manager.py   # 文件和工作表管理
 │   ├── excel_search.py    # 正则搜索功能
 │   └── excel_compare.py   # 游戏配置表比较
@@ -121,7 +121,7 @@ python -m src.server
 # 使用UV方式测试
 uv run python -m src.server
 
-# 或直接Python方式测试  
+# 或直接Python方式测试
 python -m src.server
 ```
 
@@ -131,7 +131,7 @@ python -m src.server
 可以通过MCP客户端测试以下功能：
 
 1. **创建Excel文件**: `excel_create_file`
-2. **读取数据**: `excel_get_range` 
+2. **读取数据**: `excel_get_range`
 3. **写入数据**: `excel_update_range`
 4. **搜索功能**: `excel_regex_search`
 5. **工作表管理**: `excel_create_sheet`, `excel_delete_sheet`
@@ -142,7 +142,7 @@ python -m src.server
 **问题**: `ImportError: 缺少必要的依赖包`
 **解决**: 确保已安装所有依赖 `uv sync` 或 `pip install -r requirements.txt`
 
-### 2. 路径问题  
+### 2. 路径问题
 **问题**: 找不到模块或文件
 **解决**: 确保使用绝对路径，Windows用户注意使用正斜杠
 
@@ -155,7 +155,7 @@ python -m src.server
 核心依赖:
 - `fastmcp >= 0.1.0` - MCP服务器框架
 - `openpyxl >= 3.1.0` - Excel文件操作
-- `mcp >= 1.0.0` - MCP协议支持  
+- `mcp >= 1.0.0` - MCP协议支持
 - `xlcalculator >= 0.5.0` - Excel公式计算
 - `formulas >= 1.3.0` - 公式解析引擎
 - `xlwings >= 0.33.15` - Excel应用集成
@@ -168,7 +168,7 @@ python -m src.server
 ## 技术特性
 
 - **统一错误处理**: 所有MCP工具使用 `@unified_error_handler` 装饰器
-- **模块化设计**: 核心功能分离到独立模块，便于维护和测试  
+- **模块化设计**: 核心功能分离到独立模块，便于维护和测试
 - **类型安全**: 完整的类型提示和数据验证
 - **游戏优化**: 专门为游戏配置表比较优化的功能
 - **性能优化**: 支持大文件处理和批量操作
