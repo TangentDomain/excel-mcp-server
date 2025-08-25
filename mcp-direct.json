@@ -1,0 +1,13 @@
+{
+  "mcpServers": {
+    "excel-mcp": {
+      "command": "python",
+      "args": [
+        "-m",
+        "src.server"
+      ],
+      "cwd": "D:/excel-mcp-server",
+      "description": "Excel MCP Server - 直接Python运行方式"
+    }
+  }
+}

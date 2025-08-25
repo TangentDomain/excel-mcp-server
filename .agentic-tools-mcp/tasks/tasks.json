@@ -167,6 +167,13 @@
       "description": "整理项目根目录下的杂乱文件，删除不符合规范的测试代码，归类和清理各种报告文档，建立清晰的项目结构",
       "createdAt": "2025-08-22T16:46:36.993Z",
       "updatedAt": "2025-08-22T16:46:36.993Z"
+    },
+    {
+      "id": "2f26b1f4-c695-43cc-a484-9f528d690df1",
+      "name": "Excel MCP Server 部署分析",
+      "description": "分析Excel MCP Server项目结构，提供快速部署方案，并生成适用的mcp.json配置文件。该项目是基于FastMCP框架的Excel操作服务器，支持Excel文件的读写、搜索、格式化等功能。",
+      "createdAt": "2025-08-25T03:38:19.848Z",
+      "updatedAt": "2025-08-25T03:38:19.848Z"
     }
   ],
   "tasks": [
@@ -1397,6 +1404,39 @@
       "estimatedHours": 0.5,
       "level": 0,
       "actualHours": 0.3
+    },
+    {
+      "id": "96fcf11c-e755-444b-bbbe-4ad00958d1b7",
+      "name": "分析项目架构和核心模块",
+      "details": "分析项目的核心架构和模块结构，理解ExcelReader、ExcelWriter、ExcelManager等核心组件，以及FastMCP框架的集成方式。",
+      "projectId": "2f26b1f4-c695-43cc-a484-9f528d690df1",
+      "completed": false,
+      "createdAt": "2025-08-25T03:38:26.080Z",
+      "updatedAt": "2025-08-25T03:41:09.193Z",
+      "dependsOn": [],
+      "priority": 9,
+      "complexity": 6,
+      "status": "done",
+      "tags": [],
+      "estimatedHours": 1,
+      "level": 0,
+      "actualHours": 1.5
+    },
+    {
+      "id": "d70af2b1-72bd-4105-92ef-4c4950ba5466",
+      "name": "生成MCP配置和部署文档",
+      "details": "创建Windows版本的MCP配置文件，支持uv和直接Python两种部署方式。生成部署文档和自动化脚本。",
+      "projectId": "2f26b1f4-c695-43cc-a484-9f528d690df1",
+      "completed": false,
+      "createdAt": "2025-08-25T03:40:37.759Z",
+      "updatedAt": "2025-08-25T03:40:37.759Z",
+      "dependsOn": [],
+      "priority": 8,
+      "complexity": 4,
+      "status": "done",
+      "tags": [],
+      "estimatedHours": 0.5,
+      "level": 0
     }
   ],
   "subtasks": [],
