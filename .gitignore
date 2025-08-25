@@ -79,3 +79,14 @@ TrSkill.xlsx
 
 # 忽略清理脚本生成的文件
 cleanup.py
+
+# 忽略部署过程中生成的配置文件
+mcp-generated.json
+mcp-*-generated.json
+DEPLOYMENT.md.backup
+deploy.bat.backup
+
+# 忽略部署工具生成的临时文件
+deploy-*.json
+config-*.json
+setup-*.json
