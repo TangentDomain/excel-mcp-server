@@ -81,6 +81,8 @@ TrSkill.xlsx
 cleanup.py
 
 # 忽略部署过程中生成的配置文件
+mcp-direct.json
+mcp-windows.json
 mcp-generated.json
 mcp-*-generated.json
 DEPLOYMENT.md.backup
