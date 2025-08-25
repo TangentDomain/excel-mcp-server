@@ -1,11 +1,11 @@
 # Excel MCP Server - AI Assistant Guide
 
-This project is an Excel Model Context Protocol (MCP) server that enables AI assistants to interact with Excel files through natural language commands. Built with standard MCP Python SDK and openpyxl.
+This project is an Excel Model Context Protocol (MCP) server that enables AI assistants to interact with Excel files through natural language commands. Built with FastMCP framework and openpyxl.
 
 ## Architecture Overview
 
 ### Core Components
-- **src/server.py**: MCP server entry point with standard MCP low-level API
+- **src/server.py**: FastMCP server entry point with MCP tool definitions
 - **src/core/**: Modular Excel operations
   - `excel_reader.py`: Reading operations
   - `excel_writer.py`: Writing/modification operations
@@ -17,23 +17,12 @@ This project is an Excel Model Context Protocol (MCP) server that enables AI ass
 
 ### Key Design Patterns
 
-#### Standard MCP Low-Level API
-The server uses the official MCP Python SDK low-level API:
-```python
-@server.list_tools()
-async def handle_list_tools() -> list[types.Tool]:
-    # Return tool definitions with JSON Schema
-
-@server.call_tool()
-async def handle_call_tool(name: str, arguments: dict[str, Any]) -> list[types.TextContent]:
-    # Handle tool execution
-```
-
 #### Unified Error Handling
-All implementation functions use `@unified_error_handler` decorator pattern:
+All MCP tools use `@unified_error_handler` decorator pattern:
 ```python
+@mcp.tool()
 @unified_error_handler("operation_name", extract_context_fn, return_dict=True)
-def _excel_operation(...):
+def excel_operation(...):
     # Implementation delegates to core modules
 ```
 
@@ -58,7 +47,7 @@ Supports two range formats:
 ### Running the Server
 ```bash
 # Development
-uv run python -m src.server
+python -m src.server
 
 # Testing
 pytest tests/ -v
@@ -101,7 +90,7 @@ Add to your MCP client config:
 - Support for both .xlsx and .xlsm formats
 
 ## Key Dependencies
-- **mcp**: Official MCP Python SDK (low-level API)
+- **FastMCP**: MCP server framework
 - **openpyxl**: Core Excel file operations
 - **xlcalculator/formulas**: Formula evaluation engines
 - **xlwings**: Optional Excel application integration
@@ -124,4 +113,4 @@ Add to your MCP client config:
 - Game-focused Excel comparison for configuration tables
 - Formula evaluation without file modification
 
-When working with this codebase, always use standard MCP patterns, delegate implementation to core modules, and maintain the consistent result formatting.
+When working with this codebase, always use the unified error handling patterns, delegate implementation to core modules, and maintain the consistent result formatting.
