@@ -1,73 +1,106 @@
 @echo off
-REM Excel MCP Server 快速部署脚本 - Windows版本
+chcp 65001 >nul 2>&1
+REM Excel MCP Server Quick Deploy Script - Windows Version
 
 echo ===================================
-echo Excel MCP Server 快速部署工具
+echo Excel MCP Server Quick Deploy Tool
 echo ===================================
 echo.
 
-REM 检查当前目录
+REM Check current directory
 if not exist "src\server.py" (
-    echo [错误] 请在Excel MCP Server根目录下运行此脚本
-    echo 当前目录: %CD%
+    echo [ERROR] Please run this script in Excel MCP Server root directory
+    echo Current directory: %CD%
     pause
     exit /b 1
 )
 
-echo [信息] 当前目录: %CD%
+echo [INFO] Current directory: %CD%
 echo.
 
-REM 检查uv是否已安装
-echo [步骤1] 检查uv包管理器...
+REM Check if uv is installed
+echo [STEP 1] Checking uv package manager...
 uv --version >nul 2>&1
 if errorlevel 1 (
-    echo [警告] 未检测到uv包管理器，将使用直接Python方式
-    set USE_UV=false
+    echo [WARN] UV not detected, will use direct Python method
+    set "USE_UV=false"
 ) else (
-    echo [成功] 检测到uv包管理器
-    set USE_UV=true
+    echo [OK] UV package manager detected
+    set "USE_UV=true"
 )
 echo.
 
-REM 同步/安装依赖
-echo [步骤2] 安装项目依赖...
+REM Install dependencies
+echo [STEP 2] Installing project dependencies...
 if "%USE_UV%"=="true" (
-    echo [信息] 使用uv同步依赖...
+    echo [INFO] Using uv to sync dependencies...
     uv sync
     if errorlevel 1 (
-        echo [错误] uv依赖同步失败
+        echo [ERROR] UV dependency sync failed
         pause
         exit /b 1
     )
 ) else (
-    echo [信息] 使用pip安装依赖...
+    echo [INFO] Using pip to install dependencies...
     python -m pip install fastmcp openpyxl mcp xlcalculator formulas xlwings
     if errorlevel 1 (
-        echo [错误] pip依赖安装失败
+        echo [ERROR] Pip installation failed
         pause
         exit /b 1
     )
 )
-echo [成功] 依赖安装完成
+echo [OK] Dependencies installed successfully
 echo.
 
-REM 生成MCP配置文件
-echo [步骤3] 生成MCP配置文件...
+REM Generate MCP config file
+echo [STEP 3] Generating MCP configuration file...
 
+set "PROJ_PATH=%CD:\=/%"
 if "%USE_UV%"=="true" (
-    echo [信息] 生成UV版本的mcp.json...
-    echo {"mcpServers":{"excel-mcp":{"command":"uv","args":["--directory","%CD:\=/%%","run","python","-m","src.server"],"description":"Excel MCP Server - UV运行方式"}}} > mcp-generated.json
+    echo [INFO] Generating UV version mcp.json...
+    (
+        echo {
+        echo   "mcpServers": {
+        echo     "excel-mcp": {
+        echo       "command": "uv",
+        echo       "args": [
+        echo         "--directory",
+        echo         "%PROJ_PATH%",
+        echo         "run",
+        echo         "python",
+        echo         "-m",
+        echo         "src.server"
+        echo       ],
+        echo       "description": "Excel MCP Server - UV Runtime"
+        echo     }
+        echo   }
+        echo }
+    ) > mcp-generated.json
 ) else (
-    echo [信息] 生成直接Python版本的mcp.json...
-    echo {"mcpServers":{"excel-mcp":{"command":"python","args":["-m","src.server"],"cwd":"%CD:\=/%%","description":"Excel MCP Server - 直接Python运行"}}} > mcp-generated.json
+    echo [INFO] Generating direct Python version mcp.json...
+    (
+        echo {
+        echo   "mcpServers": {
+        echo     "excel-mcp": {
+        echo       "command": "python",
+        echo       "args": [
+        echo         "-m",
+        echo         "src.server"
+        echo       ],
+        echo       "cwd": "%PROJ_PATH%",
+        echo       "description": "Excel MCP Server - Direct Python"
+        echo     }
+        echo   }
+        echo }
+    ) > mcp-generated.json
 )
 
-echo [成功] MCP配置文件已生成: mcp-generated.json
+echo [OK] MCP configuration file generated: mcp-generated.json
 echo.
 
-REM 测试服务器启动
-echo [步骤4] 测试服务器启动...
-echo [信息] 正在测试服务器是否能正常启动（5秒超时）...
+REM Test server startup
+echo [STEP 4] Testing server startup...
+echo [INFO] Testing if server can start normally ^(5 second timeout^)...
 
 if "%USE_UV%"=="true" (
     timeout 5 uv run python -m src.server >nul 2>&1
@@ -75,26 +108,30 @@ if "%USE_UV%"=="true" (
     timeout 5 python -m src.server >nul 2>&1
 )
 
-REM MCP服务器通过stdio通信，超时是正常的
-echo [成功] 服务器启动测试完成
+REM MCP server communicates via stdio, timeout is normal
+echo [OK] Server startup test completed
 echo.
 
 echo ===================================
-echo 部署完成！
+echo Deployment Complete!
 echo ===================================
 echo.
-echo 部署方式: %USE_UV:true=UV包管理器%USE_UV:false=直接Python%
-echo 配置文件: mcp-generated.json
-echo 项目目录: %CD%
+if "%USE_UV%"=="true" (
+    echo Deployment Method: UV Package Manager
+) else (
+    echo Deployment Method: Direct Python
+)
+echo Configuration File: mcp-generated.json
+echo Project Directory: %CD%
 echo.
-echo 请将 mcp-generated.json 的内容复制到您的MCP客户端配置中
+echo Please copy the content of mcp-generated.json to your MCP client configuration
 echo.
-echo 可用的配置文件:
-echo - mcp-generated.json (推荐，自动选择最佳方式)
-echo - mcp-windows.json (UV方式) 
-echo - mcp-direct.json (直接Python方式)
+echo Available configuration files:
+echo - mcp-generated.json ^(Recommended, auto-selected best method^)
+echo - mcp-windows.json ^(UV method^)
+echo - mcp-direct.json ^(Direct Python method^)
 echo.
-echo 测试命令:
+echo Test command:
 if "%USE_UV%"=="true" (
     echo uv run python -m src.server
 ) else (
