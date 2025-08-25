@@ -83,7 +83,8 @@ def _serialize_to_json_dict(result) -> Dict[str, Any]:
             return str(obj)
 
     # 转换为JSON字符串再解析回字典，自动处理复杂类型
-    json_str = json.dumps(result, default=_json_serializer, ensure_ascii=False)
+    # separators=(',', ':') 移除空格，确保紧凑输出
+    json_str = json.dumps(result, default=_json_serializer, ensure_ascii=False, separators=(',', ':'))
     return json.loads(json_str)
 
 
