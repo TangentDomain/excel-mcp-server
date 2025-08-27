@@ -141,6 +141,9 @@ def excel_list_sheets(file_path: str, include_headers: bool = True) -> Dict[str,
 
         response['sheets_with_headers'] = sheets_with_headers
 
+    # 清理资源
+    reader.close()
+    
     return response
 
 
