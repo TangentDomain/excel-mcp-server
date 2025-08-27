@@ -272,29 +272,27 @@ class TestServerInterfaces:
         assert 'error' in result
 
     def test_excel_update_range_row_format(self, sample_excel_file):
-        """Test excel_update_range with row range format (e.g., '1:1', '1250:1250')"""
-        # Test single row range
+        """Test excel_update_range with row range format (e.g., '1:1', '1250:1250') - should throw error"""
+        # Test single row range - should fail with clear error message
         data1 = [["测试1", "测试2", "测试3"]]
         result1 = excel_update_range(sample_excel_file, "1:1", data1, sheet_name="Sheet1")
         
-        assert result1['success'] is True
-        assert 'data' in result1
-        # Should update 3 cells in row 1
-        if isinstance(result1['data'], list):
-            assert len(result1['data']) == 3
+        assert result1['success'] is False
+        assert 'error' in result1
+        assert '不支持纯行范围格式' in result1['error']
+        assert 'A1:A1' in result1['error']  # Should suggest single column format
         
-        # Test multi-column data with row range (adjust expected count based on actual behavior)
+        # Test multi-row range - should also fail with clear error
         data2 = [[930006, "", "[TRBuff收益类型]无", "【女武神】退场易伤", 1, 0]]
-        result2 = excel_update_range(sample_excel_file, "3:3", data2, sheet_name="Sheet1")
+        result2 = excel_update_range(sample_excel_file, "3:5", data2, sheet_name="Sheet1")
         
-        assert result2['success'] is True
-        assert 'data' in result2
-        # The actual count might vary based on how empty values are handled
-        if isinstance(result2['data'], list):
-            assert len(result2['data']) >= 4  # At least the non-empty values should be updated
+        assert result2['success'] is False  
+        assert 'error' in result2
+        assert '不支持纯行范围格式' in result2['error']
+        assert 'B3:E5' in result2['error']  # Should suggest specific range format
 
     def test_excel_update_range_large_row_number(self, temp_dir, request):
-        """Test excel_update_range with large row numbers like user's case"""
+        """Test excel_update_range with large row numbers - should provide clear error"""
         import uuid
         from openpyxl import Workbook
         
@@ -306,7 +304,7 @@ class TestServerInterfaces:
         ws = wb.active
         ws.title = "TrBuff"
         wb.save(file_path)
-        
+
         # Test user's specific case: row 1250 with 28 columns of data
         user_data = [[
             930006, "", "[TRBuff收益类型]无", "【女武神】退场易伤", "[TRBuff添加类型]替换", 
@@ -316,14 +314,18 @@ class TestServerInterfaces:
         
         result = excel_update_range(str(file_path), "1250:1250", user_data, sheet_name="TrBuff")
         
-        assert result['success'] is True
-        assert 'data' in result
-        if isinstance(result['data'], list):
-            assert len(result['data']) == 28  # Should update 28 cells
-            # Check that the first few cells have correct coordinates
-            assert result['data'][0]['coordinate'] == 'A1250'
-            assert result['data'][0]['new_value'] == 930006
-            assert result['data'][27]['coordinate'] == 'AB1250'  # 28th column should be AB
+        # Should fail with clear error message
+        assert result['success'] is False
+        assert 'error' in result
+        assert '不支持纯行范围格式 "1250:1250"' in result['error']
+        assert 'A1250:A1250' in result['error']  # Should suggest single column format
+        assert 'A1250:Z1250' in result['error']   # Should suggest standard format
+        
+        # Test with proper format should work
+        result_proper = excel_update_range(str(file_path), "A1250:AB1250", user_data, sheet_name="TrBuff") 
+        assert result_proper['success'] is True
+        if isinstance(result_proper['data'], list):
+            assert len(result_proper['data']) == 28  # Should update 28 cells
 
     def test_excel_create_file(self, temp_dir):
         """Test excel_create_file interface"""
