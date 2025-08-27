@@ -197,7 +197,7 @@ class TestExcelCore:
         result = writer.delete_rows("Sheet1", 3, 1)
 
         assert result.success is True
-        assert 'deleted_count' in result.metadata
+        assert 'actual_deleted_count' in result.metadata
 
     def test_writer_delete_columns(self, sample_excel_file):
         """Test deleting columns"""
@@ -205,7 +205,7 @@ class TestExcelCore:
         result = writer.delete_columns("Sheet1", 3, 1)
 
         assert result.success is True
-        assert 'deleted_count' in result.metadata
+        assert 'actual_deleted_count' in result.metadata
 
     def test_writer_format_cells(self, sample_excel_file):
         """Test formatting cells"""
@@ -213,7 +213,7 @@ class TestExcelCore:
         formatting = {
             'font': {'name': 'Arial', 'size': 14, 'bold': True}
         }
-        result = writer.format_cells("Sheet1", "A1:D1", formatting)
+        result = writer.format_cells("Sheet1!A1:D1", formatting)
 
         assert result.success is True
         assert 'formatted_count' in result.metadata
@@ -244,7 +244,7 @@ class TestExcelCore:
 
         assert result.success is True
         assert file_path.exists()
-        assert "created successfully" in result.message
+        assert "成功创建" in result.message
 
     def test_manager_create_file_default_sheets(self, temp_dir):
         """Test creating file with default sheets"""
