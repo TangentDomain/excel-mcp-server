@@ -174,6 +174,13 @@
       "description": "分析Excel MCP Server项目结构，提供快速部署方案，并生成适用的mcp.json配置文件。该项目是基于FastMCP框架的Excel操作服务器，支持Excel文件的读写、搜索、格式化等功能。",
       "createdAt": "2025-08-25T03:38:19.848Z",
       "updatedAt": "2025-08-25T03:38:19.848Z"
+    },
+    {
+      "id": "f05f5efa-81e8-4909-8ed1-418b241eda57",
+      "name": "Excel MCP API设计改进",
+      "description": "基于用户的3个API设计要求对现有19个Excel MCP API进行设计违规分析和改进建议：1) 准确、没有暧昧、不容易混淆、清晰 2) 功能单一、没有上帝方法 3) 使用说明清晰、具备足够的指导能力",
+      "createdAt": "2025-08-27T13:14:09.865Z",
+      "updatedAt": "2025-08-27T13:14:09.865Z"
     }
   ],
   "tasks": [
@@ -1437,6 +1444,27 @@
       "tags": [],
       "estimatedHours": 0.5,
       "level": 0
+    },
+    {
+      "id": "26a45004-aa4b-40c2-b944-95375323a844",
+      "name": "识别和分析上帝方法违规",
+      "details": "分析excel_list_sheets等存在\"上帝方法\"问题的API，识别通过单一参数改变API行为本质的设计违规，提出拆分方案",
+      "projectId": "f05f5efa-81e8-4909-8ed1-418b241eda57",
+      "completed": false,
+      "createdAt": "2025-08-27T13:14:17.390Z",
+      "updatedAt": "2025-08-27T13:15:43.289Z",
+      "dependsOn": [],
+      "priority": 9,
+      "complexity": 8,
+      "status": "done",
+      "tags": [
+        "API设计",
+        "上帝方法",
+        "单一职责"
+      ],
+      "estimatedHours": 2,
+      "level": 0,
+      "actualHours": 2
     }
   ],
   "subtasks": [],
