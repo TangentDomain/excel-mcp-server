@@ -346,16 +346,16 @@ class ExcelWriter:
     def _convert_to_cell_range(self, cell_range: str, range_type: RangeType, sheet, data: List[List[Any]]) -> str:
         """
         检查范围表达式格式的合法性
-        
+
         Args:
             cell_range: 原始范围表达式
             range_type: 范围类型
             sheet: 工作表对象
             data: 数据数组
-            
+
         Returns:
             标准的单元格范围表达式
-            
+
         Raises:
             ValueError: 当使用不支持的范围格式时
         """
@@ -367,11 +367,11 @@ class ExcelWriter:
                 f'- 单列格式: "A{cell_range.split(":")[0]}:A{cell_range.split(":")[-1]}" (单列数据)\n'
                 f'- 指定范围: "B{cell_range.split(":")[0]}:E{cell_range.split(":")[-1]}" (B到E列)'
             )
-            
+
         elif range_type == RangeType.COLUMN_RANGE:
             # 对于列范围，直接返回不做自动扩展
             return cell_range
-            
+
         elif range_type == RangeType.SINGLE_ROW:
             # 对于单行范围，抛出明确错误
             row_num = int(cell_range.split(':')[0])  # 规范化后是 "1:1" 格式
@@ -380,11 +380,11 @@ class ExcelWriter:
                 f'- 标准格式: "A{row_num}:Z{row_num}" (明确指定列范围)\n'
                 f'- 单列格式: "A{row_num}:A{row_num}" (单列数据)'
             )
-            
+
         elif range_type == RangeType.SINGLE_COLUMN:
             # 对于单列范围，直接返回不做自动扩展
             return cell_range
-            
+
         else:
             # 其他情况（CELL_RANGE）直接返回
             return cell_range
@@ -393,13 +393,13 @@ class ExcelWriter:
         """获取工作表 - 强制要求指定工作表名称"""
         if not sheet_name or not sheet_name.strip():
             raise SheetNotFoundError(f"工作表名称不能为空，必须明确指定工作表")
-        
+
         if not workbook.sheetnames:
             raise SheetNotFoundError(f"Excel文件中没有任何工作表")
-            
+
         if sheet_name not in workbook.sheetnames:
             raise SheetNotFoundError(f"工作表不存在: {sheet_name}，可用工作表: {', '.join(workbook.sheetnames)}")
-            
+
         return workbook[sheet_name]
 
     def _write_data(
@@ -1341,37 +1341,37 @@ class ExcelWriter:
     ) -> OperationResult:
         """
         合并单元格
-        
+
         Args:
             range_expression: 范围表达式，如 "A1:C3" 或 "Sheet1!A1:C3"
             sheet_name: 工作表名称（可选，如果range_expression包含工作表名则忽略）
-            
+
         Returns:
             OperationResult: 操作结果
         """
         try:
             workbook = load_workbook(self.file_path)
-            
+
             # 解析范围表达式，构造完整的范围表达式
             if sheet_name and '!' not in range_expression:
                 full_range = f"{sheet_name}!{range_expression}"
             else:
                 full_range = range_expression
-            
+
             range_info = RangeParser.parse_range_expression(full_range)
-            
+
             # 获取工作表
             if range_info.sheet_name not in workbook.sheetnames:
                 raise SheetNotFoundError(f"工作表 '{range_info.sheet_name}' 不存在")
-            
+
             worksheet = workbook[range_info.sheet_name]
-            
+
             # 执行合并操作
             worksheet.merge_cells(range_info.cell_range)
-            
+
             # 保存文件
             workbook.save(self.file_path)
-            
+
             return OperationResult(
                 success=True,
                 message=f"成功合并单元格范围: {range_info.cell_range}",
@@ -1384,7 +1384,7 @@ class ExcelWriter:
                     'file_path': self.file_path
                 }
             )
-            
+
         except Exception as e:
             logger.error(f"合并单元格失败: {e}")
             return OperationResult(
@@ -1399,37 +1399,37 @@ class ExcelWriter:
     ) -> OperationResult:
         """
         取消合并单元格
-        
+
         Args:
             range_expression: 范围表达式，如 "A1:C3" 或 "Sheet1!A1:C3"
             sheet_name: 工作表名称（可选，如果range_expression包含工作表名则忽略）
-            
+
         Returns:
             OperationResult: 操作结果
         """
         try:
             workbook = load_workbook(self.file_path)
-            
+
             # 解析范围表达式，构造完整的范围表达式
             if sheet_name and '!' not in range_expression:
                 full_range = f"{sheet_name}!{range_expression}"
             else:
                 full_range = range_expression
-            
+
             range_info = RangeParser.parse_range_expression(full_range)
-            
+
             # 获取工作表
             if range_info.sheet_name not in workbook.sheetnames:
                 raise SheetNotFoundError(f"工作表 '{range_info.sheet_name}' 不存在")
-            
+
             worksheet = workbook[range_info.sheet_name]
-            
+
             # 执行取消合并操作
             worksheet.unmerge_cells(range_info.cell_range)
-            
+
             # 保存文件
             workbook.save(self.file_path)
-            
+
             return OperationResult(
                 success=True,
                 message=f"成功取消合并单元格范围: {range_info.cell_range}",
@@ -1442,7 +1442,7 @@ class ExcelWriter:
                     'file_path': self.file_path
                 }
             )
-            
+
         except Exception as e:
             logger.error(f"取消合并单元格失败: {e}")
             return OperationResult(
@@ -1458,48 +1458,48 @@ class ExcelWriter:
     ) -> OperationResult:
         """
         设置单元格边框
-        
+
         Args:
             range_expression: 范围表达式，如 "A1:C3" 或 "Sheet1!A1:C3"
             border_style: 边框样式 ("thin", "thick", "double", "dashed", "dotted")
             sheet_name: 工作表名称（可选）
-            
+
         Returns:
             OperationResult: 操作结果
         """
         try:
             from openpyxl.styles import Border, Side
-            
+
             workbook = load_workbook(self.file_path)
-            
+
             # 解析范围表达式，构造完整的范围表达式
             if sheet_name and '!' not in range_expression:
                 full_range = f"{sheet_name}!{range_expression}"
             else:
                 full_range = range_expression
-            
+
             range_info = RangeParser.parse_range_expression(full_range)
-            
+
             # 获取工作表
             if range_info.sheet_name not in workbook.sheetnames:
                 raise SheetNotFoundError(f"工作表 '{range_info.sheet_name}' 不存在")
-            
+
             worksheet = workbook[range_info.sheet_name]
-            
+
             # 创建边框样式
             side = Side(style=border_style)
             border = Border(left=side, right=side, top=side, bottom=side)
-            
+
             # 应用边框到指定范围
             cell_count = 0
             for row in worksheet[range_info.cell_range]:
                 for cell in row:
                     cell.border = border
                     cell_count += 1
-            
+
             # 保存文件
             workbook.save(self.file_path)
-            
+
             return OperationResult(
                 success=True,
                 message=f"成功设置 {cell_count} 个单元格的边框",
@@ -1514,7 +1514,7 @@ class ExcelWriter:
                     'file_path': self.file_path
                 }
             )
-            
+
         except Exception as e:
             logger.error(f"设置边框失败: {e}")
             return OperationResult(
@@ -1530,18 +1530,18 @@ class ExcelWriter:
     ) -> OperationResult:
         """
         设置行高
-        
+
         Args:
             row_number: 行号（从1开始）
             height: 行高（磅值）
             sheet_name: 工作表名称（可选，使用活动工作表）
-            
+
         Returns:
             OperationResult: 操作结果
         """
         try:
             workbook = load_workbook(self.file_path)
-            
+
             # 获取工作表
             if sheet_name:
                 if sheet_name not in workbook.sheetnames:
@@ -1550,13 +1550,13 @@ class ExcelWriter:
             else:
                 worksheet = workbook.active
                 sheet_name = worksheet.title
-            
+
             # 设置行高
             worksheet.row_dimensions[row_number].height = height
-            
+
             # 保存文件
             workbook.save(self.file_path)
-            
+
             return OperationResult(
                 success=True,
                 message=f"成功设置第 {row_number} 行的高度为 {height} 磅",
@@ -1570,7 +1570,7 @@ class ExcelWriter:
                     'file_path': self.file_path
                 }
             )
-            
+
         except Exception as e:
             logger.error(f"设置行高失败: {e}")
             return OperationResult(
@@ -1586,18 +1586,18 @@ class ExcelWriter:
     ) -> OperationResult:
         """
         设置列宽
-        
+
         Args:
             column: 列标识符，如 "A", "B", "C"
             width: 列宽（字符单位）
             sheet_name: 工作表名称（可选，使用活动工作表）
-            
+
         Returns:
             OperationResult: 操作结果
         """
         try:
             workbook = load_workbook(self.file_path)
-            
+
             # 获取工作表
             if sheet_name:
                 if sheet_name not in workbook.sheetnames:
@@ -1606,13 +1606,13 @@ class ExcelWriter:
             else:
                 worksheet = workbook.active
                 sheet_name = worksheet.title
-            
+
             # 设置列宽
             worksheet.column_dimensions[column.upper()].width = width
-            
+
             # 保存文件
             workbook.save(self.file_path)
-            
+
             return OperationResult(
                 success=True,
                 message=f"成功设置列 {column.upper()} 的宽度为 {width} 字符",
@@ -1626,7 +1626,7 @@ class ExcelWriter:
                     'file_path': self.file_path
                 }
             )
-            
+
         except Exception as e:
             logger.error(f"设置列宽失败: {e}")
             return OperationResult(

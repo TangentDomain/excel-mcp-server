@@ -276,17 +276,17 @@ class TestServerInterfaces:
         # Test single row range - should fail with clear error message
         data1 = [["测试1", "测试2", "测试3"]]
         result1 = excel_update_range(sample_excel_file, "1:1", data1, sheet_name="Sheet1")
-        
+
         assert result1['success'] is False
         assert 'error' in result1
         assert '不支持纯行范围格式' in result1['error']
         assert 'A1:A1' in result1['error']  # Should suggest single column format
-        
+
         # Test multi-row range - should also fail with clear error
         data2 = [[930006, "", "[TRBuff收益类型]无", "【女武神】退场易伤", 1, 0]]
         result2 = excel_update_range(sample_excel_file, "3:5", data2, sheet_name="Sheet1")
-        
-        assert result2['success'] is False  
+
+        assert result2['success'] is False
         assert 'error' in result2
         assert '不支持纯行范围格式' in result2['error']
         assert 'B3:E5' in result2['error']  # Should suggest specific range format
@@ -295,10 +295,10 @@ class TestServerInterfaces:
         """Test excel_update_range with large row numbers - should provide clear error"""
         import uuid
         from openpyxl import Workbook
-        
+
         test_id = str(uuid.uuid4())[:8]
         file_path = temp_dir / f"test_large_row_{test_id}.xlsx"
-        
+
         # Create test file
         wb = Workbook()
         ws = wb.active
@@ -307,22 +307,22 @@ class TestServerInterfaces:
 
         # Test user's specific case: row 1250 with 28 columns of data
         user_data = [[
-            930006, "", "[TRBuff收益类型]无", "【女武神】退场易伤", "[TRBuff添加类型]替换", 
+            930006, "", "[TRBuff收益类型]无", "【女武神】退场易伤", "[TRBuff添加类型]替换",
             "", 1, 0, "", "", "[TRBuff效果类型]属性效果", 110202, 99999999,
             "", "", "", "", "", "", "", "", "", "", "", "", "", "", ""
         ]]
-        
+
         result = excel_update_range(str(file_path), "1250:1250", user_data, sheet_name="TrBuff")
-        
+
         # Should fail with clear error message
         assert result['success'] is False
         assert 'error' in result
         assert '不支持纯行范围格式 "1250:1250"' in result['error']
         assert 'A1250:A1250' in result['error']  # Should suggest single column format
         assert 'A1250:Z1250' in result['error']   # Should suggest standard format
-        
+
         # Test with proper format should work
-        result_proper = excel_update_range(str(file_path), "A1250:AB1250", user_data, sheet_name="TrBuff") 
+        result_proper = excel_update_range(str(file_path), "A1250:AB1250", user_data, sheet_name="TrBuff")
         assert result_proper['success'] is True
         if isinstance(result_proper['data'], list):
             assert len(result_proper['data']) == 28  # Should update 28 cells

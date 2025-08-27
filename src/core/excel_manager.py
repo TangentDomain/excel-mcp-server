@@ -299,13 +299,13 @@ class ExcelManager:
             deleted_sheet_index = workbook.sheetnames.index(sheet_name)
             was_active = workbook[sheet_name] == workbook.active
             deleted_sheet_name = sheet_name  # 保存要删除的工作表名称
-            
+
             logger.info(f"准备删除工作表: {deleted_sheet_name}, 索引: {deleted_sheet_index}")
             logger.info(f"删除前工作表列表: {workbook.sheetnames}")
 
             # 删除工作表
             workbook.remove(workbook[sheet_name])
-            
+
             logger.info(f"删除后工作表列表: {workbook.sheetnames}")
 
             # 如果删除的是活动工作表，设置新的活动工作表
@@ -434,38 +434,38 @@ class ExcelManager:
     def get_file_info(file_path: str) -> OperationResult:
         """
         获取Excel文件的详细信息
-        
+
         Args:
             file_path: Excel文件路径
-            
+
         Returns:
             OperationResult: 文件信息结果
         """
         try:
             import os
             from datetime import datetime
-            
+
             if not os.path.exists(file_path):
                 raise FileNotFoundError(f"文件不存在: {file_path}")
-            
+
             # 获取文件系统信息
             stat_info = os.stat(file_path)
             file_size = stat_info.st_size
             created_time = datetime.fromtimestamp(stat_info.st_ctime).strftime('%Y-%m-%d %H:%M:%S')
             modified_time = datetime.fromtimestamp(stat_info.st_mtime).strftime('%Y-%m-%d %H:%M:%S')
-            
+
             # 获取文件格式
             file_format = Path(file_path).suffix.lower().lstrip('.')
-            
+
             # 加载工作簿获取详细信息
             workbook = load_workbook(file_path, read_only=True)
             sheet_count = len(workbook.sheetnames)
             sheet_names = workbook.sheetnames
             has_macros = file_format == 'xlsm'
-            
+
             # 获取活动工作表信息
             active_sheet = workbook.active.title if workbook.active else None
-            
+
             # 简单统计数据行数（仅活动工作表）
             total_rows = 0
             total_cols = 0
@@ -474,9 +474,9 @@ class ExcelManager:
                 if ws.max_row and ws.max_column:
                     total_rows = ws.max_row
                     total_cols = ws.max_column
-            
+
             workbook.close()
-            
+
             return OperationResult(
                 success=True,
                 message=f"成功获取文件信息: {file_path}",
@@ -501,7 +501,7 @@ class ExcelManager:
                     'sheet_summary': {name: f"工作表{i+1}" for i, name in enumerate(sheet_names)}
                 }
             )
-            
+
         except Exception as e:
             logger.error(f"获取文件信息失败: {e}")
             return OperationResult(
