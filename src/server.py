@@ -63,31 +63,25 @@ mcp = FastMCP(
 
 @mcp.tool()
 @unified_error_handler("列出工作表", extract_file_context, return_dict=True)
-def excel_list_sheets(file_path: str, include_headers: bool = True) -> Dict[str, Any]:
+def excel_list_sheets(file_path: str) -> Dict[str, Any]:
     """
-    列出Excel文件中所有工作表名称和表头
+    列出Excel文件中所有工作表名称
 
     Args:
         file_path: Excel文件路径 (.xlsx/.xlsm)
-        include_headers: 是否包含表头信息 (默认: True)
 
     Returns:
-        Dict: 包含success、sheets、sheets_with_headers、active_sheet
+        Dict: 包含success、sheets、total_sheets、active_sheet
 
     Example:
-        # 列出工作表和表头
+        # 列出工作表名称
         result = excel_list_sheets("data.xlsx")
         # 返回: {
         #   'success': True,
         #   'sheets': ['Sheet1', 'Sheet2'],
-        #   'sheets_with_headers': [
-        #     {'name': 'Sheet1', 'headers': ['列1', '列2'], 'header_count': 2},
-        #     {'name': 'Sheet2', 'headers': ['ID', '名称'], 'header_count': 2}
-        #   ]
+        #   'total_sheets': 2,
+        #   'active_sheet': 'Sheet1'
         # }
-
-        # 仅列出工作表名称
-        result = excel_list_sheets("data.xlsx", include_headers=False)
     """
     reader = ExcelReader(file_path)
     result = reader.list_sheets()
@@ -103,52 +97,87 @@ def excel_list_sheets(file_path: str, include_headers: bool = True) -> Dict[str,
         'active_sheet': result.metadata.get('active_sheet', '') if result.metadata else ''
     }
 
-    # 如果需要包含表头信息
-    if include_headers:
-        sheets_with_headers = []
-
-        for sheet_name in sheets:
-            try:
-                # 读取每个工作表的第一行作为表头
-                header_result = reader.get_range(f"{sheet_name}!1:1")
-
-                headers = []
-                if header_result.success and header_result.data:
-                    # 提取第一行的所有非空值
-                    first_row = header_result.data[0] if header_result.data else []
-                    for cell_info in first_row:
-                        # 正确处理CellInfo对象和普通值
-                        if hasattr(cell_info, 'value'):
-                            if cell_info.value is not None and cell_info.value != "":
-                                headers.append(str(cell_info.value))
-                            else:
-                                break  # 遇到空值停止
-                        elif cell_info is not None and cell_info != "":
-                            headers.append(str(cell_info))
-                        else:
-                            break  # 遇到空值停止
-
-                sheets_with_headers.append({
-                    'name': sheet_name,
-                    'headers': headers,
-                    'header_count': len(headers)
-                })
-
-            except Exception as e:
-                # 如果读取某个工作表失败，记录错误但继续处理其他工作表
-                sheets_with_headers.append({
-                    'name': sheet_name,
-                    'headers': [],
-                    'header_count': 0,
-                    'error': str(e)
-                })
-
-        response['sheets_with_headers'] = sheets_with_headers
-
     # 清理资源
     reader.close()
 
     return response
+
+
+@mcp.tool()
+@unified_error_handler("获取工作表表头", extract_file_context, return_dict=True)
+def excel_get_sheet_headers(file_path: str) -> Dict[str, Any]:
+    """
+    获取Excel文件中所有工作表的表头信息
+
+    Args:
+        file_path: Excel文件路径 (.xlsx/.xlsm)
+
+    Returns:
+        Dict: 包含success、sheets_with_headers等信息
+
+    Example:
+        # 获取所有工作表的表头
+        result = excel_get_sheet_headers("data.xlsx")
+        # 返回: {
+        #   'success': True,
+        #   'sheets_with_headers': [
+        #     {'name': 'Sheet1', 'headers': ['列1', '列2'], 'header_count': 2},
+        #     {'name': 'Sheet2', 'headers': ['ID', '名称'], 'header_count': 2}
+        #   ]
+        # }
+    """
+    reader = ExcelReader(file_path)
+    result = reader.list_sheets()
+
+    # 提取工作表名称列表
+    sheets = [sheet.name for sheet in result.data] if result.data else []
+    sheets_with_headers = []
+
+    for sheet_name in sheets:
+        try:
+            # 读取每个工作表的第一行作为表头
+            header_result = reader.get_range(f"{sheet_name}!1:1")
+
+            headers = []
+            if header_result.success and header_result.data:
+                # 提取第一行的所有非空值
+                first_row = header_result.data[0] if header_result.data else []
+                for cell_info in first_row:
+                    # 正确处理CellInfo对象和普通值
+                    if hasattr(cell_info, 'value'):
+                        if cell_info.value is not None and cell_info.value != "":
+                            headers.append(str(cell_info.value))
+                        else:
+                            break  # 遇到空值停止
+                    elif cell_info is not None and cell_info != "":
+                        headers.append(str(cell_info))
+                    else:
+                        break  # 遇到空值停止
+
+            sheets_with_headers.append({
+                'name': sheet_name,
+                'headers': headers,
+                'header_count': len(headers)
+            })
+
+        except Exception as e:
+            # 如果读取某个工作表失败，记录错误但继续处理其他工作表
+            sheets_with_headers.append({
+                'name': sheet_name,
+                'headers': [],
+                'header_count': 0,
+                'error': str(e)
+            })
+
+    # 清理资源
+    reader.close()
+
+    return {
+        'success': True,
+        'sheets_with_headers': sheets_with_headers,
+        'file_path': file_path,
+        'total_sheets': len(sheets)
+    }
 
 
 @mcp.tool()
@@ -938,16 +967,15 @@ def excel_evaluate_formula(
 
 
 @mcp.tool()
-@unified_error_handler("单元格格式化", extract_file_context, return_dict=True)
-def excel_format_cells(
+@unified_error_handler("自定义单元格格式化", extract_file_context, return_dict=True)
+def excel_format_cells_custom(
     file_path: str,
     sheet_name: str,
     range_expression: str,
-    formatting: Optional[Dict[str, Any]] = None,
-    preset: Optional[str] = None
+    formatting: Dict[str, Any]
 ) -> Dict[str, Any]:
     """
-    设置单元格格式（字体、颜色、对齐等）。formatting 和 preset 必须至少指定一个。
+    使用自定义配置设置单元格格式（字体、颜色、对齐等）
 
     Args:
         file_path: Excel文件路径 (.xlsx/.xlsm)
@@ -957,15 +985,46 @@ def excel_format_cells(
             - font: {'name': '宋体', 'size': 12, 'bold': True, 'color': 'FF0000'}
             - fill: {'color': 'FFFF00'}
             - alignment: {'horizontal': 'center', 'vertical': 'center'}
+
+    Returns:
+        Dict: 包含 success、formatted_count、message
+
+    Example:
+        result = excel_format_cells_custom(
+            "data.xlsx", 
+            "Sheet1", 
+            "A1:D1", 
+            {'font': {'bold': True, 'color': 'FF0000'}}
+        )
+    """
+    writer = ExcelWriter(file_path)
+    result = writer.format_cells(range_expression, formatting, sheet_name)
+    return format_operation_result(result)
+
+
+@mcp.tool()
+@unified_error_handler("预设单元格格式化", extract_file_context, return_dict=True)
+def excel_format_cells_preset(
+    file_path: str,
+    sheet_name: str,
+    range_expression: str,
+    preset: str
+) -> Dict[str, Any]:
+    """
+    使用预设样式设置单元格格式
+
+    Args:
+        file_path: Excel文件路径 (.xlsx/.xlsm)
+        sheet_name: 工作表名称
+        range_expression: 目标范围 (如"A1:C10")
         preset: 预设样式，可选值: "title", "header", "data", "highlight", "currency"
 
     Returns:
         Dict: 包含 success、formatted_count、message
 
     Example:
-        result = excel_format_cells("data.xlsx", "Sheet1", "A1:D1", preset="title")
-        result = excel_format_cells("data.xlsx", "Sheet1", "A1:D1", formatting={'font': {'bold': True}})
-        result = excel_format_cells("data.xlsx", "Sheet1", "A1:D1", preset="header", formatting={'font': {'size': 14}})
+        result = excel_format_cells_preset("data.xlsx", "Sheet1", "A1:D1", "title")
+        result = excel_format_cells_preset("data.xlsx", "Sheet1", "A2:D2", "header")
     """
     # 预设样式模板
     PRESETS = {
@@ -993,30 +1052,12 @@ def excel_format_cells(
         }
     }
 
-    # 构建最终格式配置
-    final_formatting = {}
+    if preset not in PRESETS:
+        return {"success": False, "error": f"未知的预设样式: {preset}。可选值: {list(PRESETS.keys())}"}
 
-    # 1. 如果有预设，先应用预设
-    if preset:
-        if preset not in PRESETS:
-            return {"success": False, "error": f"未知的预设样式: {preset}。可选值: {list(PRESETS.keys())}"}
-        final_formatting = PRESETS[preset].copy()
-
-    # 2. 如果有自定义格式，合并到最终配置（覆盖预设）
-    if formatting:
-        for key, value in formatting.items():
-            if key in final_formatting and isinstance(final_formatting[key], dict) and isinstance(value, dict):
-                # 深度合并字典类型的格式设置
-                final_formatting[key].update(value)
-            else:
-                final_formatting[key] = value
-
-    # 3. 如果既没有预设也没有自定义格式，返回错误
-    if not final_formatting:
-        return {"success": False, "error": "必须指定 formatting 或 preset 参数中的至少一个"}
-
+    formatting = PRESETS[preset]
     writer = ExcelWriter(file_path)
-    result = writer.format_cells(range_expression, final_formatting, sheet_name)
+    result = writer.format_cells(range_expression, formatting, sheet_name)
     return format_operation_result(result)
 
 
