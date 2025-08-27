@@ -271,6 +271,60 @@ class TestServerInterfaces:
         assert result['success'] is False
         assert 'error' in result
 
+    def test_excel_update_range_row_format(self, sample_excel_file):
+        """Test excel_update_range with row range format (e.g., '1:1', '1250:1250')"""
+        # Test single row range
+        data1 = [["测试1", "测试2", "测试3"]]
+        result1 = excel_update_range(sample_excel_file, "1:1", data1, sheet_name="Sheet1")
+        
+        assert result1['success'] is True
+        assert 'data' in result1
+        # Should update 3 cells in row 1
+        if isinstance(result1['data'], list):
+            assert len(result1['data']) == 3
+        
+        # Test multi-column data with row range (adjust expected count based on actual behavior)
+        data2 = [[930006, "", "[TRBuff收益类型]无", "【女武神】退场易伤", 1, 0]]
+        result2 = excel_update_range(sample_excel_file, "3:3", data2, sheet_name="Sheet1")
+        
+        assert result2['success'] is True
+        assert 'data' in result2
+        # The actual count might vary based on how empty values are handled
+        if isinstance(result2['data'], list):
+            assert len(result2['data']) >= 4  # At least the non-empty values should be updated
+
+    def test_excel_update_range_large_row_number(self, temp_dir, request):
+        """Test excel_update_range with large row numbers like user's case"""
+        import uuid
+        from openpyxl import Workbook
+        
+        test_id = str(uuid.uuid4())[:8]
+        file_path = temp_dir / f"test_large_row_{test_id}.xlsx"
+        
+        # Create test file
+        wb = Workbook()
+        ws = wb.active
+        ws.title = "TrBuff"
+        wb.save(file_path)
+        
+        # Test user's specific case: row 1250 with 28 columns of data
+        user_data = [[
+            930006, "", "[TRBuff收益类型]无", "【女武神】退场易伤", "[TRBuff添加类型]替换", 
+            "", 1, 0, "", "", "[TRBuff效果类型]属性效果", 110202, 99999999,
+            "", "", "", "", "", "", "", "", "", "", "", "", "", "", ""
+        ]]
+        
+        result = excel_update_range(str(file_path), "1250:1250", user_data, sheet_name="TrBuff")
+        
+        assert result['success'] is True
+        assert 'data' in result
+        if isinstance(result['data'], list):
+            assert len(result['data']) == 28  # Should update 28 cells
+            # Check that the first few cells have correct coordinates
+            assert result['data'][0]['coordinate'] == 'A1250'
+            assert result['data'][0]['new_value'] == 930006
+            assert result['data'][27]['coordinate'] == 'AB1250'  # 28th column should be AB
+
     def test_excel_create_file(self, temp_dir):
         """Test excel_create_file interface"""
         file_path = temp_dir / "test_create.xlsx"

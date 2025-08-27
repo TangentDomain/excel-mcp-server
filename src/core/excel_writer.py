@@ -58,8 +58,13 @@ class ExcelWriter:
             # 确定工作表
             sheet = self._get_worksheet(workbook, range_info.sheet_name)
 
+            # 根据范围类型处理不同的范围格式
+            cell_range_for_boundaries = self._convert_to_cell_range(
+                range_info.cell_range, range_info.range_type, sheet, data
+            )
+
             # 获取范围边界
-            min_col, min_row, max_col, max_row = range_boundaries(range_info.cell_range)
+            min_col, min_row, max_col, max_row = range_boundaries(cell_range_for_boundaries)
 
             # 获取范围维度（允许数据大小不匹配，Excel会自动处理）
             range_rows = max_row - min_row + 1
@@ -337,6 +342,92 @@ class ExcelWriter:
                 success=False,
                 error=str(e)
             )
+
+    def _convert_to_cell_range(self, cell_range: str, range_type: RangeType, sheet, data: List[List[Any]]) -> str:
+        """
+        将不同类型的范围表达式转换为标准的单元格范围格式
+        
+        Args:
+            cell_range: 原始范围表达式
+            range_type: 范围类型
+            sheet: 工作表对象
+            data: 数据数组（用于确定需要的列数）
+            
+        Returns:
+            标准的单元格范围表达式
+        """
+        from openpyxl.utils import get_column_letter
+        
+        if range_type == RangeType.ROW_RANGE:
+            # 处理行范围，如 "1:1" 或 "1250:1250"
+            if ':' in cell_range:
+                start_row, end_row = cell_range.split(':')
+                start_row, end_row = int(start_row), int(end_row)
+            else:
+                start_row = end_row = int(cell_range)
+                
+            # 根据数据确定需要的列数，如果没有数据则使用第一列到数据宽度
+            if data and len(data) > 0:
+                data_cols = len(data[0]) if data[0] else 1
+                end_col = data_cols
+            else:
+                end_col = 1  # 默认只使用第一列
+                
+            start_col = 1
+            start_col_letter = get_column_letter(start_col)
+            end_col_letter = get_column_letter(end_col)
+            
+            return f"{start_col_letter}{start_row}:{end_col_letter}{end_row}"
+            
+        elif range_type == RangeType.COLUMN_RANGE:
+            # 处理列范围，如 "A:A" 或 "A:C"
+            if ':' in cell_range:
+                start_col, end_col = cell_range.split(':')
+            else:
+                start_col = end_col = cell_range
+                
+            # 根据数据确定需要的行数
+            if data:
+                data_rows = len(data)
+                end_row = data_rows
+            else:
+                end_row = 1  # 默认只使用第一行
+                
+            start_row = 1
+            return f"{start_col}{start_row}:{end_col}{end_row}"
+            
+        elif range_type == RangeType.SINGLE_ROW:
+            # 处理单行，如 "1"
+            row_num = int(cell_range.split(':')[0])  # 规范化后是 "1:1" 格式
+            
+            # 根据数据确定列数
+            if data and len(data) > 0:
+                data_cols = len(data[0]) if data[0] else 1
+                end_col = data_cols
+            else:
+                end_col = 1
+                
+            start_col_letter = get_column_letter(1)
+            end_col_letter = get_column_letter(end_col)
+            
+            return f"{start_col_letter}{row_num}:{end_col_letter}{row_num}"
+            
+        elif range_type == RangeType.SINGLE_COLUMN:
+            # 处理单列，如 "A"
+            col_letter = cell_range.split(':')[0]  # 规范化后是 "A:A" 格式
+            
+            # 根据数据确定行数
+            if data:
+                data_rows = len(data)
+                end_row = data_rows
+            else:
+                end_row = 1
+                
+            return f"{col_letter}1:{col_letter}{end_row}"
+            
+        else:
+            # 其他情况（CELL_RANGE）直接返回
+            return cell_range
 
     def _get_worksheet(self, workbook, sheet_name: Optional[str]):
         """获取工作表 - 强制要求指定工作表名称"""
