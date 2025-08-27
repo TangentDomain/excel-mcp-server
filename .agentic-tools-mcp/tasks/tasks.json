@@ -1465,6 +1465,26 @@
       "estimatedHours": 2,
       "level": 0,
       "actualHours": 2
+    },
+    {
+      "id": "cfa64821-c1ee-4644-8299-ad92c587657f",
+      "name": "改进后API重新量化评分",
+      "details": "对改进后的Excel MCP API进行重新量化评分，评估设计改进的效果，并与之前85.2/100的评分进行对比",
+      "projectId": "f05f5efa-81e8-4909-8ed1-418b241eda57",
+      "completed": false,
+      "createdAt": "2025-08-27T13:39:10.337Z",
+      "updatedAt": "2025-08-27T13:39:10.337Z",
+      "dependsOn": [],
+      "priority": 8,
+      "complexity": 7,
+      "status": "in-progress",
+      "tags": [
+        "API评估",
+        "量化分析",
+        "设计改进"
+      ],
+      "estimatedHours": 1,
+      "level": 0
     }
   ],
   "subtasks": [],
