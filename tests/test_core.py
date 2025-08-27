@@ -13,7 +13,7 @@ from src.core.excel_reader import ExcelReader
 from src.core.excel_writer import ExcelWriter
 from src.core.excel_manager import ExcelManager
 from src.models.types import OperationResult, SheetInfo, CellInfo, ModifiedCell
-from src.utils.exceptions import ExcelFileNotFoundError, WorksheetNotFoundError
+from src.utils.exceptions import ExcelFileNotFoundError, SheetNotFoundError
 
 
 class TestExcelCore:

@@ -345,85 +345,45 @@ class ExcelWriter:
 
     def _convert_to_cell_range(self, cell_range: str, range_type: RangeType, sheet, data: List[List[Any]]) -> str:
         """
-        将不同类型的范围表达式转换为标准的单元格范围格式
+        检查范围表达式格式的合法性
         
         Args:
             cell_range: 原始范围表达式
             range_type: 范围类型
             sheet: 工作表对象
-            data: 数据数组（用于确定需要的列数）
+            data: 数据数组
             
         Returns:
             标准的单元格范围表达式
-        """
-        from openpyxl.utils import get_column_letter
-        
-        if range_type == RangeType.ROW_RANGE:
-            # 处理行范围，如 "1:1" 或 "1250:1250"
-            if ':' in cell_range:
-                start_row, end_row = cell_range.split(':')
-                start_row, end_row = int(start_row), int(end_row)
-            else:
-                start_row = end_row = int(cell_range)
-                
-            # 根据数据确定需要的列数，如果没有数据则使用第一列到数据宽度
-            if data and len(data) > 0:
-                data_cols = len(data[0]) if data[0] else 1
-                end_col = data_cols
-            else:
-                end_col = 1  # 默认只使用第一列
-                
-            start_col = 1
-            start_col_letter = get_column_letter(start_col)
-            end_col_letter = get_column_letter(end_col)
             
-            return f"{start_col_letter}{start_row}:{end_col_letter}{end_row}"
+        Raises:
+            ValueError: 当使用不支持的范围格式时
+        """
+        if range_type == RangeType.ROW_RANGE:
+            # 对于纯行范围格式，抛出明确错误并提供建议
+            raise ValueError(
+                f'不支持纯行范围格式 "{cell_range}"。请使用以下格式之一：\n'
+                f'- 标准格式: "A{cell_range.split(":")[0]}:Z{cell_range.split(":")[-1]}" (明确指定列范围)\n'
+                f'- 单列格式: "A{cell_range.split(":")[0]}:A{cell_range.split(":")[-1]}" (单列数据)\n'
+                f'- 指定范围: "B{cell_range.split(":")[0]}:E{cell_range.split(":")[-1]}" (B到E列)'
+            )
             
         elif range_type == RangeType.COLUMN_RANGE:
-            # 处理列范围，如 "A:A" 或 "A:C"
-            if ':' in cell_range:
-                start_col, end_col = cell_range.split(':')
-            else:
-                start_col = end_col = cell_range
-                
-            # 根据数据确定需要的行数
-            if data:
-                data_rows = len(data)
-                end_row = data_rows
-            else:
-                end_row = 1  # 默认只使用第一行
-                
-            start_row = 1
-            return f"{start_col}{start_row}:{end_col}{end_row}"
+            # 对于列范围，直接返回不做自动扩展
+            return cell_range
             
         elif range_type == RangeType.SINGLE_ROW:
-            # 处理单行，如 "1"
+            # 对于单行范围，抛出明确错误
             row_num = int(cell_range.split(':')[0])  # 规范化后是 "1:1" 格式
-            
-            # 根据数据确定列数
-            if data and len(data) > 0:
-                data_cols = len(data[0]) if data[0] else 1
-                end_col = data_cols
-            else:
-                end_col = 1
-                
-            start_col_letter = get_column_letter(1)
-            end_col_letter = get_column_letter(end_col)
-            
-            return f"{start_col_letter}{row_num}:{end_col_letter}{row_num}"
+            raise ValueError(
+                f'不支持单行范围格式 "{row_num}"。请使用以下格式之一：\n'
+                f'- 标准格式: "A{row_num}:Z{row_num}" (明确指定列范围)\n'
+                f'- 单列格式: "A{row_num}:A{row_num}" (单列数据)'
+            )
             
         elif range_type == RangeType.SINGLE_COLUMN:
-            # 处理单列，如 "A"
-            col_letter = cell_range.split(':')[0]  # 规范化后是 "A:A" 格式
-            
-            # 根据数据确定行数
-            if data:
-                data_rows = len(data)
-                end_row = data_rows
-            else:
-                end_row = 1
-                
-            return f"{col_letter}1:{col_letter}{end_row}"
+            # 对于单列范围，直接返回不做自动扩展
+            return cell_range
             
         else:
             # 其他情况（CELL_RANGE）直接返回
