@@ -59,20 +59,31 @@ mcp = FastMCP("excel-mcp")
 
 @mcp.tool()
 @unified_error_handler("列出工作表", extract_file_context, return_dict=True)
-def excel_list_sheets(file_path: str) -> Dict[str, Any]:
+def excel_list_sheets(file_path: str, include_headers: bool = True) -> Dict[str, Any]:
     """
-    列出Excel文件中所有工作表名称
+    列出Excel文件中所有工作表名称和表头
 
     Args:
         file_path: Excel文件路径 (.xlsx/.xlsm)
+        include_headers: 是否包含表头信息 (默认: True)
 
     Returns:
-        Dict: 包含 success、sheets、active_sheet
+        Dict: 包含success、sheets、sheets_with_headers、active_sheet
 
     Example:
-        # 列出工作表
+        # 列出工作表和表头
         result = excel_list_sheets("data.xlsx")
-        # 返回: {'success': True, 'sheets': ['Sheet1', 'Sheet2'], 'active_sheet': 'Sheet1'}
+        # 返回: {
+        #   'success': True,
+        #   'sheets': ['Sheet1', 'Sheet2'],
+        #   'sheets_with_headers': [
+        #     {'name': 'Sheet1', 'headers': ['列1', '列2'], 'header_count': 2},
+        #     {'name': 'Sheet2', 'headers': ['ID', '名称'], 'header_count': 2}
+        #   ]
+        # }
+
+        # 仅列出工作表名称
+        result = excel_list_sheets("data.xlsx", include_headers=False)
     """
     reader = ExcelReader(file_path)
     result = reader.list_sheets()
@@ -80,13 +91,57 @@ def excel_list_sheets(file_path: str) -> Dict[str, Any]:
     # 提取工作表名称列表
     sheets = [sheet.name for sheet in result.data] if result.data else []
 
-    return {
+    response = {
         'success': True,
         'sheets': sheets,
         'file_path': file_path,
         'total_sheets': result.metadata.get('total_sheets', len(sheets)) if result.metadata else len(sheets),
         'active_sheet': result.metadata.get('active_sheet', '') if result.metadata else ''
     }
+
+    # 如果需要包含表头信息
+    if include_headers:
+        sheets_with_headers = []
+
+        for sheet_name in sheets:
+            try:
+                # 读取每个工作表的第一行作为表头
+                header_result = reader.get_range(f"{sheet_name}!1:1")
+
+                headers = []
+                if header_result.success and header_result.data:
+                    # 提取第一行的所有非空值
+                    first_row = header_result.data[0] if header_result.data else []
+                    for cell_info in first_row:
+                        # 正确处理CellInfo对象和普通值
+                        if hasattr(cell_info, 'value'):
+                            if cell_info.value is not None and cell_info.value != "":
+                                headers.append(str(cell_info.value))
+                            else:
+                                break  # 遇到空值停止
+                        elif cell_info is not None and cell_info != "":
+                            headers.append(str(cell_info))
+                        else:
+                            break  # 遇到空值停止
+
+                sheets_with_headers.append({
+                    'name': sheet_name,
+                    'headers': headers,
+                    'header_count': len(headers)
+                })
+
+            except Exception as e:
+                # 如果读取某个工作表失败，记录错误但继续处理其他工作表
+                sheets_with_headers.append({
+                    'name': sheet_name,
+                    'headers': [],
+                    'header_count': 0,
+                    'error': str(e)
+                })
+
+        response['sheets_with_headers'] = sheets_with_headers
+
+    return response
 
 
 @mcp.tool()
@@ -219,6 +274,117 @@ def excel_get_range(
         result = reader.get_range(full_range_expression, include_formatting)
 
     return format_operation_result(result)
+
+
+@mcp.tool()
+@unified_error_handler("获取表头", extract_file_context, return_dict=True)
+def excel_get_headers(
+    file_path: str,
+    sheet_name: str,
+    header_row: int = 1,
+    max_columns: Optional[int] = None
+) -> Dict[str, Any]:
+    """
+    获取Excel工作表的表头信息
+
+    Args:
+        file_path: Excel文件路径 (.xlsx/.xlsm)
+        sheet_name: 工作表名称
+        header_row: 表头行号 (1-based，默认第1行)
+        max_columns: 最大读取列数限制 (可选，默认读取到第一个空列为止)
+
+    Returns:
+        Dict: 包含 success、headers(List[str])、header_count、sheet_name
+
+    Example:
+        # 获取第1行作为表头
+        result = excel_get_headers("data.xlsx", "Sheet1")
+        # 获取第2行作为表头，最多读取10列
+        result = excel_get_headers("data.xlsx", "Sheet1", header_row=2, max_columns=10)
+        # 返回格式:
+        # {
+        #   'success': True,
+        #   'headers': ['ID', '名称', '类型', '数量'],
+        #   'header_count': 4,
+        #   'sheet_name': 'Sheet1',
+        #   'header_row': 1
+        # }
+    """
+    reader = ExcelReader(file_path)
+
+    try:
+        # 构建范围表达式：读取指定行
+        if max_columns:
+            # 如果指定了最大列数，使用具体范围
+            from openpyxl.utils import get_column_letter
+            end_column = get_column_letter(max_columns)
+            range_expression = f"{sheet_name}!A{header_row}:{end_column}{header_row}"
+        else:
+            # 否则读取整行（到第一个空列为止）
+            range_expression = f"{sheet_name}!{header_row}:{header_row}"
+
+        # 读取表头行数据
+        result = reader.get_range(range_expression)
+
+        if not result.success:
+            return {
+                'success': False,
+                'error': f"无法读取表头数据: {result.message}",
+                'sheet_name': sheet_name,
+                'header_row': header_row
+            }
+
+        # 提取表头信息
+        headers = []
+        if result.data and len(result.data) > 0:
+            first_row = result.data[0]
+            for i, cell_info in enumerate(first_row):
+                # 处理CellInfo对象和普通值
+                cell_value = None
+                if hasattr(cell_info, 'value'):
+                    cell_value = cell_info.value
+                else:
+                    cell_value = cell_info
+
+                # 转换为字符串并清理
+                if cell_value is not None:
+                    str_value = str(cell_value).strip()
+                    if str_value != "":
+                        headers.append(str_value)
+                    else:
+                        # 空字符串的处理
+                        if max_columns:
+                            headers.append("")  # 指定max_columns时保留空字符串
+                        else:
+                            break  # 否则停止
+                else:
+                    # None值的处理
+                    if max_columns:
+                        headers.append("")  # 指定max_columns时将None转为空字符串
+                    else:
+                        break  # 否则停止
+
+                # 如果指定了max_columns，检查是否已达到限制
+                if max_columns and len(headers) >= max_columns:
+                    break
+
+        return {
+            'success': True,
+            'data': headers,  # 主要数据
+            'headers': headers,  # 兼容性字段
+            'header_count': len(headers),
+            'sheet_name': sheet_name,
+            'header_row': header_row,
+            'message': f"成功获取{len(headers)}个表头字段"
+        }
+
+    except Exception as e:
+        return {
+            'success': False,
+            'error': f"获取表头失败: {str(e)}",
+            'sheet_name': sheet_name,
+            'header_row': header_row
+        }
 
 
 @mcp.tool()

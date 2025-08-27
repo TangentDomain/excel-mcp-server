@@ -5,6 +5,7 @@ Simplified tests for Server MCP interfaces - more flexible to match actual API
 import pytest
 from src.server import (
     excel_list_sheets,
+    excel_get_headers,
     excel_get_range,
     excel_update_range,
     excel_create_file,
@@ -24,7 +25,7 @@ class TestServerInterfaces:
     """Test cases for Server MCP interfaces - simplified and flexible"""
 
     def test_excel_list_sheets(self, sample_excel_file):
-        """Test excel_list_sheets interface"""
+        """Test excel_list_sheets interface - basic functionality"""
         result = excel_list_sheets(sample_excel_file)
 
         assert result['success'] is True
@@ -32,6 +33,74 @@ class TestServerInterfaces:
         assert isinstance(result['sheets'], list)
         assert 'active_sheet' in result
         assert 'total_sheets' in result
+        # 新增：默认包含表头信息
+        assert 'sheets_with_headers' in result
+        assert isinstance(result['sheets_with_headers'], list)
+
+        # 验证表头信息结构
+        for sheet_info in result['sheets_with_headers']:
+            assert 'name' in sheet_info
+            assert 'headers' in sheet_info
+            assert 'header_count' in sheet_info
+            assert isinstance(sheet_info['headers'], list)
+            assert isinstance(sheet_info['header_count'], int)
+            assert sheet_info['header_count'] == len(sheet_info['headers'])
+
+    def test_excel_list_sheets_with_headers(self, sample_excel_file):
+        """Test excel_list_sheets with include_headers=True"""
+        result = excel_list_sheets(sample_excel_file, include_headers=True)
+
+        assert result['success'] is True
+        assert 'sheets_with_headers' in result
+
+        # 验证sample_excel_file的第一个工作表应该包含表头
+        sheet1_info = next((s for s in result['sheets_with_headers'] if s['name'] == 'Sheet1'), None)
+        assert sheet1_info is not None
+        assert '姓名' in sheet1_info['headers']  # 根据conftest.py中的数据
+        assert '年龄' in sheet1_info['headers']
+        assert '部门' in sheet1_info['headers']
+        assert sheet1_info['header_count'] >= 4
+
+    def test_excel_list_sheets_without_headers(self, sample_excel_file):
+        """Test excel_list_sheets with include_headers=False"""
+        result = excel_list_sheets(sample_excel_file, include_headers=False)
+
+        assert result['success'] is True
+        assert 'sheets' in result
+        assert 'active_sheet' in result
+        assert 'total_sheets' in result
+        # 不应该包含表头信息
+        assert 'sheets_with_headers' not in result
+
+    def test_excel_list_sheets_multi_sheet_with_headers(self, multi_sheet_excel_file):
+        """Test excel_list_sheets with multiple sheets and headers"""
+        result = excel_list_sheets(multi_sheet_excel_file, include_headers=True)
+
+        assert result['success'] is True
+        assert len(result['sheets']) == 4  # 根据conftest.py中的设置
+        assert len(result['sheets_with_headers']) == 4
+
+        # 验证每个工作表都有表头信息
+        expected_sheet_names = ["数据", "图表", "汇总", "分析"]
+        actual_sheet_names = [s['name'] for s in result['sheets_with_headers']]
+
+        for expected_name in expected_sheet_names:
+            assert expected_name in actual_sheet_names
+            sheet_info = next(s for s in result['sheets_with_headers'] if s['name'] == expected_name)
+            assert '测试数据' in sheet_info['headers']  # 根据conftest.py中的数据
+            assert '值' in sheet_info['headers']
+
+    def test_excel_list_sheets_empty_sheet_headers(self, empty_excel_file):
+        """Test excel_list_sheets with empty sheet"""
+        result = excel_list_sheets(empty_excel_file, include_headers=True)
+
+        assert result['success'] is True
+        assert 'sheets_with_headers' in result
+        assert len(result['sheets_with_headers']) == 1  # 应该有一个默认工作表
+
+        sheet_info = result['sheets_with_headers'][0]
+        assert sheet_info['headers'] == []  # 空工作表应该没有表头
+        assert sheet_info['header_count'] == 0
 
     def test_excel_list_sheets_invalid_file(self):
         """Test excel_list_sheets with invalid file"""
@@ -39,6 +108,136 @@ class TestServerInterfaces:
 
         assert result['success'] is False
         assert 'error' in result
+
+    # ==================== Excel Get Headers Tests ====================
+
+    def test_excel_get_headers_basic(self, sample_excel_file):
+        """Test excel_get_headers basic functionality"""
+        result = excel_get_headers(sample_excel_file, "Sheet1")
+
+        assert result['success'] is True
+        assert 'headers' in result
+        assert 'header_count' in result
+        assert 'sheet_name' in result
+        assert 'header_row' in result
+        assert 'message' in result
+
+        # Check data content based on sample_excel_file fixture
+        # The fixture adds "总计" in column E1, so we have 5 headers
+        assert result['headers'] == ["姓名", "年龄", "部门", "薪资", "总计"]
+        assert result['header_count'] == 5
+        assert result['sheet_name'] == "Sheet1"
+        assert result['header_row'] == 1
+
+        # Both data and headers should contain the same content
+        assert result['data'] == result['headers']
+
+    def test_excel_get_headers_with_max_columns(self, sample_excel_file):
+        """Test excel_get_headers with max_columns limit"""
+        result = excel_get_headers(sample_excel_file, "Sheet1", max_columns=2)
+
+        assert result['success'] is True
+        assert result['headers'] == ["姓名", "年龄"]
+        assert result['header_count'] == 2
+        assert "成功获取2个表头字段" in result['message']
+
+    def test_excel_get_headers_different_row(self, sample_excel_file):
+        """Test excel_get_headers with different header row"""
+        # Test getting data from row 2 as headers (first data row)
+        result = excel_get_headers(sample_excel_file, "Sheet1", header_row=2)
+
+        assert result['success'] is True
+        # Row 2 contains: ["张三", 25, "技术部", 8000, "=SUM(D2:D5)"]
+        # But the formula cell should show the calculated value or formula
+        assert result['header_count'] >= 4  # At least the first 4 columns
+        assert result['headers'][0] == "张三"
+        assert str(result['headers'][1]) == "25"  # Convert to string for comparison
+        assert result['headers'][2] == "技术部"
+        assert str(result['headers'][3]) == "8000"
+        assert result['header_row'] == 2
+
+    def test_excel_get_headers_second_sheet(self, sample_excel_file):
+        """Test excel_get_headers on second sheet"""
+        result = excel_get_headers(sample_excel_file, "Sheet2")
+
+        assert result['success'] is True
+        assert result['headers'] == ["产品", "销量", "单价"]
+        assert result['header_count'] == 3
+        assert result['sheet_name'] == "Sheet2"
+
+    def test_excel_get_headers_invalid_sheet(self, sample_excel_file):
+        """Test excel_get_headers with invalid sheet name"""
+        result = excel_get_headers(sample_excel_file, "NonExistentSheet")
+
+        assert result['success'] is False
+        assert 'error' in result
+        # Check for various possible error messages
+        error_msg = result['error'].lower()
+        assert ("不存在" in error_msg or "无法读取" in error_msg or
+                "工作表" in error_msg or "sheet" in error_msg)
+
+    def test_excel_get_headers_invalid_file(self):
+        """Test excel_get_headers with invalid file"""
+        result = excel_get_headers("nonexistent_file.xlsx", "Sheet1")
+
+        assert result['success'] is False
+        assert 'error' in result
+
+    def test_excel_get_headers_empty_sheet(self, empty_excel_file):
+        """Test excel_get_headers with empty sheet"""
+        result = excel_get_headers(empty_excel_file, "Sheet")
+
+        assert result['success'] is True
+        assert result['headers'] == []
+        assert result['header_count'] == 0
+
+    def test_excel_get_headers_with_mixed_types(self, temp_dir, request):
+        """Test excel_get_headers with mixed data types in headers"""
+        # Create a test file with mixed types in header row
+        import uuid
+        from openpyxl import Workbook
+
+        test_id = str(uuid.uuid4())[:8]
+        file_path = temp_dir / f"test_mixed_headers_{test_id}.xlsx"
+
+        wb = Workbook()
+        ws = wb.active
+        ws.append(["Text", 123, None, "Another Text", ""])  # Mixed types with empty cells
+        ws.append(["Data1", "Data2", "Data3", "Data4", "Data5"])
+        wb.save(file_path)
+
+        result = excel_get_headers(str(file_path), "Sheet")
+
+        assert result['success'] is True
+        # Should stop at None (empty cell) unless max_columns specified
+        assert result['headers'] == ["Text", "123"]  # Converts number to string, stops at None
+        assert result['header_count'] == 2
+
+    def test_excel_get_headers_max_columns_with_empty_cells(self, temp_dir, request):
+        """Test excel_get_headers with max_columns including empty cells"""
+        # Create a test file with empty cells in header row
+        import uuid
+        from openpyxl import Workbook
+
+        test_id = str(uuid.uuid4())[:8]
+        file_path = temp_dir / f"test_empty_headers_{test_id}.xlsx"
+
+        wb = Workbook()
+        ws = wb.active
+        ws.append(["Col1", None, "Col3", "", "Col5"])  # Empty cells in between
+        wb.save(file_path)
+
+        # Without max_columns, should stop at first None
+        result1 = excel_get_headers(str(file_path), "Sheet")
+        assert result1['success'] is True
+        assert result1['headers'] == ["Col1"]
+
+        # With max_columns, should include empty cells as empty strings
+        result2 = excel_get_headers(str(file_path), "Sheet", max_columns=5)
+        assert result2['success'] is True
+        assert result2['header_count'] == 5
+        # Should include empty strings for None and empty cells
+        assert result2['headers'] == ["Col1", "", "Col3", "", "Col5"]
 
     def test_excel_get_range(self, sample_excel_file):
         """Test excel_get_range interface"""
