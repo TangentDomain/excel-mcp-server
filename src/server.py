@@ -175,7 +175,12 @@ def excel_regex_search(
         flags: 正则修饰符 ("i"忽略大小写, "m"多行, "s"点号匹配换行)
         search_values: 是否搜索单元格值
         search_formulas: 是否搜索公式内容
-        range_expression: 搜索范围表达式 (如"A1:C10"或"Sheet1!A1:C10")
+        range_expression: 搜索范围表达式，支持多种格式：
+            - 单元格范围: "A1:C10" 或 "Sheet1!A1:C10"
+            - 行范围: "3:5" 或 "Sheet1!3:5" (第3行到第5行)
+            - 列范围: "B:D" 或 "Sheet1!B:D" (B列到D列)
+            - 单行: "7" 或 "Sheet1!7" (仅第7行)
+            - 单列: "C" 或 "Sheet1!C" (仅C列)
 
     Returns:
         Dict: 包含 success、matches(List[Dict])、match_count、searched_sheets
@@ -185,8 +190,15 @@ def excel_regex_search(
         result = excel_regex_search("data.xlsx", r'\\w+@\\w+\\.\\w+', flags="i")
         # 搜索指定工作表中的数字
         result = excel_regex_search("data.xlsx", r'\\d+', sheet_name="Sheet1")
-        # 搜索指定范围内的数字
+        # 搜索指定单元格范围内的数字
         result = excel_regex_search("data.xlsx", r'\\d+', range_expression="Sheet1!A1:C10")
+        # 搜索第3-5行中的邮箱
+        result = excel_regex_search("data.xlsx", r'@', range_expression="3:5", sheet_name="Sheet1")
+        # 搜索B列到D列中的内容
+        result = excel_regex_search("data.xlsx", r'关键词', range_expression="B:D", sheet_name="Sheet1")
+        # 搜索单行或单列
+        result = excel_regex_search("data.xlsx", r'总计', range_expression="10", sheet_name="Sheet1")  # 仅第10行
+        result = excel_regex_search("data.xlsx", r'金额', range_expression="E", sheet_name="Sheet1")   # 仅E列
         # 搜索数字并包含公式
         result = excel_regex_search("data.xlsx", r'\\d+', search_formulas=True)
     """

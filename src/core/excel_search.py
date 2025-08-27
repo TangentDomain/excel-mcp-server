@@ -221,12 +221,39 @@ class ExcelSearcher:
         range_info
     ) -> List[SearchMatch]:
         """在指定范围内搜索"""
-        from openpyxl.utils import range_boundaries
+        from openpyxl.utils import range_boundaries, column_index_from_string
         
         matches = []
         
-        # 解析范围边界
-        min_col, min_row, max_col, max_row = range_boundaries(range_info.cell_range)
+        # 根据范围类型确定搜索边界
+        if range_info.range_type.value in ["row_range", "single_row"]:
+            # 行范围搜索 (如 "3:5" 或 "3")
+            min_col, max_col = 1, sheet.max_column
+            if range_info.range_type.value == "single_row":
+                # 单行 (如 "3")
+                row_num = int(range_info.cell_range.split(':')[0])
+                min_row = max_row = row_num
+            else:
+                # 行范围 (如 "3:5")
+                start_row, end_row = map(int, range_info.cell_range.split(':'))
+                min_row, max_row = start_row, end_row
+                
+        elif range_info.range_type.value in ["column_range", "single_column"]:
+            # 列范围搜索 (如 "B:D" 或 "B")
+            min_row, max_row = 1, sheet.max_row
+            if range_info.range_type.value == "single_column":
+                # 单列 (如 "B")
+                col_letter = range_info.cell_range.split(':')[0]
+                min_col = max_col = column_index_from_string(col_letter)
+            else:
+                # 列范围 (如 "B:D")
+                start_col, end_col = range_info.cell_range.split(':')
+                min_col = column_index_from_string(start_col)
+                max_col = column_index_from_string(end_col)
+                
+        else:
+            # 单元格范围搜索 (如 "A1:C10")
+            min_col, min_row, max_col, max_row = range_boundaries(range_info.cell_range)
         
         # 遍历范围内的单元格
         for row in sheet.iter_rows(min_row=min_row, max_row=max_row, min_col=min_col, max_col=max_col):
