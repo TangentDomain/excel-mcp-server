@@ -245,20 +245,27 @@ def excel_get_range(
 
     Args:
         file_path: Excel文件路径 (.xlsx/.xlsm)
-        range_expression: 范围表达式，支持两种格式：
+        range_expression: 范围表达式，支持以下格式：
             - 包含工作表名: "Sheet1!A1:C10"、"TrSkill!A1:Z100"
             - 不包含工作表名: "A1:C10" (需要同时指定sheet_name参数)
+            - ✅ 支持行范围读取: "1:1"、"5:10" (仅用于读取操作)
         sheet_name: 工作表名称 (可选，当range_expression不包含工作表名时必需)
         include_formatting: 是否包含单元格格式
 
     Returns:
         Dict: 包含 success、data(List[List])、range_info
 
+    注意:
+        读取操作支持行范围格式(如"1:1")，但更新操作不支持。
+        建议统一使用明确的单元格范围格式以保持一致性。
+
     Example:
         # 使用包含工作表名的范围表达式
         result = excel_get_range("data.xlsx", "Sheet1!A1:C10")
         # 使用分离的参数
         result = excel_get_range("data.xlsx", "A1:C10", sheet_name="Sheet1")
+        # 读取整行（支持但不推荐）
+        result = excel_get_range("data.xlsx", "1:1", sheet_name="Sheet1")
     """
     reader = ExcelReader(file_path)
 
@@ -291,15 +298,21 @@ def excel_get_headers(
         file_path: Excel文件路径 (.xlsx/.xlsm)
         sheet_name: 工作表名称
         header_row: 表头行号 (1-based，默认第1行)
-        max_columns: 最大读取列数限制 (可选，默认读取到第一个空列为止)
+        max_columns: 最大读取列数限制 (可选)
+            - 指定数值: 精确读取指定列数，如 max_columns=10 读取A-J列
+            - None(默认): 读取前100列范围 (A-CV列)，然后截取到第一个空列
 
     Returns:
         Dict: 包含 success、headers(List[str])、header_count、sheet_name
 
+    注意:
+        为保持与范围更新操作的一致性，方法内部使用明确的单元格范围而非行范围格式。
+        当 max_columns=None 时，实际读取 A1:CV1 范围，然后自动截取到第一个空列。
+
     Example:
-        # 获取第1行作为表头
+        # 获取第1行作为表头（自动截取到空列）
         result = excel_get_headers("data.xlsx", "Sheet1")
-        # 获取第2行作为表头，最多读取10列
+        # 获取第2行作为表头，精确读取10列
         result = excel_get_headers("data.xlsx", "Sheet1", header_row=2, max_columns=10)
         # 返回格式:
         # {
@@ -320,8 +333,9 @@ def excel_get_headers(
             end_column = get_column_letter(max_columns)
             range_expression = f"{sheet_name}!A{header_row}:{end_column}{header_row}"
         else:
-            # 否则读取整行（到第一个空列为止）
-            range_expression = f"{sheet_name}!{header_row}:{header_row}"
+            # 否则使用一个合理的默认范围（读取前100列，足够覆盖绝大部分表格）
+            # 避免使用行范围格式以保持与更新操作的一致性
+            range_expression = f"{sheet_name}!A{header_row}:CV{header_row}"  # CV = 第100列
 
         # 读取表头行数据
         result = reader.get_range(range_expression)
@@ -401,9 +415,11 @@ def excel_update_range(
 
     Args:
         file_path: Excel文件路径 (.xlsx/.xlsm)
-        range_expression: 范围表达式，支持两种格式：
+        range_expression: 范围表达式，支持以下格式：
             - 包含工作表名: "Sheet1!A1:C10"、"TrSkill!A1:Z100"
             - 不包含工作表名: "A1:C10" (需要同时指定sheet_name参数)
+            - ❌ 不支持纯行范围: "1:1"、"1250:1250" 等格式会报错
+              请使用明确的单元格范围: "A1:Z1"、"A1250:AB1250"
         data: 二维数组数据 [[row1], [row2], ...]
         sheet_name: 工作表名称 (可选，当range_expression不包含工作表名时必需)
         preserve_formulas: 保留已有公式 (默认值: True)
@@ -412,11 +428,18 @@ def excel_update_range(
 
     Returns:
         Dict: 包含 success、updated_cells(int)、message
+        
+    注意:
+        为了确保行为可预测，系统不再自动扩展行范围格式。
+        如果使用 "1250:1250" 格式，将收到明确的错误提示和修正建议。
 
     Example:
         data = [["姓名", "年龄"], ["张三", 25]]
+        # ✅ 正确的用法
         result = excel_update_range("test.xlsx", "Sheet1!A1:B2", data)
-        result = excel_update_range("test.xlsx", "A1:B2", data, sheet_name="Sheet1", preserve_formulas=False)
+        result = excel_update_range("test.xlsx", "A1:B2", data, sheet_name="Sheet1")
+        # ❌ 错误的用法 - 会报错并提供建议
+        result = excel_update_range("test.xlsx", "1:1", data, sheet_name="Sheet1")
     """
     writer = ExcelWriter(file_path)
 
