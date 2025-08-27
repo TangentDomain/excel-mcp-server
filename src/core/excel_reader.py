@@ -32,27 +32,27 @@ class ExcelReader:
         """
         self.file_path = ExcelValidator.validate_file_path(file_path)
         self._workbook_cache = {}  # 缓存不同参数的工作簿
-    
+
     def _get_workbook(self, read_only: bool = True, data_only: bool = False):
         """
         获取缓存的工作簿或加载新工作簿
-        
+
         Args:
             read_only: 是否以只读模式打开
             data_only: 是否只读取值（不包含公式）
-        
+
         Returns:
             Workbook: openpyxl工作簿对象
         """
         cache_key = (read_only, data_only)
         if cache_key not in self._workbook_cache:
             self._workbook_cache[cache_key] = load_workbook(
-                self.file_path, 
-                read_only=read_only, 
+                self.file_path,
+                read_only=read_only,
                 data_only=data_only
             )
         return self._workbook_cache[cache_key]
-    
+
     def close(self):
         """关闭所有缓存的工作簿"""
         for workbook in self._workbook_cache.values():
@@ -154,13 +154,13 @@ class ExcelReader:
         """获取工作表 - 强制要求指定工作表名称"""
         if not sheet_name or not sheet_name.strip():
             raise SheetNotFoundError(f"工作表名称不能为空，必须明确指定工作表")
-        
+
         if not workbook.sheetnames:
             raise SheetNotFoundError(f"Excel文件中没有任何工作表")
-            
+
         if sheet_name not in workbook.sheetnames:
             raise SheetNotFoundError(f"工作表不存在: {sheet_name}，可用工作表: {', '.join(workbook.sheetnames)}")
-            
+
         return workbook[sheet_name]
 
     def _get_range_data(
@@ -188,25 +188,25 @@ class ExcelReader:
         row_parts = range_info.cell_range.split(':')
         start_row = int(row_parts[0])
         end_row = int(row_parts[1])
-        
+
         # 优化：使用iter_rows而不是手动遍历所有列
         # 这样只会读取实际有数据的列，避免max_column性能问题
         data = []
         max_col_found = 0
-        
+
         for row in sheet.iter_rows(min_row=start_row, max_row=end_row, values_only=False):
             row_data = []
             last_data_col = 0
-            
+
             # 找到这行最后一个有数据的列
             for col_idx, cell in enumerate(row, 1):
                 if cell.value is not None:
                     last_data_col = col_idx
-            
+
             # 如果这行完全没有数据，至少包含第一个单元格
             if last_data_col == 0:
                 last_data_col = 1
-            
+
             # 只读取到最后一个有数据的列
             for col_idx in range(1, last_data_col + 1):
                 if col_idx - 1 < len(row):
@@ -215,7 +215,7 @@ class ExcelReader:
                     cell = sheet.cell(row=start_row + len(data), column=col_idx)
                 cell_info = self._create_cell_info(cell, include_formatting)
                 row_data.append(cell_info)
-            
+
             data.append(row_data)
             max_col_found = max(max_col_found, last_data_col)
 
@@ -293,7 +293,7 @@ class ExcelReader:
         else:
             # 对于EmptyCell，手动构造坐标
             coordinate = f"{get_column_letter(cell.column)}{cell.row}" if hasattr(cell, 'row') and hasattr(cell, 'column') else "A1"
-        
+
         cell_info = CellInfo(
             coordinate=coordinate,
             value=cell.value

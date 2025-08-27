@@ -43,7 +43,7 @@ from .utils.formatter import format_operation_result
 # ==================== 配置和初始化 ====================
 # 开启详细日志用于调试
 logging.basicConfig(
-    level=logging.INFO,
+    level=logging.DEBUG,  # 改为DEBUG级别获取更多信息
     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
     handlers=[
         logging.StreamHandler(),
@@ -51,8 +51,12 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
-# 创建FastMCP服务器实例
-mcp = FastMCP("excel-mcp")
+# 创建FastMCP服务器实例，开启调试模式和详细日志
+mcp = FastMCP(
+    name="excel-mcp",
+    debug=True,                    # 开启调试模式
+    log_level="DEBUG"              # 设置日志级别为DEBUG
+)
 
 
 # ==================== MCP 工具定义 ====================
@@ -143,7 +147,7 @@ def excel_list_sheets(file_path: str, include_headers: bool = True) -> Dict[str,
 
     # 清理资源
     reader.close()
-    
+
     return response
 
 
