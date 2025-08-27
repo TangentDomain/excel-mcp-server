@@ -287,15 +287,22 @@ class ExcelReader:
 
     def _create_cell_info(self, cell, include_formatting: bool) -> CellInfo:
         """创建单元格信息对象"""
+        # 处理EmptyCell对象，它没有coordinate属性
+        if hasattr(cell, 'coordinate'):
+            coordinate = cell.coordinate
+        else:
+            # 对于EmptyCell，手动构造坐标
+            coordinate = f"{get_column_letter(cell.column)}{cell.row}" if hasattr(cell, 'row') and hasattr(cell, 'column') else "A1"
+        
         cell_info = CellInfo(
-            coordinate=cell.coordinate,
+            coordinate=coordinate,
             value=cell.value
         )
 
-        if include_formatting:
+        if include_formatting and hasattr(cell, 'data_type'):
             cell_info.data_type = cell.data_type
-            cell_info.number_format = cell.number_format
-            cell_info.font = str(cell.font) if cell.font else None
-            cell_info.fill = str(cell.fill) if cell.fill else None
+            cell_info.number_format = getattr(cell, 'number_format', None)
+            cell_info.font = str(cell.font) if hasattr(cell, 'font') and cell.font else None
+            cell_info.fill = str(cell.fill) if hasattr(cell, 'fill') and cell.fill else None
 
         return cell_info
