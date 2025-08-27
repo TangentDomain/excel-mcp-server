@@ -549,6 +549,166 @@ def excel_create_file(
 
 
 @mcp.tool()
+@unified_error_handler("导出为CSV", extract_file_context, return_dict=True)
+def excel_export_to_csv(
+    file_path: str,
+    output_path: str,
+    sheet_name: Optional[str] = None,
+    encoding: str = "utf-8"
+) -> Dict[str, Any]:
+    """
+    将Excel工作表导出为CSV文件
+
+    Args:
+        file_path: Excel文件路径 (.xlsx/.xlsm)
+        output_path: 输出CSV文件路径
+        sheet_name: 工作表名称 (默认使用活动工作表)
+        encoding: 文件编码 (默认: utf-8，可选: gbk)
+
+    Returns:
+        Dict: 包含 success、output_path、row_count、message
+
+    Example:
+        # 导出活动工作表为CSV
+        result = excel_export_to_csv("data.xlsx", "output.csv")
+        # 导出指定工作表
+        result = excel_export_to_csv("report.xlsx", "summary.csv", "汇总", "gbk")
+    """
+    from .core.excel_converter import ExcelConverter
+    converter = ExcelConverter(file_path)
+    result = converter.export_to_csv(output_path, sheet_name, encoding)
+    return format_operation_result(result)
+
+
+@mcp.tool()
+@unified_error_handler("从CSV导入", extract_file_context, return_dict=True)
+def excel_import_from_csv(
+    csv_path: str,
+    output_path: str,
+    sheet_name: str = "Sheet1",
+    encoding: str = "utf-8",
+    has_header: bool = True
+) -> Dict[str, Any]:
+    """
+    从CSV文件导入数据创建Excel文件
+
+    Args:
+        csv_path: CSV文件路径
+        output_path: 输出Excel文件路径
+        sheet_name: 工作表名称 (默认: Sheet1)
+        encoding: CSV文件编码 (默认: utf-8，可选: gbk)
+        has_header: 是否包含表头行
+
+    Returns:
+        Dict: 包含 success、output_path、row_count、sheet_name
+
+    Example:
+        # 从CSV创建Excel文件
+        result = excel_import_from_csv("data.csv", "output.xlsx")
+        # 指定编码和工作表名
+        result = excel_import_from_csv("sales.csv", "report.xlsx", "销售数据", "gbk")
+    """
+    from .core.excel_converter import ExcelConverter
+    result = ExcelConverter.import_from_csv(csv_path, output_path, sheet_name, encoding, has_header)
+    return format_operation_result(result)
+
+
+@mcp.tool()
+@unified_error_handler("文件格式转换", extract_file_context, return_dict=True)
+def excel_convert_format(
+    input_path: str,
+    output_path: str,
+    target_format: str = "xlsx"
+) -> Dict[str, Any]:
+    """
+    转换Excel文件格式
+
+    Args:
+        input_path: 输入文件路径
+        output_path: 输出文件路径
+        target_format: 目标格式，可选值: "xlsx", "xlsm", "csv", "json"
+
+    Returns:
+        Dict: 包含 success、input_format、output_format、file_size
+
+    Example:
+        # 将xlsm转换为xlsx
+        result = excel_convert_format("macro.xlsm", "data.xlsx", "xlsx")
+        # 转换为JSON格式
+        result = excel_convert_format("data.xlsx", "data.json", "json")
+    """
+    from .core.excel_converter import ExcelConverter
+    result = ExcelConverter.convert_format(input_path, output_path, target_format)
+    return format_operation_result(result)
+
+
+@mcp.tool()
+@unified_error_handler("合并Excel文件", extract_file_context, return_dict=True)
+def excel_merge_files(
+    input_files: List[str],
+    output_path: str,
+    merge_mode: str = "sheets"
+) -> Dict[str, Any]:
+    """
+    合并多个Excel文件
+
+    Args:
+        input_files: 输入文件路径列表
+        output_path: 输出文件路径
+        merge_mode: 合并模式，可选值:
+            - "sheets": 将每个文件作为独立工作表
+            - "append": 将数据追加到单个工作表中
+            - "horizontal": 水平合并（按列）
+
+    Returns:
+        Dict: 包含 success、merged_files、total_sheets、output_path
+
+    Example:
+        # 将多个文件合并为多个工作表
+        files = ["file1.xlsx", "file2.xlsx", "file3.xlsx"]
+        result = excel_merge_files(files, "merged.xlsx", "sheets")
+        
+        # 将数据追加合并
+        result = excel_merge_files(files, "combined.xlsx", "append")
+    """
+    from .core.excel_converter import ExcelConverter
+    result = ExcelConverter.merge_files(input_files, output_path, merge_mode)
+    return format_operation_result(result)
+
+
+@mcp.tool()
+@unified_error_handler("获取文件信息", extract_file_context, return_dict=True)
+def excel_get_file_info(
+    file_path: str
+) -> Dict[str, Any]:
+    """
+    获取Excel文件的详细信息
+
+    Args:
+        file_path: Excel文件路径
+
+    Returns:
+        Dict: 包含文件信息，如大小、创建时间、工作表数量、格式等
+
+    Example:
+        # 获取文件详细信息
+        result = excel_get_file_info("data.xlsx")
+        # 返回: {
+        #   'success': True,
+        #   'file_size': 12345,
+        #   'created_time': '2025-01-01 10:00:00',
+        #   'modified_time': '2025-01-02 15:30:00',
+        #   'format': 'xlsx',
+        #   'sheet_count': 3,
+        #   'has_macros': False
+        # }
+    """
+    from .core.excel_manager import ExcelManager
+    result = ExcelManager.get_file_info(file_path)
+    return format_operation_result(result)
+
+
+@mcp.tool()
 @unified_error_handler("创建工作表", extract_file_context, return_dict=True)
 def excel_create_sheet(
     file_path: str,
@@ -834,6 +994,163 @@ def excel_format_cells(
 
     writer = ExcelWriter(file_path)
     result = writer.format_cells(range_expression, final_formatting, sheet_name)
+    return format_operation_result(result)
+
+
+@mcp.tool()
+@unified_error_handler("合并单元格", extract_file_context, return_dict=True)
+def excel_merge_cells(
+    file_path: str,
+    sheet_name: str,
+    range_expression: str
+) -> Dict[str, Any]:
+    """
+    合并指定范围的单元格
+
+    Args:
+        file_path: Excel文件路径 (.xlsx/.xlsm)
+        sheet_name: 工作表名称
+        range_expression: 要合并的范围 (如"A1:C3")
+
+    Returns:
+        Dict: 包含 success、message、merged_range
+
+    Example:
+        # 合并A1:C3范围的单元格
+        result = excel_merge_cells("data.xlsx", "Sheet1", "A1:C3")
+        # 合并标题行
+        result = excel_merge_cells("report.xlsx", "Summary", "A1:E1")
+    """
+    writer = ExcelWriter(file_path)
+    result = writer.merge_cells(range_expression, sheet_name)
+    return format_operation_result(result)
+
+
+@mcp.tool()
+@unified_error_handler("取消合并单元格", extract_file_context, return_dict=True)
+def excel_unmerge_cells(
+    file_path: str,
+    sheet_name: str,
+    range_expression: str
+) -> Dict[str, Any]:
+    """
+    取消合并指定范围的单元格
+
+    Args:
+        file_path: Excel文件路径 (.xlsx/.xlsm)
+        sheet_name: 工作表名称
+        range_expression: 要取消合并的范围 (如"A1:C3")
+
+    Returns:
+        Dict: 包含 success、message、unmerged_range
+
+    Example:
+        # 取消合并A1:C3范围的单元格
+        result = excel_unmerge_cells("data.xlsx", "Sheet1", "A1:C3")
+    """
+    writer = ExcelWriter(file_path)
+    result = writer.unmerge_cells(range_expression, sheet_name)
+    return format_operation_result(result)
+
+
+@mcp.tool()
+@unified_error_handler("设置边框样式", extract_file_context, return_dict=True)
+def excel_set_borders(
+    file_path: str,
+    sheet_name: str,
+    range_expression: str,
+    border_style: str = "thin"
+) -> Dict[str, Any]:
+    """
+    为指定范围设置边框样式
+
+    Args:
+        file_path: Excel文件路径 (.xlsx/.xlsm)
+        sheet_name: 工作表名称
+        range_expression: 目标范围 (如"A1:C10")
+        border_style: 边框样式，可选值: "thin", "thick", "medium", "double", "dotted", "dashed"
+
+    Returns:
+        Dict: 包含 success、message、styled_range
+
+    Example:
+        # 为表格添加细边框
+        result = excel_set_borders("data.xlsx", "Sheet1", "A1:E10", "thin")
+        # 为标题添加粗边框
+        result = excel_set_borders("data.xlsx", "Sheet1", "A1:E1", "thick")
+    """
+    writer = ExcelWriter(file_path)
+    result = writer.set_borders(range_expression, border_style, sheet_name)
+    return format_operation_result(result)
+
+
+@mcp.tool()
+@unified_error_handler("调整行高", extract_file_context, return_dict=True)
+def excel_set_row_height(
+    file_path: str,
+    sheet_name: str,
+    row_index: int,
+    height: float,
+    count: int = 1
+) -> Dict[str, Any]:
+    """
+    调整指定行的高度
+
+    Args:
+        file_path: Excel文件路径 (.xlsx/.xlsm)
+        sheet_name: 工作表名称
+        row_index: 起始行号 (1-based)
+        height: 行高 (磅值，如15.0)
+        count: 调整行数 (默认值: 1)
+
+    Returns:
+        Dict: 包含 success、message、affected_rows
+
+    Example:
+        # 调整第1行高度为25磅
+        result = excel_set_row_height("data.xlsx", "Sheet1", 1, 25.0)
+        # 调整第2-4行高度为18磅
+        result = excel_set_row_height("data.xlsx", "Sheet1", 2, 18.0, 3)
+    """
+    writer = ExcelWriter(file_path)
+    result = writer.set_row_height(row_index, height, sheet_name)
+    return format_operation_result(result)
+
+
+@mcp.tool()
+@unified_error_handler("调整列宽", extract_file_context, return_dict=True)
+def excel_set_column_width(
+    file_path: str,
+    sheet_name: str,
+    column_index: int,
+    width: float,
+    count: int = 1
+) -> Dict[str, Any]:
+    """
+    调整指定列的宽度
+
+    Args:
+        file_path: Excel文件路径 (.xlsx/.xlsm)
+        sheet_name: 工作表名称
+        column_index: 起始列号 (1-based，1=A列)
+        width: 列宽 (字符单位，如12.0)
+        count: 调整列数 (默认值: 1)
+
+    Returns:
+        Dict: 包含 success、message、affected_columns
+
+    Example:
+        # 调整A列宽度为15字符
+        result = excel_set_column_width("data.xlsx", "Sheet1", 1, 15.0)
+        # 调整B-D列宽度为12字符
+        result = excel_set_column_width("data.xlsx", "Sheet1", 2, 12.0, 3)
+    """
+    # 将列索引转换为列字母（1->A, 2->B, etc）
+    from openpyxl.utils import get_column_letter
+    column_letter = get_column_letter(column_index)
+    
+    writer = ExcelWriter(file_path)
+    result = writer.set_column_width(column_letter, width, sheet_name)
     return format_operation_result(result)
 
 

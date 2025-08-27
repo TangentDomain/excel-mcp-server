@@ -38,3 +38,8 @@ class DataValidationError(ExcelException):
 class OperationLimitError(ExcelException):
     """操作限制异常"""
     pass
+
+
+class ExcelMCPError(ExcelException):
+    """Excel MCP 通用操作异常"""
+    pass
