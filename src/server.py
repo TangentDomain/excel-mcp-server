@@ -428,7 +428,7 @@ def excel_update_range(
 
     Returns:
         Dict: 包含 success、updated_cells(int)、message
-        
+
     注意:
         为了确保行为可预测，系统不再自动扩展行范围格式。
         如果使用 "1250:1250" 格式，将收到明确的错误提示和修正建议。
@@ -667,7 +667,7 @@ def excel_merge_files(
         # 将多个文件合并为多个工作表
         files = ["file1.xlsx", "file2.xlsx", "file3.xlsx"]
         result = excel_merge_files(files, "merged.xlsx", "sheets")
-        
+
         # 将数据追加合并
         result = excel_merge_files(files, "combined.xlsx", "append")
     """
@@ -1148,7 +1148,7 @@ def excel_set_column_width(
     # 将列索引转换为列字母（1->A, 2->B, etc）
     from openpyxl.utils import get_column_letter
     column_letter = get_column_letter(column_index)
-    
+
     writer = ExcelWriter(file_path)
     result = writer.set_column_width(column_letter, width, sheet_name)
     return format_operation_result(result)
