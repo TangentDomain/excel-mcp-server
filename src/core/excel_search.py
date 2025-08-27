@@ -13,6 +13,7 @@ from openpyxl import load_workbook
 
 from ..models.types import SearchMatch, MatchType, OperationResult
 from ..utils.validators import ExcelValidator
+from ..utils.parsers import RangeParser
 
 logger = logging.getLogger(__name__)
 
@@ -35,7 +36,8 @@ class ExcelSearcher:
         flags: str = "",
         search_values: bool = True,
         search_formulas: bool = False,
-        sheet_name: Optional[str] = None
+        sheet_name: Optional[str] = None,
+        range_expression: Optional[str] = None
     ) -> OperationResult:
         """
         在Excel文件中使用正则表达式搜索单元格内容
@@ -46,6 +48,7 @@ class ExcelSearcher:
             search_values: 是否搜索单元格的显示值
             search_formulas: 是否搜索单元格的公式
             sheet_name: 工作表名称 (可选，不指定时搜索所有工作表)
+            range_expression: 搜索范围表达式 (如"A1:C10"或"Sheet1!A1:C10")
 
         Returns:
             OperationResult: 包含搜索结果的结果对象
@@ -83,7 +86,7 @@ class ExcelSearcher:
 
             # 执行搜索
             matches = self._search_workbook(
-                workbook, regex, search_values, search_formulas, sheet_name
+                workbook, regex, search_values, search_formulas, sheet_name, range_expression
             )
 
             return OperationResult(
@@ -94,7 +97,8 @@ class ExcelSearcher:
                     'pattern': pattern,
                     'total_matches': len(matches),
                     'search_values': search_values,
-                    'search_formulas': search_formulas
+                    'search_formulas': search_formulas,
+                    'range_expression': range_expression
                 }
             )
 
@@ -122,59 +126,142 @@ class ExcelSearcher:
         regex: re.Pattern,
         search_values: bool,
         search_formulas: bool,
-        sheet_name: Optional[str] = None
+        sheet_name: Optional[str] = None,
+        range_expression: Optional[str] = None
     ) -> List[SearchMatch]:
         """在工作簿中搜索"""
         matches = []
 
+        # 解析范围表达式（如果提供）
+        range_info = None
+        target_sheet_name = sheet_name
+        
+        if range_expression:
+            range_info = RangeParser.parse_range_expression(range_expression)
+            # 如果范围表达式包含工作表名，使用它
+            if range_info.sheet_name:
+                target_sheet_name = range_info.sheet_name
+
         # 确定要搜索的工作表
-        if sheet_name:
+        if target_sheet_name:
             # 搜索指定工作表
-            if sheet_name not in workbook.sheetnames:
-                raise ValueError(f"工作表 '{sheet_name}' 不存在")
-            sheet_names = [sheet_name]
+            if target_sheet_name not in workbook.sheetnames:
+                raise ValueError(f"工作表 '{target_sheet_name}' 不存在")
+            sheet_names = [target_sheet_name]
         else:
-            # 搜索所有工作表
+            # 搜索所有工作表（但如果有范围表达式，这种情况不应该发生）
             sheet_names = workbook.sheetnames
 
         # 遍历指定的工作表
-        for sheet_name in sheet_names:
-            sheet = workbook[sheet_name]
+        for current_sheet_name in sheet_names:
+            sheet = workbook[current_sheet_name]
 
-            # 遍历所有单元格
-            for row in sheet.iter_rows():
-                for cell in row:
-                    if cell.value is None:
-                        continue
+            # 如果指定了范围，则使用范围内的单元格；否则使用所有单元格
+            if range_info:
+                matches.extend(self._search_in_range(sheet, current_sheet_name, regex, search_values, search_formulas, range_info))
+            else:
+                matches.extend(self._search_entire_sheet(sheet, current_sheet_name, regex, search_values, search_formulas))
 
-                    # 搜索单元格值
-                    if search_values:
-                        cell_value = str(cell.value)
-                        for match in regex.finditer(cell_value):
-                            matches.append(SearchMatch(
-                                sheet=sheet_name,
-                                cell=cell.coordinate,
-                                value=cell_value,
-                                match=match.group(),
-                                match_start=match.start(),
-                                match_end=match.end(),
-                                match_type=MatchType.VALUE
-                            ))
+        return matches
 
-                    # 搜索单元格公式
-                    if search_formulas and hasattr(cell, 'formula') and cell.formula:
-                        formula = str(cell.formula)
-                        for match in regex.finditer(formula):
-                            matches.append(SearchMatch(
-                                sheet=sheet_name,
-                                cell=cell.coordinate,
-                                formula=formula,
-                                match=match.group(),
-                                match_start=match.start(),
-                                match_end=match.end(),
-                                match_type=MatchType.FORMULA
-                            ))
+    def _search_entire_sheet(
+        self,
+        sheet,
+        sheet_name: str,
+        regex: re.Pattern,
+        search_values: bool,
+        search_formulas: bool
+    ) -> List[SearchMatch]:
+        """在整个工作表中搜索"""
+        matches = []
+        
+        # 遍历所有单元格
+        for row in sheet.iter_rows():
+            for cell in row:
+                if cell.value is None:
+                    continue
 
+                # 搜索单元格值
+                if search_values:
+                    cell_value = str(cell.value)
+                    for match in regex.finditer(cell_value):
+                        matches.append(SearchMatch(
+                            sheet=sheet_name,
+                            cell=cell.coordinate,
+                            value=cell_value,
+                            match=match.group(),
+                            match_start=match.start(),
+                            match_end=match.end(),
+                            match_type=MatchType.VALUE
+                        ))
+
+                # 搜索单元格公式
+                if search_formulas and hasattr(cell, 'formula') and cell.formula:
+                    formula = str(cell.formula)
+                    for match in regex.finditer(formula):
+                        matches.append(SearchMatch(
+                            sheet=sheet_name,
+                            cell=cell.coordinate,
+                            formula=formula,
+                            match=match.group(),
+                            match_start=match.start(),
+                            match_end=match.end(),
+                            match_type=MatchType.FORMULA
+                        ))
+        
+        return matches
+
+    def _search_in_range(
+        self,
+        sheet,
+        sheet_name: str,
+        regex: re.Pattern,
+        search_values: bool,
+        search_formulas: bool,
+        range_info
+    ) -> List[SearchMatch]:
+        """在指定范围内搜索"""
+        from openpyxl.utils import range_boundaries
+        
+        matches = []
+        
+        # 解析范围边界
+        min_col, min_row, max_col, max_row = range_boundaries(range_info.cell_range)
+        
+        # 遍历范围内的单元格
+        for row in sheet.iter_rows(min_row=min_row, max_row=max_row, min_col=min_col, max_col=max_col):
+            for cell in row:
+                if cell.value is None:
+                    continue
+
+                # 搜索单元格值
+                if search_values:
+                    cell_value = str(cell.value)
+                    for match in regex.finditer(cell_value):
+                        matches.append(SearchMatch(
+                            sheet=sheet_name,
+                            cell=cell.coordinate,
+                            value=cell_value,
+                            match=match.group(),
+                            match_start=match.start(),
+                            match_end=match.end(),
+                            match_type=MatchType.VALUE
+                        ))
+
+                # 搜索单元格公式
+                if search_formulas and hasattr(cell, 'formula') and cell.formula:
+                    formula = str(cell.formula)
+                    for match in regex.finditer(formula):
+                        matches.append(SearchMatch(
+                            sheet=sheet_name,
+                            cell=cell.coordinate,
+                            formula=formula,
+                            match=match.group(),
+                            match_start=match.start(),
+                            match_end=match.end(),
+                            match_type=MatchType.FORMULA
+                        ))
+        
         return matches
 
     def regex_search_directory(

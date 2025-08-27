@@ -159,7 +159,8 @@ def excel_regex_search(
     sheet_name: Optional[str] = None,
     flags: str = "",
     search_values: bool = True,
-    search_formulas: bool = False
+    search_formulas: bool = False,
+    range_expression: Optional[str] = None
 ) -> Dict[str, Any]:
     """
     在Excel文件中使用正则表达式搜索单元格内容
@@ -174,6 +175,7 @@ def excel_regex_search(
         flags: 正则修饰符 ("i"忽略大小写, "m"多行, "s"点号匹配换行)
         search_values: 是否搜索单元格值
         search_formulas: 是否搜索公式内容
+        range_expression: 搜索范围表达式 (如"A1:C10"或"Sheet1!A1:C10")
 
     Returns:
         Dict: 包含 success、matches(List[Dict])、match_count、searched_sheets
@@ -183,11 +185,13 @@ def excel_regex_search(
         result = excel_regex_search("data.xlsx", r'\\w+@\\w+\\.\\w+', flags="i")
         # 搜索指定工作表中的数字
         result = excel_regex_search("data.xlsx", r'\\d+', sheet_name="Sheet1")
+        # 搜索指定范围内的数字
+        result = excel_regex_search("data.xlsx", r'\\d+', range_expression="Sheet1!A1:C10")
         # 搜索数字并包含公式
         result = excel_regex_search("data.xlsx", r'\\d+', search_formulas=True)
     """
     searcher = ExcelSearcher(file_path)
-    result = searcher.regex_search(pattern, flags, search_values, search_formulas, sheet_name)
+    result = searcher.regex_search(pattern, flags, search_values, search_formulas, sheet_name, range_expression)
     return format_operation_result(result)
 
 
