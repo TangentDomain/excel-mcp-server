@@ -289,7 +289,6 @@ def excel_regex_search_directory(
 def excel_get_range(
     file_path: str,
     range_expression: str,
-    sheet_name: Optional[str] = None,
     include_formatting: bool = False
 ) -> Dict[str, Any]:
     """
@@ -297,41 +296,38 @@ def excel_get_range(
 
     Args:
         file_path: Excel文件路径 (.xlsx/.xlsm)
-        range_expression: 范围表达式，支持以下格式：
-            - 包含工作表名: "Sheet1!A1:C10"、"TrSkill!A1:Z100"
-            - 不包含工作表名: "A1:C10" (需要同时指定sheet_name参数)
-            - ✅ 支持行范围读取: "1:1"、"5:10" (仅用于读取操作)
-        sheet_name: 工作表名称 (可选，当range_expression不包含工作表名时必需)
+        range_expression: 范围表达式，必须包含工作表名，支持格式：
+            - 标准单元格范围: "Sheet1!A1:C10"、"TrSkill!A1:Z100"
+            - 行范围: "Sheet1!1:1"、"数据!5:10"
+            - 列范围: "Sheet1!A:C"、"统计!B:E"
+            - 单行/单列: "Sheet1!5"、"数据!C"
         include_formatting: 是否包含单元格格式
 
     Returns:
         Dict: 包含 success、data(List[List])、range_info
 
     注意:
-        读取操作支持行范围格式(如"1:1")，但更新操作不支持。
-        建议统一使用明确的单元格范围格式以保持一致性。
+        为保持API一致性和清晰度，range_expression必须包含工作表名。
+        这消除了参数间的条件依赖，提高了可预测性。
 
     Example:
-        # 使用包含工作表名的范围表达式
+        # 读取单元格范围
         result = excel_get_range("data.xlsx", "Sheet1!A1:C10")
-        # 使用分离的参数
-        result = excel_get_range("data.xlsx", "A1:C10", sheet_name="Sheet1")
-        # 读取整行（支持但不推荐）
-        result = excel_get_range("data.xlsx", "1:1", sheet_name="Sheet1")
+        # 读取整行
+        result = excel_get_range("data.xlsx", "Sheet1!1:1")
+        # 读取列范围
+        result = excel_get_range("data.xlsx", "数据!A:C")
     """
+    # 验证range_expression格式
+    if '!' not in range_expression:
+        raise ValueError(
+            f"range_expression必须包含工作表名。\n"
+            f"当前格式: '{range_expression}'\n"
+            f"正确格式示例: 'Sheet1!A1:C10' 或 '数据!1:1'"
+        )
+
     reader = ExcelReader(file_path)
-
-    # 检查range_expression是否已包含工作表名
-    if '!' in range_expression:
-        # 已包含工作表名，直接使用
-        result = reader.get_range(range_expression, include_formatting)
-    else:
-        # 不包含工作表名，需要sheet_name参数
-        if not sheet_name:
-            return {"success": False, "error": "当range_expression不包含工作表名时，必须提供sheet_name参数"}
-        full_range_expression = f"{sheet_name}!{range_expression}"
-        result = reader.get_range(full_range_expression, include_formatting)
-
+    result = reader.get_range(range_expression, include_formatting)
     return format_operation_result(result)
 
 
@@ -459,7 +455,6 @@ def excel_update_range(
     file_path: str,
     range_expression: str,
     data: List[List[Any]],
-    sheet_name: Optional[str] = None,
     preserve_formulas: bool = True
 ) -> Dict[str, Any]:
     """
@@ -467,13 +462,10 @@ def excel_update_range(
 
     Args:
         file_path: Excel文件路径 (.xlsx/.xlsm)
-        range_expression: 范围表达式，支持以下格式：
-            - 包含工作表名: "Sheet1!A1:C10"、"TrSkill!A1:Z100"
-            - 不包含工作表名: "A1:C10" (需要同时指定sheet_name参数)
-            - ❌ 不支持纯行范围: "1:1"、"1250:1250" 等格式会报错
-              请使用明确的单元格范围: "A1:Z1"、"A1250:AB1250"
+        range_expression: 范围表达式，必须包含工作表名，支持格式：
+            - 标准单元格范围: "Sheet1!A1:C10"、"TrSkill!A1:Z100"
+            - 不支持行范围格式，必须使用明确单元格范围
         data: 二维数组数据 [[row1], [row2], ...]
-        sheet_name: 工作表名称 (可选，当range_expression不包含工作表名时必需)
         preserve_formulas: 保留已有公式 (默认值: True)
             - True: 如果目标单元格包含公式，则保留公式不覆盖
             - False: 覆盖所有内容，包括公式
@@ -482,30 +474,24 @@ def excel_update_range(
         Dict: 包含 success、updated_cells(int)、message
 
     注意:
-        为了确保行为可预测，系统不再自动扩展行范围格式。
-        如果使用 "1250:1250" 格式，将收到明确的错误提示和修正建议。
+        为保持API一致性和清晰度，range_expression必须包含工作表名。
+        这消除了参数间的条件依赖，提高了可预测性。
 
     Example:
         data = [["姓名", "年龄"], ["张三", 25]]
-        # ✅ 正确的用法
+        # 正确用法
         result = excel_update_range("test.xlsx", "Sheet1!A1:B2", data)
-        result = excel_update_range("test.xlsx", "A1:B2", data, sheet_name="Sheet1")
-        # ❌ 错误的用法 - 会报错并提供建议
-        result = excel_update_range("test.xlsx", "1:1", data, sheet_name="Sheet1")
     """
+    # 验证range_expression格式
+    if '!' not in range_expression:
+        raise ValueError(
+            f"range_expression必须包含工作表名。\n"
+            f"当前格式: '{range_expression}'\n"
+            f"正确格式示例: 'Sheet1!A1:B2' 或 '数据!C1:E10'"
+        )
+
     writer = ExcelWriter(file_path)
-
-    # 检查range_expression是否已包含工作表名
-    if '!' in range_expression:
-        # 已包含工作表名，直接使用
-        full_range_expression = range_expression
-    else:
-        # 不包含工作表名，需要sheet_name参数
-        if not sheet_name:
-            raise ValueError("当range_expression不包含工作表名时，必须提供sheet_name参数")
-        full_range_expression = f"{sheet_name}!{range_expression}"
-
-    result = writer.update_range(full_range_expression, data, preserve_formulas)
+    result = writer.update_range(range_expression, data, preserve_formulas)
     return format_operation_result(result)
 
 
@@ -991,9 +977,9 @@ def excel_format_cells_custom(
 
     Example:
         result = excel_format_cells_custom(
-            "data.xlsx", 
-            "Sheet1", 
-            "A1:D1", 
+            "data.xlsx",
+            "Sheet1",
+            "A1:D1",
             {'font': {'bold': True, 'color': 'FF0000'}}
         )
     """

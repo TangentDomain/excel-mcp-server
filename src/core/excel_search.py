@@ -135,7 +135,7 @@ class ExcelSearcher:
         # 解析范围表达式（如果提供）
         range_info = None
         target_sheet_name = sheet_name
-        
+
         if range_expression:
             range_info = RangeParser.parse_range_expression(range_expression)
             # 如果范围表达式包含工作表名，使用它
@@ -174,7 +174,7 @@ class ExcelSearcher:
     ) -> List[SearchMatch]:
         """在整个工作表中搜索"""
         matches = []
-        
+
         # 遍历所有单元格
         for row in sheet.iter_rows():
             for cell in row:
@@ -208,7 +208,7 @@ class ExcelSearcher:
                             match_end=match.end(),
                             match_type=MatchType.FORMULA
                         ))
-        
+
         return matches
 
     def _search_in_range(
@@ -222,9 +222,9 @@ class ExcelSearcher:
     ) -> List[SearchMatch]:
         """在指定范围内搜索"""
         from openpyxl.utils import range_boundaries, column_index_from_string
-        
+
         matches = []
-        
+
         # 根据范围类型确定搜索边界
         if range_info.range_type.value in ["row_range", "single_row"]:
             # 行范围搜索 (如 "3:5" 或 "3")
@@ -237,7 +237,7 @@ class ExcelSearcher:
                 # 行范围 (如 "3:5")
                 start_row, end_row = map(int, range_info.cell_range.split(':'))
                 min_row, max_row = start_row, end_row
-                
+
         elif range_info.range_type.value in ["column_range", "single_column"]:
             # 列范围搜索 (如 "B:D" 或 "B")
             min_row, max_row = 1, sheet.max_row
@@ -250,11 +250,11 @@ class ExcelSearcher:
                 start_col, end_col = range_info.cell_range.split(':')
                 min_col = column_index_from_string(start_col)
                 max_col = column_index_from_string(end_col)
-                
+
         else:
             # 单元格范围搜索 (如 "A1:C10")
             min_col, min_row, max_col, max_row = range_boundaries(range_info.cell_range)
-        
+
         # 遍历范围内的单元格
         for row in sheet.iter_rows(min_row=min_row, max_row=max_row, min_col=min_col, max_col=max_col):
             for cell in row:
@@ -288,7 +288,7 @@ class ExcelSearcher:
                             match_end=match.end(),
                             match_type=MatchType.FORMULA
                         ))
-        
+
         return matches
 
     def regex_search_directory(

@@ -27,14 +27,14 @@ class TestNewAPIs:
     def test_excel_list_sheets_new(self, sample_file):
         """测试新的excel_list_sheets - 只返回工作表列表"""
         result = server.excel_list_sheets(sample_file)
-        
+
         assert result['success'] is True
         assert 'sheets' in result
         assert 'total_sheets' in result
         assert 'active_sheet' in result
         # 确保不再返回sheets_with_headers
         assert 'sheets_with_headers' not in result
-        
+
         # 检查返回的工作表列表
         sheets = result['sheets']
         assert isinstance(sheets, list)
@@ -43,17 +43,17 @@ class TestNewAPIs:
     def test_excel_get_sheet_headers_new(self, sample_file):
         """测试新的excel_get_sheet_headers - 专门获取表头"""
         result = server.excel_get_sheet_headers(sample_file)
-        
+
         assert result['success'] is True
         assert 'sheets_with_headers' in result
         assert 'total_sheets' in result
         # 确保返回表头信息
         assert 'file_path' in result
-        
+
         # 检查表头信息结构
         sheets_with_headers = result['sheets_with_headers']
         assert isinstance(sheets_with_headers, list)
-        
+
         for sheet_info in sheets_with_headers:
             assert 'name' in sheet_info
             assert 'headers' in sheet_info
@@ -66,11 +66,11 @@ class TestNewAPIs:
         # 新API的分离调用
         sheets_result = server.excel_list_sheets(sample_file)
         headers_result = server.excel_get_sheet_headers(sample_file)
-        
+
         # 验证功能完整性
         assert sheets_result['success'] is True
         assert headers_result['success'] is True
-        
+
         # 工作表列表应该一致
         sheets_from_list = set(sheets_result['sheets'])
         sheets_from_headers = set([s['name'] for s in headers_result['sheets_with_headers']])
@@ -84,7 +84,7 @@ class TestNewAPIs:
             'font': {'bold': True, 'color': 'FF0000'},
             'fill': {'color': 'FFFF00'}
         }
-        
+
         # 测试参数结构（不实际运行，避免文件依赖）
         try:
             # 这应该抛出文件不存在的错误，但参数结构是正确的
@@ -96,7 +96,7 @@ class TestNewAPIs:
     def test_excel_format_cells_preset(self):
         """测试预设格式化API"""
         valid_presets = ["title", "header", "data", "highlight", "currency"]
-        
+
         for preset in valid_presets:
             try:
                 # 测试预设验证（不实际运行，避免文件依赖）
@@ -120,23 +120,23 @@ class TestNewAPIs:
     def test_parameter_clarity(self):
         """测试新API的参数清晰度"""
         import inspect
-        
+
         # 检查excel_list_sheets参数
         sig_list = inspect.signature(server.excel_list_sheets)
         params_list = list(sig_list.parameters.keys())
         assert params_list == ['file_path'], f"excel_list_sheets参数应该只有file_path，实际为: {params_list}"
-        
-        # 检查excel_get_sheet_headers参数  
+
+        # 检查excel_get_sheet_headers参数
         sig_headers = inspect.signature(server.excel_get_sheet_headers)
         params_headers = list(sig_headers.parameters.keys())
         assert params_headers == ['file_path'], f"excel_get_sheet_headers参数应该只有file_path，实际为: {params_headers}"
-        
+
         # 检查excel_format_cells_custom参数
         sig_custom = inspect.signature(server.excel_format_cells_custom)
         params_custom = list(sig_custom.parameters.keys())
         expected_custom = ['file_path', 'sheet_name', 'range_expression', 'formatting']
         assert params_custom == expected_custom, f"excel_format_cells_custom参数不符合预期"
-        
+
         # 检查excel_format_cells_preset参数
         sig_preset = inspect.signature(server.excel_format_cells_preset)
         params_preset = list(sig_preset.parameters.keys())
@@ -149,12 +149,12 @@ class TestNewAPIs:
         list_result = server.excel_list_sheets(sample_file)
         assert 'sheets' in list_result
         assert 'sheets_with_headers' not in list_result
-        
+
         # excel_get_sheet_headers应该专注于表头信息
         headers_result = server.excel_get_sheet_headers(sample_file)
         assert 'sheets_with_headers' in headers_result
         # 可以包含基础的sheets信息用于上下文，但主要功能是表头
-        
+
         # 两个API返回的数据结构应该不同，体现不同职责
         assert set(list_result.keys()) != set(headers_result.keys())
 

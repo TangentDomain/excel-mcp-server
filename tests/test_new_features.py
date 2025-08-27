@@ -41,7 +41,7 @@ class TestNewFeatures:
             ["张三", 25, "技术部"],
             ["李四", 30, "销售部"]
         ]
-        result = excel_update_range(temp_path, "A1:C3", test_data, "测试表")
+        result = excel_update_range(temp_path, "测试表!A1:C3", test_data)
         assert result['success'] is True
 
         yield temp_path
