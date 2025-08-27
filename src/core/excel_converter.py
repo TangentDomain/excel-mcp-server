@@ -51,7 +51,7 @@ class ExcelConverter:
         """
         try:
             workbook = load_workbook(self.file_path, read_only=True)
-            
+
             # 选择工作表
             if sheet_name:
                 if sheet_name not in workbook.sheetnames:
@@ -68,7 +68,7 @@ class ExcelConverter:
             # 写入CSV文件
             with open(output_path, 'w', newline='', encoding=encoding) as csvfile:
                 csv_writer = csv.writer(csvfile)
-                
+
                 row_count = 0
                 for row in sheet.iter_rows(values_only=True):
                     # 过滤掉完全空的行
@@ -137,7 +137,7 @@ class ExcelConverter:
             # 读取CSV数据
             with open(csv_path, 'r', encoding=encoding) as csvfile:
                 csv_reader = csv.reader(csvfile)
-                
+
                 row_count = 0
                 for row_index, row in enumerate(csv_reader, 1):
                     for col_index, value in enumerate(row, 1):
@@ -147,9 +147,9 @@ class ExcelConverter:
                                 value = float(value) if '.' in value else int(value)
                         except (ValueError, AttributeError):
                             pass  # 保持原始字符串值
-                        
+
                         sheet.cell(row=row_index, column=col_index, value=value)
-                    
+
                     row_count += 1
 
             # 创建输出目录
@@ -207,10 +207,10 @@ class ExcelConverter:
                 raise ExcelFileNotFoundError(f"输入文件不存在: {input_path}")
 
             input_format = Path(input_path).suffix.lower()
-            
+
             # 加载工作簿
             workbook = load_workbook(input_path)
-            
+
             # 创建输出目录
             output_dir = Path(output_path).parent
             output_dir.mkdir(parents=True, exist_ok=True)
@@ -219,7 +219,7 @@ class ExcelConverter:
                 # Excel格式转换
                 workbook.save(output_path)
                 file_size = os.path.getsize(output_path)
-                
+
                 return OperationResult(
                     success=True,
                     message=f"成功转换文件格式: {input_format} -> {target_format}",
@@ -234,25 +234,25 @@ class ExcelConverter:
                         'target_format': target_format
                     }
                 )
-            
+
             elif target_format.lower() == "json":
                 # 转换为JSON格式
                 json_data = {}
                 for sheet_name in workbook.sheetnames:
                     sheet = workbook[sheet_name]
                     sheet_data = []
-                    
+
                     for row in sheet.iter_rows(values_only=True):
                         if any(cell is not None for cell in row):
                             sheet_data.append(list(row))
-                    
+
                     json_data[sheet_name] = sheet_data
-                
+
                 with open(output_path, 'w', encoding='utf-8') as jsonfile:
                     json.dump(json_data, jsonfile, ensure_ascii=False, indent=2)
-                
+
                 file_size = os.path.getsize(output_path)
-                
+
                 return OperationResult(
                     success=True,
                     message=f"成功转换为JSON格式",
@@ -268,7 +268,7 @@ class ExcelConverter:
                         'target_format': target_format
                     }
                 )
-            
+
             else:
                 raise DataValidationError(f"不支持的目标格式: {target_format}")
 
@@ -320,43 +320,43 @@ class ExcelConverter:
                 # 每个文件作为独立工作表
                 for file_index, file_path in enumerate(input_files):
                     source_workbook = load_workbook(file_path, read_only=True)
-                    
+
                     for sheet_name in source_workbook.sheetnames:
                         source_sheet = source_workbook[sheet_name]
-                        
+
                         # 创建新工作表名称（避免重复）
                         new_sheet_name = f"{Path(file_path).stem}_{sheet_name}"
                         if len(new_sheet_name) > 31:  # Excel工作表名称长度限制
                             new_sheet_name = f"File{file_index+1}_{sheet_name}"[:31]
-                        
+
                         target_sheet = output_workbook.create_sheet(title=new_sheet_name)
-                        
+
                         # 复制数据
                         for row in source_sheet.iter_rows(values_only=True):
                             target_sheet.append(row)
-                        
+
                         total_sheets += 1
-                    
+
                     source_workbook.close()
                     merged_files += 1
 
             elif merge_mode == "append":
                 # 追加到单个工作表
                 output_sheet = output_workbook.create_sheet(title="合并数据")
-                
+
                 for file_path in input_files:
                     source_workbook = load_workbook(file_path, read_only=True)
-                    
+
                     # 使用第一个工作表的数据
                     source_sheet = source_workbook.active
-                    
+
                     for row in source_sheet.iter_rows(values_only=True):
                         if any(cell is not None for cell in row):
                             output_sheet.append(row)
-                    
+
                     source_workbook.close()
                     merged_files += 1
-                
+
                 total_sheets = 1
 
             else:

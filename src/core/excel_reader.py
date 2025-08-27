@@ -31,6 +31,34 @@ class ExcelReader:
             file_path: Excel文件路径
         """
         self.file_path = ExcelValidator.validate_file_path(file_path)
+        self._workbook_cache = {}  # 缓存不同参数的工作簿
+    
+    def _get_workbook(self, read_only: bool = True, data_only: bool = False):
+        """
+        获取缓存的工作簿或加载新工作簿
+        
+        Args:
+            read_only: 是否以只读模式打开
+            data_only: 是否只读取值（不包含公式）
+        
+        Returns:
+            Workbook: openpyxl工作簿对象
+        """
+        cache_key = (read_only, data_only)
+        if cache_key not in self._workbook_cache:
+            self._workbook_cache[cache_key] = load_workbook(
+                self.file_path, 
+                read_only=read_only, 
+                data_only=data_only
+            )
+        return self._workbook_cache[cache_key]
+    
+    def close(self):
+        """关闭所有缓存的工作簿"""
+        for workbook in self._workbook_cache.values():
+            if workbook is not None:
+                workbook.close()
+        self._workbook_cache.clear()
 
     def list_sheets(self) -> OperationResult:
         """
@@ -40,7 +68,7 @@ class ExcelReader:
             OperationResult: 包含所有工作表信息的结果
         """
         try:
-            workbook = load_workbook(self.file_path, read_only=True)
+            workbook = self._get_workbook(read_only=True)
 
             sheets_info = []
             for i, sheet_name in enumerate(workbook.sheetnames):
@@ -93,7 +121,7 @@ class ExcelReader:
             range_info = RangeParser.parse_range_expression(range_expression)
 
             # 加载Excel文件
-            workbook = load_workbook(self.file_path, data_only=True)
+            workbook = self._get_workbook(read_only=True, data_only=True)
 
             # 确定工作表
             sheet = self._get_worksheet(workbook, range_info.sheet_name)
@@ -160,20 +188,40 @@ class ExcelReader:
         row_parts = range_info.cell_range.split(':')
         start_row = int(row_parts[0])
         end_row = int(row_parts[1])
-        max_col = sheet.max_column
-
+        
+        # 优化：使用iter_rows而不是手动遍历所有列
+        # 这样只会读取实际有数据的列，避免max_column性能问题
         data = []
-        for row_idx in range(start_row, end_row + 1):
+        max_col_found = 0
+        
+        for row in sheet.iter_rows(min_row=start_row, max_row=end_row, values_only=False):
             row_data = []
-            for col_idx in range(1, max_col + 1):
-                cell = sheet.cell(row=row_idx, column=col_idx)
+            last_data_col = 0
+            
+            # 找到这行最后一个有数据的列
+            for col_idx, cell in enumerate(row, 1):
+                if cell.value is not None:
+                    last_data_col = col_idx
+            
+            # 如果这行完全没有数据，至少包含第一个单元格
+            if last_data_col == 0:
+                last_data_col = 1
+            
+            # 只读取到最后一个有数据的列
+            for col_idx in range(1, last_data_col + 1):
+                if col_idx - 1 < len(row):
+                    cell = row[col_idx - 1]
+                else:
+                    cell = sheet.cell(row=start_row + len(data), column=col_idx)
                 cell_info = self._create_cell_info(cell, include_formatting)
                 row_data.append(cell_info)
+            
             data.append(row_data)
+            max_col_found = max(max_col_found, last_data_col)
 
         dimensions = ExcelDimensions(
             rows=end_row - start_row + 1,
-            columns=max_col,
+            columns=max_col_found,
             start_row=start_row,
             start_column=1
         )
