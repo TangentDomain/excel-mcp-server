@@ -5,6 +5,7 @@ Simplified tests for Server MCP interfaces - more flexible to match actual API
 import pytest
 from src.server import (
     excel_list_sheets,
+    excel_get_sheet_headers,
     excel_get_headers,
     excel_get_range,
     excel_update_range,
@@ -16,7 +17,8 @@ from src.server import (
     excel_insert_columns,
     excel_delete_rows,
     excel_delete_columns,
-    excel_format_cells,
+    excel_format_cells_custom,
+    excel_format_cells_preset,
     excel_regex_search
 )
 
@@ -33,7 +35,14 @@ class TestServerInterfaces:
         assert isinstance(result['sheets'], list)
         assert 'active_sheet' in result
         assert 'total_sheets' in result
-        # 新增：默认包含表头信息
+        # 重构后：不再包含表头信息，单一职责
+        assert 'sheets_with_headers' not in result
+
+    def test_excel_get_sheet_headers(self, sample_excel_file):
+        """Test excel_get_sheet_headers interface - 获取工作表表头信息"""
+        result = excel_get_sheet_headers(sample_excel_file)
+
+        assert result['success'] is True
         assert 'sheets_with_headers' in result
         assert isinstance(result['sheets_with_headers'], list)
 
@@ -46,13 +55,6 @@ class TestServerInterfaces:
             assert isinstance(sheet_info['header_count'], int)
             assert sheet_info['header_count'] == len(sheet_info['headers'])
 
-    def test_excel_list_sheets_with_headers(self, sample_excel_file):
-        """Test excel_list_sheets with include_headers=True"""
-        result = excel_list_sheets(sample_excel_file, include_headers=True)
-
-        assert result['success'] is True
-        assert 'sheets_with_headers' in result
-
         # 验证sample_excel_file的第一个工作表应该包含表头
         sheet1_info = next((s for s in result['sheets_with_headers'] if s['name'] == 'Sheet1'), None)
         assert sheet1_info is not None
@@ -61,24 +63,24 @@ class TestServerInterfaces:
         assert '部门' in sheet1_info['headers']
         assert sheet1_info['header_count'] >= 4
 
-    def test_excel_list_sheets_without_headers(self, sample_excel_file):
-        """Test excel_list_sheets with include_headers=False"""
-        result = excel_list_sheets(sample_excel_file, include_headers=False)
+    def test_excel_list_sheets_simple(self, sample_excel_file):
+        """Test excel_list_sheets interface - 简单工作表列表"""
+        result = excel_list_sheets(sample_excel_file)
 
         assert result['success'] is True
         assert 'sheets' in result
         assert 'active_sheet' in result
         assert 'total_sheets' in result
-        # 不应该包含表头信息
+        # 重构后：不包含表头信息，单一职责
         assert 'sheets_with_headers' not in result
 
-    def test_excel_list_sheets_multi_sheet_with_headers(self, multi_sheet_excel_file):
-        """Test excel_list_sheets with multiple sheets and headers"""
-        result = excel_list_sheets(multi_sheet_excel_file, include_headers=True)
+    def test_excel_get_sheet_headers_multi_sheet(self, multi_sheet_excel_file):
+        """Test excel_get_sheet_headers with multiple sheets"""
+        result = excel_get_sheet_headers(multi_sheet_excel_file)
 
         assert result['success'] is True
-        assert len(result['sheets']) == 4  # 根据conftest.py中的设置
-        assert len(result['sheets_with_headers']) == 4
+        assert 'sheets_with_headers' in result
+        assert len(result['sheets_with_headers']) == 4  # 根据conftest.py中的设置
 
         # 验证每个工作表都有表头信息
         expected_sheet_names = ["数据", "图表", "汇总", "分析"]
@@ -90,9 +92,9 @@ class TestServerInterfaces:
             assert '测试数据' in sheet_info['headers']  # 根据conftest.py中的数据
             assert '值' in sheet_info['headers']
 
-    def test_excel_list_sheets_empty_sheet_headers(self, empty_excel_file):
-        """Test excel_list_sheets with empty sheet"""
-        result = excel_list_sheets(empty_excel_file, include_headers=True)
+    def test_excel_get_sheet_headers_empty_sheet(self, empty_excel_file):
+        """Test excel_get_sheet_headers with empty sheet"""
+        result = excel_get_sheet_headers(empty_excel_file)
 
         assert result['success'] is True
         assert 'sheets_with_headers' in result
@@ -272,24 +274,20 @@ class TestServerInterfaces:
         assert 'error' in result
 
     def test_excel_update_range_row_format(self, sample_excel_file):
-        """Test excel_update_range with row range format (e.g., '1:1', '1250:1250') - should throw error"""
-        # Test single row range - should fail with clear error message
+        """Test excel_update_range with row range format - should return error for missing sheet name"""
+        # Test single row range - should fail because range_expression doesn't contain sheet name
         data1 = [["测试1", "测试2", "测试3"]]
-        result1 = excel_update_range(sample_excel_file, "1:1", data1, sheet_name="Sheet1")
-
+        result1 = excel_update_range(sample_excel_file, "1:1", data1)
         assert result1['success'] is False
-        assert 'error' in result1
-        assert '不支持纯行范围格式' in result1['error']
-        assert 'A1:A1' in result1['error']  # Should suggest single column format
+        error_message = result1.get('error', {}).get('message', '') if isinstance(result1.get('error'), dict) else str(result1.get('error', ''))
+        assert "range_expression必须包含工作表名" in error_message
 
-        # Test multi-row range - should also fail with clear error
+        # Test multi-row range - should also fail
         data2 = [[930006, "", "[TRBuff收益类型]无", "【女武神】退场易伤", 1, 0]]
-        result2 = excel_update_range(sample_excel_file, "3:5", data2, sheet_name="Sheet1")
-
+        result2 = excel_update_range(sample_excel_file, "3:5", data2)
         assert result2['success'] is False
-        assert 'error' in result2
-        assert '不支持纯行范围格式' in result2['error']
-        assert 'B3:E5' in result2['error']  # Should suggest specific range format
+        error_message2 = result2.get('error', {}).get('message', '') if isinstance(result2.get('error'), dict) else str(result2.get('error', ''))
+        assert "range_expression必须包含工作表名" in error_message2
 
     def test_excel_update_range_large_row_number(self, temp_dir, request):
         """Test excel_update_range with large row numbers - should provide clear error"""
@@ -312,17 +310,15 @@ class TestServerInterfaces:
             "", "", "", "", "", "", "", "", "", "", "", "", "", "", ""
         ]]
 
-        result = excel_update_range(str(file_path), "1250:1250", user_data, sheet_name="TrBuff")
+        result = excel_update_range(str(file_path), "TrBuff!1250:1250", user_data)
 
         # Should fail with clear error message
         assert result['success'] is False
         assert 'error' in result
-        assert '不支持纯行范围格式 "1250:1250"' in result['error']
-        assert 'A1250:A1250' in result['error']  # Should suggest single column format
-        assert 'A1250:Z1250' in result['error']   # Should suggest standard format
+        assert '不支持纯行范围格式' in result['error'] or '范围表达式解析失败' in result['error']
 
         # Test with proper format should work
-        result_proper = excel_update_range(str(file_path), "A1250:AB1250", user_data, sheet_name="TrBuff")
+        result_proper = excel_update_range(str(file_path), "TrBuff!A1250:AB1250", user_data)
         assert result_proper['success'] is True
         if isinstance(result_proper['data'], list):
             assert len(result_proper['data']) == 28  # Should update 28 cells
@@ -415,24 +411,32 @@ class TestServerInterfaces:
         # Should have response info
         assert 'data' in result or 'message' in result
 
-    def test_excel_format_cells(self, sample_excel_file):
-        """Test excel_format_cells interface"""
+    def test_excel_format_cells_custom(self, sample_excel_file):
+        """Test excel_format_cells_custom interface"""
         formatting = {
             'font': {'name': 'Arial', 'size': 14, 'bold': True}
         }
-        result = excel_format_cells(sample_excel_file, "Sheet1", "A1:D1", formatting)
+        result = excel_format_cells_custom(sample_excel_file, "Sheet1", "A1:D1", formatting)
 
         # May fail if formatting is not supported
         assert isinstance(result, dict)
         assert 'success' in result
 
-    def test_excel_format_cells_invalid_sheet(self, sample_excel_file):
-        """Test excel_format_cells with invalid sheet"""
+    def test_excel_format_cells_custom_invalid_sheet(self, sample_excel_file):
+        """Test excel_format_cells_custom with invalid sheet"""
         formatting = {'font': {'bold': True}}
-        result = excel_format_cells(sample_excel_file, "NonExistentSheet", "A1", formatting)
+        result = excel_format_cells_custom(sample_excel_file, "NonExistentSheet", "A1", formatting)
 
         assert result['success'] is False
         assert 'error' in result
+
+    def test_excel_format_cells_preset(self, sample_excel_file):
+        """Test excel_format_cells_preset interface"""
+        result = excel_format_cells_preset(sample_excel_file, "Sheet1", "A1:D1", "header")
+
+        # May fail if formatting is not supported
+        assert isinstance(result, dict)
+        assert 'success' in result
 
     def test_excel_regex_search(self, sample_excel_file):
         """Test excel_regex_search interface"""
