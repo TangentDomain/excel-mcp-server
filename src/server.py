@@ -34,6 +34,9 @@ from .core.excel_manager import ExcelManager
 from .core.excel_search import ExcelSearcher
 from .core.excel_compare import ExcelComparer
 
+# 导入API模块
+from .api.excel_operations import ExcelOperations
+
 # 导入统一错误处理
 from .utils.error_handler import unified_error_handler, extract_file_context, extract_formula_context
 
@@ -62,7 +65,6 @@ mcp = FastMCP(
 # ==================== MCP 工具定义 ====================
 
 @mcp.tool()
-@unified_error_handler("列出工作表", extract_file_context, return_dict=True)
 def excel_list_sheets(file_path: str) -> Dict[str, Any]:
     """
     列出Excel文件中所有工作表名称
@@ -83,24 +85,7 @@ def excel_list_sheets(file_path: str) -> Dict[str, Any]:
         #   'active_sheet': 'Sheet1'
         # }
     """
-    reader = ExcelReader(file_path)
-    result = reader.list_sheets()
-
-    # 提取工作表名称列表
-    sheets = [sheet.name for sheet in result.data] if result.data else []
-
-    response = {
-        'success': True,
-        'sheets': sheets,
-        'file_path': file_path,
-        'total_sheets': result.metadata.get('total_sheets', len(sheets)) if result.metadata else len(sheets),
-        'active_sheet': result.metadata.get('active_sheet', '') if result.metadata else ''
-    }
-
-    # 清理资源
-    reader.close()
-
-    return response
+    return ExcelOperations.list_sheets(file_path)
 
 
 @mcp.tool()
@@ -134,7 +119,7 @@ def excel_get_sheet_headers(file_path: str) -> Dict[str, Any]:
         return sheets_result
 
     sheets_with_headers = []
-    sheets = sheets_result.get('data', [])
+    sheets = sheets_result.get('sheets', [])  # 修正字段名
 
     for sheet_name in sheets:
         try:
@@ -142,7 +127,12 @@ def excel_get_sheet_headers(file_path: str) -> Dict[str, Any]:
             header_result = excel_get_headers(file_path, sheet_name, header_row=1)
 
             if header_result.get('success'):
-                headers = header_result.get('data', {}).get('headers', [])
+                # 兼容两种可能的数据格式
+                headers = header_result.get('headers', [])
+                if not headers and 'data' in header_result:
+                    # 如果headers字段为空，尝试从data字段获取
+                    headers = header_result.get('data', [])
+                
                 sheets_with_headers.append({
                     'name': sheet_name,
                     'headers': headers,
@@ -278,7 +268,6 @@ def excel_search_directory(
 
 
 @mcp.tool()
-@unified_error_handler("范围数据读取", extract_file_context, return_dict=True)
 def excel_get_range(
     file_path: str,
     range: str,
@@ -311,21 +300,10 @@ def excel_get_range(
         # 读取列范围
         result = excel_get_range("data.xlsx", "数据!A:C")
     """
-    # 验证range格式
-    if '!' not in range:
-        raise ValueError(
-            f"range必须包含工作表名。\n"
-            f"当前格式: '{range}'\n"
-            f"正确格式示例: 'Sheet1!A1:C10' 或 '数据!1:1'"
-        )
-
-    reader = ExcelReader(file_path)
-    result = reader.get_range(range, include_formatting)
-    return format_operation_result(result)
+    return ExcelOperations.get_range(file_path, range, include_formatting)
 
 
 @mcp.tool()
-@unified_error_handler("获取表头", extract_file_context, return_dict=True)
 def excel_get_headers(
     file_path: str,
     sheet_name: str,
@@ -364,86 +342,10 @@ def excel_get_headers(
         #   'header_row': 1
         # }
     """
-    reader = ExcelReader(file_path)
-
-    try:
-        # 构建范围表达式：读取指定行
-        if max_columns:
-            # 如果指定了最大列数，使用具体范围
-            from openpyxl.utils import get_column_letter
-            end_column = get_column_letter(max_columns)
-            range_expression = f"{sheet_name}!A{header_row}:{end_column}{header_row}"
-        else:
-            # 否则使用一个合理的默认范围（读取前100列，足够覆盖绝大部分表格）
-            # 避免使用行范围格式以保持与更新操作的一致性
-            range_expression = f"{sheet_name}!A{header_row}:CV{header_row}"  # CV = 第100列
-
-        # 读取表头行数据
-        result = reader.get_range(range_expression)
-
-        if not result.success:
-            return {
-                'success': False,
-                'error': f"无法读取表头数据: {result.message}",
-                'sheet_name': sheet_name,
-                'header_row': header_row
-            }
-
-        # 提取表头信息
-        headers = []
-        if result.data and len(result.data) > 0:
-            first_row = result.data[0]
-            for i, cell_info in enumerate(first_row):
-                # 处理CellInfo对象和普通值
-                cell_value = None
-                if hasattr(cell_info, 'value'):
-                    cell_value = cell_info.value
-                else:
-                    cell_value = cell_info
-
-                # 转换为字符串并清理
-                if cell_value is not None:
-                    str_value = str(cell_value).strip()
-                    if str_value != "":
-                        headers.append(str_value)
-                    else:
-                        # 空字符串的处理
-                        if max_columns:
-                            headers.append("")  # 指定max_columns时保留空字符串
-                        else:
-                            break  # 否则停止
-                else:
-                    # None值的处理
-                    if max_columns:
-                        headers.append("")  # 指定max_columns时将None转为空字符串
-                    else:
-                        break  # 否则停止
-
-                # 如果指定了max_columns，检查是否已达到限制
-                if max_columns and len(headers) >= max_columns:
-                    break
-
-        return {
-            'success': True,
-            'data': headers,  # 主要数据
-            'headers': headers,  # 兼容性字段
-            'header_count': len(headers),
-            'sheet_name': sheet_name,
-            'header_row': header_row,
-            'message': f"成功获取{len(headers)}个表头字段"
-        }
-
-    except Exception as e:
-        return {
-            'success': False,
-            'error': f"获取表头失败: {str(e)}",
-            'sheet_name': sheet_name,
-            'header_row': header_row
-        }
+    return ExcelOperations.get_headers(file_path, sheet_name, header_row, max_columns)
 
 
 @mcp.tool()
-@unified_error_handler("范围数据更新", extract_file_context, return_dict=True)
 def excel_update_range(
     file_path: str,
     range: str,
@@ -475,17 +377,7 @@ def excel_update_range(
         # 正确用法
         result = excel_update_range("test.xlsx", "Sheet1!A1:B2", data)
     """
-    # 验证range格式
-    if '!' not in range:
-        raise ValueError(
-            f"range必须包含工作表名。\n"
-            f"当前格式: '{range}'\n"
-            f"正确格式示例: 'Sheet1!A1:B2' 或 '数据!C1:E10'"
-        )
-
-    writer = ExcelWriter(file_path)
-    result = writer.update_range(range, data, preserve_formulas)
-    return format_operation_result(result)
+    return ExcelOperations.update_range(file_path, range, data, preserve_formulas)
 
 
 @mcp.tool()
@@ -551,7 +443,6 @@ def excel_insert_columns(
 
 
 @mcp.tool()
-@unified_error_handler("文件创建", extract_file_context, return_dict=True)
 def excel_create_file(
     file_path: str,
     sheet_names: Optional[List[str]] = None
@@ -575,8 +466,7 @@ def excel_create_file(
         # 创建包含多个工作表的文件
         result = excel_create_file("report.xlsx", ["数据", "图表", "汇总"])
     """
-    result = ExcelManager.create_file(file_path, sheet_names)
-    return format_operation_result(result)
+    return ExcelOperations.create_file(file_path, sheet_names)
 
 
 @mcp.tool()

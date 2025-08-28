@@ -2,7 +2,7 @@
 """
 Excel正则搜索 - 范围功能测试
 
-测试 excel_regex_search 的范围表达式支持，包括：
+测试 excel_search 的范围表达式支持，包括：
 1. 单元格范围: A1:C10
 2. 行范围: 3:5 (第3行到第5行)
 3. 列范围: B:D (B列到D列)
@@ -19,7 +19,7 @@ from openpyxl import Workbook
 
 from src.core.excel_search import ExcelSearcher
 from src.models.types import OperationResult
-from src.server import excel_regex_search
+from src.server import excel_search
 
 
 @pytest.fixture
@@ -123,11 +123,11 @@ class TestRangeExpressionSearch:
 
     def test_cell_range_basic(self, range_search_test_file):
         """测试基本的单元格范围搜索"""
-        result = excel_regex_search(
+        result = excel_search(
             range_search_test_file,
             "@",
             sheet_name="基础数据",
-            range_expression="A1:C6"
+            range="A1:C6"
         )
 
         assert result['success'] is True
@@ -142,10 +142,10 @@ class TestRangeExpressionSearch:
 
     def test_cell_range_with_sheet_prefix(self, range_search_test_file):
         """测试带工作表名前缀的单元格范围"""
-        result = excel_regex_search(
+        result = excel_search(
             range_search_test_file,
             "@",
-            range_expression="基础数据!B1:B5"
+            range="基础数据!B1:B5"
         )
 
         assert result['success'] is True
@@ -156,11 +156,11 @@ class TestRangeExpressionSearch:
 
     def test_row_range_search(self, range_search_test_file):
         """测试行范围搜索 (3:5 = 第3-5行)"""
-        result = excel_regex_search(
+        result = excel_search(
             range_search_test_file,
             "@",
             sheet_name="基础数据",
-            range_expression="3:5"
+            range="3:5"
         )
 
         assert result['success'] is True
@@ -176,10 +176,10 @@ class TestRangeExpressionSearch:
 
     def test_row_range_with_sheet_prefix(self, range_search_test_file):
         """测试带工作表名的行范围搜索"""
-        result = excel_regex_search(
+        result = excel_search(
             range_search_test_file,
             "@row",
-            range_expression="基础数据!6:8"
+            range="基础数据!6:8"
         )
 
         assert result['success'] is True
@@ -190,11 +190,11 @@ class TestRangeExpressionSearch:
 
     def test_column_range_search(self, range_search_test_file):
         """测试列范围搜索 (B:B = B列)"""
-        result = excel_regex_search(
+        result = excel_search(
             range_search_test_file,
             "@",
             sheet_name="基础数据",
-            range_expression="B:B"
+            range="B:B"
         )
 
         assert result['success'] is True
@@ -209,11 +209,11 @@ class TestRangeExpressionSearch:
 
     def test_multiple_column_range(self, range_search_test_file):
         """测试多列范围搜索 (B:D = B到D列)"""
-        result = excel_regex_search(
+        result = excel_search(
             range_search_test_file,
             "@col3",
             sheet_name="基础数据",
-            range_expression="B:D"
+            range="B:D"
         )
 
         assert result['success'] is True
@@ -227,10 +227,10 @@ class TestRangeExpressionSearch:
 
     def test_column_range_with_sheet_prefix(self, range_search_test_file):
         """测试带工作表名的列范围搜索"""
-        result = excel_regex_search(
+        result = excel_search(
             range_search_test_file,
             "数据",
-            range_expression="基础数据!C:C"
+            range="基础数据!C:C"
         )
 
         assert result['success'] is True
@@ -241,11 +241,11 @@ class TestRangeExpressionSearch:
 
     def test_single_row_search(self, range_search_test_file):
         """测试单行搜索 (7 = 仅第7行)"""
-        result = excel_regex_search(
+        result = excel_search(
             range_search_test_file,
             "@",
             sheet_name="基础数据",
-            range_expression="7"
+            range="7"
         )
 
         assert result['success'] is True
@@ -260,10 +260,10 @@ class TestRangeExpressionSearch:
 
     def test_single_row_with_sheet_prefix(self, range_search_test_file):
         """测试带工作表名的单行搜索"""
-        result = excel_regex_search(
+        result = excel_search(
             range_search_test_file,
             "第10行",
-            range_expression="基础数据!10"
+            range="基础数据!10"
         )
 
         assert result['success'] is True
@@ -274,11 +274,11 @@ class TestRangeExpressionSearch:
 
     def test_single_column_search(self, range_search_test_file):
         """测试单列搜索 (C = 仅C列)"""
-        result = excel_regex_search(
+        result = excel_search(
             range_search_test_file,
             "数据",
             sheet_name="基础数据",
-            range_expression="C"
+            range="C"
         )
 
         assert result['success'] is True
@@ -293,10 +293,10 @@ class TestRangeExpressionSearch:
 
     def test_single_column_with_sheet_prefix(self, range_search_test_file):
         """测试带工作表名的单列搜索"""
-        result = excel_regex_search(
+        result = excel_search(
             range_search_test_file,
             "结果",
-            range_expression="基础数据!E"
+            range="基础数据!E"
         )
 
         assert result['success'] is True
@@ -308,11 +308,11 @@ class TestRangeExpressionSearch:
     def test_range_boundary_conditions(self, range_search_test_file):
         """测试范围边界条件"""
         # 测试超出实际数据范围的搜索
-        result = excel_regex_search(
+        result = excel_search(
             range_search_test_file,
             "@",
             sheet_name="基础数据",
-            range_expression="15:20"  # 超出数据行范围
+            range="15:20"  # 超出数据行范围
         )
 
         assert result['success'] is True
@@ -326,11 +326,11 @@ class TestRangeExpressionSearch:
     def test_invalid_range_expression(self, range_search_test_file):
         """测试无效的范围表达式"""
         # 这个测试可能需要根据实际的错误处理逻辑调整
-        result = excel_regex_search(
+        result = excel_search(
             range_search_test_file,
             "@",
             sheet_name="基础数据",
-            range_expression="INVALID_RANGE"
+            range="INVALID_RANGE"
         )
 
         # 根据实际错误处理，这里可能返回失败或抛出异常
@@ -344,16 +344,16 @@ class TestRangeExpressionSearch:
 
         # 全文件搜索
         start_time = time.time()
-        full_result = excel_regex_search(range_search_test_file, "@")
+        full_result = excel_search(range_search_test_file, "@")
         full_search_time = time.time() - start_time
 
         # 范围搜索
         start_time = time.time()
-        range_result = excel_regex_search(
+        range_result = excel_search(
             range_search_test_file,
             "@",
             sheet_name="基础数据",
-            range_expression="B:B"
+            range="B:B"
         )
         range_search_time = time.time() - start_time
 
@@ -416,11 +416,11 @@ class TestRangeExpressionIntegration:
         # 执行所有测试用例
         results = []
         for case in test_cases:
-            result = excel_regex_search(
+            result = excel_search(
                 range_search_test_file,
                 case["pattern"],
                 sheet_name="基础数据",
-                range_expression=case["range_expr"]
+                range=case["range_expr"]
             )
 
             # 验证结果

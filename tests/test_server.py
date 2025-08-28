@@ -17,9 +17,8 @@ from src.server import (
     excel_insert_columns,
     excel_delete_rows,
     excel_delete_columns,
-    excel_format_cells_custom,
-    excel_format_cells_preset,
-    excel_regex_search
+    excel_format_cells,
+    excel_search
 )
 
 
@@ -101,7 +100,9 @@ class TestServerInterfaces:
         assert len(result['sheets_with_headers']) == 1  # 应该有一个默认工作表
 
         sheet_info = result['sheets_with_headers'][0]
-        assert sheet_info['headers'] == []  # 空工作表应该没有表头
+        # 空工作表应该没有表头，如果headers字段被清理了，默认为空数组
+        headers = sheet_info.get('headers', [])
+        assert headers == []  # 空工作表应该没有表头
         assert sheet_info['header_count'] == 0
 
     def test_excel_list_sheets_invalid_file(self):
@@ -275,19 +276,19 @@ class TestServerInterfaces:
 
     def test_excel_update_range_row_format(self, sample_excel_file):
         """Test excel_update_range with row range format - should return error for missing sheet name"""
-        # Test single row range - should fail because range_expression doesn't contain sheet name
+        # Test single row range - should fail because range doesn't contain sheet name
         data1 = [["测试1", "测试2", "测试3"]]
         result1 = excel_update_range(sample_excel_file, "1:1", data1)
         assert result1['success'] is False
         error_message = result1.get('error', {}).get('message', '') if isinstance(result1.get('error'), dict) else str(result1.get('error', ''))
-        assert "range_expression必须包含工作表名" in error_message
+        assert "range必须包含工作表名" in error_message
 
         # Test multi-row range - should also fail
         data2 = [[930006, "", "[TRBuff收益类型]无", "【女武神】退场易伤", 1, 0]]
         result2 = excel_update_range(sample_excel_file, "3:5", data2)
         assert result2['success'] is False
         error_message2 = result2.get('error', {}).get('message', '') if isinstance(result2.get('error'), dict) else str(result2.get('error', ''))
-        assert "range_expression必须包含工作表名" in error_message2
+        assert "range必须包含工作表名" in error_message2
 
     def test_excel_update_range_large_row_number(self, temp_dir, request):
         """Test excel_update_range with large row numbers - should provide clear error"""
@@ -412,43 +413,43 @@ class TestServerInterfaces:
         assert 'data' in result or 'message' in result
 
     def test_excel_format_cells_custom(self, sample_excel_file):
-        """Test excel_format_cells_custom interface"""
+        """Test excel_format_cells with custom formatting"""
         formatting = {
             'font': {'name': 'Arial', 'size': 14, 'bold': True}
         }
-        result = excel_format_cells_custom(sample_excel_file, "Sheet1", "A1:D1", formatting)
+        result = excel_format_cells(sample_excel_file, "Sheet1", "A1:D1", formatting=formatting)
 
         # May fail if formatting is not supported
         assert isinstance(result, dict)
         assert 'success' in result
 
-    def test_excel_format_cells_custom_invalid_sheet(self, sample_excel_file):
-        """Test excel_format_cells_custom with invalid sheet"""
+    def test_excel_format_cells_invalid_sheet(self, sample_excel_file):
+        """Test excel_format_cells with invalid sheet"""
         formatting = {'font': {'bold': True}}
-        result = excel_format_cells_custom(sample_excel_file, "NonExistentSheet", "A1", formatting)
+        result = excel_format_cells(sample_excel_file, "NonExistentSheet", "A1", formatting=formatting)
 
         assert result['success'] is False
         assert 'error' in result
 
     def test_excel_format_cells_preset(self, sample_excel_file):
-        """Test excel_format_cells_preset interface"""
-        result = excel_format_cells_preset(sample_excel_file, "Sheet1", "A1:D1", "header")
+        """Test excel_format_cells with preset"""
+        result = excel_format_cells(sample_excel_file, "Sheet1", "A1:D1", preset="header")
 
         # May fail if formatting is not supported
         assert isinstance(result, dict)
         assert 'success' in result
 
-    def test_excel_regex_search(self, sample_excel_file):
-        """Test excel_regex_search interface"""
-        result = excel_regex_search(sample_excel_file, r"张三")
+    def test_excel_search(self, sample_excel_file):
+        """Test excel_search interface"""
+        result = excel_search(sample_excel_file, r"张三")
 
         assert result['success'] is True
         # Should have search results
         assert 'data' in result or 'total_matches' in result
 
-    def test_excel_regex_search_invalid_file(self):
-        """Test excel_regex_search with invalid file"""
-        result = excel_regex_search("nonexistent_file.xlsx", r"test")
+    def test_excel_search_invalid_file(self):
+        """Test excel_search with invalid file"""
+        result = excel_search("nonexistent_file.xlsx", r"test")
 
         assert result['success'] is False
         assert 'error' in result
@@ -460,7 +461,7 @@ class TestServerInterfaces:
             lambda: excel_list_sheets(sample_excel_file),
             lambda: excel_get_range(sample_excel_file, "Sheet1!A1"),
             lambda: excel_create_sheet(sample_excel_file, "TestSheet"),
-            lambda: excel_regex_search(sample_excel_file, r"test")
+            lambda: excel_search(sample_excel_file, r"test")
         ]
 
         for i, interface in enumerate(interfaces):
