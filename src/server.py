@@ -664,7 +664,7 @@ def excel_delete_columns(
     """
     return ExcelOperations.delete_columns(file_path, sheet_name, column_index, count)
 
-
+# 暂时注释掉, 以后可能会用到
 # @mcp.tool()
 def excel_set_formula(
     file_path: str,
@@ -692,7 +692,7 @@ def excel_set_formula(
     """
     return ExcelOperations.set_formula(file_path, sheet_name, cell_address, formula)
 
-
+# 暂时注释掉, 以后可能会用到
 # @mcp.tool()
 def excel_evaluate_formula(
     file_path: str,
