@@ -175,14 +175,14 @@ def excel_get_sheet_headers(file_path: str) -> Dict[str, Any]:
 
 @mcp.tool()
 @unified_error_handler("正则搜索", extract_file_context, return_dict=True)
-def excel_regex_search(
+def excel_search(
     file_path: str,
     pattern: str,
     sheet_name: Optional[str] = None,
-    flags: str = "",
-    search_values: bool = True,
-    search_formulas: bool = False,
-    range_expression: Optional[str] = None
+    regex_flags: str = "",
+    include_values: bool = True,
+    include_formulas: bool = False,
+    range: Optional[str] = None
 ) -> Dict[str, Any]:
     """
     在Excel文件中使用正则表达式搜索单元格内容
@@ -194,10 +194,10 @@ def excel_regex_search(
             - r'\\w+@\\w+\\.\\w+': 匹配邮箱
             - r'^总计|合计$': 匹配特定文本
         sheet_name: 工作表名称 (可选，不指定时搜索所有工作表)
-        flags: 正则修饰符 ("i"忽略大小写, "m"多行, "s"点号匹配换行)
-        search_values: 是否搜索单元格值
-        search_formulas: 是否搜索公式内容
-        range_expression: 搜索范围表达式，支持多种格式：
+        regex_flags: 正则修饰符 ("i"忽略大小写, "m"多行, "s"点号匹配换行)
+        include_values: 是否搜索单元格值
+        include_formulas: 是否搜索公式内容
+        range: 搜索范围表达式，支持多种格式：
             - 单元格范围: "A1:C10" 或 "Sheet1!A1:C10"
             - 行范围: "3:5" 或 "Sheet1!3:5" (第3行到第5行)
             - 列范围: "B:D" 或 "Sheet1!B:D" (B列到D列)
@@ -209,34 +209,34 @@ def excel_regex_search(
 
     Example:
         # 搜索所有工作表中的邮箱格式
-        result = excel_regex_search("data.xlsx", r'\\w+@\\w+\\.\\w+', flags="i")
+        result = excel_search("data.xlsx", r'\\w+@\\w+\\.\\w+', regex_flags="i")
         # 搜索指定工作表中的数字
-        result = excel_regex_search("data.xlsx", r'\\d+', sheet_name="Sheet1")
+        result = excel_search("data.xlsx", r'\\d+', sheet_name="Sheet1")
         # 搜索指定单元格范围内的数字
-        result = excel_regex_search("data.xlsx", r'\\d+', range_expression="Sheet1!A1:C10")
+        result = excel_search("data.xlsx", r'\\d+', range="Sheet1!A1:C10")
         # 搜索第3-5行中的邮箱
-        result = excel_regex_search("data.xlsx", r'@', range_expression="3:5", sheet_name="Sheet1")
+        result = excel_search("data.xlsx", r'@', range="3:5", sheet_name="Sheet1")
         # 搜索B列到D列中的内容
-        result = excel_regex_search("data.xlsx", r'关键词', range_expression="B:D", sheet_name="Sheet1")
+        result = excel_search("data.xlsx", r'关键词', range="B:D", sheet_name="Sheet1")
         # 搜索单行或单列
-        result = excel_regex_search("data.xlsx", r'总计', range_expression="10", sheet_name="Sheet1")  # 仅第10行
-        result = excel_regex_search("data.xlsx", r'金额', range_expression="E", sheet_name="Sheet1")   # 仅E列
+        result = excel_search("data.xlsx", r'总计', range="10", sheet_name="Sheet1")  # 仅第10行
+        result = excel_search("data.xlsx", r'金额', range="E", sheet_name="Sheet1")   # 仅E列
         # 搜索数字并包含公式
-        result = excel_regex_search("data.xlsx", r'\\d+', search_formulas=True)
+        result = excel_search("data.xlsx", r'\\d+', include_formulas=True)
     """
     searcher = ExcelSearcher(file_path)
-    result = searcher.regex_search(pattern, flags, search_values, search_formulas, sheet_name, range_expression)
+    result = searcher.regex_search(pattern, regex_flags, include_values, include_formulas, sheet_name, range)
     return format_operation_result(result)
 
 
 @mcp.tool()
-@unified_error_handler("目录正则搜索", extract_file_context, return_dict=True)
-def excel_regex_search_directory(
+@unified_error_handler("目录搜索", extract_file_context, return_dict=True)
+def excel_search_directory(
     directory_path: str,
     pattern: str,
-    flags: str = "",
-    search_values: bool = True,
-    search_formulas: bool = False,
+    regex_flags: str = "",
+    include_values: bool = True,
+    include_formulas: bool = False,
     recursive: bool = True,
     file_extensions: Optional[List[str]] = None,
     file_pattern: Optional[str] = None,
@@ -271,7 +271,7 @@ def excel_regex_search_directory(
     # 直接调用ExcelSearcher的静态方法，避免创建需要文件路径的实例
     from .core.excel_search import ExcelSearcher
     result = ExcelSearcher.search_directory_static(
-        directory_path, pattern, flags, search_values, search_formulas,
+        directory_path, pattern, regex_flags, include_values, include_formulas,
         recursive, file_extensions, file_pattern, max_files
     )
     return format_operation_result(result)
@@ -281,7 +281,7 @@ def excel_regex_search_directory(
 @unified_error_handler("范围数据读取", extract_file_context, return_dict=True)
 def excel_get_range(
     file_path: str,
-    range_expression: str,
+    range: str,
     include_formatting: bool = False
 ) -> Dict[str, Any]:
     """
@@ -289,7 +289,7 @@ def excel_get_range(
 
     Args:
         file_path: Excel文件路径 (.xlsx/.xlsm)
-        range_expression: 范围表达式，必须包含工作表名，支持格式：
+        range: 范围表达式，必须包含工作表名，支持格式：
             - 标准单元格范围: "Sheet1!A1:C10"、"TrSkill!A1:Z100"
             - 行范围: "Sheet1!1:1"、"数据!5:10"
             - 列范围: "Sheet1!A:C"、"统计!B:E"
@@ -300,7 +300,7 @@ def excel_get_range(
         Dict: 包含 success、data(List[List])、range_info
 
     注意:
-        为保持API一致性和清晰度，range_expression必须包含工作表名。
+        为保持API一致性和清晰度，range必须包含工作表名。
         这消除了参数间的条件依赖，提高了可预测性。
 
     Example:
@@ -311,16 +311,16 @@ def excel_get_range(
         # 读取列范围
         result = excel_get_range("data.xlsx", "数据!A:C")
     """
-    # 验证range_expression格式
-    if '!' not in range_expression:
+    # 验证range格式
+    if '!' not in range:
         raise ValueError(
-            f"range_expression必须包含工作表名。\n"
-            f"当前格式: '{range_expression}'\n"
+            f"range必须包含工作表名。\n"
+            f"当前格式: '{range}'\n"
             f"正确格式示例: 'Sheet1!A1:C10' 或 '数据!1:1'"
         )
 
     reader = ExcelReader(file_path)
-    result = reader.get_range(range_expression, include_formatting)
+    result = reader.get_range(range, include_formatting)
     return format_operation_result(result)
 
 
@@ -446,7 +446,7 @@ def excel_get_headers(
 @unified_error_handler("范围数据更新", extract_file_context, return_dict=True)
 def excel_update_range(
     file_path: str,
-    range_expression: str,
+    range: str,
     data: List[List[Any]],
     preserve_formulas: bool = True
 ) -> Dict[str, Any]:
@@ -455,7 +455,7 @@ def excel_update_range(
 
     Args:
         file_path: Excel文件路径 (.xlsx/.xlsm)
-        range_expression: 范围表达式，必须包含工作表名，支持格式：
+        range: 范围表达式，必须包含工作表名，支持格式：
             - 标准单元格范围: "Sheet1!A1:C10"、"TrSkill!A1:Z100"
             - 不支持行范围格式，必须使用明确单元格范围
         data: 二维数组数据 [[row1], [row2], ...]
@@ -467,7 +467,7 @@ def excel_update_range(
         Dict: 包含 success、updated_cells(int)、message
 
     注意:
-        为保持API一致性和清晰度，range_expression必须包含工作表名。
+        为保持API一致性和清晰度，range必须包含工作表名。
         这消除了参数间的条件依赖，提高了可预测性。
 
     Example:
@@ -475,16 +475,16 @@ def excel_update_range(
         # 正确用法
         result = excel_update_range("test.xlsx", "Sheet1!A1:B2", data)
     """
-    # 验证range_expression格式
-    if '!' not in range_expression:
+    # 验证range格式
+    if '!' not in range:
         raise ValueError(
-            f"range_expression必须包含工作表名。\n"
-            f"当前格式: '{range_expression}'\n"
+            f"range必须包含工作表名。\n"
+            f"当前格式: '{range}'\n"
             f"正确格式示例: 'Sheet1!A1:B2' 或 '数据!C1:E10'"
         )
 
     writer = ExcelWriter(file_path)
-    result = writer.update_range(range_expression, data, preserve_formulas)
+    result = writer.update_range(range, data, preserve_formulas)
     return format_operation_result(result)
 
 
@@ -950,7 +950,7 @@ def excel_evaluate_formula(
 def excel_format_cells(
     file_path: str,
     sheet_name: str,
-    range_expression: str,
+    range: str,
     formatting: Optional[Dict[str, Any]] = None,
     preset: Optional[str] = None
 ) -> Dict[str, Any]:
@@ -960,7 +960,7 @@ def excel_format_cells(
     Args:
         file_path: Excel文件路径 (.xlsx/.xlsm)
         sheet_name: 工作表名称
-        range_expression: 目标范围 (如"A1:C10")
+        range: 目标范围 (如"A1:C10")
         formatting: 自定义格式配置字典（可选）：
             - font: {'name': '宋体', 'size': 12, 'bold': True, 'color': 'FF0000'}
             - fill: {'color': 'FFFF00'}
@@ -1025,7 +1025,7 @@ def excel_format_cells(
         final_formatting = formatting
 
     writer = ExcelWriter(file_path)
-    result = writer.format_cells(range_expression, final_formatting, sheet_name)
+    result = writer.format_cells(range, final_formatting, sheet_name)
     return format_operation_result(result)
 
 
@@ -1034,7 +1034,7 @@ def excel_format_cells(
 def excel_merge_cells(
     file_path: str,
     sheet_name: str,
-    range_expression: str
+    range: str
 ) -> Dict[str, Any]:
     """
     合并指定范围的单元格
@@ -1042,7 +1042,7 @@ def excel_merge_cells(
     Args:
         file_path: Excel文件路径 (.xlsx/.xlsm)
         sheet_name: 工作表名称
-        range_expression: 要合并的范围 (如"A1:C3")
+        range: 要合并的范围 (如"A1:C3")
 
     Returns:
         Dict: 包含 success、message、merged_range
@@ -1054,7 +1054,7 @@ def excel_merge_cells(
         result = excel_merge_cells("report.xlsx", "Summary", "A1:E1")
     """
     writer = ExcelWriter(file_path)
-    result = writer.merge_cells(range_expression, sheet_name)
+    result = writer.merge_cells(range, sheet_name)
     return format_operation_result(result)
 
 
@@ -1063,7 +1063,7 @@ def excel_merge_cells(
 def excel_unmerge_cells(
     file_path: str,
     sheet_name: str,
-    range_expression: str
+    range: str
 ) -> Dict[str, Any]:
     """
     取消合并指定范围的单元格
@@ -1071,7 +1071,7 @@ def excel_unmerge_cells(
     Args:
         file_path: Excel文件路径 (.xlsx/.xlsm)
         sheet_name: 工作表名称
-        range_expression: 要取消合并的范围 (如"A1:C3")
+        range: 要取消合并的范围 (如"A1:C3")
 
     Returns:
         Dict: 包含 success、message、unmerged_range
@@ -1081,7 +1081,7 @@ def excel_unmerge_cells(
         result = excel_unmerge_cells("data.xlsx", "Sheet1", "A1:C3")
     """
     writer = ExcelWriter(file_path)
-    result = writer.unmerge_cells(range_expression, sheet_name)
+    result = writer.unmerge_cells(range, sheet_name)
     return format_operation_result(result)
 
 
@@ -1090,7 +1090,7 @@ def excel_unmerge_cells(
 def excel_set_borders(
     file_path: str,
     sheet_name: str,
-    range_expression: str,
+    range: str,
     border_style: str = "thin"
 ) -> Dict[str, Any]:
     """
@@ -1099,7 +1099,7 @@ def excel_set_borders(
     Args:
         file_path: Excel文件路径 (.xlsx/.xlsm)
         sheet_name: 工作表名称
-        range_expression: 目标范围 (如"A1:C10")
+        range: 目标范围 (如"A1:C10")
         border_style: 边框样式，可选值: "thin", "thick", "medium", "double", "dotted", "dashed"
 
     Returns:
@@ -1112,7 +1112,7 @@ def excel_set_borders(
         result = excel_set_borders("data.xlsx", "Sheet1", "A1:E1", "thick")
     """
     writer = ExcelWriter(file_path)
-    result = writer.set_borders(range_expression, border_style, sheet_name)
+    result = writer.set_borders(range, border_style, sheet_name)
     return format_operation_result(result)
 
 
