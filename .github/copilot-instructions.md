@@ -1,60 +1,58 @@
-# Excel MCP Server - AI Assistant Guide
+# Excel MCP Server - AI编码助手指南
 
-This project is an Excel Model Context Protocol (MCP) server that enables AI assistants to interact with Excel files through natural language commands. Built with FastMCP framework and openpyxl.
+基于FastMCP和openpyxl的Excel文件MCP服务器，支持AI通过自然语言操作Excel文件。
 
-## Architecture Overview
+## 核心架构
 
-### Core Components
-- **src/server.py**: FastMCP server entry point with MCP tool definitions
-- **src/core/**: Modular Excel operations
-  - `excel_reader.py`: Reading operations
-  - `excel_writer.py`: Writing/modification operations
-  - `excel_manager.py`: File and worksheet management
-  - `excel_search.py`: Regex search functionality
-  - `excel_compare.py`: Game development specialized comparison
-- **src/utils/**: Utilities with unified error handling and formatters
-- **src/models/**: Type definitions and data models
+### 模块组织
+- **src/server.py**: 纯MCP工具定义，委托给ExcelOperations
+- **src/api/excel_operations.py**: 集中化业务逻辑处理中心
+- **src/core/**: Excel操作模块(reader, writer, manager, search, compare)
+- **src/utils/**: 格式化器和工具函数
+- **src/models/**: 类型定义和数据模型
 
-### Key Design Patterns
+### 设计模式
 
-#### Unified Error Handling
-All MCP tools use `@unified_error_handler` decorator pattern:
+#### 纯委托架构(重构后)
+所有MCP工具使用简单委托：
 ```python
 @mcp.tool()
-@unified_error_handler("operation_name", extract_context_fn, return_dict=True)
-def excel_operation(...):
-    # Implementation delegates to core modules
+def excel_list_sheets(file_path: str) -> Dict[str, Any]:
+    return ExcelOperations.list_sheets(file_path)
 ```
 
-#### Result Formatting
-Consistent result format using `format_operation_result()`:
+#### 统一结果格式
 ```python
-return {
+{
     'success': bool,
-    'data': Any,  # Core result data
+    'data': Any,        # 核心数据
     'message': str,
-    'metadata': dict  # Additional context
+    'metadata': dict    # 附加上下文
 }
 ```
 
-#### Range Expression Patterns
-Supports two range formats:
-- With sheet: `"Sheet1!A1:C10"` or `"TrSkill!A1:Z100"`
-- Without sheet: `"A1:C10"` (requires separate sheet_name parameter)
+#### 范围表达式支持
+- 带工作表: `"Sheet1!A1:C10"` 或 `"TrSkill!A1:Z100"`
+- 行范围: `"Sheet1!1:5"` 或 `"3:8"`
+- 列范围: `"Sheet1!A:C"` 或 `"B:E"`
+- 单行/列: `"Sheet1!5"` 或 `"C"`
 
-## Development Workflows
+## 开发工作流
 
-### Running the Server
+### 运行和测试
 ```bash
-# Development
+# 开发运行
 python -m src.server
 
-# Testing
+# 完整测试(221个)
 pytest tests/ -v
+
+# 模块测试
+pytest tests/test_api_excel_operations.py -v
+pytest tests/test_core.py -v
 ```
 
-### MCP Client Configuration
-Add to your MCP client config:
+### MCP客户端配置
 ```json
 {
   "mcpServers": {
@@ -67,50 +65,47 @@ Add to your MCP client config:
 }
 ```
 
-### Testing Strategy
-- Comprehensive test coverage in `tests/`
-- Fixture-based testing with `sample_excel_file`
-- Server interface testing in `test_server.py`
-- Each core module has dedicated test files
+### 测试策略
+- **221个测试，100%通过率**
+- **分层测试**: API/核心/MCP接口测试
+- **Mock隔离**: API层使用Mock确保独立性
+- 关键文件: `test_api_excel_operations.py`(API), `test_core.py`(核心), `test_server.py`(MCP)
 
-## Project-Specific Conventions
+## 项目特色
 
-### Game Development Focus
-- Excel comparison tools specialized for game configuration tables
-- ID-based object tracking (new, modified, deleted objects)
-- Supports Chinese worksheet names with fallback mechanisms
+### 游戏开发特化
+- **Excel配置表比较**: 专为游戏配置设计
+- **ID对象跟踪**: 检测新增/修改/删除对象
+- **紧凑数组格式**: 优化游戏数据传输
+- **TrSkill表分析**: 技能配置专项比较
 
-### Error Context Extraction
-- `extract_file_context()`: Captures file path and operation context
-- `extract_formula_context()`: Captures formula evaluation context
+### 中文/Unicode全支持
+- 中文工作表名处理和编码
+- Unicode标准化文本处理
+- 本地化Excel特性回退机制
 
-### Excel Operation Patterns
-- 1-based indexing to match Excel conventions
-- Preserve formulas by default (`preserve_formulas=True`)
-- Support for both .xlsx and .xlsm formats
+### Excel操作约定
+- **1-based索引**匹配Excel惯例
+- **默认保留公式**(`preserve_formulas=True`)
+- 支持`.xlsx`和`.xlsm`格式
+- 游戏表结构感知能力
 
-## Key Dependencies
-- **FastMCP**: MCP server framework
-- **openpyxl**: Core Excel file operations
-- **xlcalculator/formulas**: Formula evaluation engines
-- **xlwings**: Optional Excel application integration
-- **pytest/pytest-asyncio**: Testing framework
+## 关键依赖
+- **FastMCP**: MCP服务器框架
+- **openpyxl**: 核心Excel文件操作
+- **xlcalculator/formulas**: 公式评估引擎
+- **xlwings**: 可选Excel应用集成
+- **pytest/pytest-asyncio**: 测试框架
 
-## Common Operations
+## 常用操作
 
-### File and Sheet Management
-- Create files with optional sheet names
-- Sheet CRUD operations with Chinese name support
-- Automatic active sheet management
+### 文件和工作表管理
+文件创建、工作表CRUD、中文名支持、活动表自动管理
 
-### Data Operations
-- Range-based read/write with format preservation
-- Row/column insertion and deletion
-- Cell formatting with presets (title, header, data, highlight, currency)
+### 数据操作
+基于范围的读写、格式保留、行列插入删除、单元格格式化预设
 
-### Search and Analysis
-- Regex search across files and directories
-- Game-focused Excel comparison for configuration tables
-- Formula evaluation without file modification
+### 搜索分析
+正则搜索、目录批量搜索、游戏配置表比较、公式评估
 
-When working with this codebase, always use the unified error handling patterns, delegate implementation to core modules, and maintain the consistent result formatting.
+开发时始终使用统一的委托模式，将实现委托给核心模块，保持一致的结果格式。
