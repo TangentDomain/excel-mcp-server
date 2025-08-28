@@ -132,7 +132,7 @@ def excel_get_sheet_headers(file_path: str) -> Dict[str, Any]:
                 if not headers and 'data' in header_result:
                     # 如果headers字段为空，尝试从data字段获取
                     headers = header_result.get('data', [])
-                
+
                 sheets_with_headers.append({
                     'name': sheet_name,
                     'headers': headers,

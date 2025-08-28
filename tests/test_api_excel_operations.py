@@ -38,11 +38,11 @@ class TestExcelOperations:
     def test_excel_file(self, temp_dir):
         """创建用于测试的Excel文件"""
         file_path = temp_dir / "test_operations.xlsx"
-        
+
         wb = Workbook()
         ws = wb.active
         ws.title = "TestSheet"
-        
+
         # 添加测试数据
         test_data = [
             ["姓名", "年龄", "邮箱"],
@@ -50,14 +50,14 @@ class TestExcelOperations:
             ["李四", 30, "li@example.com"],
             ["王五", 28, "wang@example.com"]
         ]
-        
+
         for row_idx, row_data in enumerate(test_data, start=1):
             for col_idx, cell_value in enumerate(row_data, start=1):
                 ws.cell(row=row_idx, column=col_idx, value=cell_value)
-        
+
         wb.save(file_path)
         wb.close()
-        
+
         return str(file_path)
 
     @pytest.fixture
@@ -82,17 +82,17 @@ class TestExcelOperations:
         """测试get_range方法的成功执行流程"""
         # 执行测试
         result = ExcelOperations.get_range(
-            test_excel_file, 
+            test_excel_file,
             "TestSheet!A1:C2"
         )
-        
+
         # 验证结果
         assert result['success'] is True
         assert 'data' in result
         assert isinstance(result['data'], list)
         assert len(result['data']) == 2  # 2行数据
         assert len(result['data'][0]) == 3  # 3列数据
-        
+
         # 验证数据内容
         first_row = result['data'][0]
         assert first_row[0]['value'] == '姓名'
@@ -103,10 +103,10 @@ class TestExcelOperations:
         """测试包含格式信息的get_range调用"""
         result = ExcelOperations.get_range(
             test_excel_file,
-            "TestSheet!A1:B1", 
+            "TestSheet!A1:B1",
             include_formatting=True
         )
-        
+
         assert result['success'] is True
         assert len(result['data']) == 1
         assert len(result['data'][0]) == 2
@@ -117,7 +117,7 @@ class TestExcelOperations:
             ("TestSheet!A1:B2", 2, 2),    # 单元格范围
             ("TestSheet!A1", 1, 1),       # 单个单元格
         ]
-        
+
         for range_expr, expected_rows, expected_cols in test_cases:
             result = ExcelOperations.get_range(test_excel_file, range_expr)
             assert result['success'] is True
@@ -131,7 +131,7 @@ class TestExcelOperations:
         # 更新为使用新的_validate_range_format方法
         result1 = ExcelOperations._validate_range_format("TestSheet!A1:B2")
         assert result1['valid'] is True  # 只验证格式，不验证文件路径
-        
+
         # 实际的文件路径验证在get_range方法内部处理
         result = ExcelOperations.get_range("", "TestSheet!A1:B2")
         assert result['success'] is False
@@ -142,7 +142,7 @@ class TestExcelOperations:
         result1 = ExcelOperations._validate_range_format("")
         assert result1['valid'] is False
         assert 'range参数不能为空' in result1['error']
-        
+
         result2 = ExcelOperations._validate_range_format("   ")
         assert result2['valid'] is False
         assert 'range参数不能为空' in result2['error']
@@ -158,10 +158,10 @@ class TestExcelOperations:
         # 这些调用不应抛出异常
         result1 = ExcelOperations._validate_range_format("Sheet1!A1:B2")
         assert result1['valid'] is True
-        
+
         result2 = ExcelOperations._validate_range_format("数据!C1:D10")
         assert result2['valid'] is True
-        
+
         result3 = ExcelOperations._validate_range_format("MySheet!A1")
         assert result3['valid'] is True
 
@@ -174,19 +174,19 @@ class TestExcelOperations:
         mock_reader = unittest.mock.MagicMock()
         mock_reader_class.return_value = mock_reader
         mock_reader.get_range.return_value = OperationResult(success=True, data=[])
-        
+
         # 执行测试（通过公共API而不是内部方法）
         result = ExcelOperations.get_range(
-            "test.xlsx", 
-            "Sheet1!A1:B2", 
+            "test.xlsx",
+            "Sheet1!A1:B2",
             False
         )
-        
+
         # 验证调用
         mock_reader_class.assert_called_once_with("test.xlsx")
         mock_reader.get_range.assert_called_once_with("Sheet1!A1:B2", False)
         mock_reader.close.assert_called_once()
-        
+
         # 验证结果
         assert result['success'] is True
 
@@ -197,10 +197,10 @@ class TestExcelOperations:
         mock_reader = unittest.mock.MagicMock()
         mock_reader_class.return_value = mock_reader
         mock_reader.get_range.side_effect = Exception("读取错误")
-        
+
         # 执行测试并验证异常被正确处理
         result = ExcelOperations.get_range("test.xlsx", "Sheet1!A1:B2")
-        
+
         assert result['success'] is False
         assert '获取范围数据失败' in result['error']
         assert '读取错误' in result['error']
@@ -215,15 +215,15 @@ class TestExcelOperations:
         sample_result = OperationResult(success=True, data=[])
         expected_formatted = {"success": True, "data": [], "formatted": True}
         mock_formatter.return_value = expected_formatted
-        
+
         with unittest.mock.patch('src.api.excel_operations.ExcelReader') as mock_reader_class:
             mock_reader = unittest.mock.MagicMock()
             mock_reader_class.return_value = mock_reader
             mock_reader.get_range.return_value = sample_result
-            
+
             # 执行测试
             result = ExcelOperations.get_range("test.xlsx", "Sheet1!A1:B2")
-            
+
             # 验证调用和结果
             mock_formatter.assert_called_once_with(sample_result)
             assert result == expected_formatted
@@ -234,7 +234,7 @@ class TestExcelOperations:
         """测试错误响应的结构"""
         error_msg = "测试错误消息"
         result = ExcelOperations._format_error_result(error_msg)  # 使用正确的方法名
-        
+
         assert result['success'] is False
         assert result['error'] == error_msg
         assert result['data'] is None
@@ -245,7 +245,7 @@ class TestExcelOperations:
         result = ExcelOperations.get_range("test.xlsx", "A1:B2")  # 缺少工作表名
         assert result['success'] is False
         assert 'range必须包含工作表名' in result['error']
-        
+
         # 测试无效的范围表达式
         result = ExcelOperations.get_range("test.xlsx", "A1:B2")
         assert result['success'] is False
@@ -256,9 +256,9 @@ class TestExcelOperations:
         """测试get_range的业务执行错误处理"""
         # 设置mock：模拟文件不存在的情况
         mock_reader_class.side_effect = FileNotFoundError("文件未找到")
-        
+
         result = ExcelOperations.get_range("nonexistent.xlsx", "Sheet1!A1:B2")
-        
+
         assert result['success'] is False
         assert '文件未找到' in result['error']
 
@@ -270,15 +270,15 @@ class TestExcelOperations:
         # 临时启用调试日志
         original_debug_setting = ExcelOperations.DEBUG_LOG_ENABLED
         ExcelOperations.DEBUG_LOG_ENABLED = True
-        
+
         try:
             ExcelOperations.get_range(test_excel_file, "TestSheet!A1:B2")
-            
+
             # 验证日志调用 - 使用info而不是debug
             assert mock_logger.info.call_count >= 1  # 开始的日志
             info_calls = [call[0][0] for call in mock_logger.info.call_args_list]
             assert any("开始获取范围数据" in msg for msg in info_calls)
-            
+
         finally:
             # 恢复原始设置
             ExcelOperations.DEBUG_LOG_ENABLED = original_debug_setting
@@ -289,13 +289,13 @@ class TestExcelOperations:
         # 确保调试日志被禁用
         original_debug_setting = ExcelOperations.DEBUG_LOG_ENABLED
         ExcelOperations.DEBUG_LOG_ENABLED = False
-        
+
         try:
             ExcelOperations.get_range(test_excel_file, "TestSheet!A1:B2")
-            
+
             # 验证没有info日志（因为被禁用）
             mock_logger.info.assert_not_called()
-            
+
         finally:
             # 恢复原始设置
             ExcelOperations.DEBUG_LOG_ENABLED = original_debug_setting
@@ -308,17 +308,17 @@ class TestExcelOperations:
         # 临时启用调试日志
         original_debug_setting = ExcelOperations.DEBUG_LOG_ENABLED
         ExcelOperations.DEBUG_LOG_ENABLED = True
-        
+
         try:
             # 触发错误 - 使用无效的范围格式
             ExcelOperations.get_range("test.xlsx", "A1:B2")  # 缺少工作表名
-            
+
             # 由于是参数验证错误，不会记录error级别日志，而是直接返回错误
             # 所以这里不验证error日志，而是验证返回结果
             result = ExcelOperations.get_range("test.xlsx", "A1:B2")
             assert result['success'] is False
             assert 'range必须包含工作表名' in result['error']
-            
+
         finally:
             # 恢复原始设置
             ExcelOperations.DEBUG_LOG_ENABLED = original_debug_setting
@@ -337,7 +337,7 @@ class TestExcelOperations:
             "InvalidSheet!A1:B2",  # 不存在的工作表
             "TestSheet!Z1:AA100",  # 超出数据范围（应该仍然成功，但返回空数据）
         ]
-        
+
         for invalid_range in invalid_ranges:
             result = ExcelOperations.get_range(test_excel_file, invalid_range)
             # 注意：根据实际实现，某些"无效"范围可能仍然会成功但返回空数据
@@ -351,13 +351,13 @@ class TestExcelOperations:
         # 测试多种范围表达式
         test_cases = [
             {
-                "range": "TestSheet!A1:C1", 
+                "range": "TestSheet!A1:C1",
                 "expected_data": "姓名",
                 "description": "表头行测试"
             },
             {
                 "range": "TestSheet!A2:C2",
-                "expected_data": "张三", 
+                "expected_data": "张三",
                 "description": "数据行测试"
             },
             {
@@ -367,16 +367,16 @@ class TestExcelOperations:
                 "description": "单列测试"
             }
         ]
-        
+
         for case in test_cases:
             result = ExcelOperations.get_range(test_excel_file, case["range"])
-            
+
             assert result['success'] is True, f"失败的测试用例: {case['description']}"
             assert 'data' in result
-            
+
             if 'expected_data' in case:
                 assert result['data'][0][0]['value'] == case['expected_data']
-            
+
             if 'expected_rows' in case and 'expected_cols' in case:
                 assert len(result['data']) == case['expected_rows']
                 assert len(result['data'][0]) == case['expected_cols']
@@ -389,11 +389,11 @@ class TestExcelOperations:
         mock_reader = unittest.mock.MagicMock()
         mock_reader_class.return_value = mock_reader
         mock_reader.get_range.return_value = OperationResult(success=True, data=[])
-        
+
         # 多次调用
         for _ in range(3):
             ExcelOperations.get_range("test.xlsx", "Sheet1!A1:B2")
-        
+
         # 验证每次调用都正确创建和关闭reader
         assert mock_reader_class.call_count == 3
         assert mock_reader.close.call_count == 3
@@ -402,28 +402,28 @@ class TestExcelOperations:
         """测试并发访问的安全性（基本测试）"""
         import threading
         import time
-        
+
         results = []
         errors = []
-        
+
         def worker():
             try:
                 result = ExcelOperations.get_range(test_excel_file, "TestSheet!A1:B2")
                 results.append(result)
             except Exception as e:
                 errors.append(e)
-        
+
         # 创建多个线程
         threads = []
         for _ in range(5):
             thread = threading.Thread(target=worker)
             threads.append(thread)
             thread.start()
-        
+
         # 等待所有线程完成
         for thread in threads:
             thread.join()
-        
+
         # 验证结果
         assert len(errors) == 0, f"并发访问出现错误: {errors}"
         assert len(results) == 5
