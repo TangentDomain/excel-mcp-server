@@ -181,6 +181,13 @@
       "description": "基于用户的3个API设计要求对现有19个Excel MCP API进行设计违规分析和改进建议：1) 准确、没有暧昧、不容易混淆、清晰 2) 功能单一、没有上帝方法 3) 使用说明清晰、具备足够的指导能力",
       "createdAt": "2025-08-27T13:14:09.865Z",
       "updatedAt": "2025-08-27T13:14:09.865Z"
+    },
+    {
+      "id": "7530b79d-3181-4888-a902-11de2369d924",
+      "name": "Excel MCP Server API重构",
+      "description": "重构Excel MCP Server API结构，将具体实现从server.py拆分到独立文件，提高内聚性和模块化程度。以excel_get_range为试验对象，去除unified_error_handler装饰器，实现更清晰的代码结构。",
+      "createdAt": "2025-08-28T04:12:21.486Z",
+      "updatedAt": "2025-08-28T04:12:21.486Z"
     }
   ],
   "tasks": [
@@ -1484,6 +1491,26 @@
         "设计改进"
       ],
       "estimatedHours": 1,
+      "level": 0
+    },
+    {
+      "id": "2fb9a5f0-df5f-4126-b7cb-8cdf505b7cd6",
+      "name": "重构excel_get_range API",
+      "details": "以excel_get_range为试点，实现API重构：\n1. 创建api/excel_operations.py模块，提供高内聚的业务功能\n2. 将参数验证、业务逻辑、错误处理、结果格式化整合到单一模块\n3. server.py只保留MCP工具定义，通过简单调用委托给api模块\n4. 去除unified_error_handler装饰器，使用核心模块的原生错误处理\n5. 确保功能完整性和向后兼容性",
+      "projectId": "7530b79d-3181-4888-a902-11de2369d924",
+      "completed": true,
+      "createdAt": "2025-08-28T04:13:58.902Z",
+      "updatedAt": "2025-08-28T04:17:42.644Z",
+      "dependsOn": [],
+      "priority": 8,
+      "complexity": 8,
+      "status": "done",
+      "tags": [
+        "refactoring",
+        "api-design",
+        "excel_get_range"
+      ],
+      "estimatedHours": 4,
       "level": 0
     }
   ],
