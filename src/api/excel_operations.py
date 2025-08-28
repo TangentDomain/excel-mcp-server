@@ -7,7 +7,7 @@ Excel MCP Server - Excel操作API模块
 """
 
 import logging
-from typing import Dict, Any, List, Optional
+from typing import Dict, Any, List, Optional, Union
 
 from ..core.excel_reader import ExcelReader
 from ..core.excel_writer import ExcelWriter
@@ -314,6 +314,569 @@ class ExcelOperations:
 
         return headers
 
+    @classmethod
+    def search(
+        cls,
+        file_path: str,
+        pattern: str,
+        sheet_name: Optional[str] = None,
+        regex_flags: str = "",
+        include_values: bool = True,
+        include_formulas: bool = False,
+        range: Optional[str] = None
+    ) -> Dict[str, Any]:
+        """
+        @intention 在Excel文件中使用正则表达式搜索单元格内容
+
+        Args:
+            file_path: Excel文件路径 (.xlsx/.xlsm)
+            pattern: 正则表达式模式
+            sheet_name: 工作表名称 (可选)
+            regex_flags: 正则修饰符
+            include_values: 是否搜索单元格值
+            include_formulas: 是否搜索公式内容
+            range: 搜索范围表达式
+
+        Returns:
+            Dict: 标准化的操作结果
+        """
+        if cls.DEBUG_LOG_ENABLED:
+            logger.info(f"{cls._LOG_PREFIX} 开始正则搜索: {pattern}")
+
+        try:
+            from ..core.excel_search import ExcelSearcher
+            searcher = ExcelSearcher(file_path)
+            result = searcher.regex_search(pattern, regex_flags, include_values, include_formulas, sheet_name, range)
+            return format_operation_result(result)
+
+        except Exception as e:
+            error_msg = f"正则搜索失败: {str(e)}"
+            logger.error(f"{cls._LOG_PREFIX} {error_msg}")
+            return cls._format_error_result(error_msg)
+
+    @classmethod
+    def search_directory(
+        cls,
+        directory_path: str,
+        pattern: str,
+        regex_flags: str = "",
+        include_values: bool = True,
+        include_formulas: bool = False,
+        recursive: bool = True,
+        file_extensions: Optional[List[str]] = None,
+        file_pattern: Optional[str] = None,
+        max_files: int = 100
+    ) -> Dict[str, Any]:
+        """
+        @intention 在目录下的所有Excel文件中搜索内容
+
+        Args:
+            directory_path: 目录路径
+            pattern: 正则表达式模式
+            其他参数同search方法
+
+        Returns:
+            Dict: 标准化的操作结果
+        """
+        if cls.DEBUG_LOG_ENABLED:
+            logger.info(f"{cls._LOG_PREFIX} 开始目录搜索: {directory_path}")
+
+        try:
+            from ..core.excel_search import ExcelSearcher
+            result = ExcelSearcher.search_directory_static(
+                directory_path, pattern, regex_flags, include_values, include_formulas,
+                recursive, file_extensions, file_pattern, max_files
+            )
+            return format_operation_result(result)
+
+        except Exception as e:
+            error_msg = f"目录搜索失败: {str(e)}"
+            logger.error(f"{cls._LOG_PREFIX} {error_msg}")
+            return cls._format_error_result(error_msg)
+
+    @classmethod
+    def get_sheet_headers(cls, file_path: str) -> Dict[str, Any]:
+        """
+        @intention 获取Excel文件中所有工作表的表头信息
+
+        Args:
+            file_path: Excel文件路径 (.xlsx/.xlsm)
+
+        Returns:
+            Dict: 包含所有工作表表头信息
+        """
+        if cls.DEBUG_LOG_ENABLED:
+            logger.info(f"{cls._LOG_PREFIX} 开始获取所有工作表表头: {file_path}")
+
+        try:
+            # 步骤1: 获取所有工作表列表
+            sheets_result = cls.list_sheets(file_path)
+            if not sheets_result.get('success'):
+                return sheets_result
+
+            # 步骤2: 获取每个工作表的表头
+            sheets_with_headers = []
+            sheets = sheets_result.get('sheets', [])
+
+            for sheet_name in sheets:
+                try:
+                    header_result = cls.get_headers(file_path, sheet_name, header_row=1)
+
+                    if header_result.get('success'):
+                        headers = header_result.get('headers', [])
+                        if not headers and 'data' in header_result:
+                            headers = header_result.get('data', [])
+
+                        sheets_with_headers.append({
+                            'name': sheet_name,
+                            'headers': headers,
+                            'header_count': len(headers)
+                        })
+                    else:
+                        sheets_with_headers.append({
+                            'name': sheet_name,
+                            'headers': [],
+                            'header_count': 0,
+                            'error': header_result.get('error', '未知错误')
+                        })
+
+                except Exception as e:
+                    sheets_with_headers.append({
+                        'name': sheet_name,
+                        'headers': [],
+                        'header_count': 0,
+                        'error': str(e)
+                    })
+
+            return format_operation_result({
+                'success': True,
+                'sheets_with_headers': sheets_with_headers,
+                'file_path': file_path,
+                'total_sheets': len(sheets)
+            })
+
+        except Exception as e:
+            error_msg = f"获取工作表表头失败: {str(e)}"
+            logger.error(f"{cls._LOG_PREFIX} {error_msg}")
+            return cls._format_error_result(error_msg)
+
+    @classmethod
+    def insert_rows(
+        cls,
+        file_path: str,
+        sheet_name: str,
+        row_index: int,
+        count: int = 1
+    ) -> Dict[str, Any]:
+        """
+        @intention 在指定位置插入空行
+
+        Args:
+            file_path: Excel文件路径 (.xlsx/.xlsm)
+            sheet_name: 工作表名称
+            row_index: 插入位置 (1-based)
+            count: 插入行数
+
+        Returns:
+            Dict: 标准化的操作结果
+        """
+        if cls.DEBUG_LOG_ENABLED:
+            logger.info(f"{cls._LOG_PREFIX} 开始插入行: {sheet_name} 第{row_index}行")
+
+        try:
+            from ..core.excel_writer import ExcelWriter
+            writer = ExcelWriter(file_path)
+            result = writer.insert_rows(sheet_name, row_index, count)
+            return format_operation_result(result)
+
+        except Exception as e:
+            error_msg = f"插入行操作失败: {str(e)}"
+            logger.error(f"{cls._LOG_PREFIX} {error_msg}")
+            return cls._format_error_result(error_msg)
+
+    @classmethod
+    def insert_columns(
+        cls,
+        file_path: str,
+        sheet_name: str,
+        column_index: int,
+        count: int = 1
+    ) -> Dict[str, Any]:
+        """
+        @intention 在指定位置插入空列
+
+        Args:
+            file_path: Excel文件路径 (.xlsx/.xlsm)
+            sheet_name: 工作表名称
+            column_index: 插入位置 (1-based)
+            count: 插入列数
+
+        Returns:
+            Dict: 标准化的操作结果
+        """
+        if cls.DEBUG_LOG_ENABLED:
+            logger.info(f"{cls._LOG_PREFIX} 开始插入列: {sheet_name} 第{column_index}列")
+
+        try:
+            from ..core.excel_writer import ExcelWriter
+            writer = ExcelWriter(file_path)
+            result = writer.insert_columns(sheet_name, column_index, count)
+            return format_operation_result(result)
+
+        except Exception as e:
+            error_msg = f"插入列操作失败: {str(e)}"
+            logger.error(f"{cls._LOG_PREFIX} {error_msg}")
+            return cls._format_error_result(error_msg)
+
+    @classmethod
+    def export_to_csv(
+        cls,
+        file_path: str,
+        output_path: str,
+        sheet_name: Optional[str] = None,
+        encoding: str = "utf-8"
+    ) -> Dict[str, Any]:
+        """
+        @intention 将Excel工作表导出为CSV文件
+
+        Args:
+            file_path: Excel文件路径 (.xlsx/.xlsm)
+            output_path: 输出CSV文件路径
+            sheet_name: 工作表名称 (默认使用活动工作表)
+            encoding: 文件编码 (默认: utf-8)
+
+        Returns:
+            Dict: 标准化的操作结果
+        """
+        if cls.DEBUG_LOG_ENABLED:
+            logger.info(f"{cls._LOG_PREFIX} 开始导出为CSV: {output_path}")
+
+        try:
+            from ..core.excel_converter import ExcelConverter
+            converter = ExcelConverter(file_path)
+            result = converter.export_to_csv(output_path, sheet_name, encoding)
+            return format_operation_result(result)
+
+        except Exception as e:
+            error_msg = f"导出为CSV失败: {str(e)}"
+            logger.error(f"{cls._LOG_PREFIX} {error_msg}")
+            return cls._format_error_result(error_msg)
+
+    @classmethod
+    def import_from_csv(
+        cls,
+        csv_path: str,
+        output_path: str,
+        sheet_name: str = "Sheet1",
+        encoding: str = "utf-8",
+        has_header: bool = True
+    ) -> Dict[str, Any]:
+        """
+        @intention 从CSV文件导入数据创建Excel文件
+
+        Args:
+            csv_path: CSV文件路径
+            output_path: 输出Excel文件路径
+            sheet_name: 工作表名称
+            encoding: CSV文件编码
+            has_header: 是否包含表头行
+
+        Returns:
+            Dict: 标准化的操作结果
+        """
+        if cls.DEBUG_LOG_ENABLED:
+            logger.info(f"{cls._LOG_PREFIX} 开始从CSV导入: {csv_path}")
+
+        try:
+            from ..core.excel_converter import ExcelConverter
+            result = ExcelConverter.import_from_csv(csv_path, output_path, sheet_name, encoding, has_header)
+            return format_operation_result(result)
+
+        except Exception as e:
+            error_msg = f"从CSV导入失败: {str(e)}"
+            logger.error(f"{cls._LOG_PREFIX} {error_msg}")
+            return cls._format_error_result(error_msg)
+
+    @classmethod
+    def convert_format(
+        cls,
+        input_path: str,
+        output_path: str,
+        target_format: str = "xlsx"
+    ) -> Dict[str, Any]:
+        """
+        @intention 转换Excel文件格式
+
+        Args:
+            input_path: 输入文件路径
+            output_path: 输出文件路径
+            target_format: 目标格式
+
+        Returns:
+            Dict: 标准化的操作结果
+        """
+        if cls.DEBUG_LOG_ENABLED:
+            logger.info(f"{cls._LOG_PREFIX} 开始格式转换: {input_path} -> {output_path}")
+
+        try:
+            from ..core.excel_converter import ExcelConverter
+            result = ExcelConverter.convert_format(input_path, output_path, target_format)
+            return format_operation_result(result)
+
+        except Exception as e:
+            error_msg = f"文件格式转换失败: {str(e)}"
+            logger.error(f"{cls._LOG_PREFIX} {error_msg}")
+            return cls._format_error_result(error_msg)
+
+    @classmethod
+    def merge_files(
+        cls,
+        input_files: List[str],
+        output_path: str,
+        merge_mode: str = "sheets"
+    ) -> Dict[str, Any]:
+        """
+        @intention 合并多个Excel文件
+
+        Args:
+            input_files: 输入文件路径列表
+            output_path: 输出文件路径
+            merge_mode: 合并模式
+
+        Returns:
+            Dict: 标准化的操作结果
+        """
+        if cls.DEBUG_LOG_ENABLED:
+            logger.info(f"{cls._LOG_PREFIX} 开始合并文件: {len(input_files)}个文件")
+
+        try:
+            from ..core.excel_converter import ExcelConverter
+            result = ExcelConverter.merge_files(input_files, output_path, merge_mode)
+            return format_operation_result(result)
+
+        except Exception as e:
+            error_msg = f"合并Excel文件失败: {str(e)}"
+            logger.error(f"{cls._LOG_PREFIX} {error_msg}")
+            return cls._format_error_result(error_msg)
+
+    @classmethod
+    def get_file_info(cls, file_path: str) -> Dict[str, Any]:
+        """
+        @intention 获取Excel文件的详细信息
+
+        Args:
+            file_path: Excel文件路径
+
+        Returns:
+            Dict: 标准化的操作结果
+        """
+        if cls.DEBUG_LOG_ENABLED:
+            logger.info(f"{cls._LOG_PREFIX} 开始获取文件信息: {file_path}")
+
+        try:
+            from ..core.excel_manager import ExcelManager
+            result = ExcelManager.get_file_info(file_path)
+            return format_operation_result(result)
+
+        except Exception as e:
+            error_msg = f"获取文件信息失败: {str(e)}"
+            logger.error(f"{cls._LOG_PREFIX} {error_msg}")
+            return cls._format_error_result(error_msg)
+
+    @classmethod
+    def create_sheet(
+        cls,
+        file_path: str,
+        sheet_name: str,
+        index: Optional[int] = None
+    ) -> Dict[str, Any]:
+        """
+        @intention 在文件中创建新工作表
+
+        Args:
+            file_path: Excel文件路径
+            sheet_name: 新工作表名称
+            index: 插入位置
+
+        Returns:
+            Dict: 标准化的操作结果
+        """
+        if cls.DEBUG_LOG_ENABLED:
+            logger.info(f"{cls._LOG_PREFIX} 开始创建工作表: {sheet_name}")
+
+        try:
+            from ..core.excel_manager import ExcelManager
+            manager = ExcelManager(file_path)
+            result = manager.create_sheet(sheet_name, index)
+            return format_operation_result(result)
+
+        except Exception as e:
+            error_msg = f"创建工作表失败: {str(e)}"
+            logger.error(f"{cls._LOG_PREFIX} {error_msg}")
+            return cls._format_error_result(error_msg)
+
+    @classmethod
+    def delete_sheet(cls, file_path: str, sheet_name: str) -> Dict[str, Any]:
+        """
+        @intention 删除指定工作表
+
+        Args:
+            file_path: Excel文件路径
+            sheet_name: 要删除的工作表名称
+
+        Returns:
+            Dict: 标准化的操作结果
+        """
+        if cls.DEBUG_LOG_ENABLED:
+            logger.info(f"{cls._LOG_PREFIX} 开始删除工作表: {sheet_name}")
+
+        try:
+            from ..core.excel_manager import ExcelManager
+            manager = ExcelManager(file_path)
+            result = manager.delete_sheet(sheet_name)
+            return format_operation_result(result)
+
+        except Exception as e:
+            error_msg = f"删除工作表失败: {str(e)}"
+            logger.error(f"{cls._LOG_PREFIX} {error_msg}")
+            return cls._format_error_result(error_msg)
+
+    @classmethod
+    def rename_sheet(
+        cls,
+        file_path: str,
+        old_name: str,
+        new_name: str
+    ) -> Dict[str, Any]:
+        """
+        @intention 重命名工作表
+
+        Args:
+            file_path: Excel文件路径
+            old_name: 当前工作表名称
+            new_name: 新工作表名称
+
+        Returns:
+            Dict: 标准化的操作结果
+        """
+        if cls.DEBUG_LOG_ENABLED:
+            logger.info(f"{cls._LOG_PREFIX} 开始重命名工作表: {old_name} -> {new_name}")
+
+        try:
+            from ..core.excel_manager import ExcelManager
+            manager = ExcelManager(file_path)
+            result = manager.rename_sheet(old_name, new_name)
+            return format_operation_result(result)
+
+        except Exception as e:
+            error_msg = f"重命名工作表失败: {str(e)}"
+            logger.error(f"{cls._LOG_PREFIX} {error_msg}")
+            return cls._format_error_result(error_msg)
+
+    @classmethod
+    def delete_rows(
+        cls,
+        file_path: str,
+        sheet_name: str,
+        row_index: int,
+        count: int = 1
+    ) -> Dict[str, Any]:
+        """
+        @intention 删除指定行
+
+        Args:
+            file_path: Excel文件路径
+            sheet_name: 工作表名称
+            row_index: 起始行号 (1-based)
+            count: 删除行数
+
+        Returns:
+            Dict: 标准化的操作结果
+        """
+        if cls.DEBUG_LOG_ENABLED:
+            logger.info(f"{cls._LOG_PREFIX} 开始删除行: {sheet_name} 第{row_index}行")
+
+        try:
+            from ..core.excel_writer import ExcelWriter
+            writer = ExcelWriter(file_path)
+            result = writer.delete_rows(sheet_name, row_index, count)
+            return format_operation_result(result)
+
+        except Exception as e:
+            error_msg = f"删除行操作失败: {str(e)}"
+            logger.error(f"{cls._LOG_PREFIX} {error_msg}")
+            return cls._format_error_result(error_msg)
+
+    @classmethod
+    def delete_columns(
+        cls,
+        file_path: str,
+        sheet_name: str,
+        column_index: int,
+        count: int = 1
+    ) -> Dict[str, Any]:
+        """
+        @intention 删除指定列
+
+        Args:
+            file_path: Excel文件路径
+            sheet_name: 工作表名称
+            column_index: 起始列号 (1-based)
+            count: 删除列数
+
+        Returns:
+            Dict: 标准化的操作结果
+        """
+        if cls.DEBUG_LOG_ENABLED:
+            logger.info(f"{cls._LOG_PREFIX} 开始删除列: {sheet_name} 第{column_index}列")
+
+        try:
+            from ..core.excel_writer import ExcelWriter
+            writer = ExcelWriter(file_path)
+            result = writer.delete_columns(sheet_name, column_index, count)
+            return format_operation_result(result)
+
+        except Exception as e:
+            error_msg = f"删除列操作失败: {str(e)}"
+            logger.error(f"{cls._LOG_PREFIX} {error_msg}")
+            return cls._format_error_result(error_msg)
+
+    @classmethod
+    def format_cells(
+        cls,
+        file_path: str,
+        sheet_name: str,
+        range: str,
+        formatting: Optional[Dict[str, Any]] = None,
+        preset: Optional[str] = None
+    ) -> Dict[str, Any]:
+        """
+        @intention 设置单元格格式
+
+        Args:
+            file_path: Excel文件路径
+            sheet_name: 工作表名称
+            range: 目标范围
+            formatting: 自定义格式配置
+            preset: 预设样式
+
+        Returns:
+            Dict: 标准化的操作结果
+        """
+        if cls.DEBUG_LOG_ENABLED:
+            logger.info(f"{cls._LOG_PREFIX} 开始格式化单元格: {range}")
+
+        try:
+            from ..core.excel_writer import ExcelWriter
+            writer = ExcelWriter(file_path)
+            result = writer.format_cells(sheet_name, range, formatting, preset)
+            return format_operation_result(result)
+
+        except Exception as e:
+            error_msg = f"单元格格式化失败: {str(e)}"
+            logger.error(f"{cls._LOG_PREFIX} {error_msg}")
+            return cls._format_error_result(error_msg)
+
     # --- 错误处理 ---
     @classmethod
     def _format_error_result(cls, error_message: str) -> Dict[str, Any]:
@@ -323,3 +886,214 @@ class ExcelOperations:
             'error': error_message,
             'data': None
         }
+
+    # --- 单元格操作扩展 ---
+    @classmethod
+    def merge_cells(cls, file_path: str, sheet_name: str, range: str) -> Dict[str, Any]:
+        """
+        @intention 合并指定范围的单元格
+        """
+        if cls.DEBUG_LOG_ENABLED:
+            logger.info(f"{cls._LOG_PREFIX} 开始合并单元格: {range}")
+
+        try:
+            from ..core.excel_writer import ExcelWriter
+            writer = ExcelWriter(file_path)
+            result = writer.merge_cells(range, sheet_name)
+            return format_operation_result(result)
+
+        except Exception as e:
+            error_msg = f"合并单元格失败: {str(e)}"
+            logger.error(f"{cls._LOG_PREFIX} {error_msg}")
+            return cls._format_error_result(error_msg)
+
+    @classmethod
+    def unmerge_cells(cls, file_path: str, sheet_name: str, range: str) -> Dict[str, Any]:
+        """
+        @intention 取消合并指定范围的单元格
+        """
+        if cls.DEBUG_LOG_ENABLED:
+            logger.info(f"{cls._LOG_PREFIX} 开始取消合并单元格: {range}")
+
+        try:
+            from ..core.excel_writer import ExcelWriter
+            writer = ExcelWriter(file_path)
+            result = writer.unmerge_cells(range, sheet_name)
+            return format_operation_result(result)
+
+        except Exception as e:
+            error_msg = f"取消合并单元格失败: {str(e)}"
+            logger.error(f"{cls._LOG_PREFIX} {error_msg}")
+            return cls._format_error_result(error_msg)
+
+    @classmethod
+    def set_borders(cls, file_path: str, sheet_name: str, range: str,
+                   border_style: str = "thin") -> Dict[str, Any]:
+        """
+        @intention 为指定范围设置边框样式
+        """
+        if cls.DEBUG_LOG_ENABLED:
+            logger.info(f"{cls._LOG_PREFIX} 开始设置边框: {range}, 样式: {border_style}")
+
+        try:
+            from ..core.excel_writer import ExcelWriter
+            writer = ExcelWriter(file_path)
+            result = writer.set_borders(range, border_style, sheet_name)
+            return format_operation_result(result)
+
+        except Exception as e:
+            error_msg = f"设置边框失败: {str(e)}"
+            logger.error(f"{cls._LOG_PREFIX} {error_msg}")
+            return cls._format_error_result(error_msg)
+
+    @classmethod
+    def set_row_height(cls, file_path: str, sheet_name: str, row_index: int,
+                      height: float, count: int = 1) -> Dict[str, Any]:
+        """
+        @intention 调整指定行的高度
+        """
+        if cls.DEBUG_LOG_ENABLED:
+            logger.info(f"{cls._LOG_PREFIX} 开始调整行高: 行{row_index}, 高度{height}, 数量{count}")
+
+        try:
+            from ..core.excel_writer import ExcelWriter
+            writer = ExcelWriter(file_path)
+
+            # ExcelWriter.set_row_height(row_number, height, sheet_name)
+            for i in range(count):
+                row_num = row_index + i
+                result = writer.set_row_height(row_num, height, sheet_name)
+                if not result.success:
+                    break
+
+            return format_operation_result(result)
+
+        except Exception as e:
+            error_msg = f"调整行高失败: {str(e)}"
+            logger.error(f"{cls._LOG_PREFIX} {error_msg}")
+            return cls._format_error_result(error_msg)
+
+    @classmethod
+    def set_column_width(cls, file_path: str, sheet_name: str, column_index: int,
+                        width: float, count: int = 1) -> Dict[str, Any]:
+        """
+        @intention 调整指定列的宽度
+        """
+        if cls.DEBUG_LOG_ENABLED:
+            logger.info(f"{cls._LOG_PREFIX} 开始调整列宽: 列{column_index}, 宽度{width}, 数量{count}")
+
+        try:
+            from ..core.excel_writer import ExcelWriter
+            from openpyxl.utils import get_column_letter
+
+            writer = ExcelWriter(file_path)
+
+            # ExcelWriter.set_column_width(column, width, sheet_name)
+            for i in range(count):
+                col_idx = column_index + i
+                column_letter = get_column_letter(col_idx)
+                result = writer.set_column_width(column_letter, width, sheet_name)
+                if not result.success:
+                    break
+
+            return format_operation_result(result)
+
+        except Exception as e:
+            error_msg = f"调整列宽失败: {str(e)}"
+            logger.error(f"{cls._LOG_PREFIX} {error_msg}")
+            return cls._format_error_result(error_msg)
+
+    @classmethod
+    def compare_sheets(cls, file1_path: str, sheet1_name: str, file2_path: str,
+                      sheet2_name: str, id_column: Union[int, str] = 1,
+                      header_row: int = 1) -> Dict[str, Any]:
+        """
+        @intention 比较两个Excel工作表，识别ID对象的新增、删除、修改
+        """
+        if cls.DEBUG_LOG_ENABLED:
+            logger.info(f"{cls._LOG_PREFIX} 开始比较工作表: {file1_path}:{sheet1_name} vs {file2_path}:{sheet2_name}")
+
+        try:
+            from ..core.excel_compare import ExcelCompareEngine
+            compare_engine = ExcelCompareEngine()
+            result = compare_engine.compare_sheets(
+                file1_path, sheet1_name, file2_path, sheet2_name,
+                id_column, header_row
+            )
+            return format_operation_result(result)
+
+        except Exception as e:
+            error_msg = f"比较工作表失败: {str(e)}"
+            logger.error(f"{cls._LOG_PREFIX} {error_msg}")
+            return cls._format_error_result(error_msg)
+
+    # --- 公式操作扩展 ---
+    @classmethod
+    def set_formula(cls, file_path: str, sheet_name: str, cell_range: str,
+                   formula: str) -> Dict[str, Any]:
+        """
+        @intention 设置指定单元格或区域的公式
+        """
+        if cls.DEBUG_LOG_ENABLED:
+            logger.info(f"{cls._LOG_PREFIX} 开始设置公式: {cell_range} = {formula}")
+
+        try:
+            from ..core.excel_writer import ExcelWriter
+            writer = ExcelWriter(file_path)
+            result = writer.set_formula(sheet_name, cell_range, formula)
+            return format_operation_result(result)
+
+        except Exception as e:
+            error_msg = f"设置公式失败: {str(e)}"
+            logger.error(f"{cls._LOG_PREFIX} {error_msg}")
+            return cls._format_error_result(error_msg)
+
+    @classmethod
+    def evaluate_formula(cls, formula: str, context_sheet: Optional[str] = None) -> Dict[str, Any]:
+        """
+        @intention 计算公式的值，不修改文件
+        """
+        if cls.DEBUG_LOG_ENABLED:
+            logger.info(f"{cls._LOG_PREFIX} 开始计算公式: {formula}")
+
+        try:
+            from ..core.excel_writer import ExcelWriter
+            writer = ExcelWriter("")  # 临时实例，不需要文件
+            result = writer.evaluate_formula(formula, context_sheet)
+            return format_operation_result(result)
+
+        except Exception as e:
+            error_msg = f"公式计算失败: {str(e)}"
+            logger.error(f"{cls._LOG_PREFIX} {error_msg}")
+            return cls._format_error_result(error_msg)
+
+    @classmethod
+    def compare_files(cls, file1_path: str, file2_path: str) -> Dict[str, Any]:
+        """
+        @intention 比较两个Excel文件的所有工作表
+        """
+        if cls.DEBUG_LOG_ENABLED:
+            logger.info(f"{cls._LOG_PREFIX} 开始比较文件: {file1_path} vs {file2_path}")
+
+        try:
+            from ..models.types import ComparisonOptions
+            from ..core.excel_compare import ExcelComparer
+
+            # 标准文件比较配置
+            options = ComparisonOptions(
+                compare_values=True,
+                compare_formulas=False,
+                compare_formats=False,
+                ignore_empty_cells=True,
+                case_sensitive=True,
+                structured_comparison=False
+            )
+
+            comparer = ExcelComparer(options)
+            result = comparer.compare_files(file1_path, file2_path)
+            return format_operation_result(result)
+
+        except Exception as e:
+            error_msg = f"比较文件失败: {str(e)}"
+            logger.error(f"{cls._LOG_PREFIX} {error_msg}")
+            return cls._format_error_result(error_msg)
