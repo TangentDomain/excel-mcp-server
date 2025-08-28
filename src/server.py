@@ -27,21 +27,8 @@ except ImportError as e:
     print("请运行: pip install fastmcp openpyxl")
     exit(1)
 
-# 导入核心模块
-from .core.excel_reader import ExcelReader
-from .core.excel_writer import ExcelWriter
-from .core.excel_manager import ExcelManager
-from .core.excel_search import ExcelSearcher
-from .core.excel_compare import ExcelComparer
-
 # 导入API模块
 from .api.excel_operations import ExcelOperations
-
-# 导入统一错误处理
-from .utils.error_handler import unified_error_handler, extract_file_context, extract_formula_context
-
-# 导入结果格式化工具
-from .utils.formatter import format_operation_result
 
 # ==================== 配置和初始化 ====================
 # 开启详细日志用于调试
@@ -89,7 +76,6 @@ def excel_list_sheets(file_path: str) -> Dict[str, Any]:
 
 
 @mcp.tool()
-@unified_error_handler("获取工作表表头", extract_file_context, return_dict=True)
 def excel_get_sheet_headers(file_path: str) -> Dict[str, Any]:
     """
     获取Excel文件中所有工作表的表头信息
@@ -113,58 +99,10 @@ def excel_get_sheet_headers(file_path: str) -> Dict[str, Any]:
         #   ]
         # }
     """
-    # 先获取所有工作表列表
-    sheets_result = excel_list_sheets(file_path)
-    if not sheets_result.get('success'):
-        return sheets_result
-
-    sheets_with_headers = []
-    sheets = sheets_result.get('sheets', [])  # 修正字段名
-
-    for sheet_name in sheets:
-        try:
-            # 使用统一的 excel_get_headers 方法获取每个工作表的表头
-            header_result = excel_get_headers(file_path, sheet_name, header_row=1)
-
-            if header_result.get('success'):
-                # 兼容两种可能的数据格式
-                headers = header_result.get('headers', [])
-                if not headers and 'data' in header_result:
-                    # 如果headers字段为空，尝试从data字段获取
-                    headers = header_result.get('data', [])
-
-                sheets_with_headers.append({
-                    'name': sheet_name,
-                    'headers': headers,
-                    'header_count': len(headers)
-                })
-            else:
-                # 如果读取某个工作表失败，记录错误但继续处理其他工作表
-                sheets_with_headers.append({
-                    'name': sheet_name,
-                    'headers': [],
-                    'header_count': 0,
-                    'error': header_result.get('error', '未知错误')
-                })
-
-        except Exception as e:
-            sheets_with_headers.append({
-                'name': sheet_name,
-                'headers': [],
-                'header_count': 0,
-                'error': str(e)
-            })
-
-    return format_operation_result({
-        'success': True,
-        'sheets_with_headers': sheets_with_headers,
-        'file_path': file_path,
-        'total_sheets': len(sheets)
-    })
+    return ExcelOperations.get_sheet_headers(file_path)
 
 
 @mcp.tool()
-@unified_error_handler("正则搜索", extract_file_context, return_dict=True)
 def excel_search(
     file_path: str,
     pattern: str,
@@ -214,13 +152,10 @@ def excel_search(
         # 搜索数字并包含公式
         result = excel_search("data.xlsx", r'\\d+', include_formulas=True)
     """
-    searcher = ExcelSearcher(file_path)
-    result = searcher.regex_search(pattern, regex_flags, include_values, include_formulas, sheet_name, range)
-    return format_operation_result(result)
+    return ExcelOperations.search(file_path, pattern, sheet_name, regex_flags, include_values, include_formulas, range)
 
 
 @mcp.tool()
-@unified_error_handler("目录搜索", extract_file_context, return_dict=True)
 def excel_search_directory(
     directory_path: str,
     pattern: str,
@@ -241,9 +176,9 @@ def excel_search_directory(
             - r'\\d+': 匹配数字
             - r'\\w+@\\w+\\.\\w+': 匹配邮箱
             - r'^总计|合计$': 匹配特定文本
-        flags: 正则修饰符 ("i"忽略大小写, "m"多行, "s"点号匹配换行)
-        search_values: 是否搜索单元格值
-        search_formulas: 是否搜索公式内容
+        regex_flags: 正则修饰符 ("i"忽略大小写, "m"多行, "s"点号匹配换行)
+        include_values: 是否搜索单元格值
+        include_formulas: 是否搜索公式内容
         recursive: 是否递归搜索子目录
         file_extensions: 文件扩展名过滤，如[".xlsx", ".xlsm"]
         file_pattern: 文件名正则模式过滤
@@ -254,17 +189,11 @@ def excel_search_directory(
 
     Example:
         # 搜索目录中的邮箱格式
-        result = excel_regex_search_directory("./data", r'\\w+@\\w+\\.\\w+', "i")
+        result = excel_search_directory("./data", r'\\w+@\\w+\\.\\w+', "i")
         # 搜索特定文件名模式
-        result = excel_regex_search_directory("./reports", r'\\d+', file_pattern=r'.*销售.*')
+        result = excel_search_directory("./reports", r'\\d+', file_pattern=r'.*销售.*')
     """
-    # 直接调用ExcelSearcher的静态方法，避免创建需要文件路径的实例
-    from .core.excel_search import ExcelSearcher
-    result = ExcelSearcher.search_directory_static(
-        directory_path, pattern, regex_flags, include_values, include_formulas,
-        recursive, file_extensions, file_pattern, max_files
-    )
-    return format_operation_result(result)
+    return ExcelOperations.search_directory(directory_path, pattern, regex_flags, include_values, include_formulas, recursive, file_extensions, file_pattern, max_files)
 
 
 @mcp.tool()
@@ -381,7 +310,6 @@ def excel_update_range(
 
 
 @mcp.tool()
-@unified_error_handler("插入行操作", extract_file_context, return_dict=True)
 def excel_insert_rows(
     file_path: str,
     sheet_name: str,
@@ -406,13 +334,10 @@ def excel_insert_rows(
         # 在第5行插入3行（明确指定count）
         result = excel_insert_rows("data.xlsx", "Sheet1", 5, 3)
     """
-    writer = ExcelWriter(file_path)
-    result = writer.insert_rows(sheet_name, row_index, count)
-    return format_operation_result(result)
+    return ExcelOperations.insert_rows(file_path, sheet_name, row_index, count)
 
 
 @mcp.tool()
-@unified_error_handler("插入列操作", extract_file_context, return_dict=True)
 def excel_insert_columns(
     file_path: str,
     sheet_name: str,
@@ -437,9 +362,7 @@ def excel_insert_columns(
         # 在第1列插入2列（明确指定count，即在A列前插入2列）
         result = excel_insert_columns("data.xlsx", "Sheet1", 1, 2)
     """
-    writer = ExcelWriter(file_path)
-    result = writer.insert_columns(sheet_name, column_index, count)
-    return format_operation_result(result)
+    return ExcelOperations.insert_columns(file_path, sheet_name, column_index, count)
 
 
 @mcp.tool()
@@ -470,7 +393,6 @@ def excel_create_file(
 
 
 @mcp.tool()
-@unified_error_handler("导出为CSV", extract_file_context, return_dict=True)
 def excel_export_to_csv(
     file_path: str,
     output_path: str,
@@ -495,14 +417,10 @@ def excel_export_to_csv(
         # 导出指定工作表
         result = excel_export_to_csv("report.xlsx", "summary.csv", "汇总", "gbk")
     """
-    from .core.excel_converter import ExcelConverter
-    converter = ExcelConverter(file_path)
-    result = converter.export_to_csv(output_path, sheet_name, encoding)
-    return format_operation_result(result)
+    return ExcelOperations.export_to_csv(file_path, output_path, sheet_name, encoding)
 
 
 @mcp.tool()
-@unified_error_handler("从CSV导入", extract_file_context, return_dict=True)
 def excel_import_from_csv(
     csv_path: str,
     output_path: str,
@@ -529,13 +447,10 @@ def excel_import_from_csv(
         # 指定编码和工作表名
         result = excel_import_from_csv("sales.csv", "report.xlsx", "销售数据", "gbk")
     """
-    from .core.excel_converter import ExcelConverter
-    result = ExcelConverter.import_from_csv(csv_path, output_path, sheet_name, encoding, has_header)
-    return format_operation_result(result)
+    return ExcelOperations.import_from_csv(csv_path, output_path, sheet_name, encoding, has_header)
 
 
 @mcp.tool()
-@unified_error_handler("文件格式转换", extract_file_context, return_dict=True)
 def excel_convert_format(
     input_path: str,
     output_path: str,
@@ -558,13 +473,10 @@ def excel_convert_format(
         # 转换为JSON格式
         result = excel_convert_format("data.xlsx", "data.json", "json")
     """
-    from .core.excel_converter import ExcelConverter
-    result = ExcelConverter.convert_format(input_path, output_path, target_format)
-    return format_operation_result(result)
+    return ExcelOperations.convert_format(input_path, output_path, target_format)
 
 
 @mcp.tool()
-@unified_error_handler("合并Excel文件", extract_file_context, return_dict=True)
 def excel_merge_files(
     input_files: List[str],
     output_path: str,
@@ -592,16 +504,11 @@ def excel_merge_files(
         # 将数据追加合并
         result = excel_merge_files(files, "combined.xlsx", "append")
     """
-    from .core.excel_converter import ExcelConverter
-    result = ExcelConverter.merge_files(input_files, output_path, merge_mode)
-    return format_operation_result(result)
+    return ExcelOperations.merge_files(input_files, output_path, merge_mode)
 
 
 @mcp.tool()
-@unified_error_handler("获取文件信息", extract_file_context, return_dict=True)
-def excel_get_file_info(
-    file_path: str
-) -> Dict[str, Any]:
+def excel_get_file_info(file_path: str) -> Dict[str, Any]:
     """
     获取Excel文件的详细信息
 
@@ -624,13 +531,10 @@ def excel_get_file_info(
         #   'has_macros': False
         # }
     """
-    from .core.excel_manager import ExcelManager
-    result = ExcelManager.get_file_info(file_path)
-    return format_operation_result(result)
+    return ExcelOperations.get_file_info(file_path)
 
 
 @mcp.tool()
-@unified_error_handler("创建工作表", extract_file_context, return_dict=True)
 def excel_create_sheet(
     file_path: str,
     sheet_name: str,
@@ -656,13 +560,10 @@ def excel_create_sheet(
         # 创建新工作表到第一个位置（index=0）
         result = excel_create_sheet("data.xlsx", "首页", 0)
     """
-    manager = ExcelManager(file_path)
-    result = manager.create_sheet(sheet_name, index)
-    return format_operation_result(result)
+    return ExcelOperations.create_sheet(file_path, sheet_name, index)
 
 
 @mcp.tool()
-@unified_error_handler("删除工作表", extract_file_context, return_dict=True)
 def excel_delete_sheet(
     file_path: str,
     sheet_name: str
@@ -681,13 +582,10 @@ def excel_delete_sheet(
         # 删除指定工作表
         result = excel_delete_sheet("data.xlsx", "临时数据")
     """
-    manager = ExcelManager(file_path)
-    result = manager.delete_sheet(sheet_name)
-    return format_operation_result(result)
+    return ExcelOperations.delete_sheet(file_path, sheet_name)
 
 
 @mcp.tool()
-@unified_error_handler("重命名工作表", extract_file_context, return_dict=True)
 def excel_rename_sheet(
     file_path: str,
     old_name: str,
@@ -708,13 +606,10 @@ def excel_rename_sheet(
         # 重命名工作表
         result = excel_rename_sheet("data.xlsx", "Sheet1", "主数据")
     """
-    manager = ExcelManager(file_path)
-    result = manager.rename_sheet(old_name, new_name)
-    return format_operation_result(result)
+    return ExcelOperations.rename_sheet(file_path, old_name, new_name)
 
 
 @mcp.tool()
-@unified_error_handler("删除行操作", extract_file_context, return_dict=True)
 def excel_delete_rows(
     file_path: str,
     sheet_name: str,
@@ -739,13 +634,10 @@ def excel_delete_rows(
         # 删除第3-5行（删除3行，从第3行开始）
         result = excel_delete_rows("data.xlsx", "Sheet1", 3, 3)
     """
-    writer = ExcelWriter(file_path)
-    result = writer.delete_rows(sheet_name, row_index, count)
-    return format_operation_result(result)
+    return ExcelOperations.delete_rows(file_path, sheet_name, row_index, count)
 
 
 @mcp.tool()
-@unified_error_handler("删除列操作", extract_file_context, return_dict=True)
 def excel_delete_columns(
     file_path: str,
     sheet_name: str,
@@ -770,13 +662,10 @@ def excel_delete_columns(
         # 删除第1-3列（删除3列，从A列开始删除A、B、C列）
         result = excel_delete_columns("data.xlsx", "Sheet1", 1, 3)
     """
-    writer = ExcelWriter(file_path)
-    result = writer.delete_columns(sheet_name, column_index, count)
-    return format_operation_result(result)
+    return ExcelOperations.delete_columns(file_path, sheet_name, column_index, count)
 
 
 # @mcp.tool()
-@unified_error_handler("设置公式", extract_file_context, return_dict=True)
 def excel_set_formula(
     file_path: str,
     sheet_name: str,
@@ -801,13 +690,10 @@ def excel_set_formula(
         # 设置平均值公式
         result = excel_set_formula("data.xlsx", "Sheet1", "E1", "AVERAGE(A1:A10)")
     """
-    writer = ExcelWriter(file_path)
-    result = writer.set_formula(cell_address, formula, sheet_name)
-    return format_operation_result(result)
+    return ExcelOperations.set_formula(file_path, sheet_name, cell_address, formula)
 
 
 # @mcp.tool()
-@unified_error_handler("公式计算", extract_formula_context, return_dict=True)
 def excel_evaluate_formula(
     file_path: str,
     formula: str,
@@ -830,13 +716,10 @@ def excel_evaluate_formula(
         # 计算特定工作表的平均值
         result = excel_evaluate_formula("data.xlsx", "AVERAGE(B:B)", "Sheet1")
     """
-    writer = ExcelWriter(file_path)
-    result = writer.evaluate_formula(formula, context_sheet)
-    return format_operation_result(result)
+    return ExcelOperations.evaluate_formula(formula, context_sheet)
 
 
 @mcp.tool()
-@unified_error_handler("单元格格式化", extract_file_context, return_dict=True)
 def excel_format_cells(
     file_path: str,
     sheet_name: str,
@@ -870,57 +753,10 @@ def excel_format_cells(
         result = excel_format_cells("data.xlsx", "Sheet1", "A1:D1",
             formatting={'font': {'bold': True, 'color': 'FF0000'}})
     """
-    # 参数验证
-    if not formatting and not preset:
-        return format_operation_result({
-            "success": False,
-            "error": "必须指定 formatting（自定义格式）或 preset（预设样式）其中之一"
-        })
-
-    # 预设样式模板
-    PRESETS = {
-        "title": {
-            'font': {'name': '微软雅黑', 'size': 16, 'bold': True, 'color': 'FFFFFF'},
-            'fill': {'color': '4472C4'},
-            'alignment': {'horizontal': 'center', 'vertical': 'center'}
-        },
-        "header": {
-            'font': {'name': '微软雅黑', 'size': 12, 'bold': True, 'color': '000000'},
-            'fill': {'color': 'D9E1F2'},
-            'alignment': {'horizontal': 'center', 'vertical': 'center'}
-        },
-        "data": {
-            'font': {'name': '宋体', 'size': 11, 'color': '000000'},
-            'alignment': {'horizontal': 'left', 'vertical': 'center'}
-        },
-        "highlight": {
-            'font': {'bold': True, 'color': '000000'},
-            'fill': {'color': 'FFFF00'}
-        },
-        "currency": {
-            'font': {'name': '宋体', 'size': 11, 'color': '000000'},
-            'alignment': {'horizontal': 'right', 'vertical': 'center'}
-        }
-    }
-
-    # 确定最终格式配置
-    if preset:
-        if preset not in PRESETS:
-            return format_operation_result({
-                "success": False,
-                "error": f"未知的预设样式: {preset}。可选值: {list(PRESETS.keys())}"
-            })
-        final_formatting = PRESETS[preset]
-    else:
-        final_formatting = formatting
-
-    writer = ExcelWriter(file_path)
-    result = writer.format_cells(range, final_formatting, sheet_name)
-    return format_operation_result(result)
+    return ExcelOperations.format_cells(file_path, sheet_name, range, formatting, preset)
 
 
 @mcp.tool()
-@unified_error_handler("合并单元格", extract_file_context, return_dict=True)
 def excel_merge_cells(
     file_path: str,
     sheet_name: str,
@@ -943,13 +779,10 @@ def excel_merge_cells(
         # 合并标题行
         result = excel_merge_cells("report.xlsx", "Summary", "A1:E1")
     """
-    writer = ExcelWriter(file_path)
-    result = writer.merge_cells(range, sheet_name)
-    return format_operation_result(result)
+    return ExcelOperations.merge_cells(file_path, sheet_name, range)
 
 
 @mcp.tool()
-@unified_error_handler("取消合并单元格", extract_file_context, return_dict=True)
 def excel_unmerge_cells(
     file_path: str,
     sheet_name: str,
@@ -970,13 +803,10 @@ def excel_unmerge_cells(
         # 取消合并A1:C3范围的单元格
         result = excel_unmerge_cells("data.xlsx", "Sheet1", "A1:C3")
     """
-    writer = ExcelWriter(file_path)
-    result = writer.unmerge_cells(range, sheet_name)
-    return format_operation_result(result)
+    return ExcelOperations.unmerge_cells(file_path, sheet_name, range)
 
 
 @mcp.tool()
-@unified_error_handler("设置边框样式", extract_file_context, return_dict=True)
 def excel_set_borders(
     file_path: str,
     sheet_name: str,
@@ -1001,13 +831,10 @@ def excel_set_borders(
         # 为标题添加粗边框
         result = excel_set_borders("data.xlsx", "Sheet1", "A1:E1", "thick")
     """
-    writer = ExcelWriter(file_path)
-    result = writer.set_borders(range, border_style, sheet_name)
-    return format_operation_result(result)
+    return ExcelOperations.set_borders(file_path, sheet_name, range, border_style)
 
 
 @mcp.tool()
-@unified_error_handler("调整行高", extract_file_context, return_dict=True)
 def excel_set_row_height(
     file_path: str,
     sheet_name: str,
@@ -1034,13 +861,10 @@ def excel_set_row_height(
         # 调整第2-4行高度为18磅
         result = excel_set_row_height("data.xlsx", "Sheet1", 2, 18.0, 3)
     """
-    writer = ExcelWriter(file_path)
-    result = writer.set_row_height(row_index, height, sheet_name)
-    return format_operation_result(result)
+    return ExcelOperations.set_row_height(file_path, sheet_name, row_index, height, count)
 
 
 @mcp.tool()
-@unified_error_handler("调整列宽", extract_file_context, return_dict=True)
 def excel_set_column_width(
     file_path: str,
     sheet_name: str,
@@ -1067,19 +891,12 @@ def excel_set_column_width(
         # 调整B-D列宽度为12字符
         result = excel_set_column_width("data.xlsx", "Sheet1", 2, 12.0, 3)
     """
-    # 将列索引转换为列字母（1->A, 2->B, etc）
-    from openpyxl.utils import get_column_letter
-    column_letter = get_column_letter(column_index)
-
-    writer = ExcelWriter(file_path)
-    result = writer.set_column_width(column_letter, width, sheet_name)
-    return format_operation_result(result)
+    return ExcelOperations.set_column_width(file_path, sheet_name, column_index, width, count)
 
 
 # ==================== Excel比较功能 ====================
 
 # @mcp.tool()
-@unified_error_handler("Excel文件比较", extract_file_context, return_dict=True)
 def excel_compare_files(
     file1_path: str,
     file2_path: str,
@@ -1103,29 +920,8 @@ def excel_compare_files(
         - 🗑️ 删除对象：ID在文件1中存在但文件2中消失
         - 🔄 修改对象：ID存在于两文件中但属性发生变化
     """
-    # 游戏开发专用配置 - 直接创建固定配置
-    from .models.types import ComparisonOptions
-    from .core.excel_compare import ExcelComparer
-
-    options = ComparisonOptions(
-        compare_values=True,
-        compare_formulas=False,
-        compare_formats=False,
-        ignore_empty_cells=True,
-        case_sensitive=True,
-        structured_comparison=True,
-        header_row=header_row,
-        id_column=id_column,
-        show_numeric_changes=True,
-        game_friendly_format=True,
-        focus_on_id_changes=True
-    )
-
-    comparer = ExcelComparer(options)
-    result = comparer.compare_files(file1_path, file2_path)
-    return format_operation_result(result)
+    return ExcelOperations.compare_files(file1_path, file2_path)
 @mcp.tool()
-@unified_error_handler("Excel工作表比较", extract_file_context, return_dict=True)
 def excel_compare_sheets(
     file1_path: str,
     sheet1_name: str,
@@ -1196,27 +992,7 @@ def excel_compare_sheets(
             row_id, diff_type = row[0], row[1]
             print(f"{diff_type}: {row_id}")
     """
-    # 游戏开发专用配置 - 直接创建固定配置
-    from .models.types import ComparisonOptions
-    from .core.excel_compare import ExcelComparer
-
-    options = ComparisonOptions(
-        compare_values=True,
-        compare_formulas=False,
-        compare_formats=False,
-        ignore_empty_cells=True,
-        case_sensitive=True,
-        structured_comparison=True,
-        header_row=header_row,
-        id_column=id_column,
-        show_numeric_changes=True,
-        game_friendly_format=True,
-        focus_on_id_changes=True
-    )
-
-    comparer = ExcelComparer(options)
-    result = comparer.compare_sheets(file1_path, sheet1_name, file2_path, sheet2_name)
-    return format_operation_result(result)
+    return ExcelOperations.compare_sheets(file1_path, sheet1_name, file2_path, sheet2_name, id_column, header_row)
 # ==================== 主程序 ====================
 if __name__ == "__main__":
     # 运行FastMCP服务器
