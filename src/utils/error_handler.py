@@ -49,6 +49,11 @@ class ErrorHandler:
         return ErrorHandler.ERROR_CODES.get(exception_name, 'UNKNOWN_ERROR')
 
     @staticmethod
+    def get_error_solution(error_code: str) -> str:
+        """获取错误解决方案"""
+        return ErrorHandler.ERROR_SOLUTIONS.get(error_code, '请联系技术支持或查看文档')
+
+    @staticmethod
     def format_error_response(
         error: Exception,
         context: Optional[Dict[str, Any]] = None,
