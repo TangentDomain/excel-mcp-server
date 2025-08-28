@@ -269,6 +269,38 @@ class ExcelConverter:
                     }
                 )
 
+            elif target_format.lower() == "csv":
+                # 转换为CSV格式 - 使用第一个工作表
+                sheet = workbook.active
+                sheet_name = sheet.title
+
+                with open(output_path, 'w', newline='', encoding='utf-8') as csvfile:
+                    csv_writer = csv.writer(csvfile)
+
+                    row_count = 0
+                    for row in sheet.iter_rows(values_only=True):
+                        if any(cell is not None for cell in row):
+                            csv_writer.writerow(row)
+                            row_count += 1
+
+                file_size = os.path.getsize(output_path)
+
+                return OperationResult(
+                    success=True,
+                    message=f"成功转换为CSV格式",
+                    data={
+                        'input_format': input_format,
+                        'output_format': 'csv',
+                        'file_size': file_size,
+                        'output_path': output_path,
+                        'row_count': row_count
+                    },
+                    metadata={
+                        'input_path': input_path,
+                        'target_format': target_format
+                    }
+                )
+
             else:
                 raise DataValidationError(f"不支持的目标格式: {target_format}")
 

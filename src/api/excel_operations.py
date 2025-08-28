@@ -869,7 +869,24 @@ class ExcelOperations:
         try:
             from ..core.excel_writer import ExcelWriter
             writer = ExcelWriter(file_path)
-            result = writer.format_cells(sheet_name, range, formatting, preset)
+            # 处理预设格式
+            if preset:
+                preset_formats = {
+                    'title': {'font': {'name': '微软雅黑', 'size': 14, 'bold': True}, 'alignment': {'horizontal': 'center'}},
+                    'header': {'font': {'name': '微软雅黑', 'size': 11, 'bold': True}, 'fill': {'color': 'D9D9D9'}},
+                    'data': {'font': {'name': '微软雅黑', 'size': 10}},
+                    'highlight': {'fill': {'color': 'FFFF00'}},
+                    'currency': {'number_format': '¥#,##0.00'}
+                }
+                formatting = preset_formats.get(preset, formatting or {})
+
+            # 构建完整的range表达式
+            if '!' not in range:
+                range_expression = f"{sheet_name}!{range}"
+            else:
+                range_expression = range
+
+            result = writer.format_cells(range_expression, formatting or {})
             return format_operation_result(result)
 
         except Exception as e:
@@ -1014,11 +1031,16 @@ class ExcelOperations:
             logger.info(f"{cls._LOG_PREFIX} 开始比较工作表: {file1_path}:{sheet1_name} vs {file2_path}:{sheet2_name}")
 
         try:
-            from ..core.excel_compare import ExcelCompareEngine
-            compare_engine = ExcelCompareEngine()
-            result = compare_engine.compare_sheets(
-                file1_path, sheet1_name, file2_path, sheet2_name,
-                id_column, header_row
+            from ..core.excel_compare import ExcelComparer
+            from ..models.types import ComparisonOptions
+
+            # 创建比较选项
+            options = ComparisonOptions()
+            comparer = ExcelComparer(options)
+
+            # 执行比较 - 使用正确的参数顺序
+            result = comparer.compare_sheets(
+                file1_path, sheet1_name, file2_path, sheet2_name, options
             )
             return format_operation_result(result)
 
