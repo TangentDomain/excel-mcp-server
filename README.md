@@ -8,8 +8,8 @@
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![Python Version](https://img.shields.io/badge/python-3.10+-blue.svg)](https://www.python.org/downloads/)
 [![Powered by: FastMCP](https://img.shields.io/badge/Powered%20by-FastMCP-orange)](https://github.com/jlowin/fastmcp)
-[![Status](https://img.shields.io/badge/status-production-success.svg)]()
-[![Tests](https://img.shields.io/badge/tests-221%20passed-brightgreen.svg)]()
+[![Status](https://img.shields.io/badge/status-production-success.svg)](#)
+[![Tests](https://img.shields.io/badge/tests-221%20passed-brightgreen.svg)](#)
 
 **ExcelMCP** is a comprehensive Model Context Protocol (MCP) server that revolutionizes Excel file manipulation through AI. Built with **FastMCP** and **openpyxl**, it provides 27+ powerful tools enabling AI assistants to perform complex Excel operations through natural language commands. From regex searches across thousands of files to advanced data manipulation and formatting - all with enterprise-grade reliability.
 

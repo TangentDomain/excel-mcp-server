@@ -5,58 +5,11 @@
 
 # ExcelMCP: 强大的 Excel MCP 服务器 🚀
 
-[![许可证: ## 💡 实际应用场景
-
-- **数据清理**: "在 `/reports` 目录中的所有 `.xlsx` 文件中，查找包含 `N/A` 的单元格，并将其替换为空值。"
-- **自动报告**: "创建一个新文件 `summary.xlsx`。将 `sales_data.xlsx` 中的范围 `A1:F20` 复制到名为'Sales'的工作表中，并将 `inventory.xlsx` 中的 `A1:D15` 复制到名为'Inventory'的工作表中。"
-- **数据提取**: "获取 `contacts.xlsx` 中 A 列为'Active'的所有 D 列的值。"
-- **批量格式化**: "在 `financials.xlsx` 中，将整个第一行加粗，并将其背景颜色设置为浅灰色。"
-
-## 🏗️ 技术架构
-
-### 核心技术栈
-
-- **FastMCP**: 现代化的 MCP 服务器框架
-- **openpyxl**: 核心 Excel 文件操作库
-- **Python 3.10+**: 现代 Python 特性支持
-
-### 项目结构
-
-```
-src/
-├── server.py                          # MCP 服务器入口点
-├── api/
-│   └── excel_operations.py            # 统一业务逻辑处理中心
-├── core/                              # 核心 Excel 操作模块
-│   ├── reader.py                      # Excel 文件读取
-│   ├── writer.py                      # Excel 文件写入
-│   ├── manager.py                     # 文件和工作表管理
-│   ├── search.py                      # 搜索和正则功能
-│   └── compare.py                     # 工作表比较（游戏配置优化）
-├── utils/                             # 工具函数
-│   ├── formatter.py                   # 结果格式化器
-│   └── validators.py                  # 输入验证
-└── models/
-    └── types.py                       # 类型定义
-```
-
-### 质量保证
-
-- **221 个测试用例**，100% 通过率
-- **分层测试策略**: API、核心模块、MCP 接口
-- **统一结果格式**: 所有操作返回一致的响应结构
-- **错误处理**: 集中式错误处理和用户友好的错误消息
-
-### 游戏开发特化功能
-
-- **Excel 配置表比较**: 专为游戏配置设计
-- **ID 对象跟踪**: 检测新增/修改/删除的配置对象
-- **紧凑数组格式**: 优化游戏数据传输效率
-- **中文/Unicode 支持**: 完整的本地化支持ttps://img.shields.io/badge/License-MIT-yellow.svg)](<https://opensource.org/licenses/MIT>)
+[![许可证: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![Python 版本](https://img.shields.io/badge/python-3.10+-blue.svg)](https://www.python.org/downloads/)
 [![技术支持: FastMCP](https://img.shields.io/badge/Powered%20by-FastMCP-orange)](https://github.com/jlowin/fastmcp)
-[![状态](https://img.shields.io/badge/status-production-success.svg)]()
-[![测试](https://img.shields.io/badge/tests-221%20passed-brightgreen.svg)]()
+[![状态](https://img.shields.io/badge/status-production-success.svg)](#)
+[![测试](https://img.shields.io/badge/tests-221%20passed-brightgreen.svg)](#)
 
 **ExcelMCP** 是一个全面的模型上下文协议 (MCP) 服务器，通过 AI 革命性地改变 Excel 文件操作方式。基于 **FastMCP** 和 **openpyxl** 构建，提供 27+ 个强大工具，使 AI 助手能够通过自然语言命令执行复杂的 Excel 操作。从跨数千文件的正则搜索到高级数据操作和格式化 - 全部具备企业级可靠性。
 
