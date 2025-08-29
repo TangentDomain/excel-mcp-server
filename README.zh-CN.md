@@ -5,23 +5,74 @@
 
 # ExcelMCP: 强大的 Excel MCP 服务器 🚀
 
-[![许可证: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
-[![Python 版本](https://img.shields.io/badge/python-3.10+-blue.svg)](https://www.python.org/downloads/)
-[![技术支持: FastMCP](https://img.shields.io/badge/Powered%20by-FastMCP-orange)](https://github.com/your-fastmcp-repo)
-[![状态](https://img.shields.io/badge/status-active-success.svg)]()
+[![许可证: ## 💡 实际应用场景
 
-**ExcelMCP** 是一个强大的模型上下文协议 (MCP) 服务器，它改变了您与 Excel 电子表格的交互方式。告别复杂的公式和手动数据整理。借助 ExcelMCP，您可以使用简单的自然语言命令来管理、查询和自动化您的 Excel 工作流。让 AI 助手直接操控您的 Excel 文件，实现真正的智能化办公。
+- **数据清理**: "在 `/reports` 目录中的所有 `.xlsx` 文件中，查找包含 `N/A` 的单元格，并将其替换为空值。"
+- **自动报告**: "创建一个新文件 `summary.xlsx`。将 `sales_data.xlsx` 中的范围 `A1:F20` 复制到名为'Sales'的工作表中，并将 `inventory.xlsx` 中的 `A1:D15` 复制到名为'Inventory'的工作表中。"
+- **数据提取**: "获取 `contacts.xlsx` 中 A 列为'Active'的所有 D 列的值。"
+- **批量格式化**: "在 `financials.xlsx` 中，将整个第一行加粗，并将其背景颜色设置为浅灰色。"
+
+## 🏗️ 技术架构
+
+### 核心技术栈
+
+- **FastMCP**: 现代化的 MCP 服务器框架
+- **openpyxl**: 核心 Excel 文件操作库
+- **Python 3.10+**: 现代 Python 特性支持
+
+### 项目结构
+
+```
+src/
+├── server.py                          # MCP 服务器入口点
+├── api/
+│   └── excel_operations.py            # 统一业务逻辑处理中心
+├── core/                              # 核心 Excel 操作模块
+│   ├── reader.py                      # Excel 文件读取
+│   ├── writer.py                      # Excel 文件写入
+│   ├── manager.py                     # 文件和工作表管理
+│   ├── search.py                      # 搜索和正则功能
+│   └── compare.py                     # 工作表比较（游戏配置优化）
+├── utils/                             # 工具函数
+│   ├── formatter.py                   # 结果格式化器
+│   └── validators.py                  # 输入验证
+└── models/
+    └── types.py                       # 类型定义
+```
+
+### 质量保证
+
+- **221 个测试用例**，100% 通过率
+- **分层测试策略**: API、核心模块、MCP 接口
+- **统一结果格式**: 所有操作返回一致的响应结构
+- **错误处理**: 集中式错误处理和用户友好的错误消息
+
+### 游戏开发特化功能
+
+- **Excel 配置表比较**: 专为游戏配置设计
+- **ID 对象跟踪**: 检测新增/修改/删除的配置对象
+- **紧凑数组格式**: 优化游戏数据传输效率
+- **中文/Unicode 支持**: 完整的本地化支持ttps://img.shields.io/badge/License-MIT-yellow.svg)](<https://opensource.org/licenses/MIT>)
+[![Python 版本](https://img.shields.io/badge/python-3.10+-blue.svg)](https://www.python.org/downloads/)
+[![技术支持: FastMCP](https://img.shields.io/badge/Powered%20by-FastMCP-orange)](https://github.com/jlowin/fastmcp)
+[![状态](https://img.shields.io/badge/status-production-success.svg)]()
+[![测试](https://img.shields.io/badge/tests-221%20passed-brightgreen.svg)]()
+
+**ExcelMCP** 是一个全面的模型上下文协议 (MCP) 服务器，通过 AI 革命性地改变 Excel 文件操作方式。基于 **FastMCP** 和 **openpyxl** 构建，提供 27+ 个强大工具，使 AI 助手能够通过自然语言命令执行复杂的 Excel 操作。从跨数千文件的正则搜索到高级数据操作和格式化 - 全部具备企业级可靠性。
+
+🎯 **完美适用于：** 游戏开发配置表、数据分析工作流、自动化报告、批量文件处理和智能化办公自动化。
 
 ---
 
-### ✨ 主要功能
+## ✨ 主要功能
 
-*   ⚡️ **闪电般快速的搜索**: 使用强大的正则表达式搜索，即时在数千个单元格和文件中查找数据。
-*   📊 **轻松的数据管理**: 通过简单的指令读取、写入和更新单元格范围、行和列。
-*   🗂️ **完全的工作区控制**: 即时创建、删除和管理 Excel 文件和工作表。
-*   🎨 **动态格式化**: 使用预设或自定义样式，为您的数据应用美观、一致的格式。
-*   🔍 **目录范围的操作**: 一次性在整个 Excel 文件文件夹上运行命令，实现真正的自动化。
-*   🔒 **稳健可靠**: 内置集中式错误处理系统，性能稳定可预测。
+- ⚡️ **27+ 高级工具**: 从基础 CRUD 到复杂格式化的完整 Excel 操作套件
+- 🔍 **强大搜索引擎**: 正则表达式跨文件搜索，支持目录级批量操作
+- 📊 **智能数据操作**: 基于范围的读写、行列管理、公式保护
+- 🎨 **专业格式化**: 预设样式、自定义格式、边框、合并、尺寸调整
+- 🗂️ **文件生命周期管理**: 创建、转换、合并、导入/导出 CSV、文件信息
+- 🎮 **游戏开发优化**: 专为游戏开发设计的 Excel 配置表比较功能
+- 🔒 **企业级可靠性**: 集中错误处理、全面验证、100% 测试覆盖率
 
 ---
 
@@ -30,47 +81,56 @@
 *（此处可以插入一个 GIF，展示用户输入“在 `report.xlsx` 中查找所有电子邮件并用黄色突出显示”，然后服务器执行该命令）*
 
 **示例提示:**
+
 ```
 "在 `quarterly_sales.xlsx` 中，查找‘地区’为‘北部’且‘销售额’超过 5000 的所有行。将它们复制到一个名为‘Top Performers’的新工作表中，并将标题格式设置为蓝色。"
 ```
 
 ---
 
-### 🚀 快速入门 (5 分钟设置)
+## 🚀 快速入门 (3 分钟设置)
 
-只需几个步骤，即可在您喜欢的 MCP 客户端（如 VS Code、Cursor 或 Claude Desktop）中运行 ExcelMCP。
+在您喜欢的 MCP 客户端（VS Code 配 Continue、Cursor、Claude Desktop 或任何 MCP 兼容客户端）中运行 ExcelMCP。
 
-**先决条件:**
-*   Python 3.10+
-*   一个与 MCP 兼容的客户端。
+### 先决条件
 
-**安装:**
+- Python 3.10+
+- 一个与 MCP 兼容的客户端
 
-1.  **克隆存储库:**
+### 安装
+
+1. **克隆存储库:**
+
     ```bash
-    git clone https://github.com/your-username/excel-mcp-server.git
+    git clone https://github.com/tangjian/excel-mcp-server.git
     cd excel-mcp-server
     ```
 
-2.  **安装依赖项:**
-    我们建议使用 `uv` 进行快速安装。
+2. **安装依赖项:**
+
+    使用 **uv**（推荐，速度更快）:
+
     ```bash
     pip install uv
-    uv pip install -r requirements.txt
+    uv sync
     ```
 
-3.  **配置您的 MCP 客户端:**
-    将以下配置添加到您客户端的 MCP 设置文件中 (例如 `.vscode/mcp.json`, `.cursor/mcp.json`):
+    或使用 **pip**:
+
+    ```bash
+    pip install -e .
+    ```
+
+3. **配置您的 MCP 客户端:**
+
+    添加到您的 MCP 客户端配置中（`.vscode/mcp.json`、`.cursor/mcp.json` 等）:
 
     ```json
     {
       "mcpServers": {
         "excelmcp": {
           "command": "python",
-          "args": [
-            "-m",
-            "src.server"
-          ],
+          "args": ["-m", "src.server"],
           "env": {
             "PYTHONPATH": "${workspaceRoot}"
           }
@@ -78,42 +138,75 @@
       }
     }
     ```
-    *请确保 `PYTHONPATH` 指向项目目录的根目录。*
 
-4.  **开始自动化！**
-    一切就绪！开始向您的 AI 助手发出自然语言命令来控制 Excel。
+4. **开始自动化！**
+
+    准备就绪！让您的 AI 助手通过自然语言控制 Excel 文件。
 
 ---
 
-### 🛠️ 可用工具
+## � 完整工具列表（27个工具）
 
-ExcelMCP 向您的 AI 助手公开了一套丰富的工具集:
+### 📁 文件与工作表管理
 
-| 工具名称                       | 描述                                                                 |
-| ------------------------------ | -------------------------------------------------------------------- |
-| `excel_list_sheets`            | 列出给定 Excel 文件中的所有工作表名称。                              |
-| `excel_regex_search`           | 在单个文件中搜索与正则表达式模式匹配的内容。                         |
-| `excel_regex_search_directory` | 在指定目录中的所有 Excel 文件中搜索内容。                            |
-| `excel_get_range`              | 读取并返回指定范围（例如 "A1:C10"）的数据。                          |
-| `excel_update_range`           | 使用新数据更新指定范围。                                             |
-| `excel_insert_rows`            | 在给定位置插入指定数量的空行。                                       |
-| `excel_insert_columns`         | 在给定位置插入指定数量的空列。                                       |
-| `excel_delete_rows`            | 从给定位置删除指定数量的行。                                         |
-| `excel_delete_columns`         | 从给定位置删除指定数量的列。                                         |
-| `excel_create_file`            | 创建一个新的、空的 `.xlsx` 文件，可选择带有命名的工作表。            |
-| `excel_create_sheet`           | 向现有文件添加新工作表。                                             |
-| `excel_delete_sheet`           | 从文件中删除工作表。                                                 |
-| `excel_rename_sheet`           | 重命名现有工作表。                                                   |
-| `excel_format_cells`           | 将样式（字体、颜色、对齐方式）应用于单元格范围。                     |
+| 工具 | 用途 |
+|------|------|
+| `excel_create_file` | 创建新的 Excel 文件（.xlsx/.xlsm），支持自定义工作表 |
+| `excel_create_sheet` | 在现有文件中添加新工作表 |
+| `excel_delete_sheet` | 删除指定工作表 |
+| `excel_list_sheets` | 列出工作表名称和获取文件信息 |
+| `excel_rename_sheet` | 重命名工作表 |
+| `excel_get_file_info` | 获取文件元数据（大小、创建日期等） |
+
+### 📊 数据操作
+
+| 工具 | 用途 |
+|------|------|
+| `excel_get_range` | 读取单元格/行/列范围（支持 A1:C10、行范围、列范围等） |
+| `excel_update_range` | 写入/更新数据范围，支持公式保留 |
+| `excel_get_headers` | 从任意行提取表头 |
+| `excel_get_sheet_headers` | 获取所有工作表的表头 |
+| `excel_insert_rows` | 插入空行到指定位置 |
+| `excel_delete_rows` | 删除行范围 |
+| `excel_insert_columns` | 插入空列到指定位置 |
+| `excel_delete_columns` | 删除列范围 |
+
+### 🔍 搜索与分析
+
+| 工具 | 用途 |
+|------|------|
+| `excel_search` | 在工作表中进行正则表达式搜索 |
+| `excel_search_directory` | 在目录中的所有 Excel 文件中批量搜索 |
+| `excel_compare_sheets` | 比较两个工作表，检测变化（针对游戏配置优化） |
+
+### 🎨 格式化与样式
+
+| 工具 | 用途 |
+|------|------|
+| `excel_format_cells` | 应用字体、颜色、对齐等格式（预设或自定义） |
+| `excel_set_borders` | 设置单元格边框样式 |
+| `excel_merge_cells` | 合并单元格范围 |
+| `excel_unmerge_cells` | 取消合并单元格 |
+| `excel_set_column_width` | 调整列宽 |
+| `excel_set_row_height` | 调整行高 |
+
+### 🔄 数据转换
+
+| 工具 | 用途 |
+|------|------|
+| `excel_export_to_csv` | 导出工作表为 CSV 格式 |
+| `excel_import_from_csv` | 从 CSV 创建 Excel 文件 |
+| `excel_convert_format` | 在 Excel 格式间转换（.xlsx、.xlsm、.csv、.json） |
+| `excel_merge_files` | 合并多个 Excel 文件 |
 
 ---
 
 ### 💡 用例
 
-*   **数据清理**: "在 `/reports` 目录中的所有 `.xlsx` 文件中，查找包含 `N/A` 的单元格，并将其替换为空值。"
-*   **自动报告**: "创建一个新文件 `summary.xlsx`。将 `sales_data.xlsx` 中的范围 `A1:F20` 复制到名为‘Sales’的工作表中，并将 `inventory.xlsx` 中的 `A1:D15` 复制到名为‘Inventory’的工作表中。"
-*   **数据提取**: "获取 `contacts.xlsx` 中 A 列为‘Active’的所有 D 列的值。"
-*   **批量格式化**: "在 `financials.xlsx` 中，将整个第一行加粗，并将其背景颜色设置为浅灰色。"
+- **数据清理**: "在 `/reports` 目录中的所有 `.xlsx` 文件中，查找包含 `N/A` 的单元格，并将其替换为空值。"
+- **自动报告**: "创建一个新文件 `summary.xlsx`。将 `sales_data.xlsx` 中的范围 `A1:F20` 复制到名为‘Sales’的工作表中，并将 `inventory.xlsx` 中的 `A1:D15` 复制到名为‘Inventory’的工作表中。"
+- **数据提取**: "获取 `contacts.xlsx` 中 A 列为‘Active’的所有 D 列的值。"
+- **批量格式化**: "在 `financials.xlsx` 中，将整个第一行加粗，并将其背景颜色设置为浅灰色。"
 
 ---
 
