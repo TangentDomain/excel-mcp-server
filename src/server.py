@@ -86,6 +86,20 @@ def excel_assistant_guide() -> str:
   - 指定列查找: `excel_find_last_row("data.xlsx", "Sheet1", "A")`
 • **安全更新**: `excel_get_range` → `excel_update_range`
   - 先查看现有数据格式，再保持一致性更新
+• **🎨 快速格式化**: `excel_format_cells` 预设样式（降低复杂度）
+  - 标题样式: `preset="title"` (大字体、粗体、居中)
+  - 表头样式: `preset="header"` (粗体、灰色背景)
+  - 突出显示: `preset="highlight"` (黄色背景)
+  - 货币格式: `preset="currency"` (¥符号、千分位)
+  - 标准数据: `preset="data"` (统一字体格式)
+
+## 🎮 游戏开发专用功能
+• **配置表版本对比**: `excel_compare_sheets` - ID对象跟踪
+  - 装备表比较: `excel_compare_sheets("v1.xlsx", "装备表", "v2.xlsx", "装备表")`
+  - 智能变化追踪: 攻击力100→120 (+20, +20%) 🔺
+  - 对象状态标识: 新增🆕、删除❌、修改🔄
+• **完整对比流程**: 比较配置表 → 突出显示变化 → 格式化报告 → 导出结果
+• **专项支持**: TrSkill技能表、装备表、怪物表等游戏配置结构
 
 ## 常见问题快速解决
 • 文件不存在 → 检查路径和权限
@@ -94,7 +108,7 @@ def excel_assistant_guide() -> str:
 • 搜索无结果 → 检查正则表达式和范围设置
 • 数据追加位置 → 用`excel_find_last_row`定位插入点
 
-专业提示：游戏配置表使用`excel_compare_sheets`追踪ID对象变更"""
+🚀 高级工作流: 数据定位→安全更新→快速格式化→游戏配置对比"""
 
 
 # ==================== MCP 工具定义 ====================
