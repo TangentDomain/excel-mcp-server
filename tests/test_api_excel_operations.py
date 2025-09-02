@@ -428,3 +428,103 @@ class TestExcelOperations:
         assert len(errors) == 0, f"并发访问出现错误: {errors}"
         assert len(results) == 5
         assert all(result['success'] for result in results)
+
+
+    # ==================== 测试find_last_row方法 ====================
+
+    def test_find_last_row_entire_sheet(self, test_excel_file):
+        """测试查找整个工作表的最后一行"""
+        result = ExcelOperations.find_last_row(str(test_excel_file), "TestSheet")
+
+        assert result['success']
+        assert result['data']['last_row'] == 4  # 表头1行 + 数据3行
+        assert result['data']['sheet_name'] == "TestSheet"
+        assert result['data']['column'] is None
+        assert result['data']['search_scope'] == "整个工作表"
+        assert "成功查找整个工作表最后一行" in result['message']
+
+    def test_find_last_row_specific_column_by_name(self, test_excel_file):
+        """测试查找指定列（按列名）的最后一行"""
+        result = ExcelOperations.find_last_row(str(test_excel_file), "TestSheet", "A")
+
+        assert result['success']
+        assert result['data']['last_row'] == 4
+        assert result['data']['sheet_name'] == "TestSheet"
+        assert result['data']['column'] == "A"
+        assert result['data']['search_scope'] == "A列"
+        assert "成功查找A列最后一行" in result['message']
+
+    def test_find_last_row_specific_column_by_index(self, test_excel_file):
+        """测试查找指定列（按索引）的最后一行"""
+        result = ExcelOperations.find_last_row(str(test_excel_file), "TestSheet", 2)
+
+        assert result['success']
+        assert result['data']['last_row'] == 4
+        assert result['data']['sheet_name'] == "TestSheet"
+        assert result['data']['column'] == 2
+        assert result['data']['search_scope'] == "B列"
+        assert "成功查找B列最后一行" in result['message']
+
+    def test_find_last_row_empty_sheet(self, temp_dir):
+        """测试查找空工作表的最后一行"""
+        empty_file = temp_dir / "empty.xlsx"
+        wb = Workbook()
+        wb.save(empty_file)
+
+        result = ExcelOperations.find_last_row(str(empty_file), "Sheet")
+
+        assert result['success']
+        assert result['data']['last_row'] == 0
+        assert "没有数据" in result['message']
+
+    def test_find_last_row_nonexistent_sheet(self, test_excel_file):
+        """测试查找不存在的工作表"""
+        result = ExcelOperations.find_last_row(str(test_excel_file), "NonExistentSheet")
+
+        assert not result['success']
+        assert "工作表不存在" in result['error']
+
+    def test_find_last_row_invalid_file(self):
+        """测试无效的文件路径"""
+        result = ExcelOperations.find_last_row("nonexistent_file.xlsx", "Sheet1")
+
+        assert not result['success']
+        assert "查找最后一行失败" in result['error']
+
+    def test_find_last_row_invalid_column_name(self, test_excel_file):
+        """测试无效的列名"""
+        result = ExcelOperations.find_last_row(str(test_excel_file), "TestSheet", "INVALID")
+
+        assert not result['success']
+        assert "无效的列名" in result['error']
+
+    def test_find_last_row_invalid_column_index(self, test_excel_file):
+        """测试无效的列索引"""
+        result = ExcelOperations.find_last_row(str(test_excel_file), "TestSheet", 0)
+
+        assert not result['success']
+        assert "列索引必须大于等于1" in result['error']
+
+    def test_find_last_row_invalid_column_type(self, test_excel_file):
+        """测试无效的列参数类型"""
+        result = ExcelOperations.find_last_row(str(test_excel_file), "TestSheet", 3.14)
+
+        assert not result['success']
+        assert "列参数必须是字符串或整数" in result['error']
+
+    @unittest.mock.patch('src.api.excel_operations.logger')
+    def test_find_last_row_logging(self, mock_logger, test_excel_file):
+        """测试find_last_row的日志记录"""
+        # 开启调试日志
+        original_debug = ExcelOperations.DEBUG_LOG_ENABLED
+        ExcelOperations.DEBUG_LOG_ENABLED = True
+
+        try:
+            ExcelOperations.find_last_row(str(test_excel_file), "TestSheet")
+
+            # 验证日志调用
+            mock_logger.info.assert_called()
+            log_calls = [call.args[0] for call in mock_logger.info.call_args_list]
+            assert any("[API][ExcelOperations] 开始查找最后一行" in call for call in log_calls)
+        finally:
+            ExcelOperations.DEBUG_LOG_ENABLED = original_debug

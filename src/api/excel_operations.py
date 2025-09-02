@@ -1119,3 +1119,112 @@ class ExcelOperations:
             error_msg = f"比较文件失败: {str(e)}"
             logger.error(f"{cls._LOG_PREFIX} {error_msg}")
             return cls._format_error_result(error_msg)
+
+    @classmethod
+    def find_last_row(
+        cls,
+        file_path: str,
+        sheet_name: str,
+        column: Optional[Union[str, int]] = None
+    ) -> Dict[str, Any]:
+        """
+        @intention 查找表格中最后一行有数据的位置
+
+        Args:
+            file_path: Excel文件路径 (.xlsx/.xlsm)
+            sheet_name: 工作表名称
+            column: 指定列来查找最后一行（可选）
+                - None: 查找整个工作表的最后一行
+                - 整数: 列索引 (1-based，1=A列)
+                - 字符串: 列名 (A, B, C...)
+
+        Returns:
+            Dict: 包含 success、last_row、message 等信息
+
+        Example:
+            # 查找整个工作表的最后一行
+            result = ExcelOperations.find_last_row("data.xlsx", "Sheet1")
+            # 查找A列的最后一行有数据的位置
+            result = ExcelOperations.find_last_row("data.xlsx", "Sheet1", "A")
+            # 查找第3列的最后一行有数据的位置
+            result = ExcelOperations.find_last_row("data.xlsx", "Sheet1", 3)
+        """
+        if cls.DEBUG_LOG_ENABLED:
+            logger.info(f"{cls._LOG_PREFIX} 开始查找最后一行: {sheet_name}")
+
+        try:
+            from ..core.excel_reader import ExcelReader
+            reader = ExcelReader(file_path)
+
+            # 获取工作簿和工作表
+            workbook = reader._get_workbook(read_only=True, data_only=True)
+            sheet = reader._get_worksheet(workbook, sheet_name)
+
+            last_row = 0
+            search_info = ""
+
+            if column is None:
+                # 查找整个工作表的最后一行
+                last_row = sheet.max_row
+                # 从后往前查找真正有数据的最后一行
+                for row_num in range(sheet.max_row, 0, -1):
+                    has_data = False
+                    for col_num in range(1, sheet.max_column + 1):
+                        cell_value = sheet.cell(row=row_num, column=col_num).value
+                        if cell_value is not None and str(cell_value).strip():
+                            has_data = True
+                            break
+                    if has_data:
+                        last_row = row_num
+                        break
+                else:
+                    last_row = 0  # 整个工作表都没有数据
+                search_info = "整个工作表"
+            else:
+                # 查找指定列的最后一行
+                from openpyxl.utils import column_index_from_string, get_column_letter
+
+                # 转换列参数为列索引
+                if isinstance(column, str):
+                    try:
+                        col_index = column_index_from_string(column.upper())
+                    except ValueError:
+                        reader.close()
+                        return cls._format_error_result(f"无效的列名: {column}")
+                elif isinstance(column, int):
+                    if column < 1:
+                        reader.close()
+                        return cls._format_error_result("列索引必须大于等于1")
+                    col_index = column
+                else:
+                    reader.close()
+                    return cls._format_error_result("列参数必须是字符串或整数")
+
+                # 查找指定列的最后一行有数据
+                for row_num in range(sheet.max_row, 0, -1):
+                    cell_value = sheet.cell(row=row_num, column=col_index).value
+                    if cell_value is not None and str(cell_value).strip():
+                        last_row = row_num
+                        break
+
+                col_letter = get_column_letter(col_index)
+                search_info = f"{col_letter}列"
+
+            reader.close()
+
+            return {
+                'success': True,
+                'data': {
+                    'last_row': last_row,
+                    'sheet_name': sheet_name,
+                    'column': column,
+                    'search_scope': search_info
+                },
+                'last_row': last_row,  # 兼容性字段
+                'message': f"成功查找{search_info}最后一行: 第{last_row}行" if last_row > 0 else f"{search_info}没有数据"
+            }
+
+        except Exception as e:
+            error_msg = f"查找最后一行失败: {str(e)}"
+            logger.error(f"{cls._LOG_PREFIX} {error_msg}")
+            return cls._format_error_result(error_msg)

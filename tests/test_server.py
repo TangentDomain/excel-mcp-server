@@ -18,7 +18,8 @@ from src.server import (
     excel_delete_rows,
     excel_delete_columns,
     excel_format_cells,
-    excel_search
+    excel_search,
+    excel_find_last_row
 )
 
 
@@ -486,3 +487,72 @@ class TestServerInterfaces:
             else:
                 assert 'error' in result
                 assert isinstance(result['error'], str)
+
+
+    def test_excel_find_last_row(self, sample_excel_file):
+        """Test excel_find_last_row interface - basic functionality"""
+        # 获取第一个工作表名称
+        sheets_result = excel_list_sheets(sample_excel_file)
+        assert sheets_result['success']
+        sheet_name = sheets_result['sheets'][0]
+
+        # 测试查找整个工作表的最后一行
+        result = excel_find_last_row(sample_excel_file, sheet_name)
+
+        assert result['success'] is True
+        assert 'data' in result
+        assert 'last_row' in result['data']
+        assert 'sheet_name' in result['data']
+        assert 'column' in result['data']
+        assert 'search_scope' in result['data']
+        assert isinstance(result['data']['last_row'], int)
+        assert result['data']['last_row'] >= 0
+        assert result['data']['sheet_name'] == sheet_name
+        assert result['data']['column'] is None  # 没有指定列
+        assert result['data']['search_scope'] == "整个工作表"
+
+        # 兼容性字段检查
+        assert 'last_row' in result
+        assert result['last_row'] == result['data']['last_row']
+
+        # 消息检查
+        assert 'message' in result
+        assert isinstance(result['message'], str)
+
+    def test_excel_find_last_row_with_column_name(self, sample_excel_file):
+        """Test excel_find_last_row with column name - specific column functionality"""
+        sheets_result = excel_list_sheets(sample_excel_file)
+        assert sheets_result['success']
+        sheet_name = sheets_result['sheets'][0]
+
+        # 测试查找A列的最后一行
+        result = excel_find_last_row(sample_excel_file, sheet_name, "A")
+
+        assert result['success'] is True
+        assert result['data']['column'] == "A"
+        assert result['data']['search_scope'] == "A列"
+        assert isinstance(result['data']['last_row'], int)
+        assert result['data']['last_row'] >= 0
+
+    def test_excel_find_last_row_with_column_index(self, sample_excel_file):
+        """Test excel_find_last_row with column index - specific column functionality"""
+        sheets_result = excel_list_sheets(sample_excel_file)
+        assert sheets_result['success']
+        sheet_name = sheets_result['sheets'][0]
+
+        # 测试查找第1列的最后一行
+        result = excel_find_last_row(sample_excel_file, sheet_name, 1)
+
+        assert result['success'] is True
+        assert result['data']['column'] == 1
+        assert result['data']['search_scope'] == "A列"  # 第1列对应A列
+        assert isinstance(result['data']['last_row'], int)
+        assert result['data']['last_row'] >= 0
+
+    def test_excel_find_last_row_nonexistent_sheet(self, sample_excel_file):
+        """Test excel_find_last_row with nonexistent sheet - error handling"""
+        result = excel_find_last_row(sample_excel_file, "NonExistentSheet")
+
+        assert result['success'] is False
+        assert 'error' in result
+        assert "工作表不存在" in result['error']

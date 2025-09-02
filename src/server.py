@@ -58,7 +58,7 @@ def excel_assistant_guide() -> str:
 
     统一的Excel操作指导，包含关键原则、常见问题和最佳实践
     """
-    return """🔧 Excel专业AI助手 - 27个工具可用
+    return """🔧 Excel专业AI助手 - 28个工具可用
 
 ## 核心原则
 • 1-based索引：第1行=1, 第1列=1
@@ -68,6 +68,7 @@ def excel_assistant_guide() -> str:
 
 ## ⚠️ 关键警告
 • excel_update_range会覆盖现有数据
+• **更新前必须先用excel_get_range查看周围数据，确保填写风格一致**
 • 如需保留原数据，请先用excel_insert_rows插入新行
 • 使用绝对路径避免文件访问问题
 • 确认文件扩展名(.xlsx/.xlsm)和权限
@@ -75,14 +76,23 @@ def excel_assistant_guide() -> str:
 ## 工作流程
 1. 获取文件信息 (`excel_get_file_info`)
 2. 查看工作表结构 (`excel_list_sheets`, `excel_get_headers`)
-3. 执行操作（读取、更新、搜索等）
-4. 验证结果
+3. 找到数据边界 (`excel_find_last_row`) - 定位数据范围
+4. 执行操作（读取、更新、搜索等）
+5. 验证结果
+
+## 常用工具组合
+• **数据定位**: `excel_find_last_row` → 快速找到表格最后一行
+  - 整表查找: `excel_find_last_row("data.xlsx", "Sheet1")`
+  - 指定列查找: `excel_find_last_row("data.xlsx", "Sheet1", "A")`
+• **安全更新**: `excel_get_range` → `excel_update_range`
+  - 先查看现有数据格式，再保持一致性更新
 
 ## 常见问题快速解决
 • 文件不存在 → 检查路径和权限
 • 工作表不存在 → 使用`excel_list_sheets`确认名称
 • 范围操作失败 → 确保格式："Sheet1!A1:C10"
 • 搜索无结果 → 检查正则表达式和范围设置
+• 数据追加位置 → 用`excel_find_last_row`定位插入点
 
 专业提示：游戏配置表使用`excel_compare_sheets`追踪ID对象变更"""
 
@@ -401,6 +411,37 @@ def excel_insert_columns(
         result = excel_insert_columns("data.xlsx", "Sheet1", 1, 2)
     """
     return ExcelOperations.insert_columns(file_path, sheet_name, column_index, count)
+
+
+@mcp.tool()
+def excel_find_last_row(
+    file_path: str,
+    sheet_name: str,
+    column: Optional[Union[str, int]] = None
+) -> Dict[str, Any]:
+    """
+    查找表格中最后一行有数据的位置
+
+    Args:
+        file_path: Excel文件路径 (.xlsx/.xlsm)
+        sheet_name: 工作表名称
+        column: 指定列来查找最后一行（可选）
+            - None: 查找整个工作表的最后一行
+            - 整数: 列索引 (1-based，1=A列)
+            - 字符串: 列名 (A, B, C...)
+
+    Returns:
+        Dict: 包含 success、last_row、message 等信息
+
+    Example:
+        # 查找整个工作表的最后一行
+        result = excel_find_last_row("data.xlsx", "Sheet1")
+        # 查找A列的最后一行有数据的位置
+        result = excel_find_last_row("data.xlsx", "Sheet1", "A")
+        # 查找第3列的最后一行有数据的位置
+        result = excel_find_last_row("data.xlsx", "Sheet1", 3)
+    """
+    return ExcelOperations.find_last_row(file_path, sheet_name, column)
 
 
 @mcp.tool()
