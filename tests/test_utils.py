@@ -91,7 +91,6 @@ class TestModelTypes:
         sheet_info = SheetInfo(
             index=0,
             name="Sheet1",
-            is_active=True,
             max_row=100,
             max_column=10,
             max_column_letter="J"
@@ -99,7 +98,6 @@ class TestModelTypes:
 
         assert sheet_info.name == "Sheet1"
         assert sheet_info.index == 0
-        assert sheet_info.is_active is True
         assert sheet_info.max_row == 100
         assert sheet_info.max_column == 10
         assert sheet_info.max_column_letter == "J"
@@ -109,7 +107,6 @@ class TestModelTypes:
         sheet_info = SheetInfo(
             index=1,
             name="数据分析表",
-            is_active=False,
             max_row=50,
             max_column=5,
             max_column_letter="E"
@@ -117,7 +114,6 @@ class TestModelTypes:
 
         assert sheet_info.name == "数据分析表"
         assert sheet_info.index == 1
-        assert sheet_info.is_active is False
 
     def test_range_info_creation(self):
         """Test RangeInfo creation with actual fields"""
@@ -244,7 +240,6 @@ class TestModelTypes:
         sheet_info = SheetInfo(
             index=0,
             name="测试表",
-            is_active=True,
             max_row=10,
             max_column=3,
             max_column_letter="C"

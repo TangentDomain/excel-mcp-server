@@ -61,7 +61,6 @@ class ExcelManager:
                     created_sheets.append(SheetInfo(
                         index=i,
                         name=sheet.title,
-                        is_active=i == 0,
                         max_row=1,
                         max_column=1,
                         max_column_letter='A'
@@ -75,7 +74,6 @@ class ExcelManager:
                 created_sheets = [SheetInfo(
                     index=0,
                     name='Sheet1',
-                    is_active=True,
                     max_row=1,
                     max_column=1,
                     max_column_letter='A'
@@ -178,7 +176,6 @@ class ExcelManager:
             sheet_info = SheetInfo(
                 index=workbook.sheetnames.index(sheet_name),
                 name=new_sheet.title,
-                is_active=new_sheet == workbook.active,
                 max_row=1,
                 max_column=1,
                 max_column_letter='A'
@@ -297,7 +294,6 @@ class ExcelManager:
 
             # 记录删除前的信息
             deleted_sheet_index = workbook.sheetnames.index(sheet_name)
-            was_active = workbook[sheet_name] == workbook.active
             deleted_sheet_name = sheet_name  # 保存要删除的工作表名称
 
             logger.info(f"准备删除工作表: {deleted_sheet_name}, 索引: {deleted_sheet_index}")
@@ -308,12 +304,13 @@ class ExcelManager:
 
             logger.info(f"删除后工作表列表: {workbook.sheetnames}")
 
-            # 如果删除的是活动工作表，设置新的活动工作表
-            if was_active:
-                if deleted_sheet_index < len(workbook.sheetnames):
-                    workbook.active = deleted_sheet_index
-                else:
-                    workbook.active = deleted_sheet_index - 1
+            # 如果删除的是第一个工作表，设置新的第一个为活动工作表
+            if deleted_sheet_index == 0 and workbook.sheetnames:
+                workbook.active = 0
+            elif deleted_sheet_index < len(workbook.sheetnames):
+                workbook.active = deleted_sheet_index
+            else:
+                workbook.active = deleted_sheet_index - 1
 
             # 保存文件
             workbook.save(self.file_path)
@@ -325,7 +322,6 @@ class ExcelManager:
                 remaining_sheet_infos.append(SheetInfo(
                     index=i,
                     name=sheet_name_iter,
-                    is_active=sheet == workbook.active,
                     max_row=sheet.max_row,
                     max_column=sheet.max_column,
                     max_column_letter=get_column_letter(sheet.max_column)
@@ -339,7 +335,6 @@ class ExcelManager:
                     'file_path': self.file_path,
                     'deleted_sheet': deleted_sheet_name,
                     'deleted_index': deleted_sheet_index,
-                    'was_active': was_active,
                     'new_active_sheet': workbook.active.title,
                     'remaining_sheets': workbook.sheetnames,
                     'total_sheets': len(workbook.sheetnames)
@@ -391,7 +386,6 @@ class ExcelManager:
             # 获取工作表
             sheet = workbook[old_name]
             old_index = workbook.sheetnames.index(old_name)
-            was_active = sheet == workbook.active
 
             # 重命名工作表
             sheet.title = new_name
@@ -403,7 +397,6 @@ class ExcelManager:
             renamed_sheet_info = SheetInfo(
                 index=old_index,
                 name=new_name,
-                is_active=was_active,
                 max_row=sheet.max_row,
                 max_column=sheet.max_column,
                 max_column_letter=get_column_letter(sheet.max_column) if sheet.max_column > 0 else 'A'
@@ -418,7 +411,6 @@ class ExcelManager:
                     'old_name': old_name,
                     'new_name': new_name,
                     'sheet_index': old_index,
-                    'is_active': was_active,
                     'all_sheets': workbook.sheetnames
                 }
             )
@@ -463,14 +455,11 @@ class ExcelManager:
             sheet_names = workbook.sheetnames
             has_macros = file_format == 'xlsm'
 
-            # 获取活动工作表信息
-            active_sheet = workbook.active.title if workbook.active else None
-
-            # 简单统计数据行数（仅活动工作表）
+            # 简单统计数据行数（使用第一个工作表）
             total_rows = 0
             total_cols = 0
-            if workbook.active:
-                ws = workbook.active
+            if workbook.worksheets:
+                ws = workbook.worksheets[0]  # 使用第一个工作表
                 if ws.max_row and ws.max_column:
                     total_rows = ws.max_row
                     total_cols = ws.max_column
@@ -490,7 +479,6 @@ class ExcelManager:
                     'format': file_format,
                     'sheet_count': sheet_count,
                     'sheet_names': sheet_names,
-                    'active_sheet': active_sheet,
                     'has_macros': has_macros,
                     'total_rows': total_rows,
                     'total_cols': total_cols

@@ -147,8 +147,7 @@ class ExcelOperations:
                 'success': True,
                 'sheets': sheets,
                 'file_path': file_path,
-                'total_sheets': result.metadata.get('total_sheets', len(sheets)) if result.metadata else len(sheets),
-                'active_sheet': result.metadata.get('active_sheet', '') if result.metadata else ''
+                'total_sheets': result.metadata.get('total_sheets', len(sheets)) if result.metadata else len(sheets)
             }
 
             # 步骤3: 清理资源

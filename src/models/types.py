@@ -85,7 +85,6 @@ class SheetInfo:
     """工作表信息"""
     index: int
     name: str
-    is_active: bool
     max_row: int
     max_column: int
     max_column_letter: str

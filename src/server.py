@@ -122,7 +122,7 @@ def excel_list_sheets(file_path: str) -> Dict[str, Any]:
         file_path: Excel文件路径 (.xlsx/.xlsm)
 
     Returns:
-        Dict: 包含success、sheets、total_sheets、active_sheet
+        Dict: 包含success、sheets、total_sheets
 
     Example:
         # 列出工作表名称
@@ -130,8 +130,7 @@ def excel_list_sheets(file_path: str) -> Dict[str, Any]:
         # 返回: {
         #   'success': True,
         #   'sheets': ['Sheet1', 'Sheet2'],
-        #   'total_sheets': 2,
-        #   'active_sheet': 'Sheet1'
+        #   'total_sheets': 2
         # }
     """
     return ExcelOperations.list_sheets(file_path)

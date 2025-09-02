@@ -80,7 +80,8 @@ class TestExcelOperationsExtended:
             assert result['success'] is True
             assert result['sheets'] == ["Sheet1", "数据表"]
             assert result['total_sheets'] == 2
-            assert result['active_sheet'] == 'Sheet1'
+            # active_sheet概念已被移除
+            assert 'active_sheet' not in result
             mock_reader.close.assert_called_once()
 
     def test_get_headers_success(self):

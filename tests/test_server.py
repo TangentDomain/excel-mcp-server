@@ -33,10 +33,11 @@ class TestServerInterfaces:
         assert result['success'] is True
         assert 'sheets' in result
         assert isinstance(result['sheets'], list)
-        assert 'active_sheet' in result
         assert 'total_sheets' in result
         # 重构后：不再包含表头信息，单一职责
         assert 'sheets_with_headers' not in result
+        # 已移除active_sheet概念
+        assert 'active_sheet' not in result
 
     def test_excel_get_sheet_headers(self, sample_excel_file):
         """Test excel_get_sheet_headers interface - 获取工作表表头信息"""
@@ -69,10 +70,11 @@ class TestServerInterfaces:
 
         assert result['success'] is True
         assert 'sheets' in result
-        assert 'active_sheet' in result
         assert 'total_sheets' in result
         # 重构后：不包含表头信息，单一职责
         assert 'sheets_with_headers' not in result
+        # 已移除active_sheet概念
+        assert 'active_sheet' not in result
 
     def test_excel_get_sheet_headers_multi_sheet(self, multi_sheet_excel_file):
         """Test excel_get_sheet_headers with multiple sheets"""

@@ -77,7 +77,6 @@ class ExcelReader:
                 sheet_info = SheetInfo(
                     index=i,
                     name=sheet_name,
-                    is_active=sheet == workbook.active,
                     max_row=sheet.max_row,
                     max_column=sheet.max_column,
                     max_column_letter=get_column_letter(sheet.max_column)
@@ -89,8 +88,7 @@ class ExcelReader:
                 data=sheets_info,
                 metadata={
                     'file_path': self.file_path,
-                    'total_sheets': len(sheets_info),
-                    'active_sheet': workbook.active.title
+                    'total_sheets': len(sheets_info)
                 }
             )
 

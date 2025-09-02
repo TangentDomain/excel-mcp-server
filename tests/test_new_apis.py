@@ -31,7 +31,8 @@ class TestNewAPIs:
         assert result['success'] is True
         assert 'sheets' in result
         assert 'total_sheets' in result
-        assert 'active_sheet' in result
+        # active_sheet概念已被移除
+        assert 'active_sheet' not in result
         # 确保不再返回sheets_with_headers
         assert 'sheets_with_headers' not in result
 
