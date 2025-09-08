@@ -44,21 +44,7 @@ logger = logging.getLogger(__name__)
 # 创建FastMCP服务器实例，开启调试模式和详细日志
 mcp = FastMCP(
     name="excel-mcp",
-    debug=True,                    # 开启调试模式
-    log_level="DEBUG"              # 设置日志级别为DEBUG
-)
-
-
-# ==================== 全局提示词定义 ====================
-
-@mcp.prompt()
-def excel_assistant_guide() -> str:
-    """
-    Excel操作AI助手核心指南
-
-    统一的Excel操作指导，包含关键原则、常见问题和最佳实践
-    """
-    return """🔧 Excel专业AI助手 - 28个工具可用
+    instructions="""🔧 Excel专业AI助手 - 28个工具可用
 
 ## 核心原则
 • 1-based索引：第1行=1, 第1列=1
@@ -82,44 +68,18 @@ def excel_assistant_guide() -> str:
 
 ## 常用工具组合
 • **数据定位**: `excel_find_last_row` → 快速找到表格最后一行
-  - 整表查找: `excel_find_last_row("data.xlsx", "Sheet1")`
-  - 指定列查找: `excel_find_last_row("data.xlsx", "Sheet1", "A")`
 • **安全更新**: `excel_get_range` → `excel_update_range`
-  - 先查看现有数据格式，再保持一致性更新
 • **🎨 快速格式化**: `excel_format_cells` 预设样式（降低复杂度）
-  - 标题样式: `preset="title"` (大字体、粗体、居中)
-  - 表头样式: `preset="header"` (粗体、灰色背景)
-  - 突出显示: `preset="highlight"` (黄色背景)
-  - 货币格式: `preset="currency"` (¥符号、千分位)
-  - 标准数据: `preset="data"` (统一字体格式)
-
-## 💡 数据填写模式参考
-• **观察现有数据格式**: 填写前先了解表格结构和数据样式
-  - 了解表头: `excel_get_headers("file.xlsx", "Sheet1")` - 先确认各列含义
-  - 查看样例: `excel_get_range("file.xlsx", "Sheet1!A2:Z6")` - 再看表头下面5行数据
-  - 数据规律: 观察ID格式、文本长度、数值范围、日期格式等
-• **保持格式一致性**:  
-  - ID列: 如果现有是6位数字(100001)，新增也用6位
-  - 文本列: 保持类似长度和命名风格 
-  - 数值列: 遵循现有的小数位数和数值范围
-  - 枚举列: 查看现有值范围，如"启用/禁用"或"A/B/C"
-
-## 常见问题快速解决
-• 文件不存在 → 检查路径和权限
-• 工作表不存在 → 使用`excel_list_sheets`确认名称
-• 范围操作失败 → 确保格式："Sheet1!A1:C10"
-• 搜索无结果 → 检查正则表达式和范围设置
-• 数据追加位置 → 用`excel_find_last_row`定位插入点
 
 ## 🎮 游戏开发专用功能
 • **配置表版本对比**: `excel_compare_sheets` - ID对象跟踪
-  - 装备表比较: `excel_compare_sheets("v1.xlsx", "装备表", "v2.xlsx", "装备表")`
-  - 智能变化追踪: 攻击力100→120 (+20, +20%) 🔺
-  - 对象状态标识: 新增🆕、删除❌、修改🔄
-• **完整对比流程**: 比较配置表 → 突出显示变化 → 格式化报告 → 导出结果
+• **智能变化追踪**: 攻击力100→120 (+20, +20%) 🔺
 • **专项支持**: TrSkill技能表、装备表、怪物表等游戏配置结构
 
-🚀 高级工作流: 数据定位→安全更新→快速格式化→游戏配置对比"""
+🚀 高级工作流: 数据定位→安全更新→快速格式化→游戏配置对比""",
+    debug=True,                    # 开启调试模式
+    log_level="DEBUG"              # 设置日志级别为DEBUG
+)
 
 
 # ==================== MCP 工具定义 ====================
