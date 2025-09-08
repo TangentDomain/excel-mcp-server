@@ -1081,6 +1081,58 @@ def excel_compare_files(
         - 🔄 修改对象：ID存在于两文件中但属性发生变化
     """
     return ExcelOperations.compare_files(file1_path, file2_path)
+
+
+@mcp.tool()
+def excel_check_duplicate_ids(
+    file_path: str,
+    sheet_name: str,
+    id_column: Union[int, str] = 1,
+    header_row: int = 1
+) -> Dict[str, Any]:
+    """
+    检查Excel工作表中ID列的重复值
+
+    专为游戏配置表设计，快速识别ID重复问题，确保配置数据的唯一性。
+
+    Args:
+        file_path: Excel文件路径 (.xlsx/.xlsm)
+        sheet_name: 工作表名称
+        id_column: ID列位置（1-based数字或列名），默认第一列
+        header_row: 表头行号（1-based），默认第一行
+
+    Returns:
+        Dict: 查重结果
+        {
+            "success": true,
+            "has_duplicates": true,
+            "duplicate_count": 2,
+            "total_ids": 100,
+            "unique_ids": 98,
+            "duplicates": [
+                {
+                    "id_value": "100001",
+                    "count": 3,
+                    "rows": [5, 15, 25]
+                },
+                {
+                    "id_value": "100002", 
+                    "count": 2,
+                    "rows": [8, 18]
+                }
+            ],
+            "message": "发现2个重复ID，涉及5行数据"
+        }
+
+    Example:
+        # 检查技能配置表ID重复
+        result = excel_check_duplicate_ids("skills.xlsx", "技能配置表")
+        # 检查装备表第2列ID重复
+        result = excel_check_duplicate_ids("items.xlsx", "装备配置表", id_column=2)
+    """
+    return ExcelOperations.check_duplicate_ids(file_path, sheet_name, id_column, header_row)
+
+
 @mcp.tool()
 def excel_compare_sheets(
     file1_path: str,

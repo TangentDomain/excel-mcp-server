@@ -1234,3 +1234,172 @@ class ExcelOperations:
             error_msg = f"查找最后一行失败: {str(e)}"
             logger.error(f"{cls._LOG_PREFIX} {error_msg}")
             return cls._format_error_result(error_msg)
+
+    @classmethod
+    def check_duplicate_ids(
+        cls, 
+        file_path: str, 
+        sheet_name: str, 
+        id_column: Union[int, str] = 1,
+        header_row: int = 1
+    ) -> Dict[str, Any]:
+        """
+        检查Excel工作表中的ID重复情况
+        
+        Args:
+            file_path: Excel文件路径
+            sheet_name: 工作表名称
+            id_column: ID列位置 (1-based数字或列名)
+            header_row: 表头行号 (1-based)
+        
+        Returns:
+            Dict: 包含success、has_duplicates、duplicate_count、total_ids、unique_ids、duplicates、message
+        """
+        if cls.DEBUG_LOG_ENABLED:
+            logger.info(f"{cls._LOG_PREFIX} 开始检查ID重复: {sheet_name}")
+
+        try:
+            from collections import Counter
+            from openpyxl import load_workbook
+            
+            # 参数验证
+            if not file_path or not sheet_name:
+                return {
+                    'success': False,
+                    'message': '文件路径和工作表名不能为空',
+                    'has_duplicates': False,
+                    'duplicate_count': 0,
+                    'total_ids': 0,
+                    'unique_ids': 0,
+                    'duplicates': []
+                }
+            
+            # 加载工作簿
+            try:
+                wb = load_workbook(file_path, read_only=True)
+            except FileNotFoundError:
+                return {
+                    'success': False,
+                    'message': f'文件不存在: {file_path}',
+                    'has_duplicates': False,
+                    'duplicate_count': 0,
+                    'total_ids': 0,
+                    'unique_ids': 0,
+                    'duplicates': []
+                }
+            except Exception as e:
+                return {
+                    'success': False,
+                    'message': f'无法加载文件: {str(e)}',
+                    'has_duplicates': False,
+                    'duplicate_count': 0,
+                    'total_ids': 0,
+                    'unique_ids': 0,
+                    'duplicates': []
+                }
+            
+            # 检查工作表是否存在
+            if sheet_name not in wb.sheetnames:
+                return {
+                    'success': False,
+                    'message': f'工作表不存在: {sheet_name}',
+                    'has_duplicates': False,
+                    'duplicate_count': 0,
+                    'total_ids': 0,
+                    'unique_ids': 0,
+                    'duplicates': []
+                }
+            
+            ws = wb[sheet_name]
+            
+            # 处理列索引
+            if isinstance(id_column, str):
+                from openpyxl.utils import column_index_from_string
+                try:
+                    col_idx = column_index_from_string(id_column)
+                except Exception:
+                    return {
+                        'success': False,
+                        'message': f'无效的列名: {id_column}',
+                        'has_duplicates': False,
+                        'duplicate_count': 0,
+                        'total_ids': 0,
+                        'unique_ids': 0,
+                        'duplicates': []
+                    }
+            else:
+                col_idx = id_column
+            
+            # 检查表头行是否存在
+            if header_row < 1 or header_row > ws.max_row:
+                return {
+                    'success': False,
+                    'message': f'表头行不存在: {header_row}',
+                    'has_duplicates': False,
+                    'duplicate_count': 0,
+                    'total_ids': 0,
+                    'unique_ids': 0,
+                    'duplicates': []
+                }
+            
+            # 检查列是否存在
+            if col_idx < 1 or col_idx > ws.max_column:
+                return {
+                    'success': False,
+                    'message': f'列不存在或索引超出范围: {col_idx}',
+                    'has_duplicates': False,
+                    'duplicate_count': 0,
+                    'total_ids': 0,
+                    'unique_ids': 0,
+                    'duplicates': []
+                }
+            
+            # 收集ID数据
+            ids_with_rows = []
+            for row in range(header_row + 1, ws.max_row + 1):
+                cell_value = ws.cell(row=row, column=col_idx).value
+                if cell_value is not None:  # 跳过空值
+                    ids_with_rows.append((cell_value, row))
+            
+            # 统计ID出现次数
+            id_counter = Counter([id_val for id_val, _ in ids_with_rows])
+            total_ids = len(ids_with_rows)
+            unique_ids = len(id_counter)
+            
+            # 查找重复的ID
+            duplicates = []
+            duplicate_count = 0
+            
+            for id_value, count in id_counter.items():
+                if count > 1:
+                    duplicate_count += 1
+                    # 找到该ID的所有行号
+                    rows = [row for id_val, row in ids_with_rows if id_val == id_value]
+                    # 使用绝对行号（Excel中的实际行号）
+                    absolute_rows = rows
+                    
+                    duplicates.append({
+                        'id_value': id_value,
+                        'count': count,
+                        'rows': absolute_rows
+                    })
+            
+            has_duplicates = duplicate_count > 0
+            
+            # 构建返回结果
+            message = f"共检查{total_ids}个ID，发现{duplicate_count}个重复ID" if has_duplicates else f"共检查{total_ids}个ID，无重复ID"
+            
+            return {
+                'success': True,
+                'has_duplicates': has_duplicates,
+                'duplicate_count': duplicate_count,
+                'total_ids': total_ids,
+                'unique_ids': unique_ids,
+                'duplicates': duplicates,
+                'message': message
+            }
+            
+        except Exception as e:
+            error_msg = f"检查ID重复时发生错误: {str(e)}"
+            logger.error(f"{cls._LOG_PREFIX} {error_msg}")
+            return cls._format_error_result(error_msg)
