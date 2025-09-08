@@ -94,9 +94,9 @@ def excel_assistant_guide() -> str:
   - 标准数据: `preset="data"` (统一字体格式)
 
 ## 💡 数据填写模式参考
-• **观察现有数据格式**: 填写前先查看相邻行的数据样式
-  - 查看样例: `excel_get_range("file.xlsx", "Sheet1!A2:Z6")` - 看前5行数据
-  - 了解表头: `excel_get_headers("file.xlsx", "Sheet1")` - 确认列含义
+• **观察现有数据格式**: 填写前先了解表格结构和数据样式
+  - 了解表头: `excel_get_headers("file.xlsx", "Sheet1")` - 先确认各列含义
+  - 查看样例: `excel_get_range("file.xlsx", "Sheet1!A2:Z6")` - 再看表头下面5行数据
   - 数据规律: 观察ID格式、文本长度、数值范围、日期格式等
 • **保持格式一致性**:  
   - ID列: 如果现有是6位数字(100001)，新增也用6位
