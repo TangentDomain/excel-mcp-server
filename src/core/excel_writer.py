@@ -87,7 +87,7 @@ class ExcelWriter:
             workbook.save(self.file_path)
 
             mode_description = "插入模式" if insert_mode else "覆盖模式"
-            
+
             return OperationResult(
                 success=True,
                 data=modified_cells,
