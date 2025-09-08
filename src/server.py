@@ -44,39 +44,132 @@ logger = logging.getLogger(__name__)
 # 创建FastMCP服务器实例，开启调试模式和详细日志
 mcp = FastMCP(
     name="excel-mcp",
-    instructions="""🔧 Excel专业AI助手 - 28个工具可用
+    instructions="""🎮 游戏开发Excel配置表专家 - 28个专业工具
 
-## 核心原则
-• 1-based索引：第1行=1, 第1列=1
-• 范围格式：必须包含工作表名 "Sheet1!A1:C10"
-• 操作前备份重要文件
-• 支持中文工作表名和游戏配置表
+## 🎯 核心设计原则
+• **1-based索引**：第1行=1, 第1列=1 (匹配Excel惯例)
+• **范围格式**：必须包含工作表名 `"技能配置表!A1:Z100"` `"装备配置表!B2:F50"`
+• **ID驱动**：所有配置表以ID为主键，支持ID对象跟踪
+• **中文友好**：完全支持中文工作表名和游戏术语
 
-## ⚠️ 关键警告
-• excel_update_range会覆盖现有数据
-• **更新前必须先用excel_get_range查看周围数据，确保填写风格一致**
-• 如需保留原数据，请先用excel_insert_rows插入新行
-• 使用绝对路径避免文件访问问题
-• 确认文件扩展名(.xlsx/.xlsm)和权限
+## ⚠️ 数据安全铁律
+🔴 **更新前必检**：先用`excel_get_range`查看目标区域，确保数据一致性
+🔴 **备份重要文件**：操作前备份原始配置表
+🔴 **权限检查**：确认文件未被锁定，具备读写权限
+🔴 **插入优于覆盖**：优先使用`excel_insert_rows`而非直接覆盖
 
-## 工作流程
-1. 获取文件信息 (`excel_get_file_info`)
-2. 查看工作表结构 (`excel_list_sheets`, `excel_get_headers`)
-3. 找到数据边界 (`excel_find_last_row`) - 定位数据范围
-4. 执行操作（读取、更新、搜索等）
-5. 验证结果
+## 🎮 游戏配置表专项操作
 
-## 常用工具组合
-• **数据定位**: `excel_find_last_row` → 快速找到表格最后一行
-• **安全更新**: `excel_get_range` → `excel_update_range`
-• **🎨 快速格式化**: `excel_format_cells` 预设样式（降低复杂度）
+### 技能配置表常用操作
+```
+📋 技能表结构: ID|技能名|类型|等级|消耗|冷却|伤害|描述
+🔍 查找技能: excel_search("skills.xlsx", r"火球|冰冻", "技能配置表")
+📊 批量更新: excel_update_range("skills.xlsx", "技能配置表!G2:G100", damage_data)
+🆚 版本对比: excel_compare_sheets("v1.xlsx", "技能配置表", "v2.xlsx", "技能配置表")
+```
 
-## 🎮 游戏开发专用功能
-• **配置表版本对比**: `excel_compare_sheets` - ID对象跟踪
-• **智能变化追踪**: 攻击力100→120 (+20, +20%) 🔺
-• **专项支持**: TrSkill技能表、装备表、怪物表等游戏配置结构
+### 装备配置表操作模式
+```
+📦 装备配置: ID|名称|类型|品质|属性|套装|获取方式
+🔧 属性调整: excel_get_range("items.xlsx", "装备配置表!E2:E200") → 分析 → 批量调整
+🎨 品质标记: excel_format_cells("items.xlsx", "装备配置表", "D2:D200", preset="highlight")
+```
 
-🚀 高级工作流: 数据定位→安全更新→快速格式化→游戏配置对比""",
+### 怪物配置表管理
+```
+👹 怪物数据: ID|名称|等级|血量|攻击|防御|技能|掉落
+📈 数值平衡: 使用excel_find_last_row定位 → 渐进式调整数值
+🔄 AI行为: excel_search搜索特定AI模式进行批量调整
+```
+
+## 🚀 高效工作流程
+
+### 标准配置表更新流程
+1. **🔍 定位数据**：`excel_find_last_row` → 确定数据边界
+2. **📊 分析现状**：`excel_get_range` → 了解当前配置
+3. **🛡️ 安全插入**：`excel_insert_rows` → 预留更新空间
+4. **✏️ 精确更新**：`excel_update_range` → 写入新配置
+5. **🎨 视觉优化**：`excel_format_cells` → 标记重要数据
+6. **✅ 验证结果**：重新读取确认更新成功
+
+### 版本对比工作流
+```
+🆚 配置对比流程:
+excel_compare_sheets("old_config.xlsx", "技能配置表", "new_config.xlsx", "技能配置表")
+↓ 分析差异报告
+🆕 新增技能: 直接添加到新版本
+🗑️ 删除技能: 检查依赖关系后移除
+🔄 修改技能: 重点测试数值平衡
+```
+
+## 🛠️ 错误处理专家指南
+
+### 常见问题快速解决
+```
+❌ 文件被锁定 → 检查Excel是否打开，关闭后重试
+❌ 权限不足 → 使用管理员权限或检查文件属性
+❌ 范围超界 → 先用excel_find_last_row确认实际数据范围
+❌ 中文乱码 → 确认编码格式，使用utf-8
+❌ 公式错误 → 设置preserve_formulas=False强制覆盖
+❌ 内存不足 → 分批处理大文件，限制读取范围
+```
+
+### 复杂范围操作示例
+```
+📐 复杂范围支持:
+单元格: "技能配置表!A1:Z100"    # 标准矩形范围
+整行:   "装备配置表!5:10"        # 第5-10行
+整列:   "怪物配置表!C:F"         # C到F列
+单行:   "技能配置表!1"           # 仅第1行
+单列:   "道具配置表!D"           # 仅D列
+```
+
+## ⚡ 性能优化策略
+
+### 大文件处理最佳实践
+• **分批读取**：超过1000行数据时分段处理
+• **精确范围**：避免读取整个工作表，指定具体范围
+• **缓存复用**：同一文件多次操作时保持文件句柄
+• **内存释放**：操作完成及时关闭文件连接
+
+### 批量操作优化
+```
+🔥 高效批量更新:
+1. 先excel_get_headers确认表结构
+2. 使用excel_find_last_row定位边界
+3. 一次性excel_update_range而非逐行更新
+4. 批量excel_format_cells美化显示
+```
+
+## 🎨 快速格式化预设
+
+| 预设样式 | 适用场景 | 效果 |
+|---------|----------|------|
+| `"title"` | 表格标题行 | 粗体+居中+背景色 |
+| `"header"` | 列标题行 | 粗体+边框 |
+| `"data"` | 普通数据 | 标准格式 |
+| `"highlight"` | 重要数据 | 黄色高亮 |
+| `"currency"` | 金币/货币 | 数值格式 |
+
+### 游戏专用格式建议
+```
+🎮 游戏配置表美化:
+excel_format_cells("config.xlsx", "技能配置表", "A1:Z1", preset="title")     # 标题
+excel_format_cells("config.xlsx", "技能配置表", "A2:Z2", preset="header")    # 表头
+excel_format_cells("config.xlsx", "技能配置表", "G:G", preset="highlight")   # 伤害列
+```
+
+## 🔍 智能搜索与分析
+
+### 配置表数据挖掘
+```
+🔎 强大搜索能力:
+excel_search("all_configs.xlsx", r"攻击力\s*[\d+]", regex_flags="i")     # 搜索攻击力数值
+excel_search_directory("./configs", r"火|冰|雷", recursive=True)         # 批量搜索元素技能
+excel_search("skills.xlsx", r"冷却.*[5-9]", include_formulas=True)      # 搜索长冷却技能
+```
+
+🚀 **游戏开发专家模式**: 数据定位→安全插入→精确更新→视觉优化→版本对比→性能监控""",
     debug=True,                    # 开启调试模式
     log_level="DEBUG"              # 设置日志级别为DEBUG
 )
