@@ -79,26 +79,33 @@ class ExcelOperations:
         file_path: str,
         range_expression: str,
         data: List[List[Any]],
-        preserve_formulas: bool = True
+        preserve_formulas: bool = True,
+        insert_mode: bool = True
     ) -> Dict[str, Any]:
         """
-        @intention 更新Excel文件中指定范围的数据，确保数据完整性和公式保护
+        @intention 更新Excel文件中指定范围的数据，支持插入和覆盖模式
 
         Args:
             file_path: Excel文件路径 (.xlsx/.xlsm)
             range_expression: 范围表达式，必须包含工作表名
             data: 二维数组数据 [[row1], [row2], ...]
             preserve_formulas: 是否保留现有公式
+            insert_mode: 数据写入模式 (默认值: True)
+                - True: 插入模式，在指定位置插入新行然后写入数据（更安全）
+                - False: 覆盖模式，直接覆盖目标范围的现有数据
 
         Returns:
             Dict: 标准化的操作结果
 
         Example:
             data = [["姓名", "年龄"], ["张三", 25]]
+            # 插入模式（默认，更安全）
             result = ExcelOperations.update_range("test.xlsx", "Sheet1!A1:B2", data)
+            # 覆盖模式（显式指定）
+            result = ExcelOperations.update_range("test.xlsx", "Sheet1!A1:B2", data, insert_mode=False)
         """
         if cls.DEBUG_LOG_ENABLED:
-            logger.info(f"{cls._LOG_PREFIX} 开始更新范围数据: {range_expression}")
+            logger.info(f"{cls._LOG_PREFIX} 开始更新范围数据: {range_expression}, 模式: {'插入' if insert_mode else '覆盖'}")
 
         try:
             # 步骤1: 验证参数格式
@@ -108,7 +115,7 @@ class ExcelOperations:
 
             # 步骤2: 执行数据写入
             writer = ExcelWriter(file_path)
-            result = writer.update_range(range_expression, data, preserve_formulas)
+            result = writer.update_range(range_expression, data, preserve_formulas, insert_mode)
 
             # 步骤3: 格式化结果
             return format_operation_result(result)

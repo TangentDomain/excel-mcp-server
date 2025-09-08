@@ -340,36 +340,40 @@ def excel_update_range(
     file_path: str,
     range: str,
     data: List[List[Any]],
-    preserve_formulas: bool = True
+    preserve_formulas: bool = True,
+    insert_mode: bool = True
 ) -> Dict[str, Any]:
     """
-    更新Excel指定范围的数据。操作会覆盖目标范围内的现有数据。
+更新Excel指定范围的数据。操作会覆盖目标范围内的现有数据。
 
-    Args:
-        file_path: Excel文件路径 (.xlsx/.xlsm)
-        range: 范围表达式，必须包含工作表名，支持格式：
-            - 标准单元格范围: "Sheet1!A1:C10"、"TrSkill!A1:Z100"
-            - 不支持行范围格式，必须使用明确单元格范围
-        data: 二维数组数据 [[row1], [row2], ...]
-        preserve_formulas: 保留已有公式 (默认值: True)
-            - True: 如果目标单元格包含公式，则保留公式不覆盖
-            - False: 覆盖所有内容，包括公式
+Args:
+    file_path: Excel文件路径 (.xlsx/.xlsm)
+    range: 范围表达式，必须包含工作表名，支持格式：
+        - 标准单元格范围: "Sheet1!A1:C10"、"TrSkill!A1:Z100"
+        - 不支持行范围格式，必须使用明确单元格范围
+    data: 二维数组数据 [[row1], [row2], ...]
+    preserve_formulas: 保留已有公式 (默认值: True)
+        - True: 如果目标单元格包含公式，则保留公式不覆盖
+        - False: 覆盖所有内容，包括公式
+    insert_mode: 数据写入模式 (默认值: True)
+        - True: 插入模式，在指定位置插入新行然后写入数据（更安全，推荐）
+        - False: 覆盖模式，直接覆盖目标范围的现有数据
 
-    Returns:
-        Dict: 包含 success、updated_cells(int)、message
+Returns:
+    Dict: 包含 success、updated_cells(int)、message
 
-    注意:
-        为保持API一致性和清晰度，range必须包含工作表名。
-        这消除了参数间的条件依赖，提高了可预测性。
+注意:
+    为保持API一致性和清晰度，range必须包含工作表名。
+    这消除了参数间的条件依赖，提高了可预测性。
 
-    Example:
-        data = [["姓名", "年龄"], ["张三", 25]]
-        # 正确用法
-        result = excel_update_range("test.xlsx", "Sheet1!A1:B2", data)
+Example:
+    data = [["姓名", "年龄"], ["张三", 25]]
+    # 插入模式（默认，更安全）
+    result = excel_update_range("test.xlsx", "Sheet1!A1:B2", data)
+    # 覆盖模式（显式指定）
+    result = excel_update_range("test.xlsx", "Sheet1!A1:B2", data, insert_mode=False)
     """
-    return ExcelOperations.update_range(file_path, range, data, preserve_formulas)
-
-
+    return ExcelOperations.update_range(file_path, range, data, preserve_formulas, insert_mode)
 @mcp.tool()
 def excel_insert_rows(
     file_path: str,

@@ -35,7 +35,8 @@ class ExcelWriter:
         self,
         range_expression: str,
         data: List[List[Any]],
-        preserve_formulas: bool = True
+        preserve_formulas: bool = True,
+        insert_mode: bool = True
     ) -> OperationResult:
         """
         修改Excel文件中指定范围的数据
@@ -44,6 +45,9 @@ class ExcelWriter:
             range_expression: 范围表达式
             data: 要写入的二维数据数组
             preserve_formulas: 是否保留现有的公式
+            insert_mode: 数据写入模式 (默认值: True)
+                - True: 插入模式，在指定位置插入新行然后写入数据（更安全）
+                - False: 覆盖模式，直接覆盖目标范围的现有数据
 
         Returns:
             OperationResult: 修改操作的结果
@@ -66,10 +70,13 @@ class ExcelWriter:
             # 获取范围边界
             min_col, min_row, max_col, max_row = range_boundaries(cell_range_for_boundaries)
 
-            # 获取范围维度（允许数据大小不匹配，Excel会自动处理）
-            range_rows = max_row - min_row + 1
-            range_cols = max_col - min_col + 1
-            # 注意: 不再严格验证数据维度，允许数据超出或不足范围
+            # 处理插入模式
+            if insert_mode:
+                # 插入模式：在指定位置插入足够的行数
+                rows_to_insert = len(data)
+                if rows_to_insert > 0:
+                    sheet.insert_rows(min_row, rows_to_insert)
+                    logger.info(f"插入模式：在第{min_row}行插入了{rows_to_insert}行")
 
             # 写入数据
             modified_cells = self._write_data(
@@ -79,6 +86,8 @@ class ExcelWriter:
             # 保存文件
             workbook.save(self.file_path)
 
+            mode_description = "插入模式" if insert_mode else "覆盖模式"
+            
             return OperationResult(
                 success=True,
                 data=modified_cells,
@@ -86,7 +95,10 @@ class ExcelWriter:
                     'file_path': self.file_path,
                     'range': range_expression,
                     'sheet_name': sheet.title,
-                    'modified_cells_count': len(modified_cells)
+                    'modified_cells_count': len(modified_cells),
+                    'insert_mode': insert_mode,
+                    'mode_description': mode_description,
+                    'rows_inserted': len(data) if insert_mode else 0
                 }
             )
 
