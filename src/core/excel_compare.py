@@ -59,9 +59,9 @@ class ExcelComparer:
 
             logger.info(f"开始比较文件: {file1_path} vs {file2_path}")
 
-            # 加载两个Excel文件
-            workbook1 = load_workbook(file1_path, data_only=not compare_options.compare_formulas)
-            workbook2 = load_workbook(file2_path, data_only=not compare_options.compare_formulas)
+            # 加载两个Excel文件 - 比较操作使用只读模式
+            workbook1 = load_workbook(file1_path, data_only=not compare_options.compare_formulas, read_only=True)
+            workbook2 = load_workbook(file2_path, data_only=not compare_options.compare_formulas, read_only=True)
 
             # 比较文件结构
             structural_differences = self._compare_file_structure(workbook1, workbook2)
@@ -147,9 +147,9 @@ class ExcelComparer:
 
             logger.info(f"开始比较工作表: {file1_path}[{sheet1_name}] vs {file2_path}[{sheet2_name}]")
 
-            # 加载Excel文件
-            workbook1 = load_workbook(file1_path, data_only=not compare_options.compare_formulas)
-            workbook2 = load_workbook(file2_path, data_only=not compare_options.compare_formulas)
+            # 加载Excel文件 - 比较操作使用只读模式
+            workbook1 = load_workbook(file1_path, data_only=not compare_options.compare_formulas, read_only=True)
+            workbook2 = load_workbook(file2_path, data_only=not compare_options.compare_formulas, read_only=True)
 
             # 检查工作表是否存在
             if sheet1_name not in workbook1.sheetnames:

@@ -69,7 +69,7 @@ class ExcelSearcher:
                     self.file_path,
                     data_only=not search_formulas,
                     keep_vba=False,  # 禁用VBA以避免兼容性问题
-                    read_only=False  # 确保可读写模式
+                    read_only=True  # 搜索操作使用只读模式
                 )
             except Exception as e:
                 # 如果加载失败，尝试更保守的加载方式

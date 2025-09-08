@@ -500,8 +500,8 @@ class ExcelWriter:
             workbook.save(self.file_path)
             workbook.close()
 
-            # 重新读取以获取计算值
-            workbook_read = load_workbook(self.file_path, data_only=True)
+            # 重新读取以获取计算值 - 使用只读模式
+            workbook_read = load_workbook(self.file_path, data_only=True, read_only=True)
             sheet_read = self._get_worksheet(workbook_read, sheet_name)
             calculated_value = sheet_read[cell_address].value
             workbook_read.close()
@@ -729,8 +729,8 @@ class ExcelWriter:
         cache
     ) -> tuple:
         """创建临时工作簿用于计算"""
-        # 加载原始工作簿（用于提供数据上下文）
-        original_workbook = load_workbook(self.file_path, data_only=False)
+        # 加载原始工作簿（用于提供数据上下文） - 使用只读模式
+        original_workbook = load_workbook(self.file_path, data_only=False, read_only=True)
 
         # 创建临时工作簿进行计算
         temp_workbook = Workbook()
@@ -799,8 +799,8 @@ class ExcelWriter:
 
     def _fallback_calculation(self, temp_file_path: str, formula: str) -> any:
         """备用计算方法"""
-        # 重新加载工作簿获取数据
-        data_workbook = load_workbook(temp_file_path, data_only=True)
+        # 重新加载工作簿获取数据 - 使用只读模式
+        data_workbook = load_workbook(temp_file_path, data_only=True, read_only=True)
         data_sheet = data_workbook["Calculation"]
 
         # 尝试基础的公式解析
