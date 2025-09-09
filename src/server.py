@@ -47,6 +47,7 @@ mcp = FastMCP(
     instructions="""🎮 游戏开发Excel配置表专家 - 28个专业工具
 
 ## 🎯 核心设计原则
+• **搜索优先**：任何查找、定位、分析操作都优先使用 `excel_search`
 • **1-based索引**：第1行=1, 第1列=1 (匹配Excel惯例)
 • **范围格式**：必须包含工作表名 `"技能配置表!A1:Z100"` `"装备配置表!B2:F50"`
 • **ID驱动**：所有配置表以ID为主键，支持ID对象跟踪
@@ -86,12 +87,13 @@ mcp = FastMCP(
 ## 🚀 高效工作流程
 
 ### 标准配置表更新流程
-1. **🔍 定位数据**：`excel_find_last_row` → 确定数据边界
-2. **📊 分析现状**：`excel_get_range` → 了解当前配置
-3. **✏️ 直接更新**：`excel_update_range` → 覆盖写入新配置（默认）
-4. **🛡️ 安全插入**：需要保留数据时使用 `insert_mode=True` 或先 `excel_insert_rows`
-5. **🎨 视觉优化**：`excel_format_cells` → 标记重要数据
-6. **✅ 验证结果**：重新读取确认更新成功
+1. **🔍 搜索定位**：`excel_search` → 优先搜索目标内容，了解数据分布
+2. **📏 边界确认**：`excel_find_last_row` → 确定数据边界范围
+3. **📊 分析现状**：`excel_get_range` → 读取并了解当前配置
+4. **✏️ 直接更新**：`excel_update_range` → 覆盖写入新配置（默认）
+5. **🛡️ 安全插入**：需要保留数据时使用 `insert_mode=True` 或先 `excel_insert_rows`
+6. **🎨 视觉优化**：`excel_format_cells` → 标记重要数据
+7. **✅ 验证结果**：重新读取确认更新成功
 
 ### 版本对比工作流
 ```
@@ -162,6 +164,12 @@ excel_format_cells("config.xlsx", "技能配置表", "G:G", preset="highlight") 
 
 ## 🔍 智能搜索与分析
 
+⭐ **搜索优先金律**：任何查找、定位、分析任务都应首选 `excel_search`
+- 🎯 数据定位：快速找到目标内容的具体位置
+- 📊 结构分析：了解配置表的数据分布和模式  
+- 🔧 批量操作：基于搜索结果进行精确的批量修改
+- 🚀 效率提升：避免盲目操作，减少试错时间
+
 ### 配置表数据挖掘
 ```
 🔎 强大搜索能力:
@@ -170,7 +178,7 @@ excel_search_directory("./configs", r"火|冰|雷", recursive=True)         # �
 excel_search("skills.xlsx", r"冷却.*[5-9]", include_formulas=True)      # 搜索长冷却技能
 ```
 
-🚀 **游戏开发专家模式**: 数据定位→安全插入→精确更新→视觉优化→版本对比→性能监控""",
+🚀 **游戏开发专家模式**: 搜索定位→数据分析→安全更新→视觉优化→版本对比→性能监控""",
     debug=True,                    # 开启调试模式
     log_level="DEBUG"              # 设置日志级别为DEBUG
 )
