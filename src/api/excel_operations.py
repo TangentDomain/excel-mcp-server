@@ -1237,21 +1237,21 @@ class ExcelOperations:
 
     @classmethod
     def check_duplicate_ids(
-        cls, 
-        file_path: str, 
-        sheet_name: str, 
+        cls,
+        file_path: str,
+        sheet_name: str,
         id_column: Union[int, str] = 1,
         header_row: int = 1
     ) -> Dict[str, Any]:
         """
         检查Excel工作表中的ID重复情况
-        
+
         Args:
             file_path: Excel文件路径
             sheet_name: 工作表名称
             id_column: ID列位置 (1-based数字或列名)
             header_row: 表头行号 (1-based)
-        
+
         Returns:
             Dict: 包含success、has_duplicates、duplicate_count、total_ids、unique_ids、duplicates、message
         """
@@ -1261,7 +1261,7 @@ class ExcelOperations:
         try:
             from collections import Counter
             from openpyxl import load_workbook
-            
+
             # 参数验证
             if not file_path or not sheet_name:
                 return {
@@ -1273,7 +1273,7 @@ class ExcelOperations:
                     'unique_ids': 0,
                     'duplicates': []
                 }
-            
+
             # 加载工作簿
             try:
                 wb = load_workbook(file_path, read_only=True)
@@ -1297,7 +1297,7 @@ class ExcelOperations:
                     'unique_ids': 0,
                     'duplicates': []
                 }
-            
+
             # 检查工作表是否存在
             if sheet_name not in wb.sheetnames:
                 return {
@@ -1309,9 +1309,9 @@ class ExcelOperations:
                     'unique_ids': 0,
                     'duplicates': []
                 }
-            
+
             ws = wb[sheet_name]
-            
+
             # 处理列索引
             if isinstance(id_column, str):
                 from openpyxl.utils import column_index_from_string
@@ -1329,7 +1329,7 @@ class ExcelOperations:
                     }
             else:
                 col_idx = id_column
-            
+
             # 检查表头行是否存在
             if header_row < 1 or header_row > ws.max_row:
                 return {
@@ -1341,7 +1341,7 @@ class ExcelOperations:
                     'unique_ids': 0,
                     'duplicates': []
                 }
-            
+
             # 检查列是否存在
             if col_idx < 1 or col_idx > ws.max_column:
                 return {
@@ -1353,23 +1353,23 @@ class ExcelOperations:
                     'unique_ids': 0,
                     'duplicates': []
                 }
-            
+
             # 收集ID数据
             ids_with_rows = []
             for row in range(header_row + 1, ws.max_row + 1):
                 cell_value = ws.cell(row=row, column=col_idx).value
                 if cell_value is not None:  # 跳过空值
                     ids_with_rows.append((cell_value, row))
-            
+
             # 统计ID出现次数
             id_counter = Counter([id_val for id_val, _ in ids_with_rows])
             total_ids = len(ids_with_rows)
             unique_ids = len(id_counter)
-            
+
             # 查找重复的ID
             duplicates = []
             duplicate_count = 0
-            
+
             for id_value, count in id_counter.items():
                 if count > 1:
                     duplicate_count += 1
@@ -1377,18 +1377,18 @@ class ExcelOperations:
                     rows = [row for id_val, row in ids_with_rows if id_val == id_value]
                     # 使用绝对行号（Excel中的实际行号）
                     absolute_rows = rows
-                    
+
                     duplicates.append({
                         'id_value': id_value,
                         'count': count,
                         'rows': absolute_rows
                     })
-            
+
             has_duplicates = duplicate_count > 0
-            
+
             # 构建返回结果
             message = f"共检查{total_ids}个ID，发现{duplicate_count}个重复ID" if has_duplicates else f"共检查{total_ids}个ID，无重复ID"
-            
+
             return {
                 'success': True,
                 'has_duplicates': has_duplicates,
@@ -1398,7 +1398,7 @@ class ExcelOperations:
                 'duplicates': duplicates,
                 'message': message
             }
-            
+
         except Exception as e:
             error_msg = f"检查ID重复时发生错误: {str(e)}"
             logger.error(f"{cls._LOG_PREFIX} {error_msg}")
