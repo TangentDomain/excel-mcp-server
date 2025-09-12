@@ -349,41 +349,85 @@ class ExcelOperations:
 
     @classmethod
     def _parse_dual_header_data(cls, data: List[List], max_columns: Optional[int]) -> Dict[str, List[str]]:
-        """解析双行表头数据（字段描述 + 字段名）"""
+        """解析双行表头数据（字段描述 + 字段名），支持空值fallback机制"""
         descriptions = []
         field_names = []
-
+        
         if not data or len(data) < 2:
             # 如果数据不足两行，返回空结果
             return {
                 'descriptions': descriptions,
                 'field_names': field_names
             }
-
+        
         # 解析第一行（字段描述）
         first_row = data[0] if len(data) > 0 else []
         # 解析第二行（字段名）
         second_row = data[1] if len(data) > 1 else []
 
-        # 确定实际处理的列数（以较短的行为准）
-        max_cols = min(len(first_row), len(second_row))
+        # 确定实际处理的列数
+        max_cols = max(len(first_row), len(second_row))  # 改为取最大值，不遗漏任何列
         if max_columns:
             max_cols = min(max_cols, max_columns)
+
+        # 导入列名转换工具
+        from openpyxl.utils import get_column_letter
 
         for i in range(max_cols):
             # 处理字段描述（第1行）
             desc_cell = first_row[i] if i < len(first_row) else None
             desc_value = getattr(desc_cell, 'value', desc_cell) if hasattr(desc_cell, 'value') else desc_cell
-            desc_str = str(desc_value).strip() if desc_value is not None else ""
+            desc_str = str(desc_value).strip() if desc_value is not None and str(desc_value).strip() else ""
 
             # 处理字段名（第2行）
             name_cell = second_row[i] if i < len(second_row) else None
             name_value = getattr(name_cell, 'value', name_cell) if hasattr(name_cell, 'value') else name_cell
-            name_str = str(name_value).strip() if name_value is not None else ""
+            name_str = str(name_value).strip() if name_value is not None and str(name_value).strip() else ""
 
-            # 如果字段名为空，则停止处理（除非指定了max_columns）
-            if not name_str and not max_columns:
-                break
+            # 🆕 智能Fallback机制
+            column_letter = get_column_letter(i + 1)  # 1-based列名：A, B, C...
+            
+            # 描述为空时使用列标识作为fallback
+            if not desc_str:
+                desc_str = f"列{column_letter}"  # 中文：列A, 列B, 列C...
+            
+            # 字段名为空时使用列名作为fallback
+            if not name_str:
+                name_str = column_letter.lower()  # 小写：a, b, c...
+
+            # 🆕 检查是否应该停止（简化的停止条件）
+            # 只有在没有指定max_columns时才进行智能停止
+            if not max_columns:
+                # 检查原始数据是否为完全空（描述和字段名都是原始空值）
+                desc_is_empty = (desc_cell is None or 
+                               (hasattr(desc_cell, 'value') and desc_cell.value is None) or
+                               (not hasattr(desc_cell, 'value') and desc_cell is None))
+                name_is_empty = (name_cell is None or 
+                               (hasattr(name_cell, 'value') and name_cell.value is None) or
+                               (not hasattr(name_cell, 'value') and name_cell is None))
+                
+                # 如果当前列完全为空，检查接下来连续3列是否也为空
+                if desc_is_empty and name_is_empty:
+                    consecutive_empty = 0
+                    for j in range(i, min(i + 3, max_cols)):  # 检查当前及后续2列
+                        check_desc = first_row[j] if j < len(first_row) else None
+                        check_name = second_row[j] if j < len(second_row) else None
+                        
+                        desc_empty = (check_desc is None or 
+                                    (hasattr(check_desc, 'value') and check_desc.value is None) or
+                                    (not hasattr(check_desc, 'value') and check_desc is None))
+                        name_empty = (check_name is None or 
+                                    (hasattr(check_name, 'value') and check_name.value is None) or
+                                    (not hasattr(check_name, 'value') and check_name is None))
+                        
+                        if desc_empty and name_empty:
+                            consecutive_empty += 1
+                        else:
+                            break
+                    
+                    # 如果连续3列都为空，则停止
+                    if consecutive_empty >= 3:
+                        break
 
             descriptions.append(desc_str)
             field_names.append(name_str)
