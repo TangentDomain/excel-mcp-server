@@ -180,25 +180,62 @@ def excel_list_sheets(file_path: str) -> Dict[str, Any]:
 @mcp.tool()
 def excel_get_sheet_headers(file_path: str) -> Dict[str, Any]:
     """
-    获取Excel文件中所有工作表的表头信息
+    获取Excel文件中所有工作表的双行表头信息（游戏开发专用）
 
-    这是 excel_get_headers 的便捷封装，用于批量获取所有工作表的表头。
+    这是 excel_get_headers 的便捷封装，用于批量获取所有工作表的双行表头。
+    专为游戏配置表设计，同时获取字段描述和字段名。
 
     Args:
         file_path: Excel文件路径 (.xlsx/.xlsm)
 
     Returns:
-        Dict: 包含success、sheets_with_headers等信息
+        Dict: 包含所有工作表的双行表头信息
+        {
+            'success': bool,
+            'sheets_with_headers': [
+                {
+                    'name': str,
+                    'headers': List[str],       # 字段名（兼容性）
+                    'descriptions': List[str],  # 字段描述（第1行）
+                    'field_names': List[str],   # 字段名（第2行）
+                    'header_count': int
+                }
+            ],
+            'file_path': str,
+            'total_sheets': int
+        }
+
+    游戏配置表批量分析:
+        一次性获取所有配置表的结构信息，包括字段描述和字段名，便于快速了解整个配置文件的结构。
 
     Example:
-        # 获取所有工作表的表头
-        result = excel_get_sheet_headers("data.xlsx")
-        # 返回: {
+        # 获取游戏配置文件中所有表的双行表头
+        result = excel_get_sheet_headers("game_config.xlsx")
+        for sheet in result['sheets_with_headers']:
+            print(f"表名: {sheet['name']}")
+            print(f"字段描述: {sheet['descriptions']}")
+            print(f"字段名: {sheet['field_names']}")
+            print("---")
+
+        # 返回示例: {
         #   'success': True,
         #   'sheets_with_headers': [
-        #     {'name': 'Sheet1', 'headers': ['列1', '列2'], 'header_count': 2},
-        #     {'name': 'Sheet2', 'headers': ['ID', '名称'], 'header_count': 2}
-        #   ]
+        #     {
+        #       'name': '技能配置表',
+        #       'headers': ['skill_id', 'skill_name', 'skill_type'],
+        #       'descriptions': ['技能ID描述', '技能名称描述', '技能类型描述'],
+        #       'field_names': ['skill_id', 'skill_name', 'skill_type'],
+        #       'header_count': 3
+        #     },
+        #     {
+        #       'name': '装备配置表',
+        #       'headers': ['item_id', 'item_name', 'item_quality'],
+        #       'descriptions': ['装备ID描述', '装备名称描述', '装备品质描述'],
+        #       'field_names': ['item_id', 'item_name', 'item_quality'],
+        #       'header_count': 3
+        #     }
+        #   ],
+        #   'total_sheets': 2
         # }
     """
     return ExcelOperations.get_sheet_headers(file_path)
@@ -342,36 +379,44 @@ def excel_get_headers(
     max_columns: Optional[int] = None
 ) -> Dict[str, Any]:
     """
-    获取Excel工作表的表头信息
+    获取Excel工作表的双行表头信息（游戏开发专用）
+
+    专为游戏配置表设计，同时获取字段描述（第1行）和字段名（第2行）
 
     Args:
         file_path: Excel文件路径 (.xlsx/.xlsm)
         sheet_name: 工作表名称
-        header_row: 表头行号 (1-based，默认第1行)
+        header_row: 表头起始行号 (1-based，默认从第1行开始获取两行)
         max_columns: 最大读取列数限制 (可选)
             - 指定数值: 精确读取指定列数，如 max_columns=10 读取A-J列
             - None(默认): 读取前100列范围 (A-CV列)，然后截取到第一个空列
 
     Returns:
-        Dict: 包含 success、headers(List[str])、header_count、sheet_name
+        Dict: 包含双行表头信息
+        {
+            'success': bool,
+            'data': List[str],          # 字段名列表（兼容性）
+            'headers': List[str],       # 字段名列表（兼容性）
+            'descriptions': List[str],  # 字段描述列表（第1行）
+            'field_names': List[str],   # 字段名列表（第2行）
+            'header_count': int,
+            'sheet_name': str,
+            'header_row': int,
+            'message': str
+        }
 
-    注意:
-        为保持与范围更新操作的一致性，方法内部使用明确的单元格范围而非行范围格式。
-        当 max_columns=None 时，实际读取 A1:CV1 范围，然后自动截取到第一个空列。
+    游戏配置表标准格式:
+        第1行（descriptions）: ['技能ID描述', '技能名称描述', '技能类型描述', '技能等级描述']
+        第2行（field_names）:   ['skill_id', 'skill_name', 'skill_type', 'skill_level']
 
     Example:
-        # 获取第1行作为表头（自动截取到空列）
-        result = excel_get_headers("data.xlsx", "Sheet1")
-        # 获取第2行作为表头，精确读取10列
-        result = excel_get_headers("data.xlsx", "Sheet1", header_row=2, max_columns=10)
-        # 返回格式:
-        # {
-        #   'success': True,
-        #   'headers': ['ID', '名称', '类型', '数量'],
-        #   'header_count': 4,
-        #   'sheet_name': 'Sheet1',
-        #   'header_row': 1
-        # }
+        # 获取技能配置表的双行表头
+        result = excel_get_headers("skills.xlsx", "技能配置表")
+        print(result['descriptions'])  # ['技能ID描述', '技能名称描述', ...]
+        print(result['field_names'])   # ['skill_id', 'skill_name', ...]
+
+        # 获取装备表第3-4行作为表头，精确读取8列
+        result = excel_get_headers("items.xlsx", "装备配置表", header_row=3, max_columns=8)
     """
     return ExcelOperations.get_headers(file_path, sheet_name, header_row, max_columns)
 

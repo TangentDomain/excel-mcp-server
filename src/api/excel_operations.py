@@ -176,28 +176,41 @@ class ExcelOperations:
         max_columns: Optional[int] = None
     ) -> Dict[str, Any]:
         """
-        @intention 获取指定工作表的表头信息，支持智能截取和列数限制
+        @intention 获取指定工作表的表头信息，支持游戏开发双行模式（字段描述+字段名）
 
         Args:
             file_path: Excel文件路径 (.xlsx/.xlsm)
             sheet_name: 工作表名称
-            header_row: 表头行号 (1-based)
+            header_row: 表头起始行号 (1-based，默认从第1行开始获取两行)
             max_columns: 最大列数限制，None表示自动截取到空列
 
         Returns:
-            Dict: 包含表头列表、数量等信息
+            Dict: 包含双行表头信息
+            {
+                'success': bool,
+                'data': List[str],  # 字段名列表（兼容性）
+                'headers': List[str],  # 字段名列表（兼容性）
+                'descriptions': List[str],  # 字段描述列表（第1行）
+                'field_names': List[str],   # 字段名列表（第2行）
+                'header_count': int,
+                'sheet_name': str,
+                'header_row': int,
+                'message': str
+            }
 
         Example:
             result = ExcelOperations.get_headers("data.xlsx", "Sheet1")
+            # 第1行：['技能ID描述', '技能名称描述', '技能类型描述']
+            # 第2行：['skill_id', 'skill_name', 'skill_type']
         """
         if cls.DEBUG_LOG_ENABLED:
-            logger.info(f"{cls._LOG_PREFIX} 开始获取表头: {sheet_name}")
+            logger.info(f"{cls._LOG_PREFIX} 开始获取双行表头: {sheet_name}")
 
         try:
-            # 步骤1: 构建范围表达式
-            range_expression = cls._build_header_range(sheet_name, header_row, max_columns)
+            # 步骤1: 构建双行范围表达式
+            range_expression = cls._build_header_range(sheet_name, header_row, max_columns, dual_row=True)
 
-            # 步骤2: 读取表头数据
+            # 步骤2: 读取表头数据（两行）
             reader = ExcelReader(file_path)
             result = reader.get_range(range_expression)
             reader.close()
@@ -205,17 +218,19 @@ class ExcelOperations:
             if not result.success:
                 return cls._format_error_result(f"无法读取表头数据: {result.message}")
 
-            # 步骤3: 解析表头信息
-            headers = cls._parse_header_data(result.data, max_columns)
+            # 步骤3: 解析双行表头信息
+            header_info = cls._parse_dual_header_data(result.data, max_columns)
 
             return {
                 'success': True,
-                'data': headers,
-                'headers': headers,  # 兼容性字段
-                'header_count': len(headers),
+                'data': header_info['field_names'],  # 兼容性字段，返回字段名
+                'headers': header_info['field_names'],  # 兼容性字段，返回字段名
+                'descriptions': header_info['descriptions'],  # 字段描述（第1行）
+                'field_names': header_info['field_names'],    # 字段名（第2行）
+                'header_count': len(header_info['field_names']),
                 'sheet_name': sheet_name,
                 'header_row': header_row,
-                'message': f"成功获取{len(headers)}个表头字段"
+                'message': f"成功获取{len(header_info['field_names'])}个表头字段（描述+字段名）"
             }
 
         except Exception as e:
@@ -275,16 +290,28 @@ class ExcelOperations:
         return {'valid': True}
 
     @classmethod
-    def _build_header_range(cls, sheet_name: str, header_row: int, max_columns: Optional[int]) -> str:
-        """构建表头范围表达式"""
+    def _build_header_range(cls, sheet_name: str, header_row: int, max_columns: Optional[int], dual_row: bool = False) -> str:
+        """构建表头范围表达式，支持单行或双行模式"""
         if max_columns:
             # 如果指定了最大列数，使用具体范围
             from openpyxl.utils import get_column_letter
             end_column = get_column_letter(max_columns)
-            return f"{sheet_name}!A{header_row}:{end_column}{header_row}"
+            if dual_row:
+                # 双行模式：获取连续两行
+                end_row = header_row + 1
+                return f"{sheet_name}!A{header_row}:{end_column}{end_row}"
+            else:
+                # 单行模式（保持兼容性）
+                return f"{sheet_name}!A{header_row}:{end_column}{header_row}"
         else:
             # 否则使用一个合理的默认范围（读取前100列）
-            return f"{sheet_name}!A{header_row}:CV{header_row}"  # CV = 第100列
+            if dual_row:
+                # 双行模式：获取连续两行
+                end_row = header_row + 1
+                return f"{sheet_name}!A{header_row}:CV{end_row}"  # CV = 第100列
+            else:
+                # 单行模式（保持兼容性）
+                return f"{sheet_name}!A{header_row}:CV{header_row}"  # CV = 第100列
 
     @classmethod
     def _parse_header_data(cls, data: List[List], max_columns: Optional[int]) -> List[str]:
@@ -319,6 +346,56 @@ class ExcelOperations:
                     break
 
         return headers
+
+    @classmethod
+    def _parse_dual_header_data(cls, data: List[List], max_columns: Optional[int]) -> Dict[str, List[str]]:
+        """解析双行表头数据（字段描述 + 字段名）"""
+        descriptions = []
+        field_names = []
+
+        if not data or len(data) < 2:
+            # 如果数据不足两行，返回空结果
+            return {
+                'descriptions': descriptions,
+                'field_names': field_names
+            }
+
+        # 解析第一行（字段描述）
+        first_row = data[0] if len(data) > 0 else []
+        # 解析第二行（字段名）
+        second_row = data[1] if len(data) > 1 else []
+
+        # 确定实际处理的列数（以较短的行为准）
+        max_cols = min(len(first_row), len(second_row))
+        if max_columns:
+            max_cols = min(max_cols, max_columns)
+
+        for i in range(max_cols):
+            # 处理字段描述（第1行）
+            desc_cell = first_row[i] if i < len(first_row) else None
+            desc_value = getattr(desc_cell, 'value', desc_cell) if hasattr(desc_cell, 'value') else desc_cell
+            desc_str = str(desc_value).strip() if desc_value is not None else ""
+
+            # 处理字段名（第2行）
+            name_cell = second_row[i] if i < len(second_row) else None
+            name_value = getattr(name_cell, 'value', name_cell) if hasattr(name_cell, 'value') else name_cell
+            name_str = str(name_value).strip() if name_value is not None else ""
+
+            # 如果字段名为空，则停止处理（除非指定了max_columns）
+            if not name_str and not max_columns:
+                break
+
+            descriptions.append(desc_str)
+            field_names.append(name_str)
+
+            # 如果指定了max_columns，检查是否已达到限制
+            if max_columns and len(field_names) >= max_columns:
+                break
+
+        return {
+            'descriptions': descriptions,
+            'field_names': field_names
+        }
 
     @classmethod
     def search(
@@ -403,16 +480,30 @@ class ExcelOperations:
     @classmethod
     def get_sheet_headers(cls, file_path: str) -> Dict[str, Any]:
         """
-        @intention 获取Excel文件中所有工作表的表头信息
+        @intention 获取Excel文件中所有工作表的双行表头信息（字段描述+字段名）
 
         Args:
             file_path: Excel文件路径 (.xlsx/.xlsm)
 
         Returns:
-            Dict: 包含所有工作表表头信息
+            Dict: 包含所有工作表的双行表头信息
+            {
+                'success': bool,
+                'sheets_with_headers': [
+                    {
+                        'name': str,
+                        'headers': List[str],       # 字段名（兼容性）
+                        'descriptions': List[str],  # 字段描述（第1行）
+                        'field_names': List[str],   # 字段名（第2行）
+                        'header_count': int
+                    }
+                ],
+                'file_path': str,
+                'total_sheets': int
+            }
         """
         if cls.DEBUG_LOG_ENABLED:
-            logger.info(f"{cls._LOG_PREFIX} 开始获取所有工作表表头: {file_path}")
+            logger.info(f"{cls._LOG_PREFIX} 开始获取所有工作表双行表头: {file_path}")
 
         try:
             # 步骤1: 获取所有工作表列表
@@ -420,7 +511,7 @@ class ExcelOperations:
             if not sheets_result.get('success'):
                 return sheets_result
 
-            # 步骤2: 获取每个工作表的表头
+            # 步骤2: 获取每个工作表的双行表头
             sheets_with_headers = []
             sheets = sheets_result.get('sheets', [])
 
@@ -430,18 +521,26 @@ class ExcelOperations:
 
                     if header_result.get('success'):
                         headers = header_result.get('headers', [])
-                        if not headers and 'data' in header_result:
-                            headers = header_result.get('data', [])
+                        descriptions = header_result.get('descriptions', [])
+                        field_names = header_result.get('field_names', [])
+
+                        # 如果没有获取到field_names，使用headers作为fallback
+                        if not field_names and headers:
+                            field_names = headers
 
                         sheets_with_headers.append({
                             'name': sheet_name,
-                            'headers': headers,
-                            'header_count': len(headers)
+                            'headers': field_names,         # 兼容性字段，使用字段名
+                            'descriptions': descriptions,   # 字段描述（第1行）
+                            'field_names': field_names,     # 字段名（第2行）
+                            'header_count': len(field_names)
                         })
                     else:
                         sheets_with_headers.append({
                             'name': sheet_name,
                             'headers': [],
+                            'descriptions': [],
+                            'field_names': [],
                             'header_count': 0,
                             'error': header_result.get('error', '未知错误')
                         })
@@ -450,6 +549,8 @@ class ExcelOperations:
                     sheets_with_headers.append({
                         'name': sheet_name,
                         'headers': [],
+                        'descriptions': [],
+                        'field_names': [],
                         'header_count': 0,
                         'error': str(e)
                     })
