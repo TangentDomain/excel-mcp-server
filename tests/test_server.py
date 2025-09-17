@@ -56,12 +56,12 @@ class TestServerInterfaces:
             assert isinstance(sheet_info['header_count'], int)
             assert sheet_info['header_count'] == len(sheet_info['headers'])
 
-        # 验证sample_excel_file的第一个工作表应该包含表头
+        # 验证sample_excel_file的第一个工作表应该包含表头（双行格式，返回field_names）
         sheet1_info = next((s for s in result['sheets_with_headers'] if s['name'] == 'Sheet1'), None)
         assert sheet1_info is not None
-        assert '姓名' in sheet1_info['headers']  # 根据conftest.py中的数据
-        assert '年龄' in sheet1_info['headers']
-        assert '部门' in sheet1_info['headers']
+        assert 'name' in sheet1_info['headers']  # 根据conftest.py修改后的双行格式数据
+        assert 'age' in sheet1_info['headers']
+        assert 'department' in sheet1_info['headers']
         assert sheet1_info['header_count'] >= 4
 
     def test_excel_list_sheets_simple(self, sample_excel_file):
@@ -91,8 +91,8 @@ class TestServerInterfaces:
         for expected_name in expected_sheet_names:
             assert expected_name in actual_sheet_names
             sheet_info = next(s for s in result['sheets_with_headers'] if s['name'] == expected_name)
-            assert '测试数据' in sheet_info['headers']  # 根据conftest.py中的数据
-            assert '值' in sheet_info['headers']
+            assert 'test_data' in sheet_info['headers']  # Field names from row 2
+            assert 'value' in sheet_info['headers']
 
     def test_excel_get_sheet_headers_empty_sheet(self, empty_excel_file):
         """Test excel_get_sheet_headers with empty sheet"""
@@ -128,33 +128,38 @@ class TestServerInterfaces:
         assert 'header_row' in result
         assert 'message' in result
 
-        # Check data content based on sample_excel_file fixture
-        # The fixture adds "总计" in column E1, so we have 5 headers
-        assert result['headers'] == ["姓名", "年龄", "部门", "薪资", "总计"]
+        # Check data content based on sample_excel_file fixture with dual header format
+        # Row 1: descriptions = ["姓名描述", "年龄描述", "部门描述", "薪资描述", "总计描述"]
+        # Row 2: field_names = ["name", "age", "department", "salary", "total"]
+        # headers and data should return the field_names (row 2)
+        assert result['headers'] == ["name", "age", "department", "salary", "total"]
+        assert result['data'] == ["name", "age", "department", "salary", "total"]
+        assert result['descriptions'] == ["姓名描述", "年龄描述", "部门描述", "薪资描述", "总计描述"]
+        assert result['field_names'] == ["name", "age", "department", "salary", "total"]
         assert result['header_count'] == 5
         assert result['sheet_name'] == "Sheet1"
         assert result['header_row'] == 1
-
-        # Both data and headers should contain the same content
-        assert result['data'] == result['headers']
 
     def test_excel_get_headers_with_max_columns(self, sample_excel_file):
         """Test excel_get_headers with max_columns limit"""
         result = excel_get_headers(sample_excel_file, "Sheet1", max_columns=2)
 
         assert result['success'] is True
-        assert result['headers'] == ["姓名", "年龄"]
+        assert result['headers'] == ["name", "age"]  # Field names from row 2
+        assert result['descriptions'] == ["姓名描述", "年龄描述"]  # Descriptions from row 1
         assert result['header_count'] == 2
         assert "成功获取2个表头字段" in result['message']
 
     def test_excel_get_headers_different_row(self, sample_excel_file):
         """Test excel_get_headers with different header row"""
-        # Test getting data from row 2 as headers (first data row)
+        # Test getting data from row 2 as header start (dual header from rows 2-3)
         result = excel_get_headers(sample_excel_file, "Sheet1", header_row=2)
 
         assert result['success'] is True
-        # Row 2 contains: ["张三", 25, "技术部", 8000, "=SUM(D2:D5)"]
-        # But the formula cell should show the calculated value or formula
+        # Row 2: field_names = ["name", "age", "department", "salary", "total"]
+        # Row 3: first data row = ["张三", 25, "技术部", 8000, formula]
+        # Should get row 2 as descriptions and row 3 as field_names
+        assert result['descriptions'] == ["name", "age", "department", "salary", "total"]
         assert result['header_count'] >= 4  # At least the first 4 columns
         assert result['headers'][0] == "张三"
         assert str(result['headers'][1]) == "25"  # Convert to string for comparison
@@ -167,7 +172,8 @@ class TestServerInterfaces:
         result = excel_get_headers(sample_excel_file, "Sheet2")
 
         assert result['success'] is True
-        assert result['headers'] == ["产品", "销量", "单价"]
+        assert result['headers'] == ["product", "sales", "price"]  # Field names from row 2
+        assert result['descriptions'] == ["产品描述", "销量描述", "单价描述"]  # Descriptions from row 1
         assert result['header_count'] == 3
         assert result['sheet_name'] == "Sheet2"
 
@@ -208,16 +214,18 @@ class TestServerInterfaces:
 
         wb = Workbook()
         ws = wb.active
-        ws.append(["Text", 123, None, "Another Text", ""])  # Mixed types with empty cells
-        ws.append(["Data1", "Data2", "Data3", "Data4", "Data5"])
+        # Dual header format: row 1 = descriptions, row 2 = field_names
+        ws.append(["Text", 123, None, "Another Text", ""])  # Row 1: descriptions (mixed types)
+        ws.append(["Data1", "Data2", "Data3", "Data4", "Data5"])  # Row 2: field_names
         wb.save(file_path)
 
         result = excel_get_headers(str(file_path), "Sheet")
 
         assert result['success'] is True
-        # Should stop at None (empty cell) unless max_columns specified
-        assert result['headers'] == ["Text", "123"]  # Converts number to string, stops at None
-        assert result['header_count'] == 2
+        # Returns field_names (row 2), should get all 5 values since None is in descriptions
+        assert result['headers'] == ["Data1", "Data2", "Data3", "Data4", "Data5"]
+        assert result['descriptions'] == ["Text", "123", "列C", "Another Text", "列E"]  # Fallback mechanism for None/empty
+        assert result['header_count'] == 5
 
     def test_excel_get_headers_max_columns_with_empty_cells(self, temp_dir, request):
         """Test excel_get_headers with max_columns including empty cells"""
@@ -230,20 +238,22 @@ class TestServerInterfaces:
 
         wb = Workbook()
         ws = wb.active
-        ws.append(["Col1", None, "Col3", "", "Col5"])  # Empty cells in between
+        # Dual header format
+        ws.append(["Col1", None, "Col3", "", "Col5"])  # Row 1: descriptions with empty cells
+        ws.append(["a", "b", "c", "d", "e"])            # Row 2: field_names
         wb.save(file_path)
 
-        # Without max_columns, should stop at first None
+        # Without max_columns, should get all field_names (row 2) since data exists
         result1 = excel_get_headers(str(file_path), "Sheet")
         assert result1['success'] is True
-        assert result1['headers'] == ["Col1"]
+        assert result1['headers'] == ["a", "b", "c", "d", "e"]  # All field_names from row 2
 
-        # With max_columns, should include empty cells as empty strings
-        result2 = excel_get_headers(str(file_path), "Sheet", max_columns=5)
+        # With max_columns, should still get field_names but limited to max_columns
+        result2 = excel_get_headers(str(file_path), "Sheet", max_columns=3)
         assert result2['success'] is True
-        assert result2['header_count'] == 5
-        # Should include empty strings for None and empty cells
-        assert result2['headers'] == ["Col1", "", "Col3", "", "Col5"]
+        assert result2['header_count'] == 3
+        assert result2['headers'] == ["a", "b", "c"]  # First 3 field_names
+        assert result2['descriptions'] == ["Col1", "列B", "Col3"]  # Fallback "列B" for None
 
     def test_excel_get_range(self, sample_excel_file):
         """Test excel_get_range interface"""

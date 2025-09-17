@@ -72,9 +72,13 @@ def sample_excel_file(temp_dir, request):
     ws = wb.active
     ws.title = "Sheet1"
 
-    # Add sample data
+    # Add sample data - dual header format for excel_get_headers compatibility
+    # 第1行：字段描述（descriptions）
+    ws.append(["姓名描述", "年龄描述", "部门描述", "薪资描述", "总计描述"])
+    # 第2行：字段名（field_names）
+    ws.append(["name", "age", "department", "salary", "total"])
+    # 第3行开始：实际数据
     data = [
-        ["姓名", "年龄", "部门", "薪资"],
         ["张三", 25, "技术部", 8000],
         ["李四", 30, "市场部", 9000],
         ["王五", 28, "技术部", 8500],
@@ -85,8 +89,7 @@ def sample_excel_file(temp_dir, request):
         ws.append(row)
 
     # Add some formulas
-    ws["E1"] = "总计"
-    ws["E2"] = "=SUM(D2:D5)"
+    ws["E3"] = "=SUM(D3:D6)"
 
     # Add formatting
     header_font = Font(bold=True, color="FFFFFF")
@@ -97,10 +100,11 @@ def sample_excel_file(temp_dir, request):
         cell.fill = header_fill
         cell.alignment = Alignment(horizontal="center")
 
-    # Create second sheet
+    # Create second sheet with dual header format
     ws2 = wb.create_sheet("Sheet2")
-    ws2.append(["产品", "销量", "单价"])
-    ws2.append(["A", 100, 50])
+    ws2.append(["产品描述", "销量描述", "单价描述"])  # Row 1: descriptions
+    ws2.append(["product", "sales", "price"])      # Row 2: field_names
+    ws2.append(["A", 100, 50])                    # Row 3+: actual data
     ws2.append(["B", 200, 30])
 
     wb.save(file_path)
@@ -134,12 +138,13 @@ def multi_sheet_excel_file(temp_dir, request):
     default_sheet = wb.active
     wb.remove(default_sheet)
 
-    # Create multiple sheets
+    # Create multiple sheets with dual header format
     sheet_names = ["数据", "图表", "汇总", "分析"]
     for name in sheet_names:
         ws = wb.create_sheet(name)
-        ws.append(["测试数据", "值"])
-        ws.append(["项目1", 100])
+        ws.append(["测试数据描述", "值描述"])   # Row 1: descriptions
+        ws.append(["test_data", "value"])    # Row 2: field_names
+        ws.append(["项目1", 100])            # Row 3+: actual data
         ws.append(["项目2", 200])
 
     wb.save(file_path)
