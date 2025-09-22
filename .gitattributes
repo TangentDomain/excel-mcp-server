@@ -1,0 +1,13 @@
+# 将项目标记为中文项目
+*.md linguist-language=Chinese
+*.py linguist-language=Python
+docs/*.md linguist-language=Chinese
+
+# 文档文件标记为中文
+README.md linguist-language=Chinese
+CONTRIBUTING.zh-CN.md linguist-language=Chinese
+游戏开发Excel配置表比较指南.md linguist-language=Chinese
+
+# 确保中文文档被检测
+*.md linguist-detectable=true
+docs/ linguist-detectable=true

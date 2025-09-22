@@ -1,82 +1,82 @@
 
 <div align="center">
-<a href="README.md">English</a> | <a href="README.zh-CN.md">简体中文</a>
+<a href="README.md">简体中文</a> | <a href="README.en.md">English</a>
 </div>
 
-# ExcelMCP: Powerful Excel MCP Server 🚀
+# ExcelMCP: 强大的 Excel MCP 服务器 🚀
 
-[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
-[![Python Version](https://img.shields.io/badge/python-3.10+-blue.svg)](https://www.python.org/downloads/)
-[![Powered by: FastMCP](https://img.shields.io/badge/Powered%20by-FastMCP-orange)](https://github.com/jlowin/fastmcp)
-[![Status](https://img.shields.io/badge/status-production-success.svg)](#)
-[![Tests](https://img.shields.io/badge/tests-221%20passed-brightgreen.svg)](#)
+[![许可证: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+[![Python 版本](https://img.shields.io/badge/python-3.10+-blue.svg)](https://www.python.org/downloads/)
+[![技术支持: FastMCP](https://img.shields.io/badge/Powered%20by-FastMCP-orange)](https://github.com/jlowin/fastmcp)
+[![状态](https://img.shields.io/badge/status-production-success.svg)](#)
+[![测试](https://img.shields.io/badge/tests-221%20passed-brightgreen.svg)](#)
 
-**ExcelMCP** is a comprehensive Model Context Protocol (MCP) server that revolutionizes Excel file manipulation through AI. Built with **FastMCP** and **openpyxl**, it provides 27+ powerful tools enabling AI assistants to perform complex Excel operations through natural language commands. From regex searches across thousands of files to advanced data manipulation and formatting - all with enterprise-grade reliability.
+**ExcelMCP** 是一个全面的模型上下文协议 (MCP) 服务器，通过 AI 革命性地改变 Excel 文件操作方式。基于 **FastMCP** 和 **openpyxl** 构建，提供 27+ 个强大工具，使 AI 助手能够通过自然语言命令执行复杂的 Excel 操作。从跨数千文件的正则搜索到高级数据操作和格式化 - 全部具备企业级可靠性。
 
-🎯 **Perfect for:** Game development configuration tables, data analysis workflows, automated reporting, bulk file processing, and intelligent office automation.
-
----
-
-## ✨ Key Features
-
-- ⚡️ **27+ Advanced Tools**: Complete Excel manipulation suite from basic CRUD to complex formatting
-- 🔍 **Powerful Search Engine**: Regex search across files with directory-wide operations
-- � **Smart Data Operations**: Range-based read/write, row/column management, formula preservation
-- 🎨 **Professional Formatting**: Preset styles, custom formatting, borders, merging, sizing
-- �️ **File Lifecycle Management**: Create, convert, merge, import/export CSV, file information
-- 🎮 **Game Development Optimized**: Specialized Excel config table comparison for game development
-- 🔒 **Enterprise-Ready**: Centralized error handling, comprehensive validation, 100% test coverage
+🎯 **完美适用于：** 游戏开发配置表、数据分析工作流、自动化报告、批量文件处理和智能化办公自动化。
 
 ---
 
-### 🎬 Quick Demo
+## ✨ 主要功能
 
-*(Here you could insert a GIF showing a user typing "Find all emails in `report.xlsx` and highlight them in yellow" and the server executing it)*
+- ⚡️ **27+ 高级工具**: 从基础 CRUD 到复杂格式化的完整 Excel 操作套件
+- 🔍 **强大搜索引擎**: 正则表达式跨文件搜索，支持目录级批量操作
+- 📊 **智能数据操作**: 基于范围的读写、行列管理、公式保护
+- 🎨 **专业格式化**: 预设样式、自定义格式、边框、合并、尺寸调整
+- 🗂️ **文件生命周期管理**: 创建、转换、合并、导入/导出 CSV、文件信息
+- 🎮 **游戏开发优化**: 专为游戏开发设计的 Excel 配置表比较功能
+- 🔒 **企业级可靠性**: 集中错误处理、全面验证、100% 测试覆盖率
 
-**Example Prompt:**
+---
+
+### 🎬 快速演示
+
+*（此处可以插入一个 GIF，展示用户输入“在 `report.xlsx` 中查找所有电子邮件并用黄色突出显示”，然后服务器执行该命令）*
+
+**示例提示:**
 
 ```
-"In `quarterly_sales.xlsx`, find all rows where the 'Region' is 'North' and the 'Sale Amount' is over 5000. Copy them to a new sheet named 'Top Performers' and format the header in blue."
+"在 `quarterly_sales.xlsx` 中，查找‘地区’为‘北部’且‘销售额’超过 5000 的所有行。将它们复制到一个名为‘Top Performers’的新工作表中，并将标题格式设置为蓝色。"
 ```
 
 ---
 
-## 🚀 Getting Started (3-Minute Setup)
+## 🚀 快速入门 (3 分钟设置)
 
-Get ExcelMCP running in your favorite MCP client (VS Code with Continue, Cursor, Claude Desktop, or any MCP-compatible client).
+在您喜欢的 MCP 客户端（VS Code 配 Continue、Cursor、Claude Desktop 或任何 MCP 兼容客户端）中运行 ExcelMCP。
 
-### Prerequisites
+### 先决条件
 
 - Python 3.10+
-- An MCP-compatible client
+- 一个与 MCP 兼容的客户端
 
-### Installation
+### 安装
 
-1. **Clone the repository:**
+1. **克隆存储库:**
 
     ```bash
     git clone https://github.com/tangjian/excel-mcp-server.git
     cd excel-mcp-server
     ```
 
-2. **Install dependencies:**
+2. **安装依赖项:**
 
-    Using **uv** (recommended for speed):
+    使用 **uv**（推荐，速度更快）:
 
     ```bash
     pip install uv
     uv sync
     ```
 
-    Or using **pip**:
+    或使用 **pip**:
 
     ```bash
     pip install -e .
     ```
 
-3. **Configure your MCP client:**
+3. **配置您的 MCP 客户端:**
 
-    Add to your MCP client configuration (`.vscode/mcp.json`, `.cursor/mcp.json`, etc.):
+    添加到您的 MCP 客户端配置中（`.vscode/mcp.json`、`.cursor/mcp.json` 等）:
 
     ```json
     {
@@ -92,168 +92,81 @@ Get ExcelMCP running in your favorite MCP client (VS Code with Continue, Cursor,
     }
     ```
 
-4. **Start automating!**
+4. **开始自动化！**
 
-    You're ready! Ask your AI assistant to control Excel files with natural language.
-
----
-
-## 🛠️ Available Tools (27 Advanced Excel Operations)
-
-ExcelMCP provides a comprehensive suite of Excel manipulation tools:
-
-### 📋 File & Sheet Management
-
-| Tool | Description |
-|------|------------|
-| `excel_list_sheets` | Lists all worksheet names in an Excel file |
-| `excel_create_file` | Creates new Excel files with optional named sheets |
-| `excel_create_sheet` | Adds new worksheets to existing files |
-| `excel_delete_sheet` | Removes worksheets from files |
-| `excel_rename_sheet` | Renames existing worksheets |
-| `excel_get_file_info` | Retrieves detailed file information (size, format, etc.) |
-
-### 🔍 Search & Data Discovery
-
-| Tool | Description |
-|------|------------|
-| `excel_search` | Regex search within single Excel files with range support |
-| `excel_search_directory` | Batch regex search across entire directories |
-| `excel_get_range` | Reads data from specified ranges (cells/rows/columns) |
-| `excel_get_headers` | Extracts column headers from worksheets |
-| `excel_get_sheet_headers` | Gets headers from all worksheets in a file |
-
-### ✏️ Data Manipulation
-
-| Tool | Description |
-|------|------------|
-| `excel_update_range` | Updates cell ranges with new data and formula preservation |
-| `excel_insert_rows` | Inserts empty rows at specified positions |
-| `excel_insert_columns` | Inserts empty columns at specified positions |
-| `excel_delete_rows` | Removes rows from worksheets |
-| `excel_delete_columns` | Removes columns from worksheets |
-
-### 🎨 Formatting & Styling
-
-| Tool | Description |
-|------|------------|
-| `excel_format_cells` | Applies fonts, colors, alignment with presets or custom styles |
-| `excel_merge_cells` | Merges cell ranges for headers and layouts |
-| `excel_unmerge_cells` | Unmerges previously merged cell ranges |
-| `excel_set_borders` | Adds borders with various styles (thin, thick, dotted, etc.) |
-| `excel_set_row_height` | Adjusts row heights in points |
-| `excel_set_column_width` | Adjusts column widths in character units |
-
-### 🔄 Import/Export & Conversion
-
-| Tool | Description |
-|------|------------|
-| `excel_export_to_csv` | Exports worksheets to CSV with encoding options |
-| `excel_import_from_csv` | Creates Excel files from CSV data |
-| `excel_convert_format` | Converts between Excel formats (xlsx, xlsm, csv, json) |
-| `excel_merge_files` | Combines multiple Excel files with different merge modes |
-| `excel_compare_sheets` | Compares Excel sheets to identify differences (game dev optimized) |
-
-All tools return structured JSON responses with success indicators, detailed results, and comprehensive error information.
+    准备就绪！让您的 AI 助手通过自然语言控制 Excel 文件。
 
 ---
 
-## 💡 Use Cases & Examples
+## � 完整工具列表（27个工具）
 
-### Real-World Applications
+### 📁 文件与工作表管理
 
-- **Game Development**: "Compare TrSkill.xlsx configuration tables between versions and highlight changes in damage values"
-- **Data Cleaning**: "In all `.xlsx` files in `/reports`, find cells containing 'N/A' and replace with empty values"
-- **Automated Reporting**: "Create summary.xlsx with Sales sheet (copy A1:F20 from sales_data.xlsx) and Inventory sheet (copy A1:D15 from inventory.xlsx)"
-- **Bulk Processing**: "Search all Excel files in directory for email patterns and export matches to emails.csv"
-- **Professional Formatting**: "Apply company header style to A1:E1 range with blue background and white bold text"
+| 工具 | 用途 |
+|------|------|
+| `excel_create_file` | 创建新的 Excel 文件（.xlsx/.xlsm），支持自定义工作表 |
+| `excel_create_sheet` | 在现有文件中添加新工作表 |
+| `excel_delete_sheet` | 删除指定工作表 |
+| `excel_list_sheets` | 列出工作表名称和获取文件信息 |
+| `excel_rename_sheet` | 重命名工作表 |
+| `excel_get_file_info` | 获取文件元数据（大小、创建日期等） |
 
-### Command Examples
+### 📊 数据操作
 
-```plaintext
-Natural Language → AI Assistant → ExcelMCP
+| 工具 | 用途 |
+|------|------|
+| `excel_get_range` | 读取单元格/行/列范围（支持 A1:C10、行范围、列范围等） |
+| `excel_update_range` | 写入/更新数据范围，支持公式保留 |
+| `excel_get_headers` | 从任意行提取表头 |
+| `excel_get_sheet_headers` | 获取所有工作表的表头 |
+| `excel_insert_rows` | 插入空行到指定位置 |
+| `excel_delete_rows` | 删除行范围 |
+| `excel_insert_columns` | 插入空列到指定位置 |
+| `excel_delete_columns` | 删除列范围 |
 
-"Find all cells containing currency symbols in my finance folder"
-→ Uses excel_search_directory with regex pattern [$€¥£]
+### 🔍 搜索与分析
 
-"Create a new report with three sheets: Data, Charts, Summary"
-→ Uses excel_create_file with custom sheet names
+| 工具 | 用途 |
+|------|------|
+| `excel_search` | 在工作表中进行正则表达式搜索 |
+| `excel_search_directory` | 在目录中的所有 Excel 文件中批量搜索 |
+| `excel_compare_sheets` | 比较两个工作表，检测变化（针对游戏配置优化） |
 
-"Make the header row bold and add borders to the data table"
-→ Uses excel_format_cells with preset="header" + excel_set_borders
+### 🎨 格式化与样式
 
-"Compare Q3 and Q4 sales sheets and show me what changed"
-→ Uses excel_compare_sheets to identify differences
-```
+| 工具 | 用途 |
+|------|------|
+| `excel_format_cells` | 应用字体、颜色、对齐等格式（预设或自定义） |
+| `excel_set_borders` | 设置单元格边框样式 |
+| `excel_merge_cells` | 合并单元格范围 |
+| `excel_unmerge_cells` | 取消合并单元格 |
+| `excel_set_column_width` | 调整列宽 |
+| `excel_set_row_height` | 调整行高 |
 
----
+### 🔄 数据转换
 
-## 🏗️ Architecture & Dependencies
-
-### Core Technologies
-
-- **[FastMCP](https://github.com/jlowin/fastmcp)**: Modern MCP server framework
-- **[openpyxl](https://openpyxl.readthedocs.io/)**: Core Excel file manipulation
-- **[xlcalculator](https://pypi.org/project/xlcalculator/)**: Formula evaluation engine
-- **[xlwings](https://www.xlwings.org/)**: Optional Excel application integration
-
-### Project Structure
-
-```
-src/
-├── server.py              # MCP tool definitions (pure delegation)
-├── api/excel_operations.py # Centralized business logic
-├── core/                  # Excel operation modules
-│   ├── excel_reader.py    # Read operations
-│   ├── excel_writer.py    # Write operations
-│   ├── excel_manager.py   # File/sheet management
-│   └── excel_search.py    # Search & comparison
-├── utils/                 # Validators, parsers, formatters
-└── models/                # Type definitions
-```
-
-### Quality Assurance
-
-- **221 comprehensive tests** with 100% passing rate
-- **Centralized error handling** with structured responses
-- **Type safety** with full TypeScript-style annotations
-- **Game development optimized** with specialized config table tools
+| 工具 | 用途 |
+|------|------|
+| `excel_export_to_csv` | 导出工作表为 CSV 格式 |
+| `excel_import_from_csv` | 从 CSV 创建 Excel 文件 |
+| `excel_convert_format` | 在 Excel 格式间转换（.xlsx、.xlsm、.csv、.json） |
+| `excel_merge_files` | 合并多个 Excel 文件 |
 
 ---
 
-## 🤝 Contributing
+### 💡 用例
 
-We welcome contributions! Whether it's adding new features, improving documentation, or reporting bugs:
-
-1. **Fork the repository** and create your feature branch
-2. **Add tests** for any new functionality (maintain our 100% pass rate!)
-3. **Follow code style**: Use type hints, docstrings, and our error handling patterns
-4. **Submit a PR** with clear description of changes
-
-### Development Setup
-
-```bash
-git clone https://github.com/tangjian/excel-mcp-server.git
-cd excel-mcp-server
-uv sync --dev  # Install with development dependencies
-pytest tests/ # Run the full test suite (221 tests)
-```
+- **数据清理**: "在 `/reports` 目录中的所有 `.xlsx` 文件中，查找包含 `N/A` 的单元格，并将其替换为空值。"
+- **自动报告**: "创建一个新文件 `summary.xlsx`。将 `sales_data.xlsx` 中的范围 `A1:F20` 复制到名为‘Sales’的工作表中，并将 `inventory.xlsx` 中的 `A1:D15` 复制到名为‘Inventory’的工作表中。"
+- **数据提取**: "获取 `contacts.xlsx` 中 A 列为‘Active’的所有 D 列的值。"
+- **批量格式化**: "在 `financials.xlsx` 中，将整个第一行加粗，并将其背景颜色设置为浅灰色。"
 
 ---
 
-## 📜 License
+### 🤝 贡献
 
-Licensed under the **MIT License**. See [LICENSE](LICENSE) for details.
+欢迎贡献！无论是添加新功能、改进文档还是报告错误，我们都希望得到您的帮助。请查看我们的 `CONTRIBUTING.md` 以获取有关如何开始的更多详细信息。
 
----
+### 📜 许可证
 
-## ⭐ Support
-
-If ExcelMCP helps your workflow, please:
-
-- ⭐ Star this repository
-- 🐛 Report issues on GitHub
-- 💡 Suggest new features
-- 📖 Contribute to documentation
-
-**Built with ❤️ for the AI and Excel automation community**
+该项目根据 MIT 许可证授权。有关详细信息，请参阅 [LICENSE](LICENSE) 文件。
