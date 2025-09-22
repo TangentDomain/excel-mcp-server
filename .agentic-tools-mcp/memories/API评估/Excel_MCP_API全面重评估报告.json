@@ -1,8 +1,0 @@
-{
-  "id": "6cfbfda4-1f7e-4adc-91b7-e904182bdf58",
-  "title": "Excel MCP API全面重评估报告",
-  "details": "## Excel MCP API 全面重评估报告 (2025-08-21)\n\n### 📊 总体情况\n**整体平均分**: 77.6分 (提升+1.2分)\n**优秀级API**: 3个 (20%) - excel_format_cells(85), excel_list_sheets(84), excel_create_file(83)\n**良好级API**: 7个 (47%) - 76-82分区间  \n**一般级API**: 5个 (33%) - 70-73分区间\n**待改进API**: 0个\n\n### 🎯 优化成果\n1. **excel_format_cells**: 62→85分 (+23分) - 预设模板功能突破性创新\n2. **excel_regex_search**: 68→76分 (+8分) - 注释格式修复有效\n\n### 📋 详细评分\n**优秀级 (85+分)**:\n- excel_format_calls: 85分 (设计38/40, 文档28/30, 体验29/30)\n- excel_list_sheets: 84分 (设计35/40, 文档27/30, 体验28/30)  \n- excel_create_file: 83分 (设计34/40, 文档26/30, 体验29/30)\n\n**良好级 (75-84分)**:\n- excel_get_range: 82分\n- excel_evaluate_formula: 81分\n- excel_update_range: 80分\n- excel_create_sheet: 79分\n- excel_set_formula: 78分\n- excel_regex_search: 76分\n- excel_rename_sheet: 76分\n\n**一般级 (65-74分)**:\n- excel_insert_rows: 73分\n- excel_insert_columns: 73分\n- excel_delete_rows: 72分\n- excel_delete_columns: 72分\n- excel_delete_sheet: 70分\n\n### 🔧 关键洞察\n1. **预设功能是杀手级特性** - excel_format_cells从最差变最优\n2. **API设计已经成熟** - 整体架构和一致性很好\n3. **文档质量显著提升** - 注释修复效果明显\n4. **用户体验优化成功** - 学习成本大幅降低\n\n### 💡 建议\n当前质量已达高水准，建议专注功能扩展而非基础优化。唯一可选项：返回值结构统一化。",
-  "category": "API评估",
-  "dateCreated": "2025-08-21T07:25:13.550Z",
-  "dateUpdated": "2025-08-21T07:25:13.550Z"
-}

@@ -1,8 +1,0 @@
-{
-  "id": "2148fb70-42fb-471a-8f3e-0bbb9454ef11",
-  "title": "Excel MCP Server Windows部署经验",
-  "details": "Excel MCP Server 部署经验总结：\n\n**项目概述**\n- 基于FastMCP框架的Excel操作服务器\n- 核心模块：ExcelReader、ExcelWriter、ExcelManager、ExcelSearcher\n- 使用uv包管理器，支持Python 3.10+\n\n**部署关键要点**\n1. MCP服务器通过stdio通信，不支持--help等交互式命令\n2. Windows环境需要使用正斜杠路径格式\n3. 支持两种主要部署方式：UV包管理器（推荐）和直接Python\n4. 核心依赖：fastmcp, openpyxl, mcp, xlcalculator, formulas, xlwings\n\n**生成的配置文件**\n- mcp-windows.json: UV方式配置\n- mcp-direct.json: 直接Python方式配置\n- deploy.bat: Windows自动化部署脚本\n- DEPLOYMENT.md: 详细部署文档\n\n**常见问题**\n- 路径问题：Windows需要使用绝对路径和正斜杠\n- 依赖问题：确保所有依赖正确安装\n- 权限问题：确保对Excel文件有读写权限\n\n**测试验证**\n通过timeout命令测试服务器启动（MCP服务器超时退出是正常现象）",
-  "category": "project_deployment",
-  "dateCreated": "2025-08-25T03:41:01.931Z",
-  "dateUpdated": "2025-08-25T03:41:01.931Z"
-}

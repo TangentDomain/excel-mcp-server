@@ -1,8 +1,0 @@
-{
-  "id": "5676b1fb-6bf6-4ae4-abe7-318fb99472a7",
-  "title": "Excel MCP项目文档不一致分析",
-  "details": "在分析excel-mcp-server项目时发现README.zh-CN.md与pyproject.toml存在多处不一致：\n\n**关键不一致项：**\n1. 项目名称：pyproject.toml使用\"excel-mcp-server-fastmcp\"，README使用\"ExcelMCP\"\n2. Python版本要求：pyproject.toml要求\">=3.10\"，README声称\"3.8+\"\n3. Git仓库URL：README使用占位符\"your-username/excel-mcp.git\"\n4. 目录名称：README提到\"cd excel-mcp\"，实际应该是项目根目录名\n\n**修复原则：**\n以pyproject.toml作为权威信息源，因为它是构建配置的核心文件，修正README中的所有不一致内容。",
-  "category": "project_analysis",
-  "dateCreated": "2025-08-21T10:54:22.720Z",
-  "dateUpdated": "2025-08-21T10:54:22.720Z"
-}

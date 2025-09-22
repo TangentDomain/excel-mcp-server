@@ -1,8 +1,0 @@
-{
-  "id": "7d21672e-531b-419c-8346-9ce6b3e7a588",
-  "title": "Excel MCP Server API修复记录",
-  "details": "## Excel MCP Server 测试修复记录\n\n### 已修复问题\n\n1. **模型hashability问题**\n   - **问题**: SheetInfo模型无法被哈希，导致test_models_hashability失败\n   - **修复**: 在SheetInfo数据类上添加了`frozen=True`参数\n   - **位置**: `src/models/types.py`\n   - **影响**: 使所有模型支持哈希操作，可用作字典键或集合元素\n\n2. **API返回格式一致性问题 - evaluate_formula**\n   - **问题**: evaluate_formula方法将结果存储在metadata字段而非data字段\n   - **修复**: 在ExcelWriter.evaluate_formula方法中添加`data=calculated_value`参数\n   - **位置**: `src/core/excel_writer.py`\n   - **影响**: 修复了test_evaluate_formula和test_evaluate_formula_with_context\n\n3. **测试断言错误 - set_formula**\n   - **问题**: 测试期望公式值为\"SUM(A1:A5)\"但Excel实际存储为\"=SUM(A1:A5)\"\n   - **修复**: 更新测试断言以包含等号前缀\n   - **位置**: `tests/test_excel_writer.py`\n   - **原则**: Excel公式在存储时总是包含等号前缀\n\n### 测试进展\n- 从13个失败减少到预计6-7个失败\n- 成功修复3-4个相关测试",
-  "category": "testing_fixes",
-  "dateCreated": "2025-08-21T04:49:16.799Z",
-  "dateUpdated": "2025-08-21T04:49:16.799Z"
-}

@@ -1,8 +1,0 @@
-{
-  "id": "a7fa0b17-24f3-4081-b83c-33e8b0c9e9ea",
-  "title": "Excel比较结果数据结构设计",
-  "details": "为Excel比较结果设计包含不变数据的新数据结构方案：\n\n核心设计：\n1. 分区存储：变化区(row_differences) + 不变区(unchanged_rows)\n2. 单份存储：不变数据只存储一份，避免重复\n3. 索引优化：data_index提供快速查找机制\n4. 向后兼容：保持现有API结构\n\n数据结构：\n- comparison_data.row_differences: 继续使用紧凑数组格式存储差异\n- comparison_data.unchanged_rows: 新增区域存储不变行，使用类似格式\n- comparison_data.data_index: 索引区，提供快速分类和统计\n\n优势：完整性(包含所有数据) + 效率(单份存储) + 性能(索引查找) + 兼容性(现有API不变)\n\n实现要点：\n1. 修改ExcelComparer._compare_structured_data方法\n2. 扩展formatter.py的_build_compact_array函数\n3. 添加新的数据收集和索引构建逻辑\n4. 保持现有API签名不变",
-  "category": "design_decision",
-  "dateCreated": "2025-08-22T14:37:04.422Z",
-  "dateUpdated": "2025-08-22T14:37:04.422Z"
-}
