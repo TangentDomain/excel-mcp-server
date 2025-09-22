@@ -1,31 +1,62 @@
 
 <div align="center">
-<a href="README.md">简体中文</a> | <a href="README.en.md">English</a>
+<a href="README.md">### 🎬 游戏开发场景演示
+
+**技能配置表管理:**
+
+```bash
+"在技能配置表中查找所有火系技能，将伤害值统一提升20%，并用红色高亮显示"
+```
+
+**装备数据分析:**
+
+```bash
+"比较新旧版本的装备配置表，找出所有属性变更的装备，生成详细的变更报告"
+```
+
+**游戏数值平衡:**
+
+```bash
+"检查怪物配置表中所有等级20-30的怪物，确保血量和攻击力的比例在合理范围内"
+```| <a href="README.en.md">English</a>
 </div>
 
-# ExcelMCP: 强大的 Excel MCP 服务器 🚀
+# 🎮 ExcelMCP: 游戏开发专用 Excel 配置表管理器
 
 [![许可证: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![Python 版本](https://img.shields.io/badge/python-3.10+-blue.svg)](https://www.python.org/downloads/)
 [![技术支持: FastMCP](https://img.shields.io/badge/Powered%20by-FastMCP-orange)](https://github.com/jlowin/fastmcp)
 [![状态](https://img.shields.io/badge/status-production-success.svg)](#)
-[![测试](https://img.shields.io/badge/tests-221%20passed-brightgreen.svg)](#)
+[![测试覆盖](https://img.shields.io/badge/tests-295%20passed-brightgreen.svg)](#)
+[![工具数量](https://img.shields.io/badge/tools-32个专业工具-blue.svg)](#)
 
-**ExcelMCP** 是一个全面的模型上下文协议 (MCP) 服务器，通过 AI 革命性地改变 Excel 文件操作方式。基于 **FastMCP** 和 **openpyxl** 构建，提供 27+ 个强大工具，使 AI 助手能够通过自然语言命令执行复杂的 Excel 操作。从跨数千文件的正则搜索到高级数据操作和格式化 - 全部具备企业级可靠性。
+**ExcelMCP** 是专为**游戏开发**设计的 Excel 配置表管理 MCP (Model Context Protocol) 服务器。通过 AI 自然语言指令，实现技能配置表、装备数据、怪物属性等游戏配置的智能化操作。基于 **FastMCP** 和 **openpyxl** 构建，拥有 **32个专业工具** 和 **295个测试用例**，确保企业级可靠性。
 
-🎯 **完美适用于：** 游戏开发配置表、数据分析工作流、自动化报告、批量文件处理和智能化办公自动化。
+🎯 **专为游戏开发而生：** 技能系统、装备管理、怪物配置、游戏数值平衡、版本对比、策划工具链。
 
 ---
 
-## ✨ 主要功能
+## 🎮 游戏配置表专业管理
 
-- ⚡️ **27+ 高级工具**: 从基础 CRUD 到复杂格式化的完整 Excel 操作套件
-- 🔍 **强大搜索引擎**: 正则表达式跨文件搜索，支持目录级批量操作
-- 📊 **智能数据操作**: 基于范围的读写、行列管理、公式保护
-- 🎨 **专业格式化**: 预设样式、自定义格式、边框、合并、尺寸调整
-- 🗂️ **文件生命周期管理**: 创建、转换、合并、导入/导出 CSV、文件信息
-- 🎮 **游戏开发优化**: 专为游戏开发设计的 Excel 配置表比较功能
-- 🔒 **企业级可靠性**: 集中错误处理、全面验证、100% 测试覆盖率
+### 🎯 游戏开发核心功能
+- **🛡️ 技能配置表** (TrSkill): 技能ID、名称、类型、等级、消耗、冷却、伤害、描述
+- **⚔️ 装备配置表** (TrItem): 装备ID、名称、类型、品质、属性、套装、获取方式
+- **👹 怪物配置表** (TrMonster): 怪物ID、名称、等级、血量、攻击、防御、技能、掉落
+- **🎁 道具配置表** (TrProps): 道具ID、名称、类型、数量、效果、获取、描述
+
+### ✨ 32个专业工具分类
+- **⚡️ 文件管理** (8工具): 创建、转换、合并、导入导出、文件信息
+- **🔍 智能搜索** (4工具): 正则搜索、目录搜索、游戏表头分析、重复ID检测
+- **📊 数据操作** (8工具): 范围读写、行列管理、数据更新、公式保护
+- **🎨 格式美化** (6工具): 预设样式、边框设置、合并单元格、行列尺寸
+- **🔄 版本对比** (3工具): 游戏配置表比较、对象变更跟踪、ID对象管理
+- **🛠️ 高级功能** (3工具): 中文支持、Unicode处理、批量操作
+
+### 🔒 企业级可靠性
+- **295个测试用例** 100% 通过，覆盖所有功能模块
+- **委托架构设计** 纯MCP接口 → API层 → 核心层 → 工具层
+- **统一错误处理** 集中化异常管理和用户友好提示
+- **性能优化** 工作簿缓存、内存管理、大文件处理
 
 ---
 
