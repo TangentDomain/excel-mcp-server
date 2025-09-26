@@ -345,13 +345,14 @@ def excel_get_range(
     读取Excel指定范围的数据
 
     Args:
-        file_path: Excel文件路径 (.xlsx/.xlsm)
-        range: 范围表达式，必须包含工作表名，支持格式：
+        file_path (str): Excel文件路径 (.xlsx/.xlsm) [必需]
+        range (str): 范围表达式，必须包含工作表名 [必需]
+            支持格式：
             - 标准单元格范围: "Sheet1!A1:C10"、"TrSkill!A1:Z100"
             - 行范围: "Sheet1!1:1"、"数据!5:10"
             - 列范围: "Sheet1!A:C"、"统计!B:E"
             - 单行/单列: "Sheet1!5"、"数据!C"
-        include_formatting: 是否包含单元格格式
+        include_formatting (bool, 可选): 是否包含单元格格式，默认 False
 
     Returns:
         Dict: 包含 success、data(List[List])、range_info
