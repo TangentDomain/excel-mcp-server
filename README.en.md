@@ -1,6 +1,8 @@
 
 <div align="center">
-<a href="README.md">简体中文</a> | <a href="README.en.md">English</a>
+
+[简体中文](README.md) ｜ [English](README.en.md)
+
 </div>
 
 # ExcelMCP: Powerful Excel MCP Server 🚀
@@ -8,10 +10,10 @@
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![Python Version](https://img.shields.io/badge/python-3.10+-blue.svg)](https://www.python.org/downloads/)
 [![Powered by: FastMCP](https://img.shields.io/badge/Powered%20by-FastMCP-orange)](https://github.com/jlowin/fastmcp)
-[![Status](https://img.shields.io/badge/status-production-success.svg)](#)
-[![Tests](https://img.shields.io/badge/tests-221%20passed-brightgreen.svg)](#)
+![Status](https://img.shields.io/badge/status-production-success.svg)
+![Tests](https://img.shields.io/badge/tests-295%20passed-brightgreen.svg)
 
-**ExcelMCP** is a comprehensive Model Context Protocol (MCP) server that revolutionizes Excel file manipulation through AI. Built with **FastMCP** and **openpyxl**, it provides 27+ powerful tools enabling AI assistants to perform complex Excel operations through natural language commands. From regex searches across thousands of files to advanced data manipulation and formatting - all with enterprise-grade reliability.
+**ExcelMCP** is a comprehensive Model Context Protocol (MCP) server that revolutionizes Excel file manipulation through AI. Built with **FastMCP** and **openpyxl**, it provides 32+ powerful tools enabling AI assistants to perform complex Excel operations through natural language commands. From regex searches across thousands of files to advanced data manipulation and formatting - all with enterprise-grade reliability.
 
 🎯 **Perfect for:** Game development configuration tables, data analysis workflows, automated reporting, bulk file processing, and intelligent office automation.
 
@@ -19,11 +21,11 @@
 
 ## ✨ Key Features
 
-- ⚡️ **27+ Advanced Tools**: Complete Excel manipulation suite from basic CRUD to complex formatting
+- ⚡️ **32+ Advanced Tools**: Complete Excel manipulation suite from basic CRUD to complex formatting
 - 🔍 **Powerful Search Engine**: Regex search across files with directory-wide operations
-- � **Smart Data Operations**: Range-based read/write, row/column management, formula preservation
+- 🧠 **Smart Data Operations**: Range-based read/write, row/column management, formula preservation
 - 🎨 **Professional Formatting**: Preset styles, custom formatting, borders, merging, sizing
-- �️ **File Lifecycle Management**: Create, convert, merge, import/export CSV, file information
+- 🗂️ **File Lifecycle Management**: Create, convert, merge, import/export CSV, file information
 - 🎮 **Game Development Optimized**: Specialized Excel config table comparison for game development
 - 🔒 **Enterprise-Ready**: Centralized error handling, comprehensive validation, 100% test coverage
 
@@ -35,7 +37,7 @@
 
 **Example Prompt:**
 
-```
+```text
 "In `quarterly_sales.xlsx`, find all rows where the 'Region' is 'North' and the 'Sale Amount' is over 5000. Copy them to a new sheet named 'Top Performers' and format the header in blue."
 ```
 
@@ -98,7 +100,7 @@ Get ExcelMCP running in your favorite MCP client (VS Code with Continue, Cursor,
 
 ---
 
-## 🛠️ Available Tools (27 Advanced Excel Operations)
+## 🛠️ Available Tools (32 Advanced Excel Operations)
 
 ExcelMCP provides a comprehensive suite of Excel manipulation tools:
 
@@ -199,7 +201,7 @@ Natural Language → AI Assistant → ExcelMCP
 
 ### Project Structure
 
-```
+```text
 src/
 ├── server.py              # MCP tool definitions (pure delegation)
 ├── api/excel_operations.py # Centralized business logic
@@ -214,7 +216,7 @@ src/
 
 ### Quality Assurance
 
-- **221 comprehensive tests** with 100% passing rate
+- **295 comprehensive tests** with 100% passing rate
 - **Centralized error handling** with structured responses
 - **Type safety** with full TypeScript-style annotations
 - **Game development optimized** with specialized config table tools
@@ -256,4 +258,4 @@ If ExcelMCP helps your workflow, please:
 - 💡 Suggest new features
 - 📖 Contribute to documentation
 
-**Built with ❤️ for the AI and Excel automation community**
+Built with ❤️ for the AI and Excel automation community.
