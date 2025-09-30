@@ -44,7 +44,7 @@ logger = logging.getLogger(__name__)
 # 创建FastMCP服务器实例，开启调试模式和详细日志
 mcp = FastMCP(
     name="excel-mcp",
-    instructions="""🎮 游戏开发Excel配置表专家 - 28个专业工具
+    instructions="""🎮 游戏开发Excel配置表专家 - 32个专业工具 · 295项测试验证
 
 ## 🎯 核心设计原则
 • **搜索优先**：任何查找、定位、分析操作都优先使用 `excel_search`
@@ -52,6 +52,7 @@ mcp = FastMCP(
 • **范围格式**：必须包含工作表名 `"技能配置表!A1:Z100"` `"装备配置表!B2:F50"`
 • **ID驱动**：所有配置表以ID为主键，支持ID对象跟踪
 • **中文友好**：完全支持中文工作表名和游戏术语
+• **双行表头**：游戏开发专用，第1行描述+第2行字段名的标准化结构
 
 ## ⚠️ 核心注意事项
 🔴 **默认覆盖**：`excel_update_range`默认覆盖模式，需保留数据时用`insert_mode=True`
@@ -141,9 +142,9 @@ excel_compare_sheets("old_config.xlsx", "技能配置表", "new_config.xlsx", "�
 ### 配置表数据挖掘
 ```
 🔎 强大搜索能力:
-excel_search("all_configs.xlsx", r"攻击力\s*[\d+]", regex_flags="i")     # 搜索攻击力数值
-excel_search_directory("./configs", r"火|冰|雷", recursive=True)         # 批量搜索元素技能
-excel_search("skills.xlsx", r"冷却.*[5-9]", include_formulas=True)      # 搜索长冷却技能
+excel_search("all_configs.xlsx", r"攻击力\s*\d+", use_regex=True)           # 搜索攻击力数值
+excel_search_directory("./configs", r"火|冰|雷", use_regex=True)           # 批量搜索元素技能
+excel_search("skills.xlsx", r"冷却.*[5-9]", use_regex=True, include_formulas=True)      # 搜索长冷却技能
 ```
 
 🚀 **游戏开发专家模式**: 搜索定位→数据分析→安全更新→视觉优化→版本对比→性能监控""",
@@ -246,22 +247,23 @@ def excel_search(
     file_path: str,
     pattern: str,
     sheet_name: Optional[str] = None,
-    regex_flags: str = "",
+    case_sensitive: bool = False,
+    whole_word: bool = False,
+    use_regex: bool = False,
     include_values: bool = True,
     include_formulas: bool = False,
     range: Optional[str] = None
 ) -> Dict[str, Any]:
     """
-    在Excel文件中使用正则表达式搜索单元格内容
+    在Excel文件中搜索单元格内容（VSCode风格搜索选项）
 
     Args:
         file_path: Excel文件路径 (.xlsx/.xlsm)
-        pattern: 正则表达式模式，支持常用格式：
-            - r'\\d+': 匹配数字
-            - r'\\w+@\\w+\\.\\w+': 匹配邮箱
-            - r'^总计|合计$': 匹配特定文本
+        pattern: 搜索模式。当use_regex=True时为正则表达式，否则为字面字符串
         sheet_name: 工作表名称 (可选，不指定时搜索所有工作表)
-        regex_flags: 正则修饰符 ("i"忽略大小写, "m"多行, "s"点号匹配换行)
+        case_sensitive: 大小写敏感 (默认False，即忽略大小写)
+        whole_word: 全词匹配 (默认False，即部分匹配)
+        use_regex: 启用正则表达式 (默认False，即字面字符串搜索)
         include_values: 是否搜索单元格值
         include_formulas: 是否搜索公式内容
         range: 搜索范围表达式，支持多种格式：
@@ -275,30 +277,33 @@ def excel_search(
         Dict: 包含 success、matches(List[Dict])、match_count、searched_sheets
 
     Example:
-        # 搜索所有工作表中的邮箱格式
-        result = excel_search("data.xlsx", r'\\w+@\\w+\\.\\w+', regex_flags="i")
-        # 搜索指定工作表中的数字
-        result = excel_search("data.xlsx", r'\\d+', sheet_name="Sheet1")
-        # 搜索指定单元格范围内的数字
-        result = excel_search("data.xlsx", r'\\d+', range="Sheet1!A1:C10")
-        # 搜索第3-5行中的邮箱
-        result = excel_search("data.xlsx", r'@', range="3:5", sheet_name="Sheet1")
-        # 搜索B列到D列中的内容
-        result = excel_search("data.xlsx", r'关键词', range="B:D", sheet_name="Sheet1")
-        # 搜索单行或单列
-        result = excel_search("data.xlsx", r'总计', range="10", sheet_name="Sheet1")  # 仅第10行
-        result = excel_search("data.xlsx", r'金额', range="E", sheet_name="Sheet1")   # 仅E列
+        # 普通字符串搜索（默认忽略大小写）
+        result = excel_search("data.xlsx", "总计")
+        # 大小写敏感搜索
+        result = excel_search("data.xlsx", "Total", case_sensitive=True)
+        # 全词匹配搜索（只匹配完整单词）
+        result = excel_search("data.xlsx", "sum", whole_word=True)
+        # 正则表达式搜索邮箱格式
+        result = excel_search("data.xlsx", r'\\w+@\\w+\\.\\w+', use_regex=True)
+        # 正则表达式搜索数字（大小写敏感）
+        result = excel_search("data.xlsx", r'\\d+', use_regex=True, case_sensitive=True)
+        # 搜索指定范围
+        result = excel_search("data.xlsx", "金额", range="Sheet1!A1:C10", whole_word=True)
+        # 搜索指定工作表
+        result = excel_search("data.xlsx", "error", sheet_name="Sheet1", case_sensitive=True)
         # 搜索数字并包含公式
-        result = excel_search("data.xlsx", r'\\d+', include_formulas=True)
+        result = excel_search("data.xlsx", r'\\d+', use_regex=True, include_formulas=True)
     """
-    return ExcelOperations.search(file_path, pattern, sheet_name, regex_flags, include_values, include_formulas, range)
+    return ExcelOperations.search(file_path, pattern, sheet_name, case_sensitive, whole_word, use_regex, include_values, include_formulas, range)
 
 
 @mcp.tool()
 def excel_search_directory(
     directory_path: str,
     pattern: str,
-    regex_flags: str = "",
+    case_sensitive: bool = False,
+    whole_word: bool = False,
+    use_regex: bool = False,
     include_values: bool = True,
     include_formulas: bool = False,
     recursive: bool = True,
@@ -307,15 +312,14 @@ def excel_search_directory(
     max_files: int = 100
 ) -> Dict[str, Any]:
     """
-    在目录下的所有Excel文件中使用正则表达式搜索单元格内容
+    在目录下的所有Excel文件中搜索内容（VSCode风格搜索选项）
 
     Args:
         directory_path: 目录路径
-        pattern: 正则表达式模式，支持常用格式：
-            - r'\\d+': 匹配数字
-            - r'\\w+@\\w+\\.\\w+': 匹配邮箱
-            - r'^总计|合计$': 匹配特定文本
-        regex_flags: 正则修饰符 ("i"忽略大小写, "m"多行, "s"点号匹配换行)
+        pattern: 搜索模式。当use_regex=True时为正则表达式，否则为字面字符串
+        case_sensitive: 大小写敏感 (默认False，即忽略大小写)
+        whole_word: 全词匹配 (默认False，即部分匹配)
+        use_regex: 启用正则表达式 (默认False，即字面字符串搜索)
         include_values: 是否搜索单元格值
         include_formulas: 是否搜索公式内容
         recursive: 是否递归搜索子目录
@@ -327,12 +331,18 @@ def excel_search_directory(
         Dict: 包含 success、matches(List[Dict])、total_matches、searched_files
 
     Example:
-        # 搜索目录中的邮箱格式
-        result = excel_search_directory("./data", r'\\w+@\\w+\\.\\w+', "i")
+        # 普通字符串搜索目录
+        result = excel_search_directory("./data", "总计")
+        # 大小写敏感搜索
+        result = excel_search_directory("./data", "Error", case_sensitive=True)
+        # 全词匹配搜索
+        result = excel_search_directory("./data", "sum", whole_word=True)
+        # 正则表达式搜索邮箱格式
+        result = excel_search_directory("./data", r'\\w+@\\w+\\.\\w+', use_regex=True)
         # 搜索特定文件名模式
-        result = excel_search_directory("./reports", r'\\d+', file_pattern=r'.*销售.*')
+        result = excel_search_directory("./reports", r'\\d+', use_regex=True, file_pattern=r'.*销售.*')
     """
-    return ExcelOperations.search_directory(directory_path, pattern, regex_flags, include_values, include_formulas, recursive, file_extensions, file_pattern, max_files)
+    return ExcelOperations.search_directory(directory_path, pattern, case_sensitive, whole_word, use_regex, include_values, include_formulas, recursive, file_extensions, file_pattern, max_files)
 
 
 @mcp.tool()

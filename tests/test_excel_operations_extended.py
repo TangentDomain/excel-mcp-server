@@ -90,18 +90,23 @@ class TestExcelOperationsExtended:
             mock_reader = MagicMock()
             mock_reader_class.return_value = mock_reader
 
-            # 模拟表头数据
+            # 模拟双行表头数据（第1行：描述，第2行：字段名）
             mock_result = Mock()
             mock_result.success = True
-            mock_result.data = [["ID", "姓名", "年龄", "部门"]]
+            mock_result.data = [
+                ["ID描述", "姓名描述", "年龄描述", "部门描述"],  # 第1行：字段描述
+                ["ID", "姓名", "年龄", "部门"]              # 第2行：字段名
+            ]
             mock_reader.get_range.return_value = mock_result
 
             # 调用方法
             result = ExcelOperations.get_headers("test.xlsx", "Sheet1")
 
-            # 验证结果
+            # 验证结果 - 现在返回双行表头信息
             assert result['success'] is True
-            assert result['headers'] == ["ID", "姓名", "年龄", "部门"]
+            assert result['field_names'] == ["ID", "姓名", "年龄", "部门"]
+            assert result['descriptions'] == ["ID描述", "姓名描述", "年龄描述", "部门描述"]
+            assert result['headers'] == ["ID", "姓名", "年龄", "部门"]  # 兼容性字段
             assert result['header_count'] == 4
             assert result['sheet_name'] == "Sheet1"
             mock_reader.close.assert_called_once()
@@ -112,19 +117,24 @@ class TestExcelOperationsExtended:
             mock_reader = MagicMock()
             mock_reader_class.return_value = mock_reader
 
-            # 模拟表头数据
+            # 模拟双行表头数据
             mock_result = Mock()
             mock_result.success = True
-            mock_result.data = [["ID", "姓名", "年龄", ""]]
+            mock_result.data = [
+                ["ID描述", "姓名描述", "年龄描述", "部门描述"],  # 第1行：字段描述
+                ["ID", "姓名", "年龄", "部门"]              # 第2行：字段名
+            ]
             mock_reader.get_range.return_value = mock_result
 
             # 调用方法
             result = ExcelOperations.get_headers("test.xlsx", "Sheet1", max_columns=3)
 
-            # 验证结果 - 应该保留空字符串因为指定了max_columns
+            # 验证结果 - 应该只返回前3列
             assert result['success'] is True
-            assert len(result['headers']) == 3  # 只返回前3列
-            assert result['headers'] == ["ID", "姓名", "年龄"]
+            assert len(result['field_names']) == 3  # 只返回前3列
+            assert result['field_names'] == ["ID", "姓名", "年龄"]
+            assert result['descriptions'] == ["ID描述", "姓名描述", "年龄描述"]
+            assert result['headers'] == ["ID", "姓名", "年龄"]  # 兼容性字段
 
     def test_create_file_success(self):
         """测试create_file成功场景"""

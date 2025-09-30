@@ -447,19 +447,23 @@ class ExcelOperations:
         file_path: str,
         pattern: str,
         sheet_name: Optional[str] = None,
-        regex_flags: str = "",
+        case_sensitive: bool = False,
+        whole_word: bool = False,
+        use_regex: bool = False,
         include_values: bool = True,
         include_formulas: bool = False,
         range: Optional[str] = None
     ) -> Dict[str, Any]:
         """
-        @intention 在Excel文件中使用正则表达式搜索单元格内容
+        @intention 在Excel文件中搜索单元格内容（VSCode风格搜索选项）
 
         Args:
             file_path: Excel文件路径 (.xlsx/.xlsm)
-            pattern: 正则表达式模式
+            pattern: 搜索模式（正则表达式或字面字符串）
             sheet_name: 工作表名称 (可选)
-            regex_flags: 正则修饰符
+            case_sensitive: 大小写敏感
+            whole_word: 全词匹配
+            use_regex: 启用正则表达式
             include_values: 是否搜索单元格值
             include_formulas: 是否搜索公式内容
             range: 搜索范围表达式
@@ -468,16 +472,39 @@ class ExcelOperations:
             Dict: 标准化的操作结果
         """
         if cls.DEBUG_LOG_ENABLED:
-            logger.info(f"{cls._LOG_PREFIX} 开始正则搜索: {pattern}")
+            search_type = "正则" if use_regex else ("全词" if whole_word else "字符串")
+            case_info = "大小写敏感" if case_sensitive else "忽略大小写"
+            logger.info(f"{cls._LOG_PREFIX} 开始{search_type}搜索({case_info}): {pattern}")
 
         try:
             from ..core.excel_search import ExcelSearcher
+            import re
+
             searcher = ExcelSearcher(file_path)
-            result = searcher.regex_search(pattern, regex_flags, include_values, include_formulas, sheet_name, range)
+
+            # 构建正则表达式模式
+            if use_regex:
+                # 直接使用用户提供的正则表达式
+                regex_pattern = pattern
+            else:
+                # 将字面字符串转义为正则表达式
+                escaped_pattern = re.escape(pattern)
+
+                # 如果是全词匹配，添加单词边界
+                if whole_word:
+                    regex_pattern = r'\b' + escaped_pattern + r'\b'
+                else:
+                    regex_pattern = escaped_pattern
+
+            # 构建正则表达式标志
+            regex_flags = "" if case_sensitive else "i"
+
+            result = searcher.regex_search(regex_pattern, regex_flags, include_values, include_formulas, sheet_name, range)
             return format_operation_result(result)
 
         except Exception as e:
-            error_msg = f"正则搜索失败: {str(e)}"
+            search_type = "正则" if use_regex else ("全词" if whole_word else "字符串")
+            error_msg = f"{search_type}搜索失败: {str(e)}"
             logger.error(f"{cls._LOG_PREFIX} {error_msg}")
             return cls._format_error_result(error_msg)
 
@@ -486,7 +513,9 @@ class ExcelOperations:
         cls,
         directory_path: str,
         pattern: str,
-        regex_flags: str = "",
+        case_sensitive: bool = False,
+        whole_word: bool = False,
+        use_regex: bool = False,
         include_values: bool = True,
         include_formulas: bool = False,
         recursive: bool = True,
@@ -495,29 +524,54 @@ class ExcelOperations:
         max_files: int = 100
     ) -> Dict[str, Any]:
         """
-        @intention 在目录下的所有Excel文件中搜索内容
+        @intention 在目录下的所有Excel文件中搜索内容（VSCode风格搜索选项）
 
         Args:
             directory_path: 目录路径
-            pattern: 正则表达式模式
+            pattern: 搜索模式（正则表达式或字面字符串）
+            case_sensitive: 大小写敏感
+            whole_word: 全词匹配
+            use_regex: 启用正则表达式
             其他参数同search方法
 
         Returns:
             Dict: 标准化的操作结果
         """
         if cls.DEBUG_LOG_ENABLED:
-            logger.info(f"{cls._LOG_PREFIX} 开始目录搜索: {directory_path}")
+            search_type = "正则" if use_regex else ("全词" if whole_word else "字符串")
+            case_info = "大小写敏感" if case_sensitive else "忽略大小写"
+            logger.info(f"{cls._LOG_PREFIX} 开始目录{search_type}搜索({case_info}): {directory_path}")
 
         try:
             from ..core.excel_search import ExcelSearcher
+            import re
+
+            # 构建正则表达式模式
+            if use_regex:
+                # 直接使用用户提供的正则表达式
+                regex_pattern = pattern
+            else:
+                # 将字面字符串转义为正则表达式
+                escaped_pattern = re.escape(pattern)
+
+                # 如果是全词匹配，添加单词边界
+                if whole_word:
+                    regex_pattern = r'\b' + escaped_pattern + r'\b'
+                else:
+                    regex_pattern = escaped_pattern
+
+            # 构建正则表达式标志
+            regex_flags = "" if case_sensitive else "i"
+
             result = ExcelSearcher.search_directory_static(
-                directory_path, pattern, regex_flags, include_values, include_formulas,
+                directory_path, regex_pattern, regex_flags, include_values, include_formulas,
                 recursive, file_extensions, file_pattern, max_files
             )
             return format_operation_result(result)
 
         except Exception as e:
-            error_msg = f"目录搜索失败: {str(e)}"
+            search_type = "正则" if use_regex else ("全词" if whole_word else "字符串")
+            error_msg = f"目录{search_type}搜索失败: {str(e)}"
             logger.error(f"{cls._LOG_PREFIX} {error_msg}")
             return cls._format_error_result(error_msg)
 

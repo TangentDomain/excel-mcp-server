@@ -35,8 +35,45 @@ class TestExcelCheckDuplicateIds:
     @pytest.fixture
     def temp_dir(self):
         """创建临时目录"""
-        with tempfile.TemporaryDirectory() as tmp_dir:
-            yield Path(tmp_dir)
+        import tempfile
+        from pathlib import Path
+        import gc
+        import shutil
+        import time
+        import logging
+
+        temp_path = Path(tempfile.mkdtemp())
+
+        try:
+            yield temp_path
+        finally:
+            # 使用与conftest.py相同的清理机制
+            def safe_rmtree(path, max_retries=5, delay=0.1):
+                for attempt in range(max_retries):
+                    try:
+                        gc.collect()
+                        shutil.rmtree(path)
+                        return
+                    except PermissionError as e:
+                        if attempt == max_retries - 1:
+                            try:
+                                gc.collect()
+                                for file_path in Path(path).rglob("*"):
+                                    if file_path.is_file():
+                                        try:
+                                            file_path.unlink(missing_ok=True)
+                                        except PermissionError:
+                                            pass
+                                shutil.rmtree(path, ignore_errors=True)
+                                return
+                            except Exception:
+                                logging.warning(f"Could not remove temp directory {path}: {e}")
+                                return
+                        time.sleep(delay)
+                        delay *= 2
+                        gc.collect()
+
+            safe_rmtree(temp_path)
 
     @pytest.fixture
     def no_duplicate_file(self, temp_dir):

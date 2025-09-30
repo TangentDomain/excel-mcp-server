@@ -16,27 +16,56 @@ from openpyxl.styles import Font, PatternFill, Alignment
 logging.getLogger('openpyxl').setLevel(logging.ERROR)
 
 
-def safe_rmtree(path, max_retries=3, delay=0.1):
+def safe_rmtree(path, max_retries=5, delay=0.1):
     """Safely remove directory tree with retry mechanism for Windows file locking"""
+    import gc
+
     for attempt in range(max_retries):
         try:
+            # Force garbage collection before attempting removal
+            gc.collect()
+
+            # Try to remove the directory
             shutil.rmtree(path)
             return
+
         except PermissionError as e:
             if attempt == max_retries - 1:
-                # Last attempt failed, log warning but don't fail test
-                logging.warning(f"Could not remove temp directory {path}: {e}")
-                return
+                # Last attempt failed, try to remove individual files first
+                try:
+                    gc.collect()
+                    for file_path in Path(path).rglob("*"):
+                        if file_path.is_file():
+                            try:
+                                file_path.unlink(missing_ok=True)
+                            except PermissionError:
+                                pass
+                    # Try directory removal again
+                    shutil.rmtree(path, ignore_errors=True)
+                    return
+                except Exception:
+                    # If all else fails, just log warning
+                    logging.warning(f"Could not remove temp directory {path}: {e}")
+                    return
+
+            # Wait and retry
             time.sleep(delay)
             delay *= 2  # Exponential backoff
+            gc.collect()  # Force GC between attempts
 
 
 @pytest.fixture
 def temp_dir():
     """Create a temporary directory for test files"""
     temp_path = Path(tempfile.mkdtemp())
-    yield temp_path
-    safe_rmtree(temp_path)
+
+    try:
+        yield temp_path
+    finally:
+        # Ensure all Excel file handles are closed by forcing garbage collection
+        import gc
+        gc.collect()
+        safe_rmtree(temp_path)
 
 
 @pytest.fixture
