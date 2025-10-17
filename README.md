@@ -31,10 +31,11 @@
 [![Python 版本](https://img.shields.io/badge/python-3.10+-blue.svg)](https://www.python.org/downloads/)
 [![技术支持: FastMCP](https://img.shields.io/badge/Powered%20by-FastMCP-orange)](https://github.com/jlowin/fastmcp)
 ![状态](https://img.shields.io/badge/status-production-success.svg)
-![测试覆盖](https://img.shields.io/badge/tests-295%20passed-brightgreen.svg)
-![工具数量](https://img.shields.io/badge/tools-32个专业工具-blue.svg)
+![测试覆盖](https://img.shields.io/badge/tests-697%20passed-brightgreen.svg)
+![覆盖率](https://img.shields.io/badge/coverage-78%25-brightgreen.svg)
+![工具数量](https://img.shields.io/badge/tools-30个专业工具-blue.svg)
 
-**ExcelMCP** 是专为**游戏开发**设计的 Excel 配置表管理 MCP (Model Context Protocol) 服务器。通过 AI 自然语言指令，实现技能配置表、装备数据、怪物属性等游戏配置的智能化操作。基于 **FastMCP** 和 **openpyxl** 构建，拥有 **32个专业工具** 和 **295个测试用例**，确保企业级可靠性。
+**ExcelMCP** 是专为**游戏开发**设计的 Excel 配置表管理 MCP (Model Context Protocol) 服务器。通过 AI 自然语言指令，实现技能配置表、装备数据、怪物属性等游戏配置的智能化操作。基于 **FastMCP** 和 **openpyxl** 构建，拥有 **30个专业工具** 和 **697个测试用例**，**78%代码覆盖率**，确保企业级可靠性。
 
 🎯 **专为游戏开发而生：** 技能系统、装备管理、怪物配置、游戏数值平衡、版本对比、策划工具链。
 
@@ -49,21 +50,21 @@
 - **👹 怪物配置表** (TrMonster): 怪物ID、名称、等级、血量、攻击、防御、技能、掉落
 - **🎁 道具配置表** (TrProps): 道具ID、名称、类型、数量、效果、获取、描述
 
-### ✨ 32个专业工具分类
+### ✨ 30个专业工具分类
 
-- **⚡️ 文件管理** (8工具): 创建、转换、合并、导入导出、文件信息
-- **🔍 智能搜索** (4工具): 正则搜索、目录搜索、游戏表头分析、重复ID检测
+- **📁 文件和工作表管理** (8工具): 创建、转换、合并、导入导出、文件信息
 - **📊 数据操作** (8工具): 范围读写、行列管理、数据更新、公式保护
-- **🎨 格式美化** (6工具): 预设样式、边框设置、合并单元格、行列尺寸
-- **🔄 版本对比** (3工具): 游戏配置表比较、对象变更跟踪、ID对象管理
-- **🛠️ 高级功能** (3工具): 中文支持、Unicode处理、批量操作
+- **🔍 搜索和分析** (4工具): 正则搜索、目录搜索、游戏表头分析、重复ID检测
+- **🎨 格式化和样式** (6工具): 预设样式、边框设置、合并单元格、行列尺寸
+- **🔄 导入导出和转换** (4工具): CSV导入导出、格式转换、文件合并
 
 ### 🔒 企业级可靠性
 
-- **295个测试用例** 100% 通过，覆盖所有功能模块
+- **697个测试用例** 100% 通过，**78%代码覆盖率**，覆盖所有功能模块
 - **委托架构设计** 纯MCP接口 → API层 → 核心层 → 工具层
 - **统一错误处理** 集中化异常管理和用户友好提示
 - **性能优化** 工作簿缓存、内存管理、大文件处理
+- **游戏开发专业化** 双行表头系统、ID对象跟踪、版本对比
 
 ---
 
@@ -136,7 +137,7 @@
 
 ---
 
-## 🛠️ 完整工具列表（32个工具）
+## 🛠️ 完整工具列表（30个工具）
 
 ### 📁 文件与工作表管理
 
