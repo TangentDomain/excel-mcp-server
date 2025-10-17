@@ -15,6 +15,7 @@ dependencies = [
     "xlcalculator>=0.5.0",
     "formulas>=1.3.0",
     "xlwings>=0.33.15",
+    "psutil>=7.0.0",
 ]
 
 [project.optional-dependencies]
