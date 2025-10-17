@@ -40,20 +40,31 @@ API 业务逻辑层 (src/api/excel_operations.py)
 
 ### 运行测试
 ```bash
+# 推荐方式：使用Python模块方式运行测试（解决路径问题）
+python -m pytest tests/ -v
+
 # 运行所有测试并生成覆盖率报告
-python scripts/run_tests.py
+python -m pytest tests/ --cov=src --cov-report=html --cov-report=term
 
 # 运行特定测试模块
-pytest tests/test_api_excel_operations.py -v
-pytest tests/test_core.py -v
-pytest tests/test_server.py -v
+python -m pytest tests/test_api_excel_operations.py -v
+python -m pytest tests/test_core.py -v
+python -m pytest tests/test_server.py -v
 
 # 运行详细输出
-pytest tests/ -v --tb=short
+python -m pytest tests/ -v --tb=short
 
 # 运行特定功能的测试
-pytest tests/ -k "test_get_range" -v
+python -m pytest tests/ -k "test_get_range" -v
+
+# 运行单个测试方法
+python -m pytest tests/test_api_excel_operations.py::TestExcelOperations::test_get_range_success_flow -v -s
+
+# 传统方式（如果有路径问题）
+python scripts/run_tests.py
 ```
+
+**注意**: 推荐使用 `python -m pytest` 而不是直接 `pytest`，这样可以避免Python路径问题。
 
 ### 测试结构
 - **API 测试**: `test_api_excel_operations.py` - 使用 Mock 隔离测试业务逻辑
@@ -694,7 +705,7 @@ python scripts/run_tests.py
     "python.linting.pylintEnabled": true,
     "python.formatting.provider": "black",
     "python.testing.pytestEnabled": true,
-    "python.testing.pytestArgs": ["tests/", "-v"],
+    "python.testing.pytestArgs": ["-m", "pytest", "tests/", "-v"],
     "files.exclude": {
         "**/__pycache__": true,
         "**/*.pyc": true,
@@ -734,12 +745,15 @@ logging.basicConfig(
 #### 测试单个工具
 ```bash
 # 测试特定功能
-pytest tests/test_api_excel_operations.py::test_get_range -v -s
+python -m pytest tests/test_api_excel_operations.py::TestExcelOperations::test_get_range_success_flow -v -s
 
 # 显示详细输出
-pytest tests/test_search.py -v -s --tb=long
+python -m pytest tests/test_search.py -v -s --tb=long
 
 # 运行覆盖率测试
+python -m pytest tests/ --cov=src --cov-report=html --cov-report=term
+
+# 传统方式（备用）
 python scripts/run_tests.py
 ```
 
