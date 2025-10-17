@@ -110,7 +110,7 @@ logger = logging.getLogger(__name__)
 # 创建FastMCP服务器实例，开启调试模式和详细日志
 mcp = FastMCP(
     name="excel-mcp",
-    instructions="""🎮 游戏开发Excel配置表专家 - 32个专业工具 · 295项测试验证
+    instructions=r"""🎮 游戏开发Excel配置表专家 - 32个专业工具 · 295项测试验证
 
 ## 🎯 核心设计原则
 • **搜索优先**：任何查找、定位、分析操作都优先使用 `excel_search`

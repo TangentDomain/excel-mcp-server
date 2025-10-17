@@ -93,3 +93,23 @@ deploy-*.json
 config-*.json
 setup-*.json
 .excel_mcp_logs/
+
+# Pre-commit hooks
+.repos/
+.pre-commit-config.yaml.bak
+.pre-commit-hooks.yaml.bak
+
+# Coverage and security reports
+coverage.xml
+.bandit
+bandit-report.json
+mypy-report/
+security-report.json
+
+# Documentation and linting reports
+doc-coverage-report.txt
+lint-report.txt
+structure-report.txt
+
+# Temporary Python cache for hooks
+.pre-commit-hooks-cache/

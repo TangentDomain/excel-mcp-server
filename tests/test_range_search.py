@@ -431,7 +431,7 @@ class TestRangeExpressionIntegration:
             else:
                 matches = []
 
-            
+
             assert len(matches) >= case['expected_min'], \
                 f"{case['name']} 匹配数量不足: 期望>={case['expected_min']}, 实际={len(matches)}"
             assert result['metadata']['range_expression'] == case['range_expr'], \

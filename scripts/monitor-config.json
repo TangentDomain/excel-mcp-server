@@ -1,0 +1,43 @@
+{
+  "monitoring": {
+    "coverage_threshold": 85.0,
+    "max_execution_time": 300,
+    "max_memory_usage": 1000,
+    "continuous_monitoring": {
+      "enabled": false,
+      "interval_minutes": 5
+    }
+  },
+  "reports": {
+    "output_directory": "reports",
+    "generate_html": true,
+    "generate_json": true,
+    "keep_reports_days": 30
+  },
+  "notifications": {
+    "email": {
+      "enabled": false,
+      "smtp_server": "",
+      "smtp_port": 587,
+      "username": "",
+      "password": "",
+      "recipients": []
+    },
+    "slack": {
+      "enabled": false,
+      "webhook_url": "",
+      "channel": "#alerts"
+    }
+  },
+  "quality_thresholds": {
+    "min_test_stability": 90.0,
+    "min_code_quality": 80.0,
+    "max_duplicate_coverage": 20.0,
+    "min_test_complexity": 70.0
+  },
+  "performance_thresholds": {
+    "max_test_time": 300,
+    "max_memory_mb": 1000,
+    "min_success_rate": 95.0
+  }
+}

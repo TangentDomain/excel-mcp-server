@@ -129,8 +129,8 @@
 #### 1. **数据迁移准备**
 ```sql
 -- 技能ID映射脚本示例
-UPDATE player_skills 
-SET skill_id = CASE 
+UPDATE player_skills
+SET skill_id = CASE
     WHEN skill_id = 9001300 THEN 9001215
     WHEN skill_id = 9001302 THEN 9001216
     -- ... 更多映射

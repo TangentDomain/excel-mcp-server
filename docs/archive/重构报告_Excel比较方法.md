@@ -47,7 +47,7 @@ options = ComparisonOptions(
 def _create_excel_comparison_options(**kwargs) -> 'ComparisonOptions':
     """创建Excel比较配置选项"""
     from .models.types import ComparisonOptions
-    
+
     return ComparisonOptions(
         compare_values=kwargs.get('compare_values', True),
         compare_formulas=kwargs.get('compare_formulas', False),
@@ -168,7 +168,7 @@ def excel_compare_files(
         game_friendly_format=game_friendly_format,
         focus_on_id_changes=focus_on_id_changes
     )
-    
+
     comparer = ExcelComparer(options)
     result = comparer.compare_files(file1_path, file2_path)
     return _format_result(result)
