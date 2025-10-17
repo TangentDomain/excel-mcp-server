@@ -92,3 +92,4 @@ deploy.bat.backup
 deploy-*.json
 config-*.json
 setup-*.json
+.excel_mcp_logs/
