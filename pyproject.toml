@@ -33,7 +33,6 @@ dev = [
     "isort>=5.13.0",
     "flake8>=7.0.0",
     "mypy>=1.10.0",
-    "pre-commit>=3.8.0",
 ]
 
 test = [
@@ -54,7 +53,6 @@ quality = [
     "isort>=5.13.0",
     "flake8>=7.0.0",
     "mypy>=1.10.0",
-    "pre-commit>=3.8.0",
 ]
 
 [tool.setuptools.packages.find]
@@ -91,7 +89,6 @@ markers = [
 [dependency-groups]
 dev = [
     "coverage>=7.10.4",
-    "pre-commit>=4.3.0",
     "pytest-cov>=6.2.1",
 ]
 
