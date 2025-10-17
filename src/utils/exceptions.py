@@ -43,3 +43,18 @@ class OperationLimitError(ExcelException):
 class ExcelMCPError(ExcelException):
     """Excel MCP 通用操作异常"""
     pass
+
+
+class ExcelFileError(ExcelException):
+    """Excel文件操作异常"""
+    pass
+
+
+class SecurityError(ExcelException):
+    """安全检查异常"""
+    pass
+
+
+class OperationCancelledError(ExcelException):
+    """操作被取消异常"""
+    pass
