@@ -4,7 +4,7 @@
 
 ## 项目概览
 
-ExcelMCP 是专为游戏开发设计的 Excel 配置表管理 MCP (Model Context Protocol) 服务器。提供 32 个专业工具管理 Excel 文件，配备 295 个测试用例确保 100% 覆盖率和企业级可靠性。
+ExcelMCP 是专为游戏开发设计的 Excel 配置表管理 MCP (Model Context Protocol) 服务器。提供 30 个专业工具管理 Excel 文件，配备 289 个测试用例确保高质量覆盖和企业级可靠性。
 
 ### 核心用途
 - **游戏开发专业化**: 专精于技能配置表、装备数据、怪物属性和游戏配置管理
@@ -101,12 +101,49 @@ pytest tests/ -k "test_get_range" -v
 
 ## 工具分类
 
-### 32 个专业工具
-1. **文件和工作表管理** (8个工具): create_file, list_sheets, create_sheet, delete_sheet, rename_sheet 等
-2. **数据操作** (8个工具): get_range, update_range, insert_rows, delete_rows, insert_columns, delete_columns, find_last_row, get_headers
-3. **搜索和分析** (4个工具): search, search_directory, get_headers, get_sheet_headers
-4. **格式化和样式** (6个工具): format_cells, merge_cells, unmerge_cells, set_borders, set_row_height, set_column_width
-5. **导入导出和转换** (3个工具): export_to_csv, import_from_csv, convert_format, merge_files
+### 30 个专业工具 (已启用)
+1. **文件和工作表管理** (8个工具):
+   - `excel_list_sheets` - 列出工作表
+   - `excel_get_file_info` - 获取文件信息
+   - `excel_create_file` - 创建新文件
+   - `excel_create_sheet` - 创建工作表
+   - `excel_delete_sheet` - 删除工作表
+   - `excel_rename_sheet` - 重命名工作表
+   - `excel_get_sheet_headers` - 获取所有工作表表头
+
+2. **数据操作** (8个工具):
+   - `excel_get_range` - 读取数据范围
+   - `excel_update_range` - 更新数据范围
+   - `excel_get_headers` - 获取表头信息
+   - `excel_insert_rows` - 插入行
+   - `excel_delete_rows` - 删除行
+   - `excel_insert_columns` - 插入列
+   - `excel_delete_columns` - 删除列
+   - `excel_find_last_row` - 查找最后一行
+
+3. **搜索和分析** (4个工具):
+   - `excel_search` - 单文件搜索
+   - `excel_search_directory` - 目录批量搜索
+   - `excel_check_duplicate_ids` - ID重复检测
+   - `excel_compare_sheets` - 工作表对比
+
+4. **格式化和样式** (6个工具):
+   - `excel_format_cells` - 单元格格式化
+   - `excel_merge_cells` - 合并单元格
+   - `excel_unmerge_cells` - 取消合并
+   - `excel_set_borders` - 设置边框
+   - `excel_set_row_height` - 调整行高
+   - `excel_set_column_width` - 调整列宽
+
+5. **导入导出和转换** (4个工具):
+   - `excel_export_to_csv` - 导出CSV
+   - `excel_import_from_csv` - 导入CSV
+   - `excel_convert_format` - 格式转换
+   - `excel_merge_files` - 文件合并
+
+### 备用工具 (开发中)
+- `excel_set_formula` - 设置公式 (已注释)
+- `excel_evaluate_formula` - 计算公式 (已注释)
 
 ### 游戏开发专业化
 - **技能表**: `TrSkill` 结构，包含 ID|名称|类型|等级|消耗|冷却|伤害|描述
@@ -141,6 +178,259 @@ excel_compare_sheets("旧配置.xlsx", "TrSkill", "新配置.xlsx", "TrSkill")
 excel_check_duplicate_ids("技能表.xlsx", "技能配置表", id_column=1)
 ```
 
+## 代码示例和最佳实践
+
+### 游戏配置表管理示例
+
+#### 1. 技能配置表批量操作
+```python
+# 步骤1: 搜索特定技能类型
+search_result = excel_search(
+    file_path="skills.xlsx",
+    pattern=r"火系|冰系|雷系",
+    sheet_name="技能配置表",
+    use_regex=True
+)
+
+# 步骤2: 获取技能伤害数据
+damage_data = excel_get_range(
+    file_path="skills.xlsx",
+    range="技能配置表!G2:G100"  # 伤害列
+)
+
+# 步骤3: 批量提升伤害值 (示例: 提升20%)
+if damage_data['success']:
+    updated_damage = []
+    for row in damage_data['data']:
+        if row and row[0] and isinstance(row[0], (int, float)):
+            updated_damage.append([row[0] * 1.2])  # 提升20%
+        else:
+            updated_damage.append(row)
+
+    # 步骤4: 更新数据
+    excel_update_range(
+        file_path="skills.xlsx",
+        range="技能配置表!G2:G100",
+        data=updated_damage,
+        preserve_formulas=False
+    )
+
+# 步骤5: 高亮显示修改的技能
+excel_format_cells(
+    file_path="skills.xlsx",
+    sheet_name="技能配置表",
+    range="G2:G100",
+    preset="highlight"
+)
+```
+
+#### 2. 装备配置表分析
+```python
+# 获取装备表结构
+headers = excel_get_headers("items.xlsx", "装备配置表")
+print(f"装备表字段: {headers['field_names']}")
+
+# 查找传奇装备
+legendary_items = excel_search(
+    file_path="items.xlsx",
+    pattern="传奇",
+    sheet_name="装备配置表",
+    whole_word=True
+)
+
+# 分析装备品质分布
+quality_column = "D"  # 假设品质在第4列
+all_items = excel_get_range("items.xlsx", "装备配置表!D2:D200")
+
+# 统计各品质数量
+quality_count = {}
+for item in all_items['data']:
+    if item and item[0]:
+        quality = item[0]
+        quality_count[quality] = quality_count.get(quality, 0) + 1
+
+print(f"装备品质分布: {quality_count}")
+```
+
+#### 3. 怪物配置表数值平衡
+```python
+# 检查怪物数值平衡
+monsters = excel_get_range("monsters.xlsx", "怪物配置表!A2:F100")
+
+unbalanced_monsters = []
+for i, monster in enumerate(monsters['data'], start=2):  # 从第2行开始
+    if len(monster) >= 6:  # 确保有足够的数据
+        monster_id, name, level, hp, attack, defense = monster[:6]
+
+        if isinstance(level, (int, float)) and level >= 20 and level <= 30:
+            # 检查血量和攻击力的比例是否合理
+            hp_attack_ratio = hp / attack if attack > 0 else 0
+
+            # 如果比例超过某个阈值，标记为不平衡
+            if hp_attack_ratio > 50 or hp_attack_ratio < 10:
+                unbalanced_monsters.append({
+                    'row': i,
+                    'id': monster_id,
+                    'name': name,
+                    'level': level,
+                    'hp_attack_ratio': hp_attack_ratio
+                })
+
+# 输出不平衡的怪物
+if unbalanced_monsters:
+    print(f"发现 {len(unbalanced_monsters)} 个数值不平衡的怪物:")
+    for monster in unbalanced_monsters:
+        print(f"  行{monster['row']}: {monster['name']} (等级{monster['level']}, 比例{monster['hp_attack_ratio']:.2f})")
+```
+
+### 错误处理最佳实践
+
+#### 1. 安全的文件操作
+```python
+def safe_update_config(file_path, sheet_name, range_expr, new_data):
+    """安全的配置表更新函数"""
+    try:
+        # 步骤1: 检查文件是否存在
+        if not os.path.exists(file_path):
+            return {'success': False, 'error': f'文件不存在: {file_path}'}
+
+        # 步骤2: 检查工作表是否存在
+        sheets = excel_list_sheets(file_path)
+        if not sheets['success'] or sheet_name not in sheets['sheets']:
+            return {'success': False, 'error': f'工作表不存在: {sheet_name}'}
+
+        # 步骤3: 验证数据格式
+        if not isinstance(new_data, list) or not all(isinstance(row, list) for row in new_data):
+            return {'success': False, 'error': '数据格式错误，需要二维数组'}
+
+        # 步骤4: 执行更新
+        result = excel_update_range(
+            file_path=file_path,
+            range=range_expr,
+            data=new_data,
+            insert_mode=True  # 使用插入模式更安全
+        )
+
+        # 步骤5: 验证更新结果
+        if result['success']:
+            verification = excel_get_range(file_path, range_expr)
+            if verification['success']:
+                print(f"✅ 成功更新 {len(new_data)} 行数据")
+
+        return result
+
+    except Exception as e:
+        return {'success': False, 'error': f'更新失败: {str(e)}'}
+```
+
+#### 2. 批量操作模式
+```python
+def batch_process_game_configs(config_dir, operation_type):
+    """批量处理游戏配置表"""
+    import os
+    import glob
+
+    # 获取所有Excel文件
+    excel_files = glob.glob(os.path.join(config_dir, "*.xlsx"))
+
+    results = []
+    for file_path in excel_files:
+        try:
+            # 获取文件信息
+            file_info = excel_get_file_info(file_path)
+            if not file_info['success']:
+                continue
+
+            # 获取所有工作表
+            sheets = excel_list_sheets(file_path)
+            if not sheets['success']:
+                continue
+
+            for sheet_name in sheets['sheets']:
+                # 根据操作类型执行相应处理
+                if operation_type == "validate_ids":
+                    # 验证ID重复
+                    duplicate_check = excel_check_duplicate_ids(
+                        file_path, sheet_name, id_column=1
+                    )
+                    if duplicate_check['has_duplicates']:
+                        results.append({
+                            'file': os.path.basename(file_path),
+                            'sheet': sheet_name,
+                            'duplicates': duplicate_check['duplicate_count']
+                        })
+
+                elif operation_type == "find_last_row":
+                    # 查找数据边界
+                    last_row = excel_find_last_row(file_path, sheet_name)
+                    if last_row['success']:
+                        results.append({
+                            'file': os.path.basename(file_path),
+                            'sheet': sheet_name,
+                            'last_row': last_row['last_row']
+                        })
+
+        except Exception as e:
+            results.append({
+                'file': os.path.basename(file_path),
+                'error': str(e)
+            })
+
+    return results
+```
+
+### 性能优化建议
+
+#### 1. 大文件处理
+```python
+# 对于大文件，使用分批处理
+def process_large_excel(file_path, sheet_name, batch_size=1000):
+    """分批处理大型Excel文件"""
+    last_row = excel_find_last_row(file_path, sheet_name)
+    if not last_row['success']:
+        return
+
+    total_rows = last_row['last_row']
+    processed = 0
+
+    while processed < total_rows:
+        start_row = processed + 2  # 跳过表头
+        end_row = min(processed + batch_size + 1, total_rows)
+
+        # 读取一批数据
+        range_expr = f"{sheet_name}!A{start_row}:Z{end_row}"
+        batch_data = excel_get_range(file_path, range_expr)
+
+        if batch_data['success']:
+            # 处理这批数据
+            process_batch(batch_data['data'])
+            processed += batch_size
+            print(f"已处理 {processed}/{total_rows} 行")
+```
+
+#### 2. 缓存策略
+```python
+# 利用工作簿缓存提高性能
+def cached_read_operations(file_path, operations):
+    """使用缓存执行多个读取操作"""
+    results = {}
+
+    try:
+        # ExcelReader会自动缓存工作簿
+        from ..core.excel_reader import ExcelReader
+        reader = ExcelReader(file_path)
+
+        for op_name, range_expr in operations:
+            result = reader.get_range(range_expr)
+            results[op_name] = result
+
+        reader.close()
+        return results
+
+    except Exception as e:
+        return {'error': f'缓存读取失败: {str(e)}'}
+```
+
 ## 错误处理
 
 ### 常见问题
@@ -158,33 +448,455 @@ excel_check_duplicate_ids("技能表.xlsx", "技能配置表", id_column=1)
 
 ## 文件组织
 
-### 源代码结构
+### 目录结构要求
+
+项目必须严格遵循以下目录结构，确保代码组织的一致性和可维护性：
+
 ```
-src/
-├── server.py              # 仅 MCP 接口（委托模式）
-├── api/
-│   └── excel_operations.py # 集中式业务逻辑
-├── core/
-│   ├── excel_reader.py    # 读取操作
-│   ├── excel_writer.py    # 写入操作
-│   ├── excel_manager.py   # 文件/工作表管理
-│   ├── excel_search.py    # 搜索功能
-│   ├── excel_compare.py   # 对比操作
-│   └── excel_converter.py # 格式转换
-├── utils/
-│   └── formatter.py       # 结果格式化
-└── models/
-    └── types.py          # 类型定义
+excel-mcp-server/
+├── src/                        # 源代码目录 (必需)
+│   ├── server.py               # MCP服务器入口，仅包含MCP接口定义 (必需)
+│   ├── __init__.py            # 包初始化文件 (必需)
+│   ├── api/                    # API业务逻辑层 (必需)
+│   │   ├── __init__.py        # 包初始化文件 (必需)
+│   │   └── excel_operations.py # 集中式业务逻辑处理 (必需)
+│   ├── core/                   # 核心操作层 (必需)
+│   │   ├── __init__.py        # 包初始化文件 (必需)
+│   │   ├── excel_reader.py    # Excel读取操作 (必需)
+│   │   ├── excel_writer.py    # Excel写入操作 (必需)
+│   │   ├── excel_manager.py   # 文件和工作表管理 (必需)
+│   │   ├── excel_search.py    # 搜索功能 (必需)
+│   │   ├── excel_compare.py   # Excel对比操作 (必需)
+│   │   └── excel_converter.py # 格式转换功能 (必需)
+│   ├── utils/                  # 工具层 (必需)
+│   │   ├── __init__.py        # 包初始化文件 (必需)
+│   │   ├── formatter.py       # 结果格式化工具 (必需)
+│   │   ├── validators.py      # 数据验证工具 (必需)
+│   │   ├── parsers.py         # 数据解析工具 (必需)
+│   │   ├── exceptions.py      # 异常定义 (必需)
+│   │   └── error_handler.py   # 错误处理工具 (必需)
+│   └── models/                 # 数据模型层 (必需)
+│       ├── __init__.py        # 包初始化文件 (必需)
+│       └── types.py           # 类型定义 (必需)
+├── tests/                      # 测试目录 (必需)
+│   ├── __init__.py           # 测试包初始化 (必需)
+│   ├── conftest.py           # 测试配置和fixtures (必需)
+│   ├── test_api_excel_operations.py  # API层测试 (必需)
+│   ├── test_core.py          # 核心操作测试 (必需)
+│   ├── test_server.py        # MCP接口测试 (必需)
+│   ├── test_utils.py         # 工具函数测试 (必需)
+│   ├── test_search.py        # 搜索功能测试 (必需)
+│   ├── test_excel_converter.py # 格式转换测试 (必需)
+│   ├── test_excel_compare.py  # 对比功能测试 (必需)
+│   ├── test_error_handler.py # 错误处理测试 (必需)
+│   ├── test_features.py      # 功能特性测试 (必需)
+│   ├── test_new_features.py  # 新功能测试 (必需)
+│   ├── test_new_apis.py      # 新API测试 (必需)
+│   ├── test_excel_operations_extended.py # 扩展操作测试 (必需)
+│   ├── test_range_search.py  # 范围搜索测试 (必需)
+│   ├── test_duplicate_ids.py # ID重复检测测试 (必需)
+│   └── test_data/            # 测试数据目录 (必需)
+│       ├── demo_test.xlsx    # 演示测试文件 (必需)
+│       └── comprehensive_test.xlsx # 综合测试文件 (必需)
+├── scripts/                    # 脚本工具目录 (必需)
+│   └── run_tests.py         # 测试运行脚本 (必需)
+├── docs/                       # 文档目录 (必需)
+│   ├── 游戏开发Excel配置表比较指南.md # 游戏开发指南 (必需)
+│   └── archive/             # 归档文档目录 (必需)
+├── htmlcov/                    # 覆盖率报告目录 (自动生成)
+├── pyproject.toml             # 项目配置文件 (必需)
+├── uv.lock                    # 依赖锁定文件 (必需)
+├── README.md                  # 项目说明文档 (必需)
+├── README.en.md              # 英文版说明文档 (必需)
+├── DEPLOYMENT.md              # 部署指南 (必需)
+├── LICENSE                    # 开源许可证 (必需)
+├── CONTRIBUTING.md            # 贡献指南 (必需)
+├── CONTRIBUTING.zh-CN.md      # 中文贡献指南 (必需)
+├── CLAUDE.md                  # Claude代码指导 (必需)
+├── deploy.bat                 # Windows部署脚本 (必需)
+├── mcp-windows.json           # Windows MCP配置 (必需)
+├── mcp-direct.json            # 直接运行MCP配置 (必需)
+├── mcp-generated.json         # 生成的MCP配置 (必需)
+└── 项目说明.md                 # 项目中文说明 (必需)
 ```
 
-### 测试结构
+### 目录结构验证
+
+#### 自动验证脚本
+```bash
+# 验证目录结构完整性
+python -c "
+import os
+from pathlib import Path
+
+required_dirs = [
+    'src', 'src/api', 'src/core', 'src/utils', 'src/models',
+    'tests', 'tests/test_data', 'scripts', 'docs', 'docs/archive'
+]
+
+required_files = [
+    'src/server.py',
+    'src/api/excel_operations.py',
+    'src/core/excel_reader.py',
+    'src/utils/formatter.py',
+    'src/models/types.py',
+    'tests/conftest.py',
+    'tests/test_api_excel_operations.py',
+    'tests/test_core.py',
+    'tests/test_server.py',
+    'scripts/run_tests.py',
+    'pyproject.toml',
+    'README.md',
+    'CLAUDE.md'
+]
+
+# 检查目录和文件是否存在
+for dir_path in required_dirs:
+    if not Path(dir_path).exists():
+        print(f'❌ 缺少目录: {dir_path}')
+    else:
+        print(f'✅ 目录存在: {dir_path}')
+
+for file_path in required_files:
+    if not Path(file_path).exists():
+        print(f'❌ 缺少文件: {file_path}')
+    else:
+        print(f'✅ 文件存在: {file_path}')
+"
 ```
-tests/
-├── conftest.py           # 测试 fixtures 和配置
-├── test_api_excel_operations.py  # API 层测试
-├── test_core.py          # 核心操作测试
-├── test_server.py        # MCP 接口测试
-└── [各种功能测试] # 特定功能测试
+
+### 目录组织原则
+
+1. **分层结构**: 严格按照MCP接口层 → API层 → 核心层 → 工具层的分层组织
+2. **职责分离**: 每个目录只负责单一职责，避免混合功能模块
+3. **命名规范**:
+   - 文件名使用小写字母和下划线
+   - 测试文件以`test_`开头
+   - 核心模块以`excel_`开头
+4. **包结构**: 每个目录都必须包含`__init__.py`文件
+5. **测试覆盖**: 每个核心模块都必须有对应的测试文件
+
+### 文件命名约定
+
+#### 核心模块文件
+- `excel_reader.py` - Excel读取操作
+- `excel_writer.py` - Excel写入操作
+- `excel_manager.py` - 文件和工作表管理
+- `excel_search.py` - 搜索功能
+- `excel_compare.py` - 对比操作
+- `excel_converter.py` - 格式转换
+
+#### 工具模块文件
+- `formatter.py` - 结果格式化
+- `validators.py` - 数据验证
+- `parsers.py` - 数据解析
+- `exceptions.py` - 异常定义
+- `error_handler.py` - 错误处理
+
+#### 测试文件
+- `test_api_excel_operations.py` - API层测试
+- `test_core.py` - 核心功能测试
+- `test_server.py` - MCP接口测试
+- `test_[功能名].py` - 特定功能测试
+
+### 自动整理功能
+
+如果检测到目录结构不符合要求，可以运行以下自动整理脚本：
+
+```bash
+# 自动创建缺失的目录结构
+python scripts/ensure_directory_structure.py
+
+# 自动验证和报告目录结构状态
+python scripts/validate_directory_structure.py
+
+# 自动整理文件到正确的目录
+python scripts/organize_files.py
+```
+
+### 持续集成检查
+
+在CI/CD流水线中集成目录结构检查：
+
+```yaml
+# .github/workflows/validate-structure.yml
+name: Validate Directory Structure
+on: [push, pull_request]
+jobs:
+  validate-structure:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v2
+      - name: Validate directory structure
+        run: python scripts/validate_directory_structure.py
+      - name: Check required files
+        run: python scripts/check_required_files.py
+```
+
+## 开发环境配置
+
+### Python 环境要求
+- **Python 版本**: 3.10 或更高
+- **操作系统**: Windows/macOS/Linux
+- **内存要求**: 建议 4GB+ (处理大文件时)
+
+### 开发工具推荐
+- **IDE**: VS Code / PyCharm / Cursor
+- **包管理器**: uv (推荐) / pip
+- **版本控制**: Git
+- **测试框架**: pytest (已配置)
+
+### 快速开发环境设置
+
+#### 1. 使用 uv (推荐)
+```bash
+# 安装 uv
+pip install uv
+
+# 克隆项目
+git clone https://github.com/tangjian/excel-mcp-server.git
+cd excel-mcp-server
+
+# 同步依赖
+uv sync
+
+# 激活虚拟环境
+source .venv/bin/activate  # Linux/macOS
+# 或者
+.venv\Scripts\activate     # Windows
+
+# 运行测试验证环境
+python scripts/run_tests.py
+```
+
+#### 2. 使用 pip
+```bash
+# 创建虚拟环境
+python -m venv .venv
+source .venv/bin/activate  # Linux/macOS
+.venv\Scripts\activate     # Windows
+
+# 安装依赖
+pip install -e .
+
+# 运行测试
+python scripts/run_tests.py
+```
+
+### IDE 配置
+
+#### VS Code 配置
+```json
+// .vscode/settings.json
+{
+    "python.defaultInterpreterPath": "./.venv/bin/python",
+    "python.linting.enabled": true,
+    "python.linting.pylintEnabled": true,
+    "python.formatting.provider": "black",
+    "python.testing.pytestEnabled": true,
+    "python.testing.pytestArgs": ["tests/", "-v"],
+    "files.exclude": {
+        "**/__pycache__": true,
+        "**/*.pyc": true,
+        ".pytest_cache": true,
+        "htmlcov": true
+    }
+}
+```
+
+#### PyCharm 配置
+1. 打开项目后设置 Python 解释器指向 `.venv`
+2. 将 `src` 目录标记为源代码根目录
+3. 配置 pytest 为默认测试运行器
+
+### 环境变量配置
+```bash
+# Windows
+set PYTHONPATH=%cd%\src;%PYTHONPATH%
+set EXCELMCP_DEBUG=1
+
+# Linux/macOS
+export PYTHONPATH="${PWD}/src:${PYTHONPATH}"
+export EXCELMCP_DEBUG=1
+```
+
+### 调试配置
+
+#### 启用调试模式
+```python
+# 在 src/server.py 中修改日志级别
+logging.basicConfig(
+    level=logging.DEBUG,  # 改为 DEBUG 级别
+    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
+)
+```
+
+#### 测试单个工具
+```bash
+# 测试特定功能
+pytest tests/test_api_excel_operations.py::test_get_range -v -s
+
+# 显示详细输出
+pytest tests/test_search.py -v -s --tb=long
+
+# 运行覆盖率测试
+python scripts/run_tests.py
+```
+
+## 部署指南
+
+### 生产环境部署
+
+#### 1. Docker 部署 (推荐)
+```dockerfile
+# Dockerfile
+FROM python:3.11-slim
+
+WORKDIR /app
+
+# 安装系统依赖
+RUN apt-get update && apt-get install -y \
+    gcc \
+    && rm -rf /var/lib/apt/lists/*
+
+# 复制依赖文件
+COPY pyproject.toml uv.lock ./
+COPY src/ ./src/
+
+# 安装 uv 并同步依赖
+RUN pip install uv && \
+    uv sync --frozen
+
+# 暴露端口
+EXPOSE 8000
+
+# 启动命令
+CMD ["uv", "run", "python", "-m", "src.server"]
+```
+
+```yaml
+# docker-compose.yml
+version: '3.8'
+services:
+  excelmcp:
+    build: .
+    ports:
+      - "8000:8000"
+    volumes:
+      - ./data:/app/data
+      - ./logs:/app/logs
+    environment:
+      - PYTHONPATH=/app/src
+      - EXCELMCP_LOG_LEVEL=INFO
+    restart: unless-stopped
+```
+
+#### 2. 系统服务部署
+```bash
+# 创建系统服务 (Linux)
+sudo nano /etc/systemd/system/excelmcp.service
+```
+
+```ini
+[Unit]
+Description=Excel MCP Server
+After=network.target
+
+[Service]
+Type=simple
+User=excelmcp
+WorkingDirectory=/opt/excelmcp
+Environment=PYTHONPATH=/opt/excelmcp/src
+ExecStart=/opt/excelmcp/.venv/bin/python -m src.server
+Restart=always
+RestartSec=10
+
+[Install]
+WantedBy=multi-user.target
+```
+
+```bash
+# 启用服务
+sudo systemctl enable excelmcp
+sudo systemctl start excelmcp
+sudo systemctl status excelmcp
+```
+
+### 监控和日志
+
+#### 日志配置
+```python
+# 在 src/server.py 中配置日志
+import logging
+from logging.handlers import RotatingFileHandler
+
+# 配置文件日志
+file_handler = RotatingFileHandler(
+    'logs/excelmcp.log',
+    maxBytes=10*1024*1024,  # 10MB
+    backupCount=5
+)
+file_handler.setFormatter(
+    logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
+)
+
+logger.addHandler(file_handler)
+```
+
+#### 健康检查
+```python
+# 添加健康检查端点
+def health_check():
+    """简单的健康检查"""
+    try:
+        # 测试基本功能
+        test_file = "health_check_test.xlsx"
+        result = excel_create_file(test_file, ["test"])
+
+        if result['success']:
+            os.remove(test_file)  # 清理测试文件
+            return {"status": "healthy", "timestamp": time.time()}
+        else:
+            return {"status": "unhealthy", "error": result.get('error')}
+    except Exception as e:
+        return {"status": "error", "message": str(e)}
+```
+
+### 性能调优
+
+#### 内存优化
+```python
+# 在 ExcelReader 中配置缓存大小
+class ExcelReader:
+    def __init__(self, file_path: str, cache_size: int = 10):
+        self.file_path = file_path
+        self._workbook_cache = {}
+        self._cache_size = cache_size
+```
+
+#### 并发处理
+```python
+# 使用线程池处理多个文件
+import concurrent.futures
+from concurrent.futures import ThreadPoolExecutor
+
+def process_multiple_files(file_paths, operation):
+    """并发处理多个Excel文件"""
+    with ThreadPoolExecutor(max_workers=4) as executor:
+        futures = {
+            executor.submit(operation, file_path): file_path
+            for file_path in file_paths
+        }
+
+        results = {}
+        for future in concurrent.futures.as_completed(futures):
+            file_path = futures[future]
+            try:
+                results[file_path] = future.result()
+            except Exception as e:
+                results[file_path] = {"error": str(e)}
+
+        return results
 ```
 
 ## 中文/Unicode 支持
@@ -193,3 +905,66 @@ tests/
 - Unicode 文本处理和标准化
 - 缺失表头数据的回退机制
 - 本地化 Excel 功能处理
+
+## 故障排除
+
+### 常见部署问题
+
+#### 1. Windows 文件锁定
+```bash
+# 检查是否有Excel进程
+tasklist | findstr excel
+
+# 强制结束Excel进程
+taskkill /f /im excel.exe
+```
+
+#### 2. Linux 权限问题
+```bash
+# 检查文件权限
+ls -la /path/to/excel/files
+
+# 修改权限
+chmod 755 /path/to/excel/files
+chown -R user:group /path/to/excel/files
+```
+
+#### 3. 内存不足
+```python
+# 监控内存使用
+import psutil
+import logging
+
+def monitor_memory():
+    """监控内存使用情况"""
+    memory = psutil.virtual_memory()
+    if memory.percent > 80:
+        logging.warning(f"内存使用率过高: {memory.percent}%")
+        # 触发清理操作
+        cleanup_cache()
+```
+
+### 性能监控
+
+#### 系统指标
+```python
+# 添加性能监控装饰器
+import time
+import functools
+from typing import Callable
+
+def performance_monitor(func: Callable) -> Callable:
+    """性能监控装饰器"""
+    @functools.wraps(func)
+    def wrapper(*args, **kwargs):
+        start_time = time.time()
+        result = func(*args, **kwargs)
+        end_time = time.time()
+
+        execution_time = end_time - start_time
+        if execution_time > 5.0:  # 超过5秒记录警告
+            logging.warning(f"{func.__name__} 执行时间过长: {execution_time:.2f}s")
+
+        return result
+    return wrapper
+```
