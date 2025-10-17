@@ -206,7 +206,7 @@ class TestPerformanceBenchmarks:
             assert result['success'] is True
 
             search_time = end_time - start_time
-            match_count = len(result.get('data', [])) if result.get('data') else 0
+            match_count = len(result.get('data', []))
 
             performance_results.append({
                 'pattern': pattern,
