@@ -477,6 +477,7 @@ dependencies = [
     { name = "formulas" },
     { name = "mcp" },
     { name = "openpyxl" },
+    { name = "psutil" },
     { name = "xlcalculator" },
     { name = "xlwings" },
 ]
@@ -539,6 +540,7 @@ requires-dist = [
     { name = "mypy", marker = "extra == 'dev'", specifier = ">=1.10.0" },
     { name = "mypy", marker = "extra == 'quality'", specifier = ">=1.10.0" },
     { name = "openpyxl", specifier = ">=3.1.0" },
+    { name = "psutil", specifier = ">=7.0.0" },
     { name = "psutil", marker = "extra == 'dev'", specifier = ">=5.9.0" },
     { name = "psutil", marker = "extra == 'performance'", specifier = ">=5.9.0" },
     { name = "pytest", marker = "extra == 'dev'", specifier = ">=7.0.0" },
