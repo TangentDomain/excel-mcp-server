@@ -17,6 +17,9 @@ Excel MCP Server - 基于 FastMCP 和 openpyxl 实现
 """
 
 import logging
+import os
+import shutil
+from datetime import datetime
 from enum import Enum
 from typing import Optional, List, Dict, Any, Union
 
@@ -29,6 +32,69 @@ except ImportError as e:
 
 # 导入API模块
 from .api.excel_operations import ExcelOperations
+
+# ==================== 操作日志系统 ====================
+class OperationLogger:
+    """操作日志记录器，用于跟踪所有Excel操作"""
+
+    def __init__(self):
+        self.log_file = None
+        self.current_session = []
+
+    def start_session(self, file_path: str):
+        """开始新的操作会话"""
+        self.log_file = os.path.join(
+            os.path.dirname(file_path),
+            ".excel_mcp_logs",
+            f"operations_{datetime.now().strftime('%Y%m%d_%H%M%S')}.json"
+        )
+
+        os.makedirs(os.path.dirname(self.log_file), exist_ok=True)
+
+        self.current_session = [{
+            'session_id': datetime.now().isoformat(),
+            'file_path': file_path,
+            'operations': []
+        }]
+
+        self._save_log()
+
+    def log_operation(self, operation: str, details: Dict[str, Any]):
+        """记录操作"""
+        if not self.current_session:
+            return
+
+        operation_record = {
+            'timestamp': datetime.now().isoformat(),
+            'operation': operation,
+            'details': details
+        }
+
+        self.current_session[0]['operations'].append(operation_record)
+        self._save_log()
+
+    def _save_log(self):
+        """保存日志到文件"""
+        if not self.log_file:
+            return
+
+        try:
+            import json
+            with open(self.log_file, 'w', encoding='utf-8') as f:
+                json.dump(self.current_session, f, indent=2, ensure_ascii=False)
+        except Exception as e:
+            logger.error(f"保存操作日志失败: {e}")
+
+    def get_recent_operations(self, limit: int = 10) -> List[Dict[str, Any]]:
+        """获取最近的操作记录"""
+        if not self.current_session:
+            return []
+
+        operations = self.current_session[0]['operations']
+        return operations[-limit:] if len(operations) > limit else operations
+
+# 全局操作日志器
+operation_logger = OperationLogger()
 
 # ==================== 配置和初始化 ====================
 # 开启详细日志用于调试
@@ -379,7 +445,42 @@ def excel_get_range(
         # 读取列范围
         result = excel_get_range("data.xlsx", "数据!A:C")
     """
-    return ExcelOperations.get_range(file_path, range, include_formatting)
+    # 增强参数验证
+    from .utils.validators import ExcelValidator, DataValidationError
+
+    try:
+        # 验证范围表达式格式
+        range_validation = ExcelValidator.validate_range_expression(range)
+
+        # 验证操作规模
+        scale_validation = ExcelValidator.validate_operation_scale(range_validation['range_info'])
+
+        # 记录验证成功到调试日志
+        logger.debug(f"范围验证成功: {range_validation['normalized_range']}")
+
+    except DataValidationError as e:
+        # 记录验证失败
+        logger.error(f"范围验证失败: {str(e)}")
+
+        return {
+            'success': False,
+            'error': 'VALIDATION_FAILED',
+            'message': f"范围表达式验证失败: {str(e)}"
+        }
+
+    # 调用原始函数
+    result = ExcelOperations.get_range(file_path, range, include_formatting)
+
+    # 如果成功，添加验证信息到结果中
+    if result.get('success'):
+        result['validation_info'] = {
+            'normalized_range': range_validation['normalized_range'],
+            'sheet_name': range_validation['sheet_name'],
+            'range_type': range_validation['range_info']['type'],
+            'scale_assessment': scale_validation
+        }
+
+    return result
 
 
 @mcp.tool()
@@ -438,10 +539,10 @@ def excel_update_range(
     range: str,
     data: List[List[Any]],
     preserve_formulas: bool = True,
-    insert_mode: bool = False
+    insert_mode: bool = True
 ) -> Dict[str, Any]:
     """
-更新Excel指定范围的数据。操作会覆盖目标范围内的现有数据。
+更新Excel指定范围的数据。默认使用安全的插入模式。
 
 Args:
     file_path: Excel文件路径 (.xlsx/.xlsm)
@@ -452,25 +553,761 @@ Args:
     preserve_formulas: 保留已有公式 (默认值: True)
         - True: 如果目标单元格包含公式，则保留公式不覆盖
         - False: 覆盖所有内容，包括公式
-    insert_mode: 数据写入模式 (默认值: False)
-        - False: 覆盖模式，直接覆盖目标范围的现有数据（默认推荐）
-        - True: 插入模式，在指定位置插入新行然后写入数据（更安全）
+    insert_mode: 数据写入模式 (默认值: True - 安全优先)
+        - True: 插入模式，在指定位置插入新行然后写入数据（默认安全）
+        - False: 覆盖模式，直接覆盖目标范围的现有数据（谨慎使用）
 
 Returns:
     Dict: 包含 success、updated_cells(int)、message
 
-注意:
-    为保持API一致性和清晰度，range必须包含工作表名。
-    这消除了参数间的条件依赖，提高了可预测性。
+⚠️ 安全提示:
+    - 默认使用插入模式防止数据覆盖
+    - 如需覆盖现有数据，请明确设置 insert_mode=False
+    - 建议先使用 excel_get_range 预览当前数据
 
 Example:
     data = [["姓名", "年龄"], ["张三", 25]]
-    # 覆盖模式（默认）
+    # 安全插入模式（默认）
     result = excel_update_range("test.xlsx", "Sheet1!A1:B2", data)
-    # 插入模式（显式指定）
-    result = excel_update_range("test.xlsx", "Sheet1!A1:B2", data, insert_mode=True)
+    # 覆盖模式（需要明确指定）
+    result = excel_update_range("test.xlsx", "Sheet1!A1:B2", data, insert_mode=False)
     """
-    return ExcelOperations.update_range(file_path, range, data, preserve_formulas, insert_mode)
+    # 增强参数验证
+    from .utils.validators import ExcelValidator, DataValidationError
+
+    try:
+        # 验证范围表达式格式
+        range_validation = ExcelValidator.validate_range_expression(range)
+
+        # 验证操作规模
+        scale_validation = ExcelValidator.validate_operation_scale(range_validation['range_info'])
+
+        # 如果有警告信息，记录到操作日志
+        if scale_validation.get('warning'):
+            logger.warning(f"操作规模警告: {scale_validation['warning']}")
+
+    except DataValidationError as e:
+        # 记录验证失败
+        operation_logger.start_session(file_path)
+        operation_logger.log_operation("validation_failed", {
+            "operation": "update_range",
+            "range": range,
+            "error": str(e)
+        })
+
+        return {
+            'success': False,
+            'error': 'VALIDATION_FAILED',
+            'message': f"参数验证失败: {str(e)}"
+        }
+
+    # 开始操作会话
+    operation_logger.start_session(file_path)
+
+    # 记录操作日志
+    operation_logger.log_operation("update_range", {
+        "range": range,
+        "validated_range": range_validation['normalized_range'],
+        "data_rows": len(data),
+        "insert_mode": insert_mode,
+        "preserve_formulas": preserve_formulas,
+        "scale_info": scale_validation
+    })
+
+    try:
+        result = ExcelOperations.update_range(file_path, range, data, preserve_formulas, insert_mode)
+
+        # 记录操作结果
+        operation_logger.log_operation("operation_result", {
+            "success": result.get('success', False),
+            "updated_cells": result.get('updated_cells', 0),
+            "message": result.get('message', '')
+        })
+
+        return result
+
+    except Exception as e:
+        # 记录错误
+        operation_logger.log_operation("operation_error", {
+            "error": str(e),
+            "message": f"更新操作失败: {str(e)}"
+        })
+
+        return {
+            'success': False,
+            'error': 'OPERATION_FAILED',
+            'message': f"更新操作失败: {str(e)}"
+        }
+
+
+@mcp.tool()
+def excel_preview_operation(
+    file_path: str,
+    range: str,
+    operation_type: str = "update",
+    data: Optional[List[List[Any]]] = None
+) -> Dict[str, Any]:
+    """
+    预览Excel操作的影响范围和当前数据，确保安全操作
+
+    Args:
+        file_path: Excel文件路径 (.xlsx/.xlsm)
+        range: 范围表达式，必须包含工作表名
+        operation_type: 操作类型 ("update", "delete", "format")
+        data: 对于更新操作，提供将要写入的数据
+
+    Returns:
+        Dict: 包含预览信息、当前数据、影响评估
+
+    Example:
+        # 预览更新操作
+        result = excel_preview_operation("data.xlsx", "Sheet1!A1:C10", "update", new_data)
+        # 预览删除操作
+        result = excel_preview_operation("data.xlsx", "Sheet1!5:10", "delete")
+    """
+    # 读取当前数据
+    current_data = ExcelOperations.get_range(file_path, range)
+
+    if not current_data.get('success'):
+        return {
+            'success': False,
+            'error': 'PREVIEW_FAILED',
+            'message': f"无法预览操作: {current_data.get('message', '未知错误')}"
+        }
+
+    # 分析影响
+    data_rows = len(current_data.get('data', []))
+    data_cols = len(current_data.get('data', [])) if data_rows > 0 else 0
+    total_cells = data_rows * data_cols
+
+    # 检查是否包含非空数据
+    has_data = any(
+        any(cell is not None and str(cell).strip() for cell in row)
+        for row in current_data.get('data', [])
+    )
+
+    # 安全评估
+    risk_level = "LOW"
+    if has_data:
+        if total_cells > 100:
+            risk_level = "HIGH"
+        elif total_cells > 20:
+            risk_level = "MEDIUM"
+        else:
+            risk_level = "LOW"
+
+    return {
+        'success': True,
+        'operation_type': operation_type,
+        'range': range,
+        'current_data': current_data.get('data', []),
+        'impact_assessment': {
+            'rows_affected': data_rows,
+            'columns_affected': data_cols,
+            'total_cells': total_cells,
+            'has_existing_data': has_data,
+            'risk_level': risk_level
+        },
+        'recommendations': _get_safety_recommendations(operation_type, has_data, risk_level),
+        'safety_warning': _generate_safety_warning(operation_type, has_data, risk_level)
+    }
+
+
+def _get_safety_recommendations(operation_type: str, has_data: bool, risk_level: str) -> List[str]:
+    """获取安全操作建议"""
+    recommendations = []
+
+    if operation_type == "update":
+        if has_data:
+            recommendations.append("⚠️ 范围内已有数据，建议使用 insert_mode=True")
+            if risk_level == "HIGH":
+                recommendations.append("🔴 大范围数据操作，强烈建议先备份")
+            recommendations.append("📊 建议先预览完整数据再操作")
+        else:
+            recommendations.append("✅ 范围为空，可以安全操作")
+
+    elif operation_type == "delete":
+        recommendations.append("🗑️ 删除操作不可逆，请确认")
+        if has_data:
+            recommendations.append("⚠️ 将删除现有数据，请仔细检查")
+
+    return recommendations
+
+
+def _generate_safety_warning(operation_type: str, has_data: bool, risk_level: str) -> str:
+    """生成安全警告"""
+    if risk_level == "HIGH":
+        return f"🔴 高风险警告: {operation_type}操作将影响大量数据，请谨慎操作"
+    elif risk_level == "MEDIUM":
+        return f"🟡 中等风险: {operation_type}操作将影响部分数据，建议先备份"
+    else:
+        return f"✅ 低风险: {operation_type}操作影响较小，可以安全执行"
+
+
+@mcp.tool()
+def excel_assess_data_impact(
+    file_path: str,
+    range: str,
+    operation_type: str = "update",
+    data: Optional[List[List[Any]]] = None
+) -> Dict[str, Any]:
+    """
+    全面评估Excel操作对数据的潜在影响
+
+    Args:
+        file_path: Excel文件路径 (.xlsx/.xlsm)
+        range: 范围表达式，必须包含工作表名
+        operation_type: 操作类型 ("update", "delete", "format")
+        data: 对于更新操作，提供将要写入的数据
+
+    Returns:
+        Dict: 包含详细的数据影响评估报告
+
+    Example:
+        # 评估更新操作的影响
+        result = excel_assess_data_impact("data.xlsx", "Sheet1!A1:C10", "update", new_data)
+        # 评估删除操作的影响
+        result = excel_assess_data_impact("data.xlsx", "Sheet1!5:10", "delete")
+    """
+    from .utils.validators import ExcelValidator, DataValidationError
+
+    try:
+        # 验证范围表达式
+        range_validation = ExcelValidator.validate_range_expression(range)
+        range_info = range_validation['range_info']
+
+        # 获取当前数据
+        current_data_result = ExcelOperations.get_range(file_path, range)
+
+        if not current_data_result.get('success'):
+            return {
+                'success': False,
+                'error': 'DATA_RETRIEVAL_FAILED',
+                'message': f"无法获取当前数据: {current_data_result.get('message', '未知错误')}"
+            }
+
+        current_data = current_data_result.get('data', [])
+
+        # 分析当前数据内容
+        data_analysis = _analyze_current_data(current_data)
+
+        # 计算操作规模
+        scale_info = ExcelValidator.validate_operation_scale(range_info)
+
+        # 评估操作风险
+        risk_assessment = _assess_operation_risk(
+            operation_type,
+            data_analysis,
+            scale_info,
+            data
+        )
+
+        # 生成建议
+        recommendations = _generate_safety_recommendations(
+            operation_type,
+            data_analysis,
+            risk_assessment,
+            scale_info
+        )
+
+        # 预测结果
+        prediction = _predict_operation_result(
+            operation_type,
+            current_data,
+            data,
+            scale_info
+        )
+
+        return {
+            'success': True,
+            'operation_type': operation_type,
+            'range': range,
+            'validation_info': range_validation,
+            'current_data_analysis': data_analysis,
+            'scale_assessment': scale_info,
+            'risk_assessment': risk_assessment,
+            'safety_recommendations': recommendations,
+            'result_prediction': prediction,
+            'impact_summary': {
+                'total_cells': scale_info['total_cells'],
+                'non_empty_cells': data_analysis['non_empty_cell_count'],
+                'data_type_distribution': data_analysis['data_types'],
+                'potential_data_loss': data_analysis['non_empty_cell_count'] if operation_type in ['delete', 'update'] else 0,
+                'overall_risk_level': risk_assessment['overall_risk']
+            }
+        }
+
+    except DataValidationError as e:
+        return {
+            'success': False,
+            'error': 'VALIDATION_FAILED',
+            'message': f"参数验证失败: {str(e)}"
+        }
+
+    except Exception as e:
+        return {
+            'success': False,
+            'error': 'ASSESSMENT_FAILED',
+            'message': f"数据影响评估失败: {str(e)}"
+        }
+
+
+def _analyze_current_data(data: List[List[Any]]) -> Dict[str, Any]:
+    """分析当前数据内容"""
+    if not data:
+        return {
+            'row_count': 0,
+            'column_count': 0,
+            'total_cells': 0,
+            'non_empty_cell_count': 0,
+            'empty_cell_count': 0,
+            'data_types': {},
+            'has_formulas': False,
+            'has_numeric_data': False,
+            'has_text_data': False,
+            'has_dates': False,
+            'completeness_rate': 0.0
+        }
+
+    total_cells = len(data) * max(len(row) for row in data) if data else 0
+    non_empty_cells = 0
+    data_types = {}
+    has_formulas = False
+    has_numeric_data = False
+    has_text_data = False
+    has_dates = False
+
+    for row in data:
+        for cell in row:
+            if cell is not None and str(cell).strip():
+                non_empty_cells += 1
+
+                # 分析数据类型
+                if isinstance(cell, str):
+                    if cell.startswith('='):
+                        has_formulas = True
+                        data_types['formulas'] = data_types.get('formulas', 0) + 1
+                    else:
+                        has_text_data = True
+                        data_types['text'] = data_types.get('text', 0) + 1
+                elif isinstance(cell, (int, float)):
+                    has_numeric_data = True
+                    data_types['numeric'] = data_types.get('numeric', 0) + 1
+                else:
+                    data_types['other'] = data_types.get('other', 0) + 1
+
+    return {
+        'row_count': len(data),
+        'column_count': max(len(row) for row in data) if data else 0,
+        'total_cells': total_cells,
+        'non_empty_cell_count': non_empty_cells,
+        'empty_cell_count': total_cells - non_empty_cells,
+        'data_types': data_types,
+        'has_formulas': has_formulas,
+        'has_numeric_data': has_numeric_data,
+        'has_text_data': has_text_data,
+        'has_dates': has_dates,
+        'completeness_rate': (non_empty_cells / total_cells * 100) if total_cells > 0 else 0.0
+    }
+
+
+def _assess_operation_risk(
+    operation_type: str,
+    data_analysis: Dict[str, Any],
+    scale_info: Dict[str, Any],
+    new_data: Optional[List[List[Any]]] = None
+) -> Dict[str, Any]:
+    """评估操作风险"""
+    risk_factors = []
+    risk_score = 0
+
+    # 基于操作类型的风险
+    if operation_type == "delete":
+        risk_factors.append("删除操作不可逆")
+        risk_score += 30
+    elif operation_type == "update":
+        if data_analysis['non_empty_cell_count'] > 0:
+            risk_factors.append("将覆盖现有数据")
+            risk_score += 20
+    elif operation_type == "format":
+        risk_factors.append("格式化操作")
+        risk_score += 10
+
+    # 基于数据量的风险
+    if scale_info['total_cells'] > 10000:
+        risk_factors.append("大范围操作")
+        risk_score += 25
+    elif scale_info['total_cells'] > 1000:
+        risk_factors.append("中等范围操作")
+        risk_score += 15
+
+    # 基于数据内容的风险
+    if data_analysis['has_formulas']:
+        risk_factors.append("包含公式数据")
+        risk_score += 15
+
+    if data_analysis['completeness_rate'] > 80:
+        risk_factors.append("高密度数据区域")
+        risk_score += 10
+
+    # 确定整体风险等级
+    if risk_score >= 60:
+        overall_risk = "HIGH"
+    elif risk_score >= 30:
+        overall_risk = "MEDIUM"
+    else:
+        overall_risk = "LOW"
+
+    return {
+        'risk_score': risk_score,
+        'overall_risk': overall_risk,
+        'risk_factors': risk_factors,
+        'requires_backup': overall_risk in ["HIGH", "MEDIUM"],
+        'requires_confirmation': overall_risk == "HIGH"
+    }
+
+
+def _generate_safety_recommendations(
+    operation_type: str,
+    data_analysis: Dict[str, Any],
+    risk_assessment: Dict[str, Any],
+    scale_info: Dict[str, Any]
+) -> List[str]:
+    """生成安全建议"""
+    recommendations = []
+
+    # 基础建议
+    if risk_assessment['requires_backup']:
+        recommendations.append("🔴 强烈建议在操作前创建备份")
+
+    if risk_assessment['requires_confirmation']:
+        recommendations.append("⚠️ 高风险操作，请仔细确认后再执行")
+
+    # 基于数据内容的建议
+    if data_analysis['has_formulas']:
+        recommendations.append("📊 检测到公式数据，建议验证公式的正确性")
+
+    if data_analysis['completeness_rate'] > 50:
+        recommendations.append("💾 数据密度较高，建议先导出重要数据")
+
+    # 基于操作类型的建议
+    if operation_type == "delete":
+        recommendations.append("🗑️ 删除操作不可逆，请确认数据不再需要")
+    elif operation_type == "update":
+        if data_analysis['non_empty_cell_count'] > 0:
+            recommendations.append("✏️ 将覆盖现有数据，建议使用insert_mode=True")
+
+    # 性能建议
+    if scale_info['total_cells'] > 5000:
+        recommendations.append("⏱️ 大范围操作可能需要较长时间，请耐心等待")
+
+    return recommendations
+
+
+def _predict_operation_result(
+    operation_type: str,
+    current_data: List[List[Any]],
+    new_data: Optional[List[List[Any]]],
+    scale_info: Dict[str, Any]
+) -> Dict[str, Any]:
+    """预测操作结果"""
+    prediction = {
+        'affected_cells': scale_info['total_cells'],
+        'data_overwrite_count': 0,
+        'data_insert_count': 0,
+        'estimated_time': "minimal"
+    }
+
+    if operation_type == "update" and new_data:
+        prediction['data_overwrite_count'] = len([cell for row in current_data for cell in row if cell is not None])
+        prediction['data_insert_count'] = len([cell for row in new_data for cell in row if cell is not None])
+    elif operation_type == "delete":
+        prediction['data_overwrite_count'] = len([cell for row in current_data for cell in row if cell is not None])
+
+    # 估算执行时间
+    if scale_info['total_cells'] > 10000:
+        prediction['estimated_time'] = "long"
+    elif scale_info['total_cells'] > 1000:
+        prediction['estimated_time'] = "medium"
+
+    return prediction
+
+
+@mcp.tool()
+def excel_get_operation_history(
+    file_path: Optional[str] = None,
+    limit: int = 20
+) -> Dict[str, Any]:
+    """
+    获取Excel操作历史记录
+
+    Args:
+        file_path: 文件路径 (可选，用于过滤特定文件的操作)
+        limit: 返回的操作记录数量 (默认20)
+
+    Returns:
+        Dict: 包含操作历史和统计信息
+
+    Example:
+        # 获取所有操作历史
+        result = excel_get_operation_history()
+        # 获取特定文件的操作历史
+        result = excel_get_operation_history("data.xlsx", 10)
+    """
+    try:
+        recent_operations = operation_logger.get_recent_operations(limit)
+
+        # 如果指定了文件路径，过滤操作
+        if file_path:
+            recent_operations = [
+                op for op in recent_operations
+                if op.get('details', {}).get('file_path') == file_path
+            ]
+
+        # 统计信息
+        total_operations = len(recent_operations)
+        operation_types = {}
+        for op in recent_operations:
+            op_type = op.get('operation', 'unknown')
+            operation_types[op_type] = operation_types.get(op_type, 0) + 1
+
+        # 统计成功/失败
+        success_count = sum(1 for op in recent_operations
+                          if op.get('operation') == 'operation_result' and
+                          op.get('details', {}).get('success', False))
+
+        error_count = sum(1 for op in recent_operations
+                        if op.get('operation') == 'operation_error')
+
+        return {
+            'success': True,
+            'file_path': file_path,
+            'operations': recent_operations,
+            'statistics': {
+                'total_operations': total_operations,
+                'operation_types': operation_types,
+                'success_count': success_count,
+                'error_count': error_count,
+                'success_rate': f"{(success_count / (success_count + error_count) * 100):.1f}%" if (success_count + error_count) > 0 else "0%"
+            },
+            'message': f"找到 {total_operations} 条操作记录"
+        }
+
+    except Exception as e:
+        return {
+            'success': False,
+            'error': 'HISTORY_RETRIEVAL_FAILED',
+            'message': f"获取操作历史失败: {str(e)}"
+        }
+
+
+@mcp.tool()
+def excel_create_backup(
+    file_path: str,
+    backup_dir: Optional[str] = None
+) -> Dict[str, Any]:
+    """
+    为Excel文件创建自动备份
+
+    Args:
+        file_path: Excel文件路径 (.xlsx/.xlsm)
+        backup_dir: 备份目录 (可选，默认在文件同目录下创建.backup文件夹)
+
+    Returns:
+        Dict: 包含备份结果和备份文件路径
+
+    Example:
+        # 创建备份
+        result = excel_create_backup("data.xlsx")
+        # 指定备份目录
+        result = excel_create_backup("data.xlsx", "./backups")
+    """
+    if not os.path.exists(file_path):
+        return {
+            'success': False,
+            'error': 'FILE_NOT_FOUND',
+            'message': f"源文件不存在: {file_path}"
+        }
+
+    try:
+        # 创建备份目录
+        if backup_dir is None:
+            base_dir = os.path.dirname(file_path)
+            backup_dir = os.path.join(base_dir, ".excel_mcp_backups")
+
+        os.makedirs(backup_dir, exist_ok=True)
+
+        # 生成备份文件名
+        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+        filename = os.path.basename(file_path)
+        name, ext = os.path.splitext(filename)
+        backup_filename = f"{name}_backup_{timestamp}{ext}"
+        backup_path = os.path.join(backup_dir, backup_filename)
+
+        # 创建备份
+        shutil.copy2(file_path, backup_path)
+
+        # 检查备份大小
+        original_size = os.path.getsize(file_path)
+        backup_size = os.path.getsize(backup_path)
+
+        return {
+            'success': True,
+            'original_file': file_path,
+            'backup_file': backup_path,
+            'backup_directory': backup_dir,
+            'file_size': {
+                'original': original_size,
+                'backup': backup_size
+            },
+            'timestamp': timestamp,
+            'message': f"备份创建成功: {backup_filename}"
+        }
+
+    except Exception as e:
+        return {
+            'success': False,
+            'error': 'BACKUP_FAILED',
+            'message': f"备份创建失败: {str(e)}"
+        }
+
+
+@mcp.tool()
+def excel_restore_backup(
+    backup_path: str,
+    target_path: Optional[str] = None
+) -> Dict[str, Any]:
+    """
+    从备份恢复Excel文件
+
+    Args:
+        backup_path: 备份文件路径
+        target_path: 目标文件路径 (可选，默认恢复到原始位置)
+
+    Returns:
+        Dict: 包含恢复结果
+
+    Example:
+        # 恢复备份
+        result = excel_restore_backup("./backups/data_backup_20250117_143022.xlsx")
+        # 恢复到指定位置
+        result = excel_restore_backup("./backups/data_backup_20250117_143022.xlsx", "restored_data.xlsx")
+    """
+    if not os.path.exists(backup_path):
+        return {
+            'success': False,
+            'error': 'BACKUP_NOT_FOUND',
+            'message': f"备份文件不存在: {backup_path}"
+        }
+
+    try:
+        # 确定目标路径
+        if target_path is None:
+            # 尝试从备份文件名推断原始文件名
+            filename = os.path.basename(backup_path)
+            if "_backup_" in filename:
+                # 移除备份时间戳
+                parts = filename.split("_backup_")
+                target_path = parts[0] + os.path.splitext(backup_path)[1]
+            else:
+                target_path = filename.replace("_backup_", ".")
+
+        # 创建目标目录
+        target_dir = os.path.dirname(target_path)
+        if target_dir:
+            os.makedirs(target_dir, exist_ok=True)
+
+        # 检查目标文件是否存在
+        target_exists = os.path.exists(target_path)
+
+        # 执行恢复
+        shutil.copy2(backup_path, target_path)
+
+        return {
+            'success': True,
+            'backup_file': backup_path,
+            'target_file': target_path,
+            'target_existed': target_exists,
+            'message': f"文件恢复成功: {os.path.basename(target_path)}"
+        }
+
+    except Exception as e:
+        return {
+            'success': False,
+            'error': 'RESTORE_FAILED',
+            'message': f"恢复失败: {str(e)}"
+        }
+
+
+@mcp.tool()
+def excel_list_backups(
+    file_path: str,
+    backup_dir: Optional[str] = None
+) -> Dict[str, Any]:
+    """
+    列出指定文件的所有备份
+
+    Args:
+        file_path: 原始Excel文件路径
+        backup_dir: 备份目录 (可选)
+
+    Returns:
+        Dict: 包含备份文件列表
+
+    Example:
+        result = excel_list_backups("data.xlsx")
+    """
+    try:
+        # 确定备份目录
+        if backup_dir is None:
+            base_dir = os.path.dirname(file_path)
+            backup_dir = os.path.join(base_dir, ".excel_mcp_backups")
+
+        if not os.path.exists(backup_dir):
+            return {
+                'success': True,
+                'backups': [],
+                'message': "备份目录不存在"
+            }
+
+        # 获取文件名
+        filename = os.path.basename(file_path)
+        name, ext = os.path.splitext(filename)
+        backup_pattern = f"{name}_backup_*{ext}"
+
+        # 查找备份文件
+        backup_files = []
+        for file in os.listdir(backup_dir):
+            if file.startswith(f"{name}_backup_") and file.endswith(ext):
+                full_path = os.path.join(backup_dir, file)
+                stat = os.stat(full_path)
+                backup_files.append({
+                    'filename': file,
+                    'path': full_path,
+                    'size': stat.st_size,
+                    'created_time': datetime.fromtimestamp(stat.st_ctime),
+                    'modified_time': datetime.fromtimestamp(stat.st_mtime)
+                })
+
+        # 按时间排序
+        backup_files.sort(key=lambda x: x['created_time'], reverse=True)
+
+        return {
+            'success': True,
+            'original_file': file_path,
+            'backup_directory': backup_dir,
+            'backups': backup_files,
+            'total_backups': len(backup_files)
+        }
+
+    except Exception as e:
+        return {
+            'success': False,
+            'error': 'LIST_BACKUPS_FAILED',
+            'message': f"列出备份失败: {str(e)}"
+        }
+
+
 @mcp.tool()
 def excel_insert_rows(
     file_path: str,
@@ -775,7 +1612,39 @@ def excel_delete_sheet(
         # 删除指定工作表
         result = excel_delete_sheet("data.xlsx", "临时数据")
     """
-    return ExcelOperations.delete_sheet(file_path, sheet_name)
+    # 开始操作会话
+    operation_logger.start_session(file_path)
+
+    # 记录删除工作表操作日志
+    operation_logger.log_operation("delete_sheet", {
+        "sheet_name": sheet_name
+    })
+
+    try:
+        result = ExcelOperations.delete_sheet(file_path, sheet_name)
+
+        # 记录操作结果
+        operation_logger.log_operation("operation_result", {
+            "success": result.get('success', False),
+            "deleted_sheet": result.get('deleted_sheet', ''),
+            "remaining_sheets": result.get('remaining_sheets', 0),
+            "message": result.get('message', '')
+        })
+
+        return result
+
+    except Exception as e:
+        # 记录错误
+        operation_logger.log_operation("operation_error", {
+            "error": str(e),
+            "message": f"删除工作表操作失败: {str(e)}"
+        })
+
+        return {
+            'success': False,
+            'error': 'DELETE_SHEET_FAILED',
+            'message': f"删除工作表操作失败: {str(e)}"
+        }
 
 
 @mcp.tool()
@@ -827,7 +1696,40 @@ def excel_delete_rows(
         # 删除第3-5行（删除3行，从第3行开始）
         result = excel_delete_rows("data.xlsx", "Sheet1", 3, 3)
     """
-    return ExcelOperations.delete_rows(file_path, sheet_name, row_index, count)
+    # 开始操作会话
+    operation_logger.start_session(file_path)
+
+    # 记录删除操作日志
+    operation_logger.log_operation("delete_rows", {
+        "sheet_name": sheet_name,
+        "row_index": row_index,
+        "count": count
+    })
+
+    try:
+        result = ExcelOperations.delete_rows(file_path, sheet_name, row_index, count)
+
+        # 记录操作结果
+        operation_logger.log_operation("operation_result", {
+            "success": result.get('success', False),
+            "deleted_rows": result.get('deleted_rows', 0),
+            "message": result.get('message', '')
+        })
+
+        return result
+
+    except Exception as e:
+        # 记录错误
+        operation_logger.log_operation("operation_error", {
+            "error": str(e),
+            "message": f"删除行操作失败: {str(e)}"
+        })
+
+        return {
+            'success': False,
+            'error': 'DELETE_ROWS_FAILED',
+            'message': f"删除行操作失败: {str(e)}"
+        }
 
 
 @mcp.tool()
@@ -855,7 +1757,40 @@ def excel_delete_columns(
         # 删除第1-3列（删除3列，从A列开始删除A、B、C列）
         result = excel_delete_columns("data.xlsx", "Sheet1", 1, 3)
     """
-    return ExcelOperations.delete_columns(file_path, sheet_name, column_index, count)
+    # 开始操作会话
+    operation_logger.start_session(file_path)
+
+    # 记录删除列操作日志
+    operation_logger.log_operation("delete_columns", {
+        "sheet_name": sheet_name,
+        "column_index": column_index,
+        "count": count
+    })
+
+    try:
+        result = ExcelOperations.delete_columns(file_path, sheet_name, column_index, count)
+
+        # 记录操作结果
+        operation_logger.log_operation("operation_result", {
+            "success": result.get('success', False),
+            "deleted_columns": result.get('deleted_columns', 0),
+            "message": result.get('message', '')
+        })
+
+        return result
+
+    except Exception as e:
+        # 记录错误
+        operation_logger.log_operation("operation_error", {
+            "error": str(e),
+            "message": f"删除列操作失败: {str(e)}"
+        })
+
+        return {
+            'success': False,
+            'error': 'DELETE_COLUMNS_FAILED',
+            'message': f"删除列操作失败: {str(e)}"
+        }
 
 # 暂时注释掉, 以后可能会用到
 # @mcp.tool()
