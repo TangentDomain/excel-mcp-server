@@ -146,6 +146,14 @@ python -m pytest tests/test_api_excel_operations.py::TestExcelOperations::test_g
 
 ## 开发标准
 
+### Git分支命名规范
+- **功能开发**: 所有功能开发分支必须以 `feature/` 开头
+- **分支格式**: `feature/功能描述`，例如：
+  - `feature/temp-file-management-improvements`
+  - `feature/documentation-updates`
+  - `feature/excel-search-enhancement`
+- **规范执行**: 任何不以 `feature/` 开头的功能分支都将被拒绝合并
+
 ### 代码组织规则
 1. **MCP 接口**: `src/server.py` 仅包含 MCP 工具定义，零业务逻辑
 2. **API 层**: `src/api/excel_operations.py` 处理集中式业务逻辑，包含全面验证
