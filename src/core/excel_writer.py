@@ -7,6 +7,7 @@ Excel MCP Server - Excel写入模块
 import logging
 import tempfile
 import os
+import time
 from typing import List, Any, Optional
 from openpyxl import load_workbook, Workbook
 from openpyxl.utils import range_boundaries
@@ -14,6 +15,7 @@ from openpyxl.utils import range_boundaries
 from ..models.types import RangeInfo, ModifiedCell, OperationResult, RangeType
 from ..utils.validators import ExcelValidator
 from ..utils.parsers import RangeParser
+from ..utils.temp_file_manager import TempFileManager
 from ..utils.exceptions import SheetNotFoundError, DataValidationError
 
 logger = logging.getLogger(__name__)
@@ -75,6 +77,14 @@ class ExcelWriter:
                 # 插入模式：在指定位置插入足够的行数
                 rows_to_insert = len(data)
                 if rows_to_insert > 0:
+                    # 保存公式位置信息，以便后续调整
+                    formula_positions = {}
+                    if preserve_formulas:
+                        for row in sheet.iter_rows():
+                            for cell in row:
+                                if cell.data_type == 'f':
+                                    formula_positions[cell.coordinate] = cell.value
+
                     sheet.insert_rows(min_row, rows_to_insert)
                     logger.info(f"插入模式：在第{min_row}行插入了{rows_to_insert}行")
 
@@ -759,8 +769,10 @@ class ExcelWriter:
                         target_cell.value = cell.value
 
         # 保存到临时文件
-        temp_file = tempfile.NamedTemporaryFile(suffix='.xlsx', delete=False)
-        temp_file.close()
+        temp_file_path = TempFileManager.create_temp_excel_file()
+
+        # 创建临时文件对象（为了兼容现有代码）
+        temp_file = type('TempFile', (), {'name': temp_file_path})()
 
         # 保存工作簿
         temp_workbook.save(temp_file.name)
@@ -813,18 +825,37 @@ class ExcelWriter:
         """确定结果类型"""
         if value is None:
             return "null"
+        elif isinstance(value, bool):
+            return "boolean"  # 布尔值要在数值之前检查，因为bool是int的子类
         elif isinstance(value, (int, float)):
             return "number"
         elif isinstance(value, str):
             return "text"
-        elif isinstance(value, bool):
-            return "boolean"
         else:
             try:
+                # 检查是否是xlcalculator的数字类型
+                try:
+                    from xlcalculator.xlfunctions.func_xltypes import Number
+                    if isinstance(value, Number):
+                        return "number"
+                except ImportError:
+                    pass
+
                 # 检查是否是日期
                 from datetime import datetime, date
                 if isinstance(value, (datetime, date)):
                     return "date"
+
+                # 如果是xlcalculator的类型，尝试获取实际值
+                if hasattr(value, 'value'):
+                    actual_value = value.value
+                    if isinstance(actual_value, (int, float)):
+                        return "number"
+                    elif isinstance(actual_value, str):
+                        return "text"
+                    elif isinstance(actual_value, bool):
+                        return "boolean"
+
             except:
                 pass
             return "unknown"

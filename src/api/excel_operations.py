@@ -142,6 +142,7 @@ class ExcelOperations:
         if cls.DEBUG_LOG_ENABLED:
             logger.info(f"{cls._LOG_PREFIX} 开始获取工作表列表: {file_path}")
 
+        reader = None
         try:
             # 步骤1: 读取工作表信息
             reader = ExcelReader(file_path)
@@ -157,15 +158,19 @@ class ExcelOperations:
                 'total_sheets': result.metadata.get('total_sheets', len(sheets)) if result.metadata else len(sheets)
             }
 
-            # 步骤3: 清理资源
-            reader.close()
-
             return response
 
         except Exception as e:
             error_msg = f"获取工作表列表失败: {str(e)}"
             logger.error(f"{cls._LOG_PREFIX} {error_msg}")
             return cls._format_error_result(error_msg)
+        finally:
+            # 步骤3: 确保清理资源，即使在异常情况下
+            if reader is not None:
+                try:
+                    reader.close()
+                except Exception as cleanup_error:
+                    logger.warning(f"{cls._LOG_PREFIX} 清理ExcelReader资源时发生错误: {cleanup_error}")
 
     @classmethod
     def get_headers(
@@ -206,6 +211,7 @@ class ExcelOperations:
         if cls.DEBUG_LOG_ENABLED:
             logger.info(f"{cls._LOG_PREFIX} 开始获取双行表头: {sheet_name}")
 
+        reader = None
         try:
             # 步骤1: 构建双行范围表达式
             range_expression = cls._build_header_range(sheet_name, header_row, max_columns, dual_row=True)
@@ -213,7 +219,6 @@ class ExcelOperations:
             # 步骤2: 读取表头数据（两行）
             reader = ExcelReader(file_path)
             result = reader.get_range(range_expression)
-            reader.close()
 
             if not result.success:
                 return cls._format_error_result(f"无法读取表头数据: {result.message}")
@@ -237,6 +242,13 @@ class ExcelOperations:
             error_msg = f"获取表头失败: {str(e)}"
             logger.error(f"{cls._LOG_PREFIX} {error_msg}")
             return cls._format_error_result(error_msg)
+        finally:
+            # 确保清理资源
+            if reader is not None:
+                try:
+                    reader.close()
+                except Exception as cleanup_error:
+                    logger.warning(f"{cls._LOG_PREFIX} 清理ExcelReader资源时发生错误: {cleanup_error}")
 
     @classmethod
     def create_file(
