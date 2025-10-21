@@ -924,6 +924,35 @@ class TestExcelConverterMerge:
 class TestExcelConverterEdgeCases:
     """ExcelConverter边界条件测试"""
 
+    def setup_method(self):
+        """每个测试方法前的设置"""
+        # 创建测试Excel文件
+        self.temp_file = tempfile.NamedTemporaryFile(suffix='.xlsx', delete=False)
+        self.temp_file.close()
+        self.file_path = self.temp_file.name
+
+        # 创建基础Excel文件
+        wb = Workbook()
+        ws = wb.active
+        ws.title = "TestData"
+
+        # 添加测试数据
+        ws['A1'] = "Name"
+        ws['B1'] = "Value"
+        ws['A2'] = "Test"
+        ws['B2'] = 123
+
+        wb.save(self.file_path)
+        wb.close()
+
+    def teardown_method(self):
+        """每个测试方法后的清理"""
+        if hasattr(self, 'file_path') and os.path.exists(self.file_path):
+            try:
+                os.unlink(self.file_path)
+            except:
+                pass
+
     def test_import_from_csv_empty_file(self):
         """测试导入空CSV文件"""
         csv_file = tempfile.NamedTemporaryFile(mode='w', suffix='.csv', delete=False, encoding='utf-8')
@@ -998,8 +1027,10 @@ class TestExcelConverterEdgeCases:
         empty_file.close()
 
         wb = Workbook()
-        # 删除默认工作表，创建空工作簿
-        wb.remove(wb.active)
+        # Excel要求至少有一个可见工作表，所以我们保留一个空工作表
+        ws = wb.active
+        ws.title = "EmptySheet"
+        # 工作表是空的，没有数据
         wb.save(empty_file.name)
 
         output_file = tempfile.NamedTemporaryFile(suffix='.json', delete=False)
@@ -1011,11 +1042,11 @@ class TestExcelConverterEdgeCases:
             )
 
             assert result.success is True
-            assert result.data['sheet_count'] == 0
+            assert result.data['sheet_count'] == 1  # 一个空工作表
 
             with open(output_file.name, 'r', encoding='utf-8') as f:
                 json_data = json.load(f)
-                assert json_data == {}
+                assert json_data == {"EmptySheet": []}  # 空工作表转换为一个空数组
 
         finally:
             os.unlink(empty_file.name)

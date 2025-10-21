@@ -167,7 +167,8 @@ class ExcelConverter:
                     'output_path': output_path,
                     'row_count': row_count,
                     'sheet_name': sheet_name,
-                    'has_header': has_header
+                    'has_header': has_header,
+                    'encoding': encoding
                 },
                 metadata={
                     'source_file': csv_path,
@@ -357,9 +358,10 @@ class ExcelConverter:
                         source_sheet = source_workbook[sheet_name]
 
                         # 创建新工作表名称（避免重复）
-                        new_sheet_name = f"{Path(file_path).stem}_{sheet_name}"
+                        new_sheet_name = f"File{file_index+1}_{sheet_name}"
+                        # 如果名称太长，使用缩写形式
                         if len(new_sheet_name) > 31:  # Excel工作表名称长度限制
-                            new_sheet_name = f"File{file_index+1}_{sheet_name}"[:31]
+                            new_sheet_name = f"F{file_index+1}_{sheet_name[:20]}"[:31]
 
                         target_sheet = output_workbook.create_sheet(title=new_sheet_name)
 

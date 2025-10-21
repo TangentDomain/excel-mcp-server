@@ -271,17 +271,21 @@ def _deep_clean_nulls(obj: Any) -> Any:
     Rules:
         - None值被移除
         - 空字典{}被移除
-        - 空列表[]被移除
+        - 空列表[]被移除（除了重要的字段）
         - 递归处理嵌套结构
         - 特例：紧凑数组格式保持结构完整性
+        - 特例：data、matches等重要字段即使为空也保留
     """
     if isinstance(obj, dict):
         cleaned = {}
         for key, value in obj.items():
             if value is not None:
                 cleaned_value = _deep_clean_nulls(value)
+                # 保留重要字段，即使为空
+                if key in ['data', 'matches', 'differences', 'results']:
+                    cleaned[key] = cleaned_value
                 # 只保留非空的值
-                if cleaned_value is not None and cleaned_value != {} and cleaned_value != []:
+                elif cleaned_value is not None and cleaned_value != {} and cleaned_value != []:
                     cleaned[key] = cleaned_value
         return cleaned
     elif isinstance(obj, list):

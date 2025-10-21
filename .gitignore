@@ -113,3 +113,4 @@ structure-report.txt
 
 # Temporary Python cache for hooks
 .pre-commit-hooks-cache/
+temp_excel_files/
