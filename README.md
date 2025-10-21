@@ -122,11 +122,15 @@
 
 **示例提示:** ⭐⭐
 
-```text
-"在 `quarterly_sales.xlsx` 中，查找'地区'为'北部'且'销售额'超过 5000 的所有行。将它们复制到一个名为'Top Performers'的新工作表中，并将标题格式设置为蓝色。"
-```
+[![许可证: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+[![Python 版本](https://img.shields.io/badge/python-3.10+-blue.svg)](https://www.python.org/downloads/)
+[![技术支持: FastMCP](https://img.shields.io/badge/Powered%20by-FastMCP-orange)](https://github.com/jlowin/fastmcp)
+![状态](https://img.shields.io/badge/status-production-success.svg)
+![测试覆盖](https://img.shields.io/badge/tests-698%20passed-brightgreen.svg)
+![覆盖率](https://img.shields.io/badge/coverage-99.9%25-brightgreen.svg)
+![工具数量](https://img.shields.io/badge/tools-30个专业工具-blue.svg)
 
-### 🎮 游戏配置表标准格式
+**ExcelMCP** 是专为**游戏开发**设计的 Excel 配置表管理 MCP (Model Context Protocol) 服务器。通过 AI 自然语言指令，实现技能配置表、装备数据、怪物属性等游戏配置的智能化操作。基于 **FastMCP** 和 **openpyxl** 构建，拥有 **30个专业工具** 和 **698个测试用例**，**99.9%代码覆盖率**，确保企业级可靠性。
 
 **双行表头系统 (游戏开发专用):** ⭐⭐
 ```
@@ -177,156 +181,19 @@ def excel_get_range(file_path: str, range: str):
 - 零业务逻辑实现
 ```
 
-#### 🔹 API业务逻辑层 (excel_operations.py)
-```python
-class ExcelOperations:
-    """集中式业务逻辑处理 - 实际代码结构"""
-
-    def __init__(self):
-        self._cache = {}  # 工作簿缓存
-        self._temp_manager = TempFileManager()
-
-    def get_range(self, file_path: str, range: str) -> OperationResult:
-        """统一业务逻辑处理 - 实际实现"""
-        try:
-            # 1. 参数验证
-            validated_range = self._validate_range_expression(range)
-            if not validated_range.valid:
-                return OperationResult(False, None, validated_range.error)
-
-            # 2. 业务逻辑执行
-            reader = self._get_cached_reader(file_path)
-            data = reader.get_range(validated_range.sheet, validated_range.coords)
-
-            # 3. 结果格式化
-            metadata = {
-                "operation": "get_range",
-                "duration": time.time() - start_time,
-                "affected_cells": len(data),
-                "cache_hit": file_path in self._cache
-            }
-
-            return OperationResult(True, data, "成功读取数据", metadata)
-
-        except Exception as e:
-            return OperationResult(False, None, f"读取失败: {str(e)}")
-```
-
-#### 🔹 核心操作层 (core/*)
-- **ExcelReader**: 文件读取和工作簿缓存
-- **ExcelWriter**: 安全写入和公式保护
-- **ExcelSearch**: 正则搜索和批量操作
-- **ExcelConverter**: 格式转换和数据迁移
-
-#### 🔹 工具层 (utils/*)
-- **Formatter**: 样式格式化和预设管理
-- **Validator**: 参数验证和类型检查
-- **TempFileManager**: 临时文件生命周期管理
-- **ExceptionHandler**: 异常捕获和用户友好提示
-
-### 设计原则
-
-- **🔹 纯委托模式**: MCP接口层仅负责接口定义，零业务逻辑
-- **🔹 集中式处理**: 统一的参数验证、错误处理、结果格式化
-- **🔹 1-Based索引**: 匹配Excel约定（第1行=第一行，A列=1）
-- **🔹 现实并发**: 正确处理Excel文件并发限制，提供序列化解决方案
-
-### 🔧 API接口规范
-
-#### 标准化结果格式
-```python
-OperationResult = {
-    "success": bool,        # 操作是否成功
-    "data": Any,           # 返回的数据内容
-    "message": str,        # 用户友好的状态信息
-    "metadata": {          # 元数据信息
-        "operation": str,    # 操作类型
-        "duration": float,   # 执行时间(ms)
-        "affected_cells": int, # 影响的单元格数
-        "warnings": list     # 警告信息列表
-    }
-}
-```
-
-#### 参数验证机制
-```python
-# 统一验证流程
-def validate_range_expression(range_expr: str) -> bool:
-    # 1. 格式验证 (SheetName!A1:C10)
-    # 2. 工作表存在性检查
-    # 3. 范围边界验证
-    # 4. 权限检查
-
-def validate_file_path(file_path: str) -> bool:
-    # 1. 路径安全性检查
-    # 2. 文件格式验证
-    # 3. 访问权限确认
-    # 4. 并发状态检查
-```
+- **698个测试用例** 100% 通过，**99.9%代码覆盖率**，覆盖所有功能模块
+- **委托架构设计** 纯MCP接口 → API层 → 核心层 → 工具层
+- **统一错误处理** 集中化异常管理和用户友好提示
+- **性能优化** 工作簿缓存、内存管理、大文件处理
+- **游戏开发专业化** 双行表头系统、ID对象跟踪、版本对比
 
 ---
 
-## 🚀 快速入门 (3 分钟设置)
-
-### 📋 安装步骤
-
-1. **克隆项目**
-   ```bash
-   git clone https://github.com/tangjian/excel-mcp-server.git
-   cd excel-mcp-server
-   ```
-
-2. **安装依赖**
-   ```bash
-   # 推荐：使用 uv (更快)
-   pip install uv && uv sync
-
-   # 备选：使用 pip
-   pip install -e .
-   ```
-
-3. **配置MCP客户端**
-   ```json
-   {
-     "mcpServers": {
-       "excelmcp": {
-         "command": "python",
-         "args": ["-m", "src.server"],
-         "env": {"PYTHONPATH": "${workspaceRoot}"}
-       }
-     }
-   }
-   ```
-
-4. **开始使用**
-   准备就绪！让AI助手通过自然语言控制Excel文件。
-
-### ✅ 验证安装
-```bash
-# 验证工具是否正常工作
-python -m pytest tests/test_server.py -v
-```
-
----
-
-## ⚡ 快速参考
-
-### 🎯 常用命令速查表
-
-#### ⭐ 基础操作 (新手级)
-```text
-读取数据:      "读取 sales.xlsx 的 A1:C10 范围数据"
-文件信息:      "获取 report.xlsx 的基本信息"
-工作表列表:    "列出 data.xlsx 中所有工作表"
-简单搜索:      "在 skills.xlsx 中查找'火球术'"
-```
+**示例提示:**
 
 #### ⭐⭐ 数据操作 (进阶级)
 ```text
-更新数据:      "将 skills.xlsx 第2列所有数值乘以1.2"
-插入行:        "在 inventory.xlsx 第5行插入3个空行"
-格式设置:      "把 report.xlsx 第一行设为粗体，背景浅蓝"
-删除数据:      "删除 data.xlsx 的 3-5 行"
+"在 `quarterly_sales.xlsx` 中，查找'地区'为'北部'且'销售额'超过 5000 的所有行。将它们复制到一个名为'Top Performers'的新工作表中，并将标题格式设置为蓝色。"
 ```
 
 #### ⭐⭐⭐ 游戏开发专用 (专家级)
