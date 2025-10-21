@@ -1001,3 +1001,4 @@ def performance_monitor(func: Callable) -> Callable:
         return result
     return wrapper
 ```
+- 记得动态的更新CLAUDE.md文件
