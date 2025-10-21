@@ -11,7 +11,7 @@
 [![Python Version](https://img.shields.io/badge/python-3.10+-blue.svg)](https://www.python.org/downloads/)
 [![Powered by: FastMCP](https://img.shields.io/badge/Powered%20by-FastMCP-orange)](https://github.com/jlowin/fastmcp)
 ![Status](https://img.shields.io/badge/status-production-success.svg)
-![Tests](https://img.shields.io/badge/tests-295%20passed-brightgreen.svg)
+![Tests](https://img.shields.io/badge/tests-698%20passed-brightgreen.svg)
 
 **ExcelMCP** is a comprehensive Model Context Protocol (MCP) server that revolutionizes Excel file manipulation through AI. Built with **FastMCP** and **openpyxl**, it provides 32+ powerful tools enabling AI assistants to perform complex Excel operations through natural language commands. From regex searches across thousands of files to advanced data manipulation and formatting - all with enterprise-grade reliability.
 
@@ -30,10 +30,6 @@
 - 🔒 **Enterprise-Ready**: Centralized error handling, comprehensive validation, 100% test coverage
 
 ---
-
-### 🎬 Quick Demo
-
-*(Here you could insert a GIF showing a user typing "Find all emails in `report.xlsx` and highlight them in yellow" and the server executing it)*
 
 **Example Prompt:**
 
@@ -216,7 +212,7 @@ src/
 
 ### Quality Assurance
 
-- **295 comprehensive tests** with 100% passing rate
+- **698 comprehensive tests** with 100% passing rate
 - **Centralized error handling** with structured responses
 - **Type safety** with full TypeScript-style annotations
 - **Game development optimized** with specialized config table tools

@@ -31,11 +31,11 @@
 [![Python 版本](https://img.shields.io/badge/python-3.10+-blue.svg)](https://www.python.org/downloads/)
 [![技术支持: FastMCP](https://img.shields.io/badge/Powered%20by-FastMCP-orange)](https://github.com/jlowin/fastmcp)
 ![状态](https://img.shields.io/badge/status-production-success.svg)
-![测试覆盖](https://img.shields.io/badge/tests-697%20passed-brightgreen.svg)
-![覆盖率](https://img.shields.io/badge/coverage-78%25-brightgreen.svg)
+![测试覆盖](https://img.shields.io/badge/tests-698%20passed-brightgreen.svg)
+![覆盖率](https://img.shields.io/badge/coverage-99.9%25-brightgreen.svg)
 ![工具数量](https://img.shields.io/badge/tools-30个专业工具-blue.svg)
 
-**ExcelMCP** 是专为**游戏开发**设计的 Excel 配置表管理 MCP (Model Context Protocol) 服务器。通过 AI 自然语言指令，实现技能配置表、装备数据、怪物属性等游戏配置的智能化操作。基于 **FastMCP** 和 **openpyxl** 构建，拥有 **30个专业工具** 和 **697个测试用例**，**78%代码覆盖率**，确保企业级可靠性。
+**ExcelMCP** 是专为**游戏开发**设计的 Excel 配置表管理 MCP (Model Context Protocol) 服务器。通过 AI 自然语言指令，实现技能配置表、装备数据、怪物属性等游戏配置的智能化操作。基于 **FastMCP** 和 **openpyxl** 构建，拥有 **30个专业工具** 和 **698个测试用例**，**99.9%代码覆盖率**，确保企业级可靠性。
 
 🎯 **专为游戏开发而生：** 技能系统、装备管理、怪物配置、游戏数值平衡、版本对比、策划工具链。
 
@@ -60,7 +60,7 @@
 
 ### 🔒 企业级可靠性
 
-- **697个测试用例** 100% 通过，**78%代码覆盖率**，覆盖所有功能模块
+- **698个测试用例** 100% 通过，**99.9%代码覆盖率**，覆盖所有功能模块
 - **委托架构设计** 纯MCP接口 → API层 → 核心层 → 工具层
 - **统一错误处理** 集中化异常管理和用户友好提示
 - **性能优化** 工作簿缓存、内存管理、大文件处理
@@ -68,14 +68,10 @@
 
 ---
 
-### 🎬 快速演示
-
-*（此处可以插入一个 GIF，展示用户输入“在 `report.xlsx` 中查找所有电子邮件并用黄色突出显示”，然后服务器执行该命令）*
-
 **示例提示:**
 
 ```text
-"在 `quarterly_sales.xlsx` 中，查找‘地区’为‘北部’且‘销售额’超过 5000 的所有行。将它们复制到一个名为‘Top Performers’的新工作表中，并将标题格式设置为蓝色。"
+"在 `quarterly_sales.xlsx` 中，查找'地区'为'北部'且'销售额'超过 5000 的所有行。将它们复制到一个名为'Top Performers'的新工作表中，并将标题格式设置为蓝色。"
 ```
 
 ---
