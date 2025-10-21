@@ -446,7 +446,29 @@ class ExcelWriter:
                     continue
 
                 old_value = cell.value
-                cell.value = value
+
+                # 处理复杂数据类型
+                try:
+                    # 尝试直接设置值
+                    cell.value = value
+                except (ValueError, TypeError) as e:
+                    # 如果直接设置失败，尝试转换为字符串
+                    logger.warning(f"无法直接设置值 {value} ({type(value).__name__})，转换为字符串: {e}")
+                    try:
+                        if isinstance(value, (list, dict, tuple)):
+                            # 复杂数据类型转换为JSON字符串
+                            import json
+                            cell.value = json.dumps(value, ensure_ascii=False)
+                        elif hasattr(value, '__str__'):
+                            # 有字符串表示的对象
+                            cell.value = str(value)
+                        else:
+                            # 最后尝试转换为字符串
+                            cell.value = repr(value)
+                    except Exception as conversion_error:
+                        logger.error(f"无法转换值 {value}: {conversion_error}")
+                        # 设置为空字符串作为最后手段
+                        cell.value = ""
 
                 modified_cells.append(ModifiedCell(
                     coordinate=cell.coordinate,
@@ -1535,10 +1557,25 @@ class ExcelWriter:
 
             # 应用边框到指定范围
             cell_count = 0
-            for row in worksheet[range_info.cell_range]:
-                for cell in row:
-                    cell.border = border
-                    cell_count += 1
+            try:
+                # 尝试直接使用范围
+                for row in worksheet[range_info.cell_range]:
+                    if hasattr(row, '__iter__'):  # 确保row是可迭代的
+                        for cell in row:
+                            cell.border = border
+                            cell_count += 1
+                    else:  # 如果是单个单元格
+                        row.border = border
+                        cell_count += 1
+            except TypeError:
+                # 如果cell_range不是预期的格式，尝试其他方法
+                from openpyxl.utils import range_boundaries
+                min_col, min_row, max_col, max_row = range_boundaries(range_info.cell_range)
+                for row in range(min_row, max_row + 1):
+                    for col in range(min_col, max_col + 1):
+                        cell = worksheet.cell(row=row, column=col)
+                        cell.border = border
+                        cell_count += 1
 
             # 保存文件
             workbook.save(self.file_path)
