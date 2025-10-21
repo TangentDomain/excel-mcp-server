@@ -43,11 +43,107 @@ API 业务逻辑层 (src/api/excel_operations.py)
 工具层 (src/utils/*)
 ```
 
+### MCP 接口架构设计理念
+
+#### 1. 纯委托模式 (Pure Delegation Pattern)
+`src/server.py` 作为 MCP 接口层，严格遵循**纯委托模式**：
+
+```python
+# ❌ 错误：在MCP接口层实现业务逻辑
+@mcp.tool()
+def excel_get_range(file_path: str, range: str):
+    # 不应该在这里实现读取逻辑
+    workbook = openpyxl.load_workbook(file_path)
+    # ... 复杂的业务逻辑
+    return result
+
+# ✅ 正确：纯委托给业务逻辑层
+@mcp.tool()
+def excel_get_range(file_path: str, range: str):
+    return self.excel_ops.get_range(file_path, range)
+```
+
+**设计意图**：
+- **接口纯净性**: MCP 层仅负责接口定义和参数传递，零业务逻辑
+- **职责分离**: 业务逻辑、验证、错误处理全部集中在 `ExcelOperations` 类
+- **可测试性**: 接口层和业务逻辑层可以独立测试
+- **维护性**: 修改业务逻辑无需触及 MCP 接口定义
+
+#### 2. 集中式业务逻辑处理
+`ExcelOperations` 类作为**单一业务逻辑入口**：
+
+```python
+class ExcelOperations:
+    def get_range(self, file_path: str, range: str):
+        # 步骤1：参数验证
+        validated_params = self._validate_get_range_params(file_path, range)
+
+        # 步骤2：业务逻辑执行
+        result = self.reader.get_range(validated_params)
+
+        # 步骤3：结果格式化
+        formatted_result = format_operation_result(result)
+
+        # 步骤4：统一响应结构
+        return formatted_result
+```
+
+**核心优势**：
+- **统一验证**: 所有输入参数都经过相同的验证逻辑
+- **统一错误处理**: 标准化的异常处理和错误响应
+- **统一格式**: 所有操作返回相同结构的 `OperationResult`
+- **审计能力**: 集中的日志记录和性能监控
+
+#### 3. 现实并发操作处理
+**Excel 文件不支持真正的并发写入**，我们的架构采用现实的方法：
+
+```python
+# ❌ 不现实：期望并发Excel写入成功
+def test_concurrent_excel_writes():
+    # 多个线程同时写入同一Excel文件 - 必然失败
+
+# ✅ 现实：检测错误并提供序列化方案
+def test_concurrent_write_error_handling():
+    # 验证系统能正确检测文件锁定错误
+
+def test_sequential_operations_with_thread_safety():
+    # 使用队列序列化写入操作，确保安全
+```
+
+**架构原则**：
+- **错误检测**: 正确识别并发操作导致的文件锁定
+- **优雅降级**: 提供序列化操作队列作为备选方案
+- **用户友好**: 明确告知用户 Excel 文件的并发限制
+- **性能平衡**: 允许并发读取，序列化写入操作
+
+#### 4. 系统化测试修复方法论
+从 24 个失败测试到 100% 通过的**系统性方法**：
+
+```python
+# 测试修复分类处理
+def analyze_test_failures(failures):
+    categories = {
+        'encoding_issues': [],      # GBK编码问题
+        'formula_calculation': [],  # 公式计算类型检测
+        'concurrent_operations': [], # 并发操作处理
+        'data_format_inconsistency': [] # 数据格式不一致
+    }
+    # 分类 → 分析 → 修复 → 验证
+```
+
+**修复原则**：
+- **根因分析**: 按照错误根本原因分类，而非表面现象
+- **渐进修复**: 优先修复影响最大的基础性问题
+- **向后兼容**: 修复时保持 API 兼容性
+- **验证闭环**: 每个修复都包含完整的测试验证
+
 ### 核心设计原则
 1. **纯委托模式**: `server.py` 中的 MCP 工具将所有业务逻辑委托给 `ExcelOperations`
 2. **集中式业务逻辑**: `ExcelOperations` 类处理参数验证、业务逻辑、错误处理和结果格式化
 3. **标准化结果**: 所有操作返回 `{success, data, message, metadata}` 结构
 4. **1-Based 索引**: 匹配 Excel 约定（第1行 = 第一行，A列 = 1）
+5. **现实并发处理**: 正确处理 Excel 文件的并发限制，提供序列化解决方案
+6. **系统性测试**: 基于根因分析的测试修复方法论
 
 ### 范围表达式系统
 - **标准格式**: `"Sheet1!A1:C10"`（必须包含工作表名）
@@ -112,6 +208,39 @@ python scripts/run_tests.py
 2. **API 层**: `src/api/excel_operations.py` 处理集中式业务逻辑，包含全面验证
 3. **核心模块**: `src/core/` 模块处理单一职责的 Excel 操作
 4. **工具函数**: `src/utils/` 用于格式化助手和通用工具
+
+### 架构规范执行
+
+#### 严格遵循 CLAUDE.md 规范
+当发现可能违反现有架构规范的操作时：
+
+1. **识别违规**: 检测到可能违反分层架构或设计原则的操作
+2. **明确提示**: 立即提示用户当前操作可能违反既定规范
+3. **提供选择**:
+   - 方案A：调整操作以符合现有规范
+   - 方案B：如果确实需要打破规范，则更新 CLAUDE.md 文档
+
+#### 规范更新流程
+当架构演进需要打破现有规范时：
+
+```python
+# 示例：需要添加新的架构层次
+def propose_architecture_change():
+    """
+    规范更新提案流程：
+    1. 识别当前规范限制
+    2. 提出新架构方案
+    3. 分析影响范围
+    4. 更新 CLAUDE.md 规范
+    5. 验证新规范一致性
+    """
+```
+
+**更新原则**：
+- **向后兼容**: 尽量保持现有规范的兼容性
+- **充分讨论**: 重大架构变更需要充分论证
+- **文档同步**: 代码实现与文档规范同步更新
+- **测试验证**: 新规范需要相应的测试用例验证
 
 ### 方法复杂度指南
 - **主干方法**: ≤20 行，确保可读性
