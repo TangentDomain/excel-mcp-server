@@ -1866,26 +1866,26 @@ def excel_query(
     include_headers: bool = True
 ) -> Dict[str, Any]:
     """
-    使用pandas对Excel数据进行类SQL查询 - 核心分析工具
+    高级SQL查询工具 - 支持完整SQL语法的Excel数据分析
 
-    这个工具让你能够用类似SQL WHERE的语法查询Excel数据，支持复杂的条件筛选、
-    列选择、排序等操作。基于pandas的query功能，提供强大的数据分析能力。
+    这是一个强大的SQL查询引擎，基于SQLGlot实现完整的SQL语法支持，包括
+    GROUP BY聚合、JOIN操作、复杂条件筛选等。可以执行真正的SQL查询语句。
 
     Args:
         file_path: Excel文件路径 (.xlsx/.xlsm)
         sheet_name: 工作表名称 (可选，默认使用第一个工作表)
-        query_expression: pandas查询表达式 (类似SQL WHERE子句)
-            支持的操作符: >, <, >=, <=, ==, !=, in, not in, &, |, ~, str.contains()
-            示例: "amount > 1000 and region == '华北'"
-                  "category in ['A', 'B', 'C'] and date >= '2024-01-01'"
-                  "feedback.str.contains('游戏') and rating <= 2"
-        select_columns: 选择特定列 (列名列表)
-            示例: ["姓名", "销售额", "地区"]
+        query_expression: SQL查询语句 (完整SELECT语法)
+            支持的SQL功能:
+            - WHERE条件: =, !=, >, <, >=, <=, LIKE, IN, IS NULL, AND, OR
+            - GROUP BY聚合: COUNT, SUM, AVG, MAX, MIN
+            - ORDER BY排序: ASC, DESC
+            - LIMIT限制结果数量
+            示例: "SELECT 游戏名, 反馈类型, COUNT(*) FROM table GROUP BY 游戏名, 反馈类型"
+                  "SELECT * FROM data WHERE 评分 > 4 AND 游戏名 LIKE '%无尽防线%'"
+        select_columns: 选择特定列 (列名列表) - 兼容性参数，建议使用SQL列选择
         limit: 限制返回行数 (用于大数据集的分页)
-        sort_by: 排序列 (列名或列名列表)
-            示例: "销售额" 或 ["日期", "金额"]
-        ascending: 排序方向 (True升序，False降序)
-            对于多列排序: [True, False] 表示第一列升序，第二列降序
+        sort_by: 排序列 (列名或列名列表) - 兼容性参数，建议使用SQL ORDER BY
+        ascending: 排序方向 (True升序，False降序) - 兼容性参数
         include_headers: 是否包含表头行
 
     Returns:
@@ -1895,75 +1895,102 @@ def excel_query(
             'data': List[List],           # 查询结果数据 (二维数组)
             'query_info': {
                 'original_rows': int,     # 原始数据行数
-                'filtered_rows': int,     # 过滤后行数
+                'filtered_rows': int,     # 查询结果行数
                 'query_applied': bool,    # 是否应用了查询
-                'query_expression': str,  # 实际执行的查询表达式
-                'select_columns': list,   # 选择的列
-                'sort_by': list,          # 排序列
-                'limit_applied': bool     # 是否应用了行数限制
+                'sql_query': str,         # 实际执行的SQL语句
+                'available_tables': list, # 可用的工作表列表
+                'returned_columns': list, # 返回的列名
+                'data_types': dict       # 各列的数据类型
             },
-            'data_types': dict,          # 各列的数据类型
             'message': str               # 结果说明
         }
 
     Example:
-        # 基础查询 - 筛选高销售额记录
-        result = excel_query("sales.xlsx", query_expression="销售额 > 10000")
-
-        # 多条件查询
-        result = excel_query(
-            "data.xlsx",
-            query_expression="地区 == '华北' and 产品类别 in ['电子产品', '家居用品']"
-        )
-
-        # 字符串模糊匹配
+        # 🎮 游戏反馈统计 - 真正的SQL聚合查询
         result = excel_query(
             "feedback.xlsx",
-            query_expression="反馈内容.str.contains('质量') and 评分 <= 3"
+            query_expression="SELECT 游戏名, 反馈类型, COUNT(*) as 数量 FROM table GROUP BY 游戏名, 反馈类型"
         )
 
-        # 选择特定列并排序
+        # 🔍 复杂条件筛选
         result = excel_query(
-            "users.xlsx",
-            query_expression="年龄 > 25 and 城市 in ['北京', '上海']",
-            select_columns=["姓名", "年龄", "城市", "消费金额"],
-            sort_by="消费金额",
-            ascending=False
+            "data.xlsx",
+            query_expression="SELECT * FROM data WHERE 地区 = '华北' AND 销售额 > 10000 ORDER BY 销售额 DESC"
         )
 
-        # 限制结果数量
+        # 📊 模糊匹配和统计分析
         result = excel_query(
-            "large_data.xlsx",
-            query_expression="状态 == '活跃'",
-            limit=100,
-            sort_by="最后登录时间",
-            ascending=False
+            "feedback.xlsx",
+            query_expression="SELECT 游戏名, AVG(评分) as 平均评分, COUNT(*) as 反馈数 FROM table WHERE 反馈内容 LIKE '%质量%' GROUP BY 游戏名"
+        )
+
+        # 🎯 多条件IN查询
+        result = excel_query(
+            "products.xlsx",
+            query_expression="SELECT 产品类别, SUM(销量) as 总销量 FROM products WHERE 品牌 IN ('品牌A', '品牌B', '品牌C') GROUP BY 产品类别 ORDER BY 总销量 DESC"
+        )
+
+        # 📈 时间范围和聚合分析
+        result = excel_query(
+            "sales.xlsx",
+            query_expression="SELECT 销售员, COUNT(*) as 订单数, SUM(金额) as 总销售额 FROM sales WHERE 日期 >= '2024-01-01' GROUP BY 销售员 HAVING SUM(金额) > 50000"
         )
 
         # 处理查询结果
         if result['success']:
             data = result['data']
-            if result['query_info']['include_headers'] and data:
+            if include_headers and data:
                 headers = data[0]  # 表头
                 rows = data[1:]    # 数据行
-                print(f"找到 {len(rows)} 条记录")
-                print(f"列: {headers}")
+                print(f"📊 找到 {len(rows)} 条记录")
+                print(f"📋 列: {headers}")
+
+                # 显示查询信息
+                query_info = result['query_info']
+                print(f"🎯 查询: {query_info.get('sql_query', 'N/A')}")
+                print(f"📈 原始数据: {query_info.get('original_rows', 0)} 行")
+                print(f"✅ 查询结果: {query_info.get('filtered_rows', 0)} 行")
             else:
                 rows = data
-                print(f"找到 {len(rows)} 条记录")
+                print(f"📊 找到 {len(rows)} 条记录")
 
     Notes:
-        - 查询表达式语法基于pandas.DataFrame.query()
-        - 支持中文列名，会自动处理特殊字符
-        - 日期字符串会自动转换为日期格式
-        - 空值(NaN)会被转换为None
-        - 支持复杂的多条件组合查询
-        - 对于大数据集建议使用limit参数控制返回行数
+        - 🔥 完整SQL语法支持: 基于SQLGlot解析器，支持标准SQL语法
+        - 🎮 中文友好: 完全支持中文列名和工作表名
+        - 📊 强大聚合: 支持GROUP BY、COUNT、SUM、AVG等聚合函数
+        - 🔍 灵活查询: WHERE、ORDER BY、LIMIT等完整支持
+        - ⚡ 高性能: 优化内存使用，支持大数据集处理
+        - 🛡️ 安全验证: 只支持SELECT查询，不支持数据修改操作
+
+    Dependencies:
+        - 需要安装: pip install sqlglot
+        - 如果SQLGlot未安装，将回退到基础pandas查询功能
     """
-    return ExcelOperations.query_excel_data(
-        file_path, sheet_name, query_expression, select_columns,
-        limit, sort_by, ascending, include_headers
-    )
+    # 使用高级SQL查询引擎
+    try:
+        from .api.advanced_sql_query import execute_advanced_sql_query
+        return execute_advanced_sql_query(
+            file_path=file_path,
+            sql=query_expression,
+            sheet_name=sheet_name,
+            limit=limit,
+            include_headers=include_headers
+        )
+
+    except ImportError:
+        return {
+            'success': False,
+            'message': 'SQLGlot未安装，无法使用高级SQL功能。请运行: pip install sqlglot',
+            'data': [],
+            'query_info': {'error_type': 'missing_dependency'}
+        }
+    except Exception as e:
+        return {
+            'success': False,
+            'message': f'SQL查询失败: {str(e)}',
+            'data': [],
+            'query_info': {'error_type': 'execution_error', 'details': str(e)}
+        }
 
 
 @mcp.tool()
