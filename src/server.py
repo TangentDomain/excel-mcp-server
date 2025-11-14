@@ -110,7 +110,7 @@ logger = logging.getLogger(__name__)
 # 创建FastMCP服务器实例，开启调试模式和详细日志
 mcp = FastMCP(
     name="excel-mcp",
-    instructions=r"""🎮 游戏开发Excel配置表专家 - 32个专业工具 · 295项测试验证
+    instructions=r"""🎮 游戏开发Excel配置表专家 - 38个专业工具 · 295项测试验证
 
 ## 🎯 核心设计原则
 • **搜索优先**：任何查找、定位、分析操作都优先使用 `excel_search`
@@ -178,6 +178,15 @@ excel_compare_sheets("old_config.xlsx", "技能配置表", "new_config.xlsx", "�
 ❌ 中文乱码 → 确认编码格式，使用utf-8
 ❌ 公式错误 → 设置preserve_formulas=False强制覆盖
 ❌ 内存不足 → 分批处理大文件，限制读取范围
+```
+
+## 🧮 公式计算功能
+
+### Excel公式支持
+```
+📊 设置公式: excel_set_formula("data.xlsx", "Sheet1", "D10", "SUM(D1:D9)")
+🔢 临时计算: excel_evaluate_formula("SUM(1,2,3,4,5)")
+📈 复杂运算: excel_evaluate_formula("AVERAGE(A1:A100)*1.2", "数据表")
 ```
 
 ### 复杂范围操作示例
@@ -1792,8 +1801,7 @@ def excel_delete_columns(
             'message': f"删除列操作失败: {str(e)}"
         }
 
-# 暂时注释掉, 以后可能会用到
-# @mcp.tool()
+@mcp.tool()
 def excel_set_formula(
     file_path: str,
     sheet_name: str,
@@ -1820,10 +1828,8 @@ def excel_set_formula(
     """
     return ExcelOperations.set_formula(file_path, sheet_name, cell_address, formula)
 
-# 暂时注释掉, 以后可能会用到
-# @mcp.tool()
+@mcp.tool()
 def excel_evaluate_formula(
-    file_path: str,
     formula: str,
     context_sheet: Optional[str] = None
 ) -> Dict[str, Any]:
@@ -1831,18 +1837,19 @@ def excel_evaluate_formula(
     临时执行Excel公式并返回计算结果，不修改文件
 
     Args:
-        file_path: Excel文件路径 (.xlsx/.xlsm)
         formula: Excel公式 (不包含等号，如"SUM(A1:A10)")
-        context_sheet: 公式执行的上下文工作表名称
+        context_sheet: 公式执行的上下文工作表名称 (可选)
 
     Returns:
         Dict: 包含 success、formula、result、result_type
 
     Example:
-        # 计算A1:A10的和
-        result = excel_evaluate_formula("data.xlsx", "SUM(A1:A10)")
-        # 计算特定工作表的平均值
-        result = excel_evaluate_formula("data.xlsx", "AVERAGE(B:B)", "Sheet1")
+        # 计算基本数学运算
+        result = excel_evaluate_formula("SUM(1,2,3,4,5)")
+        # 计算平均值
+        result = excel_evaluate_formula("AVERAGE(10,20,30)")
+        # 在特定工作表上下文中计算
+        result = excel_evaluate_formula("SUM(A1:A10)", "Sheet1")
     """
     return ExcelOperations.evaluate_formula(formula, context_sheet)
 

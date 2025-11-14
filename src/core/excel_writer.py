@@ -761,49 +761,81 @@ class ExcelWriter:
         cache
     ) -> tuple:
         """创建临时工作簿用于计算"""
-        # 加载原始工作簿（用于提供数据上下文） - 使用只读模式
-        original_workbook = load_workbook(self.file_path, data_only=False, read_only=True)
-
         # 创建临时工作簿进行计算
         temp_workbook = Workbook()
         temp_sheet = temp_workbook.active
         temp_sheet.title = "Calculation"
 
-        # 选择要复制的源工作表
-        if context_sheet and context_sheet in original_workbook.sheetnames:
-            source_sheet = original_workbook[context_sheet]
-        else:
-            # 使用活动工作表或第一个工作表
-            source_sheet = original_workbook.active
+        # 只有当文件路径存在时才加载原始工作簿
+        if self.file_path and os.path.exists(self.file_path):
+            try:
+                # 加载原始工作簿（用于提供数据上下文） - 使用只读模式
+                original_workbook = load_workbook(self.file_path, data_only=False, read_only=True)
 
-        # 复制数据到临时工作表（只复制有数据的区域以提升性能）
-        if source_sheet.max_row > 1 or source_sheet.max_column > 1:
-            for row in source_sheet.iter_rows(
-                max_row=min(source_sheet.max_row, 1000),  # 限制复制范围，提升性能
-                max_col=min(source_sheet.max_column, 100)
-            ):
-                for cell in row:
-                    if cell.value is not None:
-                        target_cell = temp_sheet.cell(
-                            row=cell.row,
-                            column=cell.column
-                        )
-                        target_cell.value = cell.value
+                # 选择要复制的源工作表
+                if context_sheet and context_sheet in original_workbook.sheetnames:
+                    source_sheet = original_workbook[context_sheet]
+                else:
+                    # 使用活动工作表或第一个工作表
+                    source_sheet = original_workbook.active
+
+                # 复制数据到临时工作表
+                # 直接在这里实现数据复制，避免额外的类方法
+                for row in source_sheet.iter_rows(
+                    max_row=min(source_sheet.max_row, 1000),
+                    max_col=min(source_sheet.max_column, 100)
+                ):
+                    for cell in row:
+                        if cell.value is not None:
+                            target_cell = temp_sheet.cell(
+                                row=cell.row,
+                                column=cell.column
+                            )
+                            target_cell.value = cell.value
+
+                original_workbook.close()
+            except Exception as e:
+                logger.warning(f"无法加载原始工作簿，使用空工作簿: {e}")
+        else:
+            logger.debug("没有文件路径或文件不存在，使用空工作簿进行计算")
+
+        # 复制数据到临时工作表（如果有源数据）
+        source_sheet = None
+        if self.file_path and os.path.exists(self.file_path):
+            try:
+                original_workbook = load_workbook(self.file_path, data_only=False, read_only=True)
+
+                if context_sheet and context_sheet in original_workbook.sheetnames:
+                    source_sheet = original_workbook[context_sheet]
+                else:
+                    source_sheet = original_workbook.active
+
+                # 复制数据到临时工作表（只复制有数据的区域以提升性能）
+                if source_sheet.max_row > 1 or source_sheet.max_column > 1:
+                    for row in source_sheet.iter_rows(
+                        max_row=min(source_sheet.max_row, 1000),  # 限制复制范围，提升性能
+                        max_col=min(source_sheet.max_column, 100)
+                    ):
+                        for cell in row:
+                            if cell.value is not None:
+                                target_cell = temp_sheet.cell(
+                                    row=cell.row,
+                                    column=cell.column
+                                )
+                                target_cell.value = cell.value
+
+                original_workbook.close()
+            except Exception as e:
+                logger.warning(f"复制数据失败，使用空工作簿: {e}")
 
         # 保存到临时文件
         temp_file_path = TempFileManager.create_temp_excel_file()
-
-        # 创建临时文件对象（为了兼容现有代码）
-        temp_file = type('TempFile', (), {'name': temp_file_path})()
-
-        # 保存工作簿
-        temp_workbook.save(temp_file.name)
-        original_workbook.close()
+        temp_workbook.save(temp_file_path)
 
         # 缓存工作簿
-        cache.cache_workbook(self.file_path, temp_workbook, temp_file.name)
+        cache.cache_workbook(self.file_path or "temp", temp_workbook, temp_file_path)
 
-        return temp_workbook, temp_file.name
+        return temp_workbook, temp_file_path
 
     def _calculate_with_xlcalculator(
         self,
@@ -888,15 +920,45 @@ class ExcelWriter:
 
         formula = formula.strip()
 
-        # ==================== 基础统计函数 ====================
+        # ==================== 简单数学表达式（优先处理） ====================
 
-        # SUM函数
+        # 简单的数学表达式 - 不依赖工作表
+        if re.match(r'^[\d\+\-\*\/\s\(\)\.]+$', formula):
+            try:
+                return eval(formula)  # 注意：这在生产环境中需要更安全的实现
+            except Exception as e:
+                logger.warning(f"简单数学表达式计算失败: {formula}, 错误: {e}")
+
+        # 数字列表统计函数 - 不依赖工作表
+        # SUM函数 (数字列表)
+        sum_match = re.match(r'SUM\(([\d\s\,]+)\)', formula, re.IGNORECASE)
+        if sum_match:
+            numbers_str = sum_match.group(1)
+            try:
+                numbers = [float(n.strip()) for n in numbers_str.split(',') if n.strip()]
+                return sum(numbers)
+            except Exception as e:
+                logger.warning(f"SUM函数解析失败: {numbers_str}, 错误: {e}")
+
+        # AVERAGE函数 (数字列表)
+        avg_match = re.match(r'AVERAGE\(([\d\s\,]+)\)', formula, re.IGNORECASE)
+        if avg_match:
+            numbers_str = avg_match.group(1)
+            try:
+                numbers = [float(n.strip()) for n in numbers_str.split(',') if n.strip()]
+                return sum(numbers) / len(numbers) if numbers else 0
+            except Exception as e:
+                logger.warning(f"AVERAGE函数解析失败: {numbers_str}, 错误: {e}")
+
+        # ==================== 基础统计函数（依赖工作表） ====================
+
+        # SUM函数 (范围)
         sum_match = re.match(r'SUM\(([A-Z]+\d+):([A-Z]+\d+)\)', formula, re.IGNORECASE)
         if sum_match:
             start_cell, end_cell = sum_match.groups()
             return self._calculate_range_sum(sheet, start_cell, end_cell)
 
-        # AVERAGE函数
+        # AVERAGE函数 (范围)
         avg_match = re.match(r'AVERAGE\(([A-Z]+\d+):([A-Z]+\d+)\)', formula, re.IGNORECASE)
         if avg_match:
             start_cell, end_cell = avg_match.groups()

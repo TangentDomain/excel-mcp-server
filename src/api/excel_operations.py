@@ -1279,7 +1279,7 @@ class ExcelOperations:
         try:
             from ..core.excel_writer import ExcelWriter
             writer = ExcelWriter(file_path)
-            result = writer.set_formula(sheet_name, cell_range, formula)
+            result = writer.set_formula(cell_range, formula, sheet_name)
             return format_operation_result(result)
 
         except Exception as e:
