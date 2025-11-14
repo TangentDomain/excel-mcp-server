@@ -1614,3 +1614,244 @@ class ExcelOperations:
             error_msg = f"检查ID重复时发生错误: {str(e)}"
             logger.error(f"{cls._LOG_PREFIX} {error_msg}")
             return cls._format_error_result(error_msg)
+
+    @classmethod
+    def query_excel_data(
+        cls,
+        file_path: str,
+        sheet_name: Optional[str] = None,
+        query_expression: Optional[str] = None,
+        select_columns: Optional[List[str]] = None,
+        limit: Optional[int] = None,
+        sort_by: Optional[Union[str, List[str]]] = None,
+        ascending: Union[bool, List[bool]] = True,
+        include_headers: bool = True
+    ) -> Dict[str, Any]:
+        """
+        @intention 使用pandas对Excel数据进行类SQL查询
+
+        Args:
+            file_path: Excel文件路径
+            sheet_name: 工作表名称（可选，默认使用第一个工作表）
+            query_expression: pandas查询表达式（类似SQL WHERE子句）
+            select_columns: 选择特定列（列名列表）
+            limit: 限制返回行数
+            sort_by: 排序列（列名或列名列表）
+            ascending: 排序方向（True升序，False降序）
+            include_headers: 是否包含表头
+
+        Returns:
+            Dict: 查询结果
+        """
+        try:
+            import pandas as pd
+            import numpy as np
+
+            # 读取Excel文件，处理编码问题
+            if sheet_name is None:
+                # 读取第一个工作表
+                df = pd.read_excel(file_path, dtype=str, engine='openpyxl')
+            else:
+                df = pd.read_excel(file_path, sheet_name=sheet_name, dtype=str, engine='openpyxl')
+
+            original_rows = len(df)
+            original_cols = len(df.columns)
+
+            # 空数据处理
+            df = df.dropna(how='all')  # 删除完全为空的行
+            df = df.dropna(axis=1, how='all')  # 删除完全为空的列
+
+            if original_rows == 0 or len(df) == 0:
+                return {
+                    'success': False,
+                    'message': 'Excel文件中没有数据',
+                    'data': [],
+                    'query_info': {
+                        'original_rows': original_rows,
+                        'original_columns': original_cols,
+                        'filtered_rows': 0,
+                        'query_applied': query_expression is not None
+                    }
+                }
+
+            # 应用查询表达式
+            filtered_df = df.copy()
+            query_applied = False
+
+            if query_expression and query_expression.strip():
+                try:
+                    # 处理列名中的特殊字符和空格
+                    df_clean = df.copy()
+                    # 将列名中的空格和特殊字符替换为下划线，并处理Unicode编码
+                    clean_columns = {}
+                    for col in df.columns:
+                        # 首先解码Unicode
+                        decoded_col = str(col)
+                        if '\\u' in decoded_col:
+                            try:
+                                decoded_col = decoded_col.encode('raw_unicode_escape').decode('unicode_escape')
+                            except Exception:
+                                pass  # 保持原值
+
+                        # 清理特殊字符
+                        clean_col = decoded_col.strip().replace(' ', '_').replace('-', '_').replace('(', '').replace(')', '').replace('[', '').replace(']', '')
+                        clean_col = ''.join(c if c.isalnum() or c == '_' else '_' for c in clean_col)
+
+                        # 确保不以数字开头
+                        if clean_col and clean_col[0].isdigit():
+                            clean_col = 'col_' + clean_col
+                        if clean_col and clean_col != decoded_col:
+                            clean_columns[decoded_col] = clean_col
+
+                    # 重命名列以便查询
+                    if clean_columns:
+                        df_clean = df.rename(columns=clean_columns)
+                        # 更新查询表达式中的列名
+                        modified_query = query_expression
+                        for original, clean in clean_columns.items():
+                            # 处理各种可能的列名引用方式
+                            modified_query = modified_query.replace(f"`{original}`", clean)
+                            modified_query = modified_query.replace(f'"{original}"', clean)
+                            modified_query = modified_query.replace(f"'{original}'", clean)
+                            modified_query = modified_query.replace(original, clean)
+                        query_expression = modified_query
+
+                    # 执行查询
+                    filtered_df = df_clean.query(query_expression)
+                    query_applied = True
+
+                except Exception as query_error:
+                    # 查询失败时返回原始数据并包含错误信息
+                    return {
+                        'success': False,
+                        'message': f'查询表达式执行失败: {str(query_error)}',
+                        'data': [],
+                        'query_info': {
+                            'original_rows': original_rows,
+                            'original_columns': original_cols,
+                            'filtered_rows': len(df),
+                            'query_applied': False,
+                            'query_error': str(query_error)
+                        }
+                    }
+
+            # 选择特定列
+            if select_columns:
+                # 检查列是否存在
+                available_columns = filtered_df.columns.tolist()
+                valid_columns = [col for col in select_columns if col in available_columns]
+                missing_columns = [col for col in select_columns if col not in available_columns]
+
+                if missing_columns:
+                    return {
+                        'success': False,
+                        'message': f'以下列不存在: {missing_columns}',
+                        'data': [],
+                        'available_columns': available_columns
+                    }
+
+                if valid_columns:
+                    filtered_df = filtered_df[valid_columns]
+
+            # 排序
+            if sort_by:
+                if isinstance(sort_by, str):
+                    sort_by = [sort_by]
+                if isinstance(ascending, bool):
+                    ascending = [ascending] * len(sort_by)
+
+                # 验证排序列是否存在
+                valid_sort_columns = [col for col in sort_by if col in filtered_df.columns]
+                if len(valid_sort_columns) != len(sort_by):
+                    missing_sort_cols = [col for col in sort_by if col not in filtered_df.columns]
+                    return {
+                        'success': False,
+                        'message': f'排序列不存在: {missing_sort_cols}',
+                        'data': []
+                    }
+
+                if valid_sort_columns:
+                    filtered_df = filtered_df.sort_values(by=valid_sort_columns, ascending=ascending[:len(valid_sort_columns)])
+
+            # 限制行数
+            if limit and limit > 0:
+                filtered_df = filtered_df.head(limit)
+
+            # 准备返回数据
+            result_data = []
+
+            if include_headers:
+                # 包含表头
+                headers = filtered_df.columns.tolist()
+                result_data.append(headers)
+
+            # 添加数据行
+            for _, row in filtered_df.iterrows():
+                # 处理NaN值和特殊值
+                processed_row = []
+                for value in row:
+                    if pd.isna(value):
+                        processed_row.append(None)
+                    elif isinstance(value, (pd.Timestamp, np.datetime64)):
+                        processed_row.append(str(value))
+                    elif isinstance(value, (int, float, np.number)):
+                        if pd.isna(value) or np.isinf(value):
+                            processed_row.append(None)
+                        else:
+                            processed_row.append(float(value) if isinstance(value, (float, np.floating)) else int(value))
+                    else:
+                        # 处理Unicode编码问题
+                        if value is not None:
+                            str_value = str(value)
+                            # 检查是否包含Unicode转义序列并解码
+                            if '\\u' in str_value:
+                                try:
+                                    str_value = str_value.encode('raw_unicode_escape').decode('unicode_escape')
+                                except Exception:
+                                    pass  # 保持原值
+                            processed_row.append(str_value)
+                        else:
+                            processed_row.append(None)
+                result_data.append(processed_row)
+
+            # 构建查询信息
+            query_info = {
+                'original_rows': original_rows,
+                'original_columns': original_cols,
+                'filtered_rows': len(filtered_df),
+                'columns_returned': len(filtered_df.columns),
+                'query_applied': query_applied,
+                'query_expression': query_expression if query_applied else None,
+                'select_columns': select_columns if select_columns else None,
+                'sort_by': sort_by if sort_by else None,
+                'limit_applied': limit is not None,
+                'include_headers': include_headers
+            }
+
+            return {
+                'success': True,
+                'message': f'查询成功，返回 {len(filtered_df)} 行数据',
+                'data': result_data,
+                'query_info': query_info,
+                'data_types': {
+                    str(col): str(filtered_df[col].dtype) for col in filtered_df.columns
+                }
+            }
+
+        except Exception as e:
+            error_msg = f"Excel查询失败: {str(e)}"
+            logger.error(f"{cls._LOG_PREFIX} {error_msg}")
+            return {
+                'success': False,
+                'message': error_msg,
+                'data': None,
+                'query_info': {
+                    'original_rows': 0,
+                    'original_columns': 0,
+                    'filtered_rows': 0,
+                    'columns_returned': 0,
+                    'query_applied': False,
+                    'limit_applied': False
+                },
+                'data_types': {}
+            }

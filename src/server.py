@@ -110,7 +110,7 @@ logger = logging.getLogger(__name__)
 # 创建FastMCP服务器实例，开启调试模式和详细日志
 mcp = FastMCP(
     name="excel-mcp",
-    instructions=r"""🎮 游戏开发Excel配置表专家 - 38个专业工具 · 295项测试验证
+    instructions=r"""🎮 游戏开发Excel配置表专家 - 39个专业工具 · 295项测试验证
 
 ## 🎯 核心设计原则
 • **搜索优先**：任何查找、定位、分析操作都优先使用 `excel_search`
@@ -1852,6 +1852,118 @@ def excel_evaluate_formula(
         result = excel_evaluate_formula("SUM(A1:A10)", "Sheet1")
     """
     return ExcelOperations.evaluate_formula(formula, context_sheet)
+
+
+@mcp.tool()
+def excel_query(
+    file_path: str,
+    sheet_name: Optional[str] = None,
+    query_expression: Optional[str] = None,
+    select_columns: Optional[List[str]] = None,
+    limit: Optional[int] = None,
+    sort_by: Optional[Union[str, List[str]]] = None,
+    ascending: Union[bool, List[bool]] = True,
+    include_headers: bool = True
+) -> Dict[str, Any]:
+    """
+    使用pandas对Excel数据进行类SQL查询 - 核心分析工具
+
+    这个工具让你能够用类似SQL WHERE的语法查询Excel数据，支持复杂的条件筛选、
+    列选择、排序等操作。基于pandas的query功能，提供强大的数据分析能力。
+
+    Args:
+        file_path: Excel文件路径 (.xlsx/.xlsm)
+        sheet_name: 工作表名称 (可选，默认使用第一个工作表)
+        query_expression: pandas查询表达式 (类似SQL WHERE子句)
+            支持的操作符: >, <, >=, <=, ==, !=, in, not in, &, |, ~, str.contains()
+            示例: "amount > 1000 and region == '华北'"
+                  "category in ['A', 'B', 'C'] and date >= '2024-01-01'"
+                  "feedback.str.contains('游戏') and rating <= 2"
+        select_columns: 选择特定列 (列名列表)
+            示例: ["姓名", "销售额", "地区"]
+        limit: 限制返回行数 (用于大数据集的分页)
+        sort_by: 排序列 (列名或列名列表)
+            示例: "销售额" 或 ["日期", "金额"]
+        ascending: 排序方向 (True升序，False降序)
+            对于多列排序: [True, False] 表示第一列升序，第二列降序
+        include_headers: 是否包含表头行
+
+    Returns:
+        Dict: 查询结果
+        {
+            'success': bool,
+            'data': List[List],           # 查询结果数据 (二维数组)
+            'query_info': {
+                'original_rows': int,     # 原始数据行数
+                'filtered_rows': int,     # 过滤后行数
+                'query_applied': bool,    # 是否应用了查询
+                'query_expression': str,  # 实际执行的查询表达式
+                'select_columns': list,   # 选择的列
+                'sort_by': list,          # 排序列
+                'limit_applied': bool     # 是否应用了行数限制
+            },
+            'data_types': dict,          # 各列的数据类型
+            'message': str               # 结果说明
+        }
+
+    Example:
+        # 基础查询 - 筛选高销售额记录
+        result = excel_query("sales.xlsx", query_expression="销售额 > 10000")
+
+        # 多条件查询
+        result = excel_query(
+            "data.xlsx",
+            query_expression="地区 == '华北' and 产品类别 in ['电子产品', '家居用品']"
+        )
+
+        # 字符串模糊匹配
+        result = excel_query(
+            "feedback.xlsx",
+            query_expression="反馈内容.str.contains('质量') and 评分 <= 3"
+        )
+
+        # 选择特定列并排序
+        result = excel_query(
+            "users.xlsx",
+            query_expression="年龄 > 25 and 城市 in ['北京', '上海']",
+            select_columns=["姓名", "年龄", "城市", "消费金额"],
+            sort_by="消费金额",
+            ascending=False
+        )
+
+        # 限制结果数量
+        result = excel_query(
+            "large_data.xlsx",
+            query_expression="状态 == '活跃'",
+            limit=100,
+            sort_by="最后登录时间",
+            ascending=False
+        )
+
+        # 处理查询结果
+        if result['success']:
+            data = result['data']
+            if result['query_info']['include_headers'] and data:
+                headers = data[0]  # 表头
+                rows = data[1:]    # 数据行
+                print(f"找到 {len(rows)} 条记录")
+                print(f"列: {headers}")
+            else:
+                rows = data
+                print(f"找到 {len(rows)} 条记录")
+
+    Notes:
+        - 查询表达式语法基于pandas.DataFrame.query()
+        - 支持中文列名，会自动处理特殊字符
+        - 日期字符串会自动转换为日期格式
+        - 空值(NaN)会被转换为None
+        - 支持复杂的多条件组合查询
+        - 对于大数据集建议使用limit参数控制返回行数
+    """
+    return ExcelOperations.query_excel_data(
+        file_path, sheet_name, query_expression, select_columns,
+        limit, sort_by, ascending, include_headers
+    )
 
 
 @mcp.tool()

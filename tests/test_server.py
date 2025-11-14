@@ -21,7 +21,8 @@ from src.server import (
     excel_search,
     excel_find_last_row,
     excel_evaluate_formula,
-    excel_set_formula
+    excel_set_formula,
+    excel_query
 )
 
 
@@ -704,3 +705,207 @@ class TestServerInterfaces:
         assert isinstance(result['success'], bool)
         # Empty formula should fail
         assert result['success'] is False
+
+
+class TestExcelQuery:
+    """Test cases for excel_query interface - comprehensive testing"""
+
+    def test_excel_query_basic_functionality(self, sample_excel_file):
+        """Test excel_query basic functionality - no filters"""
+        result = excel_query(sample_excel_file)
+
+        assert result['success'] is True
+        assert 'data' in result
+        assert 'query_info' in result
+        assert 'message' in result
+        assert isinstance(result['data'], list)
+        assert len(result['data']) > 0
+
+        query_info = result['query_info']
+        assert query_info['original_rows'] > 0
+        assert query_info['original_columns'] > 0
+        assert query_info['filtered_rows'] == query_info['original_rows']
+        assert query_info['query_applied'] is False
+        assert query_info['limit_applied'] is False
+
+    def test_excel_query_with_query_expression(self, sample_excel_file):
+        """Test excel_query with query expression"""
+        # Test with a realistic expression that references actual data
+        # First get column names from the data
+        basic_result = excel_query(sample_excel_file, limit=1)
+        assert basic_result['success'] is True
+
+        if len(basic_result['data']) > 0:
+            # Get the first column name and use it in a query
+            headers = basic_result['data'][0]
+            if headers:
+                first_column = headers[0]
+                # Use a simple comparison that will always be true for non-empty data
+                result = excel_query(sample_excel_file, query_expression=f"{first_column} == {first_column}")
+
+                assert result['success'] is True
+                assert result['query_info']['query_applied'] is True
+            else:
+                pytest.skip("No columns available for query testing")
+        else:
+            # If no data, skip this test
+            pytest.skip("No data available for query testing")
+
+    def test_excel_query_select_columns(self, sample_excel_file):
+        """Test excel_query with column selection"""
+        # Get basic data first to see column names
+        basic_result = excel_query(sample_excel_file, limit=1)
+        assert basic_result['success'] is True
+
+        if len(basic_result['data']) > 0:
+            # Try to select first column (assuming there's at least one column)
+            headers = basic_result['data'][0] if basic_result['data'] else []
+            if headers:
+                first_column = [headers[0]]
+                result = excel_query(sample_excel_file, select_columns=first_column)
+
+                assert result['success'] is True
+                assert result['query_info']['select_columns'] == first_column
+                assert result['query_info']['columns_returned'] == 1
+
+    def test_excel_query_sort_ascending(self, sample_excel_file):
+        """Test excel_query with ascending sort"""
+        # First get actual column names
+        basic_result = excel_query(sample_excel_file, limit=1)
+        if basic_result['success'] and len(basic_result['data']) > 0:
+            first_column = basic_result['data'][0][0] if basic_result['data'][0] else None
+            if first_column:
+                result = excel_query(sample_excel_file, sort_by=first_column, ascending=True)
+                assert result['success'] is True
+                assert result['query_info']['sort_by'] == [first_column] or result['query_info']['sort_by'] == first_column
+            else:
+                pytest.skip("No columns available for sorting")
+        else:
+            pytest.skip("No data available for sorting test")
+
+    def test_excel_query_sort_descending(self, sample_excel_file):
+        """Test excel_query with descending sort"""
+        # First get actual column names
+        basic_result = excel_query(sample_excel_file, limit=1)
+        if basic_result['success'] and len(basic_result['data']) > 0:
+            first_column = basic_result['data'][0][0] if basic_result['data'][0] else None
+            if first_column:
+                result = excel_query(sample_excel_file, sort_by=first_column, ascending=False)
+                assert result['success'] is True
+                assert result['query_info']['sort_by'] == [first_column] or result['query_info']['sort_by'] == first_column
+            else:
+                pytest.skip("No columns available for sorting")
+        else:
+            pytest.skip("No data available for sorting test")
+
+    def test_excel_query_with_limit(self, sample_excel_file):
+        """Test excel_query with limit parameter"""
+        result = excel_query(sample_excel_file, limit=3)
+
+        assert result['success'] is True
+        assert result['query_info']['limit_applied'] is True
+        # Should return at most 3 data rows (plus headers if included)
+        total_returned = len(result['data'])
+        if result['query_info'].get('include_headers', True):
+            assert total_returned <= 4  # 3 data rows + 1 header row
+        else:
+            assert total_returned <= 3
+
+    def test_excel_query_no_headers(self, sample_excel_file):
+        """Test excel_query without headers"""
+        result = excel_query(sample_excel_file, include_headers=False)
+
+        assert result['success'] is True
+        assert result['query_info']['include_headers'] is False
+        # Should not include header row
+        assert all(isinstance(row, list) and len(row) > 0 for row in result['data'])
+
+    def test_excel_query_invalid_file(self):
+        """Test excel_query with invalid file path"""
+        result = excel_query("nonexistent_file.xlsx")
+
+        assert result['success'] is False
+        assert 'message' in result
+        assert 'data' in result
+        assert result['data'] is None or len(result['data']) == 0
+
+    def test_excel_query_invalid_sheet(self, sample_excel_file):
+        """Test excel_query with invalid sheet name"""
+        result = excel_query(sample_excel_file, sheet_name="NonExistentSheet")
+
+        assert result['success'] is False
+        assert 'message' in result
+        assert 'data' in result
+        assert result['data'] is None or len(result['data']) == 0
+
+    def test_excel_query_invalid_select_columns(self, sample_excel_file):
+        """Test excel_query with invalid column selection"""
+        result = excel_query(sample_excel_file, select_columns=["NonExistentColumn"])
+
+        assert result['success'] is False
+        assert 'message' in result
+        assert 'available_columns' in result  # Should provide list of available columns
+
+    def test_excel_query_invalid_sort_column(self, sample_excel_file):
+        """Test excel_query with invalid sort column"""
+        result = excel_query(sample_excel_file, sort_by="NonExistentColumn")
+
+        assert result['success'] is False
+        assert 'message' in result
+        assert 'data' in result
+        assert result['data'] is None or len(result['data']) == 0
+
+    def test_excel_query_invalid_query_expression(self, sample_excel_file):
+        """Test excel_query with invalid query expression"""
+        result = excel_query(sample_excel_file, query_expression="invalid_column > 100")
+
+        assert result['success'] is False
+        assert 'message' in result
+        assert 'query_error' in result['query_info']
+
+    def test_excel_query_combined_operations(self, sample_excel_file):
+        """Test excel_query with multiple operations combined"""
+        result = excel_query(
+            sample_excel_file,
+            query_expression="1 > 0",  # Always true
+            select_columns=None,  # Let it auto-select
+            limit=5,
+            sort_by="A",
+            ascending=False,
+            include_headers=True
+        )
+
+        # Should succeed with basic operations
+        assert result['success'] is True
+        assert 'query_info' in result
+        assert result['query_info']['limit_applied'] is True
+        assert result['query_info']['sort_by'] == "A"
+
+    def test_excel_query_data_types(self, sample_excel_file):
+        """Test excel_query returns data types information"""
+        result = excel_query(sample_excel_file)
+
+        if result['success'] and len(result['data']) > 0:
+            assert 'data_types' in result
+            assert isinstance(result['data_types'], dict)
+            # Data types should be strings representing pandas dtypes
+            for col_name, dtype in result['data_types'].items():
+                assert isinstance(col_name, str)
+                assert isinstance(dtype, str)
+
+    def test_excel_query_structure_consistency(self, sample_excel_file):
+        """Test excel_query return structure consistency"""
+        result = excel_query(sample_excel_file)
+
+        # Verify required fields exist
+        required_fields = ['success', 'data', 'query_info', 'message', 'data_types']
+        for field in required_fields:
+            assert field in result, f"Missing field: {field}"
+
+        # Verify query_info structure
+        required_query_fields = [
+            'original_rows', 'original_columns', 'filtered_rows',
+            'columns_returned', 'query_applied', 'limit_applied'
+        ]
+        for field in required_query_fields:
+            assert field in result['query_info'], f"Missing query_info field: {field}"
