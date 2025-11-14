@@ -1887,36 +1887,177 @@ def excel_evaluate_formula(
 @mcp.tool()
 def excel_query(
     file_path: str,
-    sheet_name: Optional[str] = None,
-    query_expression: Optional[str] = None,
-    select_columns: Optional[List[str]] = None,
-    limit: Optional[int] = None,
-    sort_by: Optional[Union[str, List[str]]] = None,
-    ascending: Union[bool, List[bool]] = True,
+    query_expression: str,
     include_headers: bool = True
 ) -> Dict[str, Any]:
     """
-    高级SQL查询工具 - 支持完整SQL语法的Excel数据分析
+    高级SQL查询工具 - 纯SQL设计的Excel数据分析引擎
 
-    这是一个强大的SQL查询引擎，基于SQLGlot实现完整的SQL语法支持，包括
-    GROUP BY聚合、JOIN操作、复杂条件筛选等。可以执行真正的SQL查询语句。
+    这是一个强大的SQL查询引擎，基于SQLGlot实现完整的SQL语法支持。采用纯SQL设计理念，
+    所有查询功能都通过标准SQL语法表达，无需学习额外的参数API。
+
+    ## 🎯 设计理念：纯SQL驱动
+    - **无冗余参数**: 所有功能都通过标准SQL语法实现
+    - **表名自动识别**: 通过SQL的FROM子句自动识别工作表，无需手动指定
+    - **完整语法支持**: 支持WHERE、GROUP BY、HAVING、ORDER BY、LIMIT等完整SQL功能
+
+    ## 📋 参数说明
+
+    ### file_path (必需) 🔴
+    - **用途**: 指定要查询的Excel文件路径
+    - **格式**: 支持 .xlsx 和 .xlsm 格式
+    - **注意**: 这是唯一无法在SQL中表达的信息，必须作为参数提供
+
+    ### query_expression (必需) 🔴
+    - **用途**: 完整的SQL查询语句
+    - **语法**: 标准SQL SELECT语法，支持复杂的查询组合
+    - **表名**: FROM子句中的表名对应Excel的工作表名称
+
+    ### include_headers (可选) 🟢
+    - **用途**: 控制结果是否包含表头行
+    - **默认值**: True (包含表头)
+    - **影响**: 仅影响输出格式，不影响查询逻辑
+
+    ## 🚀 SQL功能支持
+
+    ### 基础查询
+    ```sql
+    -- 选择所有列
+    SELECT * FROM 工作表名
+
+    -- 选择指定列
+    SELECT 列1, 列2 FROM 工作表名
+
+    -- 带计算字段
+    SELECT 列1, 列2*2 AS 双倍值 FROM 工作表名
+    ```
+
+    ### 条件筛选 (WHERE)
+    ```sql
+    -- 基础条件
+    SELECT * FROM 技能配置表 WHERE 伤害 > 50
+
+    -- 复合条件
+    SELECT * FROM 装备数据 WHERE 品质 = '传说' AND 价格 > 1000
+
+    -- 模糊匹配
+    SELECT * FROM 反馈数据 WHERE 内容 LIKE '%卡顿%'
+
+    -- 范围查询
+    SELECT * FROM 玩家数据 WHERE 等级 BETWEEN 10 AND 20
+
+    -- 集合查询
+    SELECT * FROM 物品配置 WHERE 类型 IN ('武器', '防具')
+    ```
+
+    ### 聚合统计 (GROUP BY)
+    ```sql
+    -- 基础聚合
+    SELECT 游戏名, COUNT(*) AS 反馈数 FROM 反馈数据 GROUP BY 游戏名
+
+    -- 多列聚合
+    SELECT 游戏名, 反馈类型, AVG(评分) AS 平均分
+    FROM 反馈数据
+    GROUP BY 游戏名, 反馈类型
+
+    -- 带聚合函数过滤
+    SELECT 技能类型, AVG(伤害) AS 平均伤害
+    FROM 技能配置表
+    GROUP BY 技能类型
+    HAVING AVG(伤害) > 50
+    ```
+
+    ### 排序和限制 (ORDER BY + LIMIT)
+    ```sql
+    -- 单列排序
+    SELECT * FROM 技能配置表 ORDER BY 伤害 DESC
+
+    -- 多列排序
+    SELECT * from 玩家数据 ORDER BY 等级 DESC, 经验 ASC
+
+    -- 限制结果数量
+    SELECT * FROM 装备数据 ORDER BY 价格 DESC LIMIT 10
+
+    -- 分页查询
+    SELECT * FROM 反馈数据 ORDER BY 时间 DESC LIMIT 20
+    ```
+
+    ## 🎮 游戏开发应用示例
+
+    ### 技能平衡分析
+    ```python
+    # 分析各技能类型的平均伤害
+    result = excel_query(
+        "skills.xlsx",
+        "SELECT 技能类型, AVG(伤害) AS 平均伤害, COUNT(*) AS 技能数量 "
+        "FROM 技能配置表 "
+        "GROUP BY 技能类型 "
+        "ORDER BY 平均伤害 DESC"
+    )
+
+    # 找出效率最高的技能 (伤害/冷却时间)
+    result = excel_query(
+        "skills.xlsx",
+        "SELECT 技能名, 伤害, 冷却时间, 伤害/冷却时间 AS 效率 "
+        "FROM 技能配置表 "
+        "WHERE 伤害 > 0 AND 冷却时间 > 0 "
+        "ORDER BY 效率 DESC "
+        "LIMIT 10"
+    )
+    ```
+
+    ### 装备统计分析
+    ```python
+    # 统计各品质装备数量
+    result = excel_query(
+        "items.xlsx",
+        "SELECT 品质, COUNT(*) AS 数量, AVG(价格) AS 平均价格 "
+        "FROM 装备数据 "
+        "GROUP BY 品质 "
+        "ORDER BY 数量 DESC"
+    )
+
+    # 查找高价值装备
+    result = excel_query(
+        "items.xlsx",
+        "SELECT 装备名, 品质, 价格, 价格/等级 AS 性价比 "
+        "FROM 装备数据 "
+        "WHERE 品质 IN ('传说', '史诗') AND 价格 > 5000 "
+        "ORDER BY 性价比 DESC"
+    )
+    ```
+
+    ### 玩家反馈分析
+    ```python
+    # 分析各游戏的反馈分布
+    result = excel_query(
+        "feedback.xlsx",
+        "SELECT 游戏名, 反馈类型, COUNT(*) AS 数量, AVG(评分) AS 平均评分 "
+        "FROM 反馈数据 "
+        "WHERE 评分 > 0 "
+        "GROUP BY 游戏名, 反馈类型 "
+        "ORDER BY 数量 DESC"
+    )
+
+    # 找出需要关注的低分反馈
+    result = excel_query(
+        "feedback.xlsx",
+        "SELECT * FROM 反馈数据 "
+        "WHERE 评分 <= 2 AND 反馈类型 = 'BugReport' "
+        "ORDER BY 评分 ASC, 时间 DESC "
+        "LIMIT 20"
+    )
+    ```
 
     Args:
-        file_path: Excel文件路径 (.xlsx/.xlsm)
-        sheet_name: 工作表名称 (可选，默认使用第一个工作表)
-        query_expression: SQL查询语句 (完整SELECT语法)
-            支持的SQL功能:
-            - WHERE条件: =, !=, >, <, >=, <=, LIKE, IN, IS NULL, AND, OR
-            - GROUP BY聚合: COUNT, SUM, AVG, MAX, MIN
-            - ORDER BY排序: ASC, DESC
-            - LIMIT限制结果数量
-            示例: "SELECT 游戏名, 反馈类型, COUNT(*) FROM table GROUP BY 游戏名, 反馈类型"
-                  "SELECT * FROM data WHERE 评分 > 4 AND 游戏名 LIKE '%无尽防线%'"
-        select_columns: 选择特定列 (列名列表) - 兼容性参数，建议使用SQL列选择
-        limit: 限制返回行数 (用于大数据集的分页)
-        sort_by: 排序列 (列名或列名列表) - 兼容性参数，建议使用SQL ORDER BY
-        ascending: 排序方向 (True升序，False降序) - 兼容性参数
-        include_headers: 是否包含表头行
+        file_path: Excel文件路径 (.xlsx/.xlsm) [必需]
+            指定要分析的Excel文件，支持包含中文路径
+        query_expression: 完整的SQL查询语句 [必需]
+            使用标准SQL语法，FROM子句中的表名对应Excel工作表名
+            支持中文列名和中文工作表名
+        include_headers: 结果是否包含表头行 (默认True)
+            True: 返回 [表头, 数据行...] 格式
+            False: 只返回数据行格式
 
     Returns:
         Dict: 查询结果
@@ -1935,75 +2076,157 @@ def excel_query(
             'message': str               # 结果说明
         }
 
-    Example:
-        # 🎮 游戏反馈统计 - 真正的SQL聚合查询
-        result = excel_query(
-            "feedback.xlsx",
-            query_expression="SELECT 游戏名, 反馈类型, COUNT(*) as 数量 FROM table GROUP BY 游戏名, 反馈类型"
-        )
+    ## 📝 使用示例
 
-        # 🔍 复杂条件筛选
-        result = excel_query(
-            "data.xlsx",
-            query_expression="SELECT * FROM data WHERE 地区 = '华北' AND 销售额 > 10000 ORDER BY 销售额 DESC"
-        )
+    ### 快速开始
+    ```python
+    # 最简单的使用方式 - 只需文件路径和SQL语句
+    result = excel_query(
+        "game_data.xlsx",
+        "SELECT * FROM 玩家数据 WHERE 等级 > 10"
+    )
 
-        # 📊 模糊匹配和统计分析
-        result = excel_query(
-            "feedback.xlsx",
-            query_expression="SELECT 游戏名, AVG(评分) as 平均评分, COUNT(*) as 反馈数 FROM table WHERE 反馈内容 LIKE '%质量%' GROUP BY 游戏名"
-        )
+    # 检查查询结果
+    if result['success']:
+        data = result['data']
+        print(f"查询成功，返回 {len(data)} 行数据")
+    else:
+        print(f"查询失败: {result['message']}")
+    ```
 
-        # 🎯 多条件IN查询
-        result = excel_query(
-            "products.xlsx",
-            query_expression="SELECT 产品类别, SUM(销量) as 总销量 FROM products WHERE 品牌 IN ('品牌A', '品牌B', '品牌C') GROUP BY 产品类别 ORDER BY 总销量 DESC"
-        )
+    ### 实际应用场景
+    ```python
+    # 🎮 游戏反馈统计
+    result = excel_query(
+        "feedback.xlsx",
+        "SELECT 游戏名, 反馈类型, COUNT(*) AS 数量 "
+        "FROM 反馈数据 "
+        "GROUP BY 游戏名, 反馈类型 "
+        "ORDER BY 数量 DESC"
+    )
 
-        # 📈 时间范围和聚合分析
-        result = excel_query(
-            "sales.xlsx",
-            query_expression="SELECT 销售员, COUNT(*) as 订单数, SUM(金额) as 总销售额 FROM sales WHERE 日期 >= '2024-01-01' GROUP BY 销售员 HAVING SUM(金额) > 50000"
-        )
+    # ⚔️ 技能平衡分析
+    result = excel_query(
+        "skills.xlsx",
+        "SELECT 技能类型, AVG(伤害) AS 平均伤害, "
+        "       AVG(冷却时间) AS 平均冷却, COUNT(*) AS 技能数量 "
+        "FROM 技能配置表 "
+        "GROUP BY 技能类型 "
+        "HAVING COUNT(*) > 5 "
+        "ORDER BY 平均伤害 DESC"
+    )
 
-        # 处理查询结果
-        if result['success']:
-            data = result['data']
-            if include_headers and data:
-                headers = data[0]  # 表头
-                rows = data[1:]    # 数据行
-                print(f"📊 找到 {len(rows)} 条记录")
-                print(f"📋 列: {headers}")
+    # 🛡️ 装备价值分析
+    result = excel_query(
+        "items.xlsx",
+        "SELECT 装备名, 品质, 价格/等级 AS 性价比 "
+        "FROM 装备数据 "
+        "WHERE 品质 IN ('传说', '史诗') AND 价格 > 1000 "
+        "ORDER BY 性价比 DESC "
+        "LIMIT 20"
+    )
+    ```
 
-                # 显示查询信息
-                query_info = result['query_info']
-                print(f"🎯 查询: {query_info.get('sql_query', 'N/A')}")
-                print(f"📈 原始数据: {query_info.get('original_rows', 0)} 行")
-                print(f"✅ 查询结果: {query_info.get('filtered_rows', 0)} 行")
-            else:
-                rows = data
-                print(f"📊 找到 {len(rows)} 条记录")
+    ### 结果数据处理
+    ```python
+    result = excel_query("data.xlsx", "SELECT * FROM 表名 LIMIT 10")
 
-    Notes:
-        - 🔥 完整SQL语法支持: 基于SQLGlot解析器，支持标准SQL语法
-        - 🎮 中文友好: 完全支持中文列名和工作表名
-        - 📊 强大聚合: 支持GROUP BY、COUNT、SUM、AVG等聚合函数
-        - 🔍 灵活查询: WHERE、ORDER BY、LIMIT等完整支持
-        - ⚡ 高性能: 优化内存使用，支持大数据集处理
-        - 🛡️ 安全验证: 只支持SELECT查询，不支持数据修改操作
+    if result['success']:
+        data = result['data']
 
-    Dependencies:
-        - 需要安装: pip install sqlglot
-        - 如果SQLGlot未安装，将回退到基础pandas查询功能
+        # 默认包含表头 (include_headers=True)
+        if len(data) > 1:
+            headers = data[0]      # ['列1', '列2', '列3']
+            rows = data[1:]        # [['值1', '值2', '值3'], ...]
+
+            print(f"📊 列名: {headers}")
+            print(f"📈 数据行数: {len(rows)}")
+
+            # 遍历数据行
+            for i, row in enumerate(rows, 1):
+                print(f"第{i}行: {row}")
+
+        # 查询元信息
+        query_info = result.get('query_info', {})
+        print(f"🎯 执行的SQL: {query_info.get('sql_query')}")
+        print(f"📋 返回列: {query_info.get('returned_columns')}")
+        print(f"📊 数据类型: {query_info.get('data_types')}")
+
+    else:
+        print(f"❌ 查询失败: {result['message']}")
+    ```
+
+    ## 🎯 设计优势
+
+    ### 纯SQL设计理念
+    - **零学习成本**: 如果你会SQL，就会使用excel_query
+    - **功能完整**: 所有查询功能都通过标准SQL语法实现
+    - **表名自动识别**: FROM子句中的表名直接对应Excel工作表名
+    - **参数精简**: 只保留无法在SQL中表达的必要参数
+
+    ### 实际使用优势
+    - **无需记忆参数**: 不需要记住limit、sheet_name等冗余参数
+    - **标准语法**: 支持复杂的SQL查询组合和嵌套
+    - **强大功能**: 一行SQL就能实现复杂的数据分析
+    - **中文友好**: 完全支持中文列名和工作表名
+
+    ## ⚠️ 重要说明
+
+    ### 必需参数验证
+    - `file_path` 和 `query_expression` 都是必需参数
+    - 空的SQL语句或文件路径会返回明确的错误信息
+
+    ### 表名映射规则
+    - SQL中的表名 = Excel中的工作表名
+    - 支持中文工作表名，如 `FROM 技能配置表`
+    - 支持英文工作表名，如 `FROM Skills`
+
+    ### 性能特性
+    - 🔥 完整SQL语法支持: 基于SQLGlot解析器，支持标准SQL语法
+    - ⚡ 高性能处理: 优化内存使用，支持大数据集处理
+    - 🛡️ 安全查询: 只支持SELECT查询，不支持数据修改操作
+    - 📊 智能聚合: 支持GROUP BY、HAVING等复杂聚合功能
+
+    ## 🔧 依赖要求
+
+    ```bash
+    # 安装SQL引擎依赖
+    pip install sqlglot
+
+    # 如果未安装sqlglot，会自动提示安装方法
+    ```
+
+    ### 错误处理
+    - **参数验证**: 自动检查必需参数是否为空
+    - **SQL语法**: 自动解析和验证SQL语法错误
+    - **文件检查**: 自动验证Excel文件存在性和格式
+    - **依赖检查**: 自动检测SQLGlot是否已安装
     """
+    # 参数验证
+    if not file_path or not file_path.strip():
+        return {
+            'success': False,
+            'message': '文件路径不能为空',
+            'data': [],
+            'query_info': {'error_type': 'parameter_validation'}
+        }
+
+    if not query_expression or not query_expression.strip():
+        return {
+            'success': False,
+            'message': 'SQL查询语句不能为空',
+            'data': [],
+            'query_info': {'error_type': 'parameter_validation'}
+        }
+
     # 使用高级SQL查询引擎
     try:
         from .api.advanced_sql_query import execute_advanced_sql_query
         return execute_advanced_sql_query(
             file_path=file_path,
             sql=query_expression,
-            sheet_name=sheet_name,
-            limit=limit,
+            sheet_name=None,  # 统一使用SQL FROM子句中的表名
+            limit=None,  # 统一使用SQL中的LIMIT
             include_headers=include_headers
         )
 

@@ -373,6 +373,26 @@ class TestAdvancedSQLQuery:
             pass  # 如果解析失败也算正确行为
 
 
+def test_parameter_validation(sample_excel_file):
+    """测试参数验证"""
+    from api.advanced_sql_query import execute_advanced_sql_query
+
+    # 测试空SQL语句
+    result = execute_advanced_sql_query(
+        file_path=sample_excel_file,
+        sql=""
+    )
+    assert result['success'] is False
+    assert 'No expression was parsed' in result['message']
+
+    # 测试None SQL语句
+    result = execute_advanced_sql_query(
+        file_path=sample_excel_file,
+        sql=None
+    )
+    assert result['success'] is False
+
+
 def test_integration_with_original_interface(sample_excel_file):
     """测试与原始接口的集成"""
     # 直接测试高级SQL查询引擎，绕过相对导入问题
