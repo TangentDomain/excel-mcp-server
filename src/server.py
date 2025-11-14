@@ -110,7 +110,7 @@ logger = logging.getLogger(__name__)
 # 创建FastMCP服务器实例，开启调试模式和详细日志
 mcp = FastMCP(
     name="excel-mcp",
-    instructions=r"""🎮 游戏开发Excel配置表专家 - 39个专业工具 · 295项测试验证
+    instructions=r"""🎮 游戏开发Excel配置表专家 - 40个专业工具 · 高级SQL查询支持 · 完整测试验证
 
 ## 🎯 核心设计原则
 • **搜索优先**：任何查找、定位、分析操作都优先使用 `excel_search`
@@ -154,9 +154,17 @@ mcp = FastMCP(
 1. **🔍 搜索定位**：`excel_search` → 了解数据分布和结构
 2. **📏 确定边界**：`excel_find_last_row` → 确认数据范围
 3. **📊 读取现状**：`excel_get_range` → 获取当前配置
-4. **✏️ 更新数据**：`excel_update_range` → 覆盖写入（默认）
-5. **🎨 美化显示**：`excel_format_cells` → 标记重要数据
-6. **✅ 验证结果**：重新读取确认更新成功
+4. **🚀 SQL分析**：`excel_query` → 复杂查询和统计分析
+5. **✏️ 更新数据**：`excel_update_range` → 覆盖写入（默认）
+6. **🎨 美化显示**：`excel_format_cells` → 标记重要数据
+7. **✅ 验证结果**：重新读取确认更新成功
+
+### 高级SQL分析流程
+1. **📋 需求定义**：明确分析目标和查询逻辑
+2. **🎯 SQL编写**：使用完整SQL语法表达查询需求
+3. **📊 执行查询**：`excel_query` → 获取聚合统计结果
+4. **📈 结果分析**：解读查询结果，发现数据模式
+5. **🔄 迭代优化**：根据结果调整SQL，深化分析
 
 ### 版本对比工作流
 ```
@@ -179,6 +187,26 @@ excel_compare_sheets("old_config.xlsx", "技能配置表", "new_config.xlsx", "�
 ❌ 公式错误 → 设置preserve_formulas=False强制覆盖
 ❌ 内存不足 → 分批处理大文件，限制读取范围
 ```
+
+## 🚀 高级SQL查询功能
+
+### 完整SQL语法支持
+```
+🔥 GROUP BY聚合查询: excel_query("data.xlsx", "SELECT 类型, AVG(伤害) FROM 技能表 GROUP BY 类型")
+🔍 复杂WHERE条件: excel_query("data.xlsx", "SELECT * FROM 技能表 WHERE 伤害 > 100 AND 冷却 < 3")
+📊 多条件聚合: excel_query("data.xlsx", "SELECT 职业, COUNT(*) as 数量, AVG(等级) FROM table GROUP BY 职业 HAVING AVG(等级) > 2")
+🎯 数学表达式: excel_query("data.xlsx", "SELECT 技能名, 伤害/冷却 as 效率 FROM 技能表 ORDER BY 效率 DESC LIMIT 5")
+🔤 模糊匹配查询: excel_query("data.xlsx", "SELECT * FROM 技能表 WHERE 技能名 LIKE '%火%'")
+📈 IN条件查询: excel_query("data.xlsx", "SELECT * FROM 技能表 WHERE 类型 IN ('攻击', '辅助')")
+```
+
+### SQL功能特性
+- ✅ **完整SQL语法**: WHERE、GROUP BY、HAVING、ORDER BY、LIMIT
+- ✅ **聚合函数**: COUNT、SUM、AVG、MAX、MIN
+- ✅ **数学表达式**: +、-、*、/ 运算和计算字段
+- ✅ **中文友好**: 完全支持中文列名和工作表名
+- ✅ **复杂条件**: AND、OR、括号、IN、LIKE等
+- ✅ **多级排序**: 支持多列排序和升降序
 
 ## 🧮 公式计算功能
 
@@ -222,7 +250,9 @@ excel_search_directory("./configs", r"火|冰|雷", use_regex=True)           # 
 excel_search("skills.xlsx", r"冷却.*[5-9]", use_regex=True, include_formulas=True)      # 搜索长冷却技能
 ```
 
-🚀 **游戏开发专家模式**: 搜索定位→数据分析→安全更新→视觉优化→版本对比→性能监控""",
+🚀 **游戏开发专家模式**: 搜索定位→SQL分析→安全更新→视觉优化→版本对比→性能监控
+
+🎯 **SQL驱动的数据分析**: 一句SQL完成复杂统计，GROUP BY聚合、HAVING过滤、多级排序全支持""",
     debug=True,                    # 开启调试模式
     log_level="DEBUG"              # 设置日志级别为DEBUG
 )
