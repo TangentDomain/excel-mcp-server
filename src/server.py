@@ -112,13 +112,96 @@ mcp = FastMCP(
     name="excel-mcp",
     instructions=r"""🎮 游戏开发Excel配置表专家 - 40个专业工具 · 高级SQL查询支持 · 完整测试验证
 
+## 🚀 API使用优先级指南
+
+### 🔥 第一优先：excel_query (SQL查询引擎)
+对于以下任务，**优先使用 excel_query**：
+- 📊 **数据查询和分析** - 所有SELECT操作
+- 🔍 **复杂条件筛选** - WHERE、LIKE、IN、BETWEEN等
+- 📈 **聚合统计分析** - GROUP BY、COUNT、SUM、AVG等
+- 🎯 **模式搜索和数据挖掘** - 复杂搜索逻辑
+- 📋 **跨表数据对比** - 多工作表关联分析
+- ⚡ **批量数据处理** - 一次性处理大量数据
+
+**决策原则**：问自己 - "这个任务能否用SQL查询解决？" 如果答案是"是"，优先使用 excel_query！
+
+### 🛠️ 其他工具使用场景
+- 📝 **数据修改**：excel_update_range、excel_insert_rows等
+- 🎨 **格式调整**：excel_format_cells、excel_merge_cells等
+- 📁 **文件管理**：excel_create_sheet、excel_delete_sheet等
+- 📄 **位置搜索**：excel_search - 返回具体单元格位置信息
+- 🔄 **保底方案**：当excel_query不可用时的基础操作
+
+### 🎯 工具选择决策树
+```
+需要定位具体单元格？
+├─ 是 → 使用 excel_search (返回row/column位置)
+└─ 否 → 需要数据分析吗？
+    ├─ 是 → 使用 excel_query (SQL查询)
+    └─ 否 → 使用其他基础工具
+
+复杂查询分析？
+├─ 需要 → excel_query (GROUP BY、聚合等)
+└─ 不需要 → excel_search (简单文本搜索)
+```
+
 ## 🎯 核心设计原则
-• **搜索优先**：任何查找、定位、分析操作都优先使用 `excel_search`
+• **SQL优先**：数据查询分析任务优先使用 `excel_query`
+• **智能降级**：当`excel_query`失败时，自动根据错误提示尝试基础API
 • **1-based索引**：第1行=1, 第1列=1 (匹配Excel惯例)
 • **范围格式**：必须包含工作表名 `"技能配置表!A1:Z100"` `"装备配置表!B2:F50"`
 • **ID驱动**：所有配置表以ID为主键，支持ID对象跟踪
 • **中文友好**：完全支持中文工作表名和游戏术语
 • **双行表头**：游戏开发专用，第1行描述+第2行字段名的标准化结构
+
+## 🔄 LLM智能降级策略
+
+当 `excel_query` 失败时，根据错误类型自动降级：
+
+### 依赖缺失错误 (SQLGlot未安装)
+```python
+# 原尝试
+result = excel_query("data.xlsx", "SELECT * FROM 表名 WHERE 条件")
+# 错误提示：建议使用基础API
+
+# LLM自动降级为
+result = excel_get_range("data.xlsx", "表名!A1:Z100")
+filtered = [row for row in result['data'] if 符合条件]
+```
+
+### SQL语法错误
+```python
+# 原尝试
+result = excel_query("data.xlsx", "SELECT * FROM 表名 WHERE 复杂语法")
+# 错误提示：SQL语法错误，建议简化
+
+# LLM自动降级为
+result = excel_get_range("data.xlsx", "表名!A1:Z100")
+# 或
+result = excel_search("data.xlsx", "关键词", "表名")
+```
+
+### 工作表不存在错误
+```python
+# 原尝试
+result = excel_query("data.xlsx", "SELECT * FROM 不存在的表")
+# 错误提示：检查工作表名称
+
+# LLM自动降级为
+sheets = excel_list_sheets("data.xlsx")  # 先查看可用工作表
+result = excel_get_range("data.xlsx", "正确表名!A1:Z100")
+```
+
+## 💡 降级决策流程
+```
+尝试 excel_query
+├─ 成功 → 继续执行
+└─ 失败 → 查看错误提示
+   ├─ 依赖缺失 → 使用基础API (excel_get_range, excel_search)
+   ├─ SQL语法错误 → 简化查询或使用基础搜索
+   ├─ 工作表错误 → 列出工作表后重新尝试
+   └─ 其他错误 → 使用最基础的操作保底
+```
 
 ## ⚠️ 核心注意事项
 🔴 **默认覆盖**：`excel_update_range`默认覆盖模式，需保留数据时用`insert_mode=True`
@@ -126,45 +209,82 @@ mcp = FastMCP(
 
 ## 🎮 游戏配置表专项操作
 
-### 技能配置表常用操作
+### 技能配置表SQL分析优先
 ```
 📋 技能表结构: ID|技能名|类型|等级|消耗|冷却|伤害|描述
-🔍 查找技能: excel_search("skills.xlsx", r"火球|冰冻", "技能配置表")
-📊 批量更新: excel_update_range("skills.xlsx", "技能配置表!G2:G100", damage_data)
-🆚 版本对比: excel_compare_sheets("v1.xlsx", "技能配置表", "v2.xlsx", "技能配置表")
+
+🔥 优先使用 excel_query：
+• 技能筛选: excel_query("skills.xlsx", "SELECT * FROM 技能配置表 WHERE 伤害 > 50 ORDER BY 伤害 DESC")
+• 类型统计: excel_query("skills.xlsx", "SELECT 技能类型, AVG(伤害), COUNT(*) FROM 技能配置表 GROUP BY 技能类型")
+• 效率分析: excel_query("skills.xlsx", "SELECT 技能名, 伤害/冷却 AS 效率 FROM 技能配置表 WHERE 伤害 > 0 ORDER BY 效率 DESC LIMIT 10")
+• 平衡检查: excel_query("skills.xlsx", "SELECT 技能类型, MIN(伤害), MAX(伤害), AVG(伤害) FROM 技能配置表 GROUP BY 技能类型")
+
+📊 数据更新: 基于SQL分析结果使用 excel_update_range
+🆚 版本对比: excel_compare_sheets 对比前后版本差异
 ```
 
-### 装备配置表操作模式
+### 装备配置表SQL分析优先
 ```
 📦 装备配置: ID|名称|类型|品质|属性|套装|获取方式
-🔧 属性调整: excel_get_range("items.xlsx", "装备配置表!E2:E200") → 分析 → 批量调整
-🎨 品质标记: excel_format_cells("items.xlsx", "装备配置表", "D2:D200", preset="highlight")
+
+🔥 优先使用 excel_query：
+• 品质分析: excel_query("items.xlsx", "SELECT 品质, COUNT(*), AVG(价格) FROM 装备数据 GROUP BY 品质 ORDER BY AVG(价格)")
+• 性价比排行: excel_query("items.xlsx", "SELECT 装备名, 价格/等级 AS 性价比 FROM 装备数据 WHERE 品质 = '传说' ORDER BY 性价比 DESC")
+• 属性分布: excel_query("items.xlsx", "SELECT 类型, COUNT(*) FROM 装备数据 WHERE 品质 IN ('史诗', '传说') GROUP BY 类型")
+• 套装效果: excel_query("items.xlsx", "SELECT 套装名, COUNT(*), AVG(价格) FROM 装备数据 WHERE 套装名 IS NOT NULL GROUP BY 套装名")
+
+🎨 品质标记: excel_format_cells 基于分析结果标记高价值装备
+📊 批量调整: excel_update_range 根据SQL分析进行属性平衡
 ```
 
-### 怪物配置表管理
+### 怪物配置表SQL分析优先
 ```
 👹 怪物数据: ID|名称|等级|血量|攻击|防御|技能|掉落
-📈 数值平衡: 使用excel_find_last_row定位 → 渐进式调整数值
-🔄 AI行为: excel_search搜索特定AI模式进行批量调整
+
+🔥 优先使用 excel_query：
+• 难度分布: excel_query("monsters.xlsx", "SELECT 等级区间, COUNT(*), AVG(攻击), AVG(防御) FROM 怪物数据 GROUP BY 等级区间")
+• 掉落分析: excel_query("monsters.xlsx", "SELECT 掉落物品, COUNT(*) FROM 怪物数据 WHERE 掉落物品 IS NOT NULL GROUP BY 掉落物品 ORDER BY COUNT(*) DESC")
+• 平衡检查: excel_query("monsters.xlsx", "SELECT 等级, 攻击/防御 AS 攻防比 FROM 怪物数据 WHERE 等级 BETWEEN 10 AND 20 ORDER BY 攻防比")
+• 技能统计: excel_query("monsters.xlsx", "SELECT 技能类型, COUNT(*) FROM 怪物数据 GROUP BY 技能类型 HAVING COUNT(*) > 5")
+
+📈 数值平衡: 根据SQL分析结果进行精细化调整
+🔄 批量更新: excel_update_range 基于数据分析更新怪物属性
 ```
 
 ## 🚀 高效工作流程
 
-### 标准配置表更新流程
-1. **🔍 搜索定位**：`excel_search` → 了解数据分布和结构
-2. **📏 确定边界**：`excel_find_last_row` → 确认数据范围
-3. **📊 读取现状**：`excel_get_range` → 获取当前配置
-4. **🚀 SQL分析**：`excel_query` → 复杂查询和统计分析
-5. **✏️ 更新数据**：`excel_update_range` → 覆盖写入（默认）
-6. **🎨 美化显示**：`excel_format_cells` → 标记重要数据
-7. **✅ 验证结果**：重新读取确认更新成功
+### 🎯 SQL优先的配置表分析流程
+1. **🔍 需求分析**：明确要查询的数据和分析目标
+2. **🎯 SQL查询**：`excel_query` → 一行SQL解决复杂查询
+   - 数据探索：`SELECT * FROM 技能配置表 LIMIT 10`
+   - 条件筛选：`SELECT * FROM 技能配置表 WHERE 伤害 > 50`
+   - 聚合统计：`SELECT 技能类型, AVG(伤害) FROM 技能配置表 GROUP BY 技能类型`
+3. **📊 结果解读**：分析查询结果，发现数据模式和问题
+4. **🚀 深度分析**：根据初步结果调整SQL，进行更深入分析
+5. **✏️ 数据更新**：`excel_update_range` → 基于分析结果更新配置
+6. **🎨 格式优化**：`excel_format_cells` → 标记重要数据和异常值
+7. **✅ 验证更新**：使用 `excel_query` 验证更新效果
 
-### 高级SQL分析流程
-1. **📋 需求定义**：明确分析目标和查询逻辑
-2. **🎯 SQL编写**：使用完整SQL语法表达查询需求
-3. **📊 执行查询**：`excel_query` → 获取聚合统计结果
-4. **📈 结果分析**：解读查询结果，发现数据模式
-5. **🔄 迭代优化**：根据结果调整SQL，深化分析
+### 🛠️ 基础操作保底流程
+当SQL引擎不可用或需要精确控制时：
+1. **📊 数据读取**：`excel_get_range` → 精确范围读取
+2. **🔍 简单搜索**：`excel_search` → 快速文本查找
+3. **📏 边界确认**：`excel_find_last_row` → 确定数据范围
+4. **✏️ 精确更新**：`excel_update_range` → 指定范围更新
+5. **✅ 结果验证**：重新读取确认更新成功
+
+## 💡 最佳实践决策树
+```
+需要查询/分析数据？
+├─ 是 → 使用 excel_query (SQL引擎)
+│   ├─ 简单查询：SELECT * FROM 表 WHERE 条件
+│   ├─ 聚合统计：SELECT ... GROUP BY ...
+│   └─ 复杂分析：多表JOIN、HAVING、子查询
+└─ 否 → 使用基础工具
+    ├─ 数据修改：excel_update_range
+    ├─ 格式调整：excel_format_cells
+    └─ 文件操作：excel_create_sheet等
+```
 
 ### 版本对比工作流
 ```
@@ -362,6 +482,28 @@ def excel_search(
     """
     在Excel文件中搜索单元格内容（VSCode风格搜索选项）
 
+    💡 **优先推荐**: 对于数据搜索和筛选任务，建议使用 excel_query
+    excel_query 提供更强大的搜索能力，支持复杂条件组合和结构化查询结果
+
+    📊 使用场景对比：
+    • 简单文本搜索: 使用此API
+    • 结构化数据搜索: 优先使用 excel_query
+
+    🎯 推荐用法：
+    ```python
+    # ❌ 简单搜索 - 需要后续处理
+    result = excel_search("skills.xlsx", "火球", "技能配置表")
+    # 需要手动解析搜索结果
+
+    # ✅ SQL搜索 - 直接返回结构化数据
+    result = excel_query("skills.xlsx", "SELECT * FROM 技能配置表 WHERE 技能名 LIKE '%火球%' ORDER BY 伤害 DESC")
+    # 直接获得筛选后的数据
+    ```
+
+    🔍 搜索能力对比：
+    • 此API: 文本匹配搜索
+    • excel_query: SQL条件查询 + 聚合分析 + 排序限制
+
     Args:
         file_path: Excel文件路径 (.xlsx/.xlsm)
         pattern: 搜索模式。当use_regex=True时为正则表达式，否则为字面字符串
@@ -458,6 +600,23 @@ def excel_get_range(
 ) -> Dict[str, Any]:
     """
     读取Excel指定范围的数据
+
+    💡 **优先推荐**: 对于数据查询和分析任务，建议使用 excel_query
+    excel_query 提供更强大的SQL查询能力，支持复杂条件筛选、聚合统计和数据挖掘
+
+    📊 使用场景对比：
+    • 简单数据读取: 使用此API
+    • 复杂查询分析: 优先使用 excel_query
+
+    🎯 推荐用法：
+    ```python
+    # ❌ 复杂条件筛选 - 多步骤处理
+    data = excel_get_range("skills.xlsx", "技能配置表!A1:Z1000")
+    filtered = [row for row in data if row[3] > 50 and '火' in row[1]]
+
+    # ✅ SQL查询 - 一步搞定
+    result = excel_query("skills.xlsx", "SELECT * FROM 技能配置表 WHERE 伤害 > 50 AND 技能名 LIKE '%火%' ORDER BY 伤害 DESC")
+    ```
 
     Args:
         file_path (str): Excel文件路径 (.xlsx/.xlsm) [必需]
@@ -2144,17 +2303,49 @@ def excel_query(
 
             # 遍历数据行
             for i, row in enumerate(rows, 1):
-                print(f"第{i}行: {row}")
+                print(f"数据行{i}: {row}")
 
         # 查询元信息
         query_info = result.get('query_info', {})
         print(f"🎯 执行的SQL: {query_info.get('sql_query')}")
         print(f"📋 返回列: {query_info.get('returned_columns')}")
-        print(f"📊 数据类型: {query_info.get('data_types')}")
+        print(f"📊 数据类型: {query_info.get('data_types')}')
 
     else:
         print(f"❌ 查询失败: {result['message']}")
     ```
+
+    ## ⚠️ 重要说明：与excel_search的区别
+
+    ### excel_search vs excel_query 对比
+    ```python
+    # 📄 excel_search - 返回位置信息
+    result = excel_search("data.xlsx", "关键词")
+    # 优势: 包含具体单元格位置 (row, column)
+    # 适用: 需要精确定位单元格的场景
+
+    # 📊 excel_query - 返回结构化数据
+    result = excel_query("data.xlsx", "SELECT * FROM 表名 WHERE 列名 LIKE '%关键词%'")
+    # 优势: 支持复杂查询、聚合统计、排序等
+    # 局限: 不返回具体的单元格位置信息
+    ```
+
+    ### 💡 推荐组合使用策略
+    ```python
+    # 第一步：使用excel_query进行精确查询分析
+    analysis_result = excel_query("data.xlsx",
+        "SELECT 列名, COUNT(*) as 数量 FROM 表名 WHERE 列名 LIKE '%关键词%' GROUP BY 列名")
+
+    # 第二步：如果需要具体位置，使用excel_search定位
+    if analysis_result['success']:
+        location_result = excel_search("data.xlsx", "关键词")
+        # 结合分析结果和位置信息
+    ```
+
+    ### 🎯 选择建议
+    - **需要数据分析和统计** → 使用 excel_query
+    - **需要精确定位单元格** → 使用 excel_search
+    - **需要两者结合** → 先用excel_query分析，再用excel_search定位
 
     ## 🎯 设计优势
 
@@ -2233,16 +2424,60 @@ def excel_query(
     except ImportError:
         return {
             'success': False,
-            'message': 'SQLGlot未安装，无法使用高级SQL功能。请运行: pip install sqlglot',
+            'message': 'SQLGlot未安装，无法使用高级SQL功能。请运行: pip install sqlglot\n\n💡 智能降级建议：\n• 对于简单数据读取：尝试使用 excel_get_range("文件路径", "工作表名!A1:Z100")\n• 对于文本搜索：尝试使用 excel_search("文件路径", "关键词", "工作表名")\n• 对于表头信息：尝试使用 excel_get_headers("文件路径", "工作表名")',
             'data': [],
-            'query_info': {'error_type': 'missing_dependency'}
+            'query_info': {
+                'error_type': 'missing_dependency',
+                'alternatives': ['excel_get_range', 'excel_search', 'excel_get_headers'],
+                'suggestion': '使用基础Excel操作API作为保底方案'
+            }
         }
     except Exception as e:
+        # 分析错误类型，提供针对性的降级建议
+        error_msg = str(e).lower()
+
+        if 'sql' in error_msg or 'parse' in error_msg:
+            # SQL语法错误
+            suggestion = '''💡 SQL语法错误降级建议：
+• 简化查询：尝试更简单的SQL语句
+• 基础查询：使用 excel_get_range 读取数据后手动筛选
+• 文本搜索：使用 excel_search 进行关键词搜索'''
+            alternatives = ['excel_get_range', 'excel_search']
+
+        elif 'file' in error_msg or 'not found' in error_msg:
+            # 文件相关问题
+            suggestion = '''💡 文件问题降级建议：
+• 检查文件路径：确保Excel文件存在且可访问
+• 尝试基础操作：使用 excel_get_file_info 检查文件状态
+• 格式检查：确保文件为.xlsx或.xlsm格式'''
+            alternatives = ['excel_get_file_info', 'excel_list_sheets']
+
+        elif 'sheet' in error_msg or 'table' in error_msg:
+            # 工作表问题
+            suggestion = '''💡 工作表问题降级建议：
+• 列出工作表：使用 excel_list_sheets 查看可用工作表
+• 基础读取：使用 excel_get_range 直接指定工作表范围
+• 检查表名：确认工作表名称拼写正确'''
+            alternatives = ['excel_list_sheets', 'excel_get_range']
+
+        else:
+            # 其他错误
+            suggestion = '''💡 通用降级建议：
+• 基础读取：使用 excel_get_range 读取数据范围
+• 分步处理：将复杂查询拆分为多个简单操作
+• 逐步调试：从最简单的查询开始尝试'''
+            alternatives = ['excel_get_range', 'excel_search', 'excel_get_headers']
+
         return {
             'success': False,
-            'message': f'SQL查询失败: {str(e)}',
+            'message': f'SQL查询失败: {str(e)}\n\n{suggestion}',
             'data': [],
-            'query_info': {'error_type': 'execution_error', 'details': str(e)}
+            'query_info': {
+                'error_type': 'execution_error',
+                'details': str(e),
+                'alternatives': alternatives,
+                'suggestion': 'LLM请根据错误类型选择合适的替代API继续执行任务'
+            }
         }
 
 
@@ -2460,7 +2695,26 @@ def excel_check_duplicate_ids(
     """
     检查Excel工作表中ID列的重复值
 
+    💡 **SQL替代方案**: 对于ID重复检测，可以使用 excel_query 实现更灵活的分析
+
     专为游戏配置表设计，快速识别ID重复问题，确保配置数据的唯一性。
+
+    🎯 使用场景对比：
+    ```python
+    # ❌ 专用重复检测 - 功能固定
+    result = excel_check_duplicate_ids("skills.xlsx", "技能配置表", "ID")
+
+    # ✅ SQL查询 - 更灵活强大
+    # 找出重复ID及详细信息
+    result = excel_query("skills.xlsx", "SELECT ID, 技能名, COUNT(*) as count FROM 技能配置表 GROUP BY ID HAVING COUNT(*) > 1")
+
+    # 分析ID分布情况
+    result = excel_query("skills.xlsx", "SELECT ID, 技能名, 技能类型 FROM 技能配置表 WHERE ID IN (SELECT ID FROM 技能配置表 GROUP BY ID HAVING COUNT(*) > 1)")
+    ```
+
+    🔍 分析能力对比：
+    • 此API: 快速检测ID重复，提供基础统计
+    • excel_query: 完整SQL分析，支持复杂条件和详细信息查询
 
     Args:
         file_path: Excel文件路径 (.xlsx/.xlsm)
