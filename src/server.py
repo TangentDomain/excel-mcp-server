@@ -110,271 +110,50 @@ logger = logging.getLogger(__name__)
 # 创建FastMCP服务器实例，开启调试模式和详细日志
 mcp = FastMCP(
     name="excel-mcp",
-    instructions=r"""🎮 游戏开发Excel配置表专家 - 40个专业工具 · 高级SQL查询支持 · 完整测试验证
+    instructions=r"""🎮 游戏开发Excel配置表管理专家
 
-## 🚀 API使用优先级指南
+## 🔥 核心原则：SQL优先
 
-### 🔥 第一优先：excel_query (SQL查询引擎)
-对于以下任务，**优先使用 excel_query**：
-- 📊 **数据查询和分析** - 所有SELECT操作
-- 🔍 **复杂条件筛选** - WHERE、LIKE、IN、BETWEEN等
-- 📈 **聚合统计分析** - GROUP BY、COUNT、SUM、AVG等
-- 🎯 **模式搜索和数据挖掘** - 复杂搜索逻辑
-- 📋 **跨表数据对比** - 多工作表关联分析
-- ⚡ **批量数据处理** - 一次性处理大量数据
+**优先使用 `excel_query`** - 所有数据查询分析任务
+- 复杂条件筛选 ✅ WHERE, LIKE, IN, BETWEEN
+- 聚合统计分析 ✅ COUNT, SUM, AVG, MAX, MIN, GROUP BY, HAVING
+- 排序限制 ✅ ORDER BY, LIMIT, OFFSET
 
-**决策原则**：问自己 - "这个任务能否用SQL查询解决？" 如果答案是"是"，优先使用 excel_query！
-
-### 🛠️ 其他工具使用场景
-- 📝 **数据修改**：excel_update_range、excel_insert_rows等
-- 🎨 **格式调整**：excel_format_cells、excel_merge_cells等
-- 📁 **文件管理**：excel_create_sheet、excel_delete_sheet等
-- 📄 **位置搜索**：excel_search - 返回具体单元格位置信息
-- 🔄 **保底方案**：当excel_query不可用时的基础操作
-
-### 🎯 工具选择决策树
+## 📊 工具选择决策树
 ```
-需要定位具体单元格？
-├─ 是 → 使用 excel_search (返回row/column位置)
-└─ 否 → 需要数据分析吗？
-    ├─ 是 → 使用 excel_query (SQL查询)
-    └─ 否 → 使用其他基础工具
-
-复杂查询分析？
-├─ 需要 → excel_query (GROUP BY、聚合等)
-└─ 不需要 → excel_search (简单文本搜索)
+需要数据分析/查询？ → excel_query (SQL引擎)
+需要定位单元格？   → excel_search (返回row/column)
+需要数据修改？     → excel_update_range
+需要格式调整？     → excel_format_cells
 ```
 
-## 🎯 核心设计原则
-• **SQL优先**：数据查询分析任务优先使用 `excel_query`
-• **智能降级**：当`excel_query`失败时，自动根据错误提示尝试基础API
-• **1-based索引**：第1行=1, 第1列=1 (匹配Excel惯例)
-• **范围格式**：必须包含工作表名 `"技能配置表!A1:Z100"` `"装备配置表!B2:F50"`
-• **ID驱动**：所有配置表以ID为主键，支持ID对象跟踪
-• **中文友好**：完全支持中文工作表名和游戏术语
-• **双行表头**：游戏开发专用，第1行描述+第2行字段名的标准化结构
+## ✅ SQL已支持功能 (27项)
+基础查询: SELECT, DISTINCT, 别名(AS)
+条件筛选: WHERE, =/>/</<, LIKE, IN, BETWEEN, AND/OR
+聚合统计: COUNT(*), COUNT(col), SUM, AVG, MAX, MIN, GROUP BY, HAVING
+排序限制: ORDER BY, LIMIT, OFFSET
 
-## 🔄 LLM智能降级策略
+## ❌ SQL不支持功能
+子查询, CTE(WITH), JOIN, UNION, 窗口函数, CASE WHEN, INSERT/UPDATE/DELETE
 
-当 `excel_query` 失败时，根据错误类型自动降级：
+## ⚠️ 重要原则
+- 1-based索引: 第1行=1, 第1列=1
+- 范围格式: 必须包含工作表名 "技能表!A1:Z100"
+- 默认覆盖: update_range默认覆盖，需保留数据用insert_mode=True
 
-### 依赖缺失错误 (SQLGlot未安装)
-```python
-# 原尝试
-result = excel_query("data.xlsx", "SELECT * FROM 表名 WHERE 条件")
-# 错误提示：建议使用基础API
+## 🎮 游戏配置表示例
+技能: SELECT 技能类型, AVG(伤害), COUNT(*) FROM 技能表 GROUP BY 技能类型
+装备: SELECT 品质, AVG(价格) FROM 装备表 GROUP BY 品质 ORDER BY AVG(价格) DESC
 
-# LLM自动降级为
-result = excel_get_range("data.xlsx", "表名!A1:Z100")
-filtered = [row for row in result['data'] if 符合条件]
-```
-
-### SQL语法错误
-```python
-# 原尝试
-result = excel_query("data.xlsx", "SELECT * FROM 表名 WHERE 复杂语法")
-# 错误提示：SQL语法错误，建议简化
-
-# LLM自动降级为
-result = excel_get_range("data.xlsx", "表名!A1:Z100")
-# 或
-result = excel_search("data.xlsx", "关键词", "表名")
-```
-
-### 工作表不存在错误
-```python
-# 原尝试
-result = excel_query("data.xlsx", "SELECT * FROM 不存在的表")
-# 错误提示：检查工作表名称
-
-# LLM自动降级为
-sheets = excel_list_sheets("data.xlsx")  # 先查看可用工作表
-result = excel_get_range("data.xlsx", "正确表名!A1:Z100")
-```
-
-## 💡 降级决策流程
-```
-尝试 excel_query
-├─ 成功 → 继续执行
-└─ 失败 → 查看错误提示
-   ├─ 依赖缺失 → 使用基础API (excel_get_range, excel_search)
-   ├─ SQL语法错误 → 简化查询或使用基础搜索
-   ├─ 工作表错误 → 列出工作表后重新尝试
-   └─ 其他错误 → 使用最基础的操作保底
-```
-
-## ⚠️ 核心注意事项
-🔴 **默认覆盖**：`excel_update_range`默认覆盖模式，需保留数据时用`insert_mode=True`
-🔴 **操作验证**：更新前用`excel_get_range`预览，确保目标正确
-
-## 🎮 游戏配置表专项操作
-
-### 技能配置表SQL分析优先
-```
-📋 技能表结构: ID|技能名|类型|等级|消耗|冷却|伤害|描述
-
-🔥 优先使用 excel_query：
-• 技能筛选: excel_query("skills.xlsx", "SELECT * FROM 技能配置表 WHERE 伤害 > 50 ORDER BY 伤害 DESC")
-• 类型统计: excel_query("skills.xlsx", "SELECT 技能类型, AVG(伤害), COUNT(*) FROM 技能配置表 GROUP BY 技能类型")
-• 效率分析: excel_query("skills.xlsx", "SELECT 技能名, 伤害/冷却 AS 效率 FROM 技能配置表 WHERE 伤害 > 0 ORDER BY 效率 DESC LIMIT 10")
-• 平衡检查: excel_query("skills.xlsx", "SELECT 技能类型, MIN(伤害), MAX(伤害), AVG(伤害) FROM 技能配置表 GROUP BY 技能类型")
-
-📊 数据更新: 基于SQL分析结果使用 excel_update_range
-🆚 版本对比: excel_compare_sheets 对比前后版本差异
-```
-
-### 装备配置表SQL分析优先
-```
-📦 装备配置: ID|名称|类型|品质|属性|套装|获取方式
-
-🔥 优先使用 excel_query：
-• 品质分析: excel_query("items.xlsx", "SELECT 品质, COUNT(*), AVG(价格) FROM 装备数据 GROUP BY 品质 ORDER BY AVG(价格)")
-• 性价比排行: excel_query("items.xlsx", "SELECT 装备名, 价格/等级 AS 性价比 FROM 装备数据 WHERE 品质 = '传说' ORDER BY 性价比 DESC")
-• 属性分布: excel_query("items.xlsx", "SELECT 类型, COUNT(*) FROM 装备数据 WHERE 品质 IN ('史诗', '传说') GROUP BY 类型")
-• 套装效果: excel_query("items.xlsx", "SELECT 套装名, COUNT(*), AVG(价格) FROM 装备数据 WHERE 套装名 IS NOT NULL GROUP BY 套装名")
-
-🎨 品质标记: excel_format_cells 基于分析结果标记高价值装备
-📊 批量调整: excel_update_range 根据SQL分析进行属性平衡
-```
-
-### 怪物配置表SQL分析优先
-```
-👹 怪物数据: ID|名称|等级|血量|攻击|防御|技能|掉落
-
-🔥 优先使用 excel_query：
-• 难度分布: excel_query("monsters.xlsx", "SELECT 等级区间, COUNT(*), AVG(攻击), AVG(防御) FROM 怪物数据 GROUP BY 等级区间")
-• 掉落分析: excel_query("monsters.xlsx", "SELECT 掉落物品, COUNT(*) FROM 怪物数据 WHERE 掉落物品 IS NOT NULL GROUP BY 掉落物品 ORDER BY COUNT(*) DESC")
-• 平衡检查: excel_query("monsters.xlsx", "SELECT 等级, 攻击/防御 AS 攻防比 FROM 怪物数据 WHERE 等级 BETWEEN 10 AND 20 ORDER BY 攻防比")
-• 技能统计: excel_query("monsters.xlsx", "SELECT 技能类型, COUNT(*) FROM 怪物数据 GROUP BY 技能类型 HAVING COUNT(*) > 5")
-
-📈 数值平衡: 根据SQL分析结果进行精细化调整
-🔄 批量更新: excel_update_range 基于数据分析更新怪物属性
-```
-
-## 🚀 高效工作流程
-
-### 🎯 SQL优先的配置表分析流程
-1. **🔍 需求分析**：明确要查询的数据和分析目标
-2. **🎯 SQL查询**：`excel_query` → 一行SQL解决复杂查询
-   - 数据探索：`SELECT * FROM 技能配置表 LIMIT 10`
-   - 条件筛选：`SELECT * FROM 技能配置表 WHERE 伤害 > 50`
-   - 聚合统计：`SELECT 技能类型, AVG(伤害) FROM 技能配置表 GROUP BY 技能类型`
-3. **📊 结果解读**：分析查询结果，发现数据模式和问题
-4. **🚀 深度分析**：根据初步结果调整SQL，进行更深入分析
-5. **✏️ 数据更新**：`excel_update_range` → 基于分析结果更新配置
-6. **🎨 格式优化**：`excel_format_cells` → 标记重要数据和异常值
-7. **✅ 验证更新**：使用 `excel_query` 验证更新效果
-
-### 🛠️ 基础操作保底流程
-当SQL引擎不可用或需要精确控制时：
-1. **📊 数据读取**：`excel_get_range` → 精确范围读取
-2. **🔍 简单搜索**：`excel_search` → 快速文本查找
-3. **📏 边界确认**：`excel_find_last_row` → 确定数据范围
-4. **✏️ 精确更新**：`excel_update_range` → 指定范围更新
-5. **✅ 结果验证**：重新读取确认更新成功
-
-## 💡 最佳实践决策树
-```
-需要查询/分析数据？
-├─ 是 → 使用 excel_query (SQL引擎)
-│   ├─ 简单查询：SELECT * FROM 表 WHERE 条件
-│   ├─ 聚合统计：SELECT ... GROUP BY ...
-│   └─ 复杂分析：多表JOIN、HAVING、子查询
-└─ 否 → 使用基础工具
-    ├─ 数据修改：excel_update_range
-    ├─ 格式调整：excel_format_cells
-    └─ 文件操作：excel_create_sheet等
-```
-
-### 版本对比工作流
-```
-🆚 配置对比流程:
-excel_compare_sheets("old_config.xlsx", "技能配置表", "new_config.xlsx", "技能配置表")
-↓ 分析差异报告
-🆕 新增技能: 直接添加到新版本
-🗑️ 删除技能: 检查依赖关系后移除
-🔄 修改技能: 重点测试数值平衡
-```
-
-## 🛠️ 错误处理专家指南
-
-### 常见问题快速解决
-```
-❌ 文件被锁定 → 检查Excel是否打开，关闭后重试
-❌ 权限不足 → 使用管理员权限或检查文件属性
-❌ 范围超界 → 先用excel_find_last_row确认实际数据范围
-❌ 中文乱码 → 确认编码格式，使用utf-8
-❌ 公式错误 → 设置preserve_formulas=False强制覆盖
-❌ 内存不足 → 分批处理大文件，限制读取范围
-```
-
-## 🚀 高级SQL查询功能
-
-### 完整SQL语法支持
-```
-🔥 GROUP BY聚合查询: excel_query("data.xlsx", "SELECT 类型, AVG(伤害) FROM 技能表 GROUP BY 类型")
-🔍 复杂WHERE条件: excel_query("data.xlsx", "SELECT * FROM 技能表 WHERE 伤害 > 100 AND 冷却 < 3")
-📊 多条件聚合: excel_query("data.xlsx", "SELECT 职业, COUNT(*) as 数量, AVG(等级) FROM table GROUP BY 职业 HAVING AVG(等级) > 2")
-🎯 数学表达式: excel_query("data.xlsx", "SELECT 技能名, 伤害/冷却 as 效率 FROM 技能表 ORDER BY 效率 DESC LIMIT 5")
-🔤 模糊匹配查询: excel_query("data.xlsx", "SELECT * FROM 技能表 WHERE 技能名 LIKE '%火%'")
-📈 IN条件查询: excel_query("data.xlsx", "SELECT * FROM 技能表 WHERE 类型 IN ('攻击', '辅助')")
-```
-
-### SQL功能特性
-- ✅ **完整SQL语法**: WHERE、GROUP BY、HAVING、ORDER BY、LIMIT
-- ✅ **聚合函数**: COUNT、SUM、AVG、MAX、MIN
-- ✅ **数学表达式**: +、-、*、/ 运算和计算字段
-- ✅ **中文友好**: 完全支持中文列名和工作表名
-- ✅ **复杂条件**: AND、OR、括号、IN、LIKE等
-- ✅ **多级排序**: 支持多列排序和升降序
-
-## 🧮 公式计算功能
-
-### Excel公式支持
-```
-📊 设置公式: excel_set_formula("data.xlsx", "Sheet1", "D10", "SUM(D1:D9)")
-🔢 临时计算: excel_evaluate_formula("SUM(1,2,3,4,5)")
-📈 复杂运算: excel_evaluate_formula("AVERAGE(A1:A100)*1.2", "数据表")
-```
-
-### 复杂范围操作示例
-```
-📐 复杂范围支持:
-单元格: "技能配置表!A1:Z100"    # 标准矩形范围
-整行:   "装备配置表!5:10"        # 第5-10行
-整列:   "怪物配置表!C:F"         # C到F列
-单行:   "技能配置表!1"           # 仅第1行
-单列:   "道具配置表!D"           # 仅D列
-```
-
-## ⚡ 性能优化要点
-- **分批处理**：大文件分段操作，避免内存溢出
-- **精确范围**：指定具体单元格范围，避免全表读取
-- **批量操作**：一次性更新优于逐行处理
-
-## 🎨 格式化预设
-
-| 预设 | 用途 | 效果 |
-|------|------|------|
-| `"title"` | 标题行 | 粗体+居中 |
-| `"header"` | 表头行 | 粗体+边框 |
-| `"highlight"` | 重要数据 | 黄色高亮 |
-
-## 🔍 智能搜索与分析
-
-### 配置表数据挖掘
-```
-🔎 强大搜索能力:
-excel_search("all_configs.xlsx", r"攻击力\s*\d+", use_regex=True)           # 搜索攻击力数值
-excel_search_directory("./configs", r"火|冰|雷", use_regex=True)           # 批量搜索元素技能
-excel_search("skills.xlsx", r"冷却.*[5-9]", use_regex=True, include_formulas=True)      # 搜索长冷却技能
-```
-
-🚀 **游戏开发专家模式**: 搜索定位→SQL分析→安全更新→视觉优化→版本对比→性能监控
-
-🎯 **SQL驱动的数据分析**: 一句SQL完成复杂统计，GROUP BY聚合、HAVING过滤、多级排序全支持""",
-    debug=True,                    # 开启调试模式
-    log_level="DEBUG"              # 设置日志级别为DEBUG
+## ⚡ 常用流程
+1. excel_list_sheets - 列出工作表
+2. excel_get_headers - 查看表头
+3. excel_query - SQL查询
+4. excel_update_range - 数据更新
+5. excel_format_cells - 格式美化
+""",
+    debug=True,
+    log_level="DEBUG"
 )
 
 
