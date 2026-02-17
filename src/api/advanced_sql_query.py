@@ -1,6 +1,18 @@
 """
-高级SQL查询引擎 - 基于SQLGlot实现完整SQL功能支持
-参考mcp-excel-db架构，支持GROUP BY、聚合函数、JOIN等完整SQL语法
+高级SQL查询引擎 - 基于SQLGlot实现的SQL查询支持
+
+支持功能：
+- 基础查询: SELECT, DISTINCT, 别名
+- 条件筛选: WHERE, LIKE, IN, BETWEEN, AND/OR
+- 聚合统计: COUNT, SUM, AVG, MAX, MIN, GROUP BY, HAVING
+- 排序限制: ORDER BY, LIMIT, OFFSET
+- 算术运算: 加减乘除
+
+不支持功能：
+- 子查询、CTE (WITH)、JOIN、UNION
+- 窗口函数 (ROW_NUMBER等)
+- CASE WHEN、EXISTS
+- INSERT/UPDATE/DELETE
 """
 
 import os

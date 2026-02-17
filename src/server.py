@@ -2141,6 +2141,60 @@ def excel_query(
     SELECT * FROM 反馈数据 ORDER BY 时间 DESC LIMIT 20
     ```
 
+    ## ✅ 已支持的SQL功能
+
+    | 功能 | 示例 | 状态 |
+    |------|------|------|
+    | SELECT基础 | `SELECT * FROM 表名` | ✅ |
+    | 列选择 | `SELECT 列1, 列2 FROM 表名` | ✅ |
+    | 别名 (AS) | `SELECT 列 AS 别名 FROM 表名` | ✅ |
+    | DISTINCT | `SELECT DISTINCT 列 FROM 表名` | ✅ |
+    | WHERE条件 | `SELECT * FROM 表名 WHERE 列 > 10` | ✅ |
+    | 比较运算符 | `=`, `>`, `<`, `>=`, `<=`, `<>` | ✅ |
+    | AND/OR条件 | `WHERE 条件1 AND 条件2` | ✅ |
+    | LIKE模糊匹配 | `WHERE 列 LIKE '%关键词%'` | ✅ |
+    | IN集合查询 | `WHERE 列 IN ('A', 'B')` | ✅ |
+    | BETWEEN范围 | `WHERE 列 BETWEEN 10 AND 20` | ✅ |
+    | ORDER BY排序 | `ORDER BY 列 DESC` | ✅ |
+    | 多列排序 | `ORDER BY 列1 DESC, 列2 ASC` | ✅ |
+    | LIMIT限制 | `LIMIT 10` | ✅ |
+    | OFFSET偏移 | `LIMIT 10 OFFSET 5` | ✅ |
+    | GROUP BY分组 | `GROUP BY 列` | ✅ |
+    | 多列GROUP BY | `GROUP BY 列1, 列2` | ✅ |
+    | COUNT(*)聚合 | `SELECT COUNT(*) FROM 表名` | ✅ |
+    | COUNT(列)聚合 | `SELECT COUNT(列) FROM 表名` | ✅ |
+    | SUM()求和 | `SELECT SUM(列) FROM 表名` | ✅ |
+    | AVG()平均 | `SELECT AVG(列) FROM 表名` | ✅ |
+    | MAX()最大值 | `SELECT MAX(列) FROM 表名` | ✅ |
+    | MIN()最小值 | `SELECT MIN(列) FROM 表名` | ✅ |
+    | HAVING过滤 | `HAVING COUNT(*) > 5` | ✅ |
+    | 无GROUP聚合 | `SELECT SUM(列) FROM 表名` | ✅ |
+    | 算术运算 | `SELECT 列*2 FROM 表名` | ✅ |
+    | 空值处理 | 聚合函数自动跳过NULL值 | ✅ |
+
+    ## ❌ 不支持的SQL功能
+
+    | 功能 | 示例 | 状态 | 替代方案 |
+    |------|------|------|----------|
+    | 子查询 | `SELECT * FROM (SELECT...)` | ❌ | 分步查询 |
+    | WITH/CTE | `WITH cte AS (...)` | ❌ | 分步查询 |
+    | JOIN | `SELECT * FROM a JOIN b` | ❌ | excel_search |
+    | UNION | `SELECT ... UNION SELECT...` | ❌ | 分步查询 |
+    | 窗口函数 | `ROW_NUMBER() OVER()` | ❌ | excel_search |
+    | CASE WHEN | `CASE WHEN ... THEN...` | ❌ | 分步处理 |
+    | EXISTS | `WHERE EXISTS (...)` | ❌ | 使用IN |
+    | INSERT | `INSERT INTO ...` | ❌ | excel_update_range |
+    | UPDATE | `UPDATE ... SET ...` | ❌ | excel_update_range |
+    | DELETE | `DELETE FROM ...` | ❌ | excel_delete_rows |
+    | 跨表查询 | 多表关联 | ❌ | 多次查询合并 |
+
+    ### ⚠️ 使用限制说明
+
+    - **只读查询**: 仅支持SELECT查询，不支持数据修改
+    - **单表为主**: 聚合查询主要针对单个工作表
+    - **文件大小**: 建议文件小于100MB以获得最佳性能
+    - **HAVING限制**: 复杂HAVING条件可能存在边缘情况
+
     ## 🎮 游戏开发应用示例
 
     ### 技能平衡分析
