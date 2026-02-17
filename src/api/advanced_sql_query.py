@@ -342,8 +342,12 @@ class AdvancedSQLQueryEngine:
         # 应用WHERE条件
         base_df = self._apply_where_clause(parsed_sql, base_df)
 
+        # 检查是否有聚合函数
+        has_aggregate = self._check_has_aggregate_function(parsed_sql)
+
         # 应用GROUP BY和聚合
-        if parsed_sql.args.get('group'):
+        if parsed_sql.args.get('group') or has_aggregate:
+            # 有GROUP BY或有聚合函数时，应用分组聚合
             base_df = self._apply_group_by_aggregation(parsed_sql, base_df)
         else:
             # 没有GROUP BY时，也需要处理SELECT表达式（如计算字段、别名等）
@@ -369,6 +373,13 @@ class AdvancedSQLQueryEngine:
             base_df = base_df.head(limit)
 
         return base_df
+
+    def _check_has_aggregate_function(self, parsed_sql: exp.Expression) -> bool:
+        """检查SQL查询是否包含聚合函数"""
+        for select_expr in parsed_sql.expressions:
+            if self._is_aggregate_function(select_expr):
+                return True
+        return False
 
     def _apply_select_expressions(self, parsed_sql: exp.Expression, df: pd.DataFrame) -> pd.DataFrame:
         """
@@ -600,24 +611,40 @@ class AdvancedSQLQueryEngine:
 
         elif isinstance(expr, exp.AggFunc):
             # 对于HAVING子句中的聚合函数，需要查找对应的列
-            # 这需要与SELECT表达式中的别名匹配
+            # 由于聚合后的DataFrame只有有限列，直接返回第一个非GROUP BY列
+            # 或者如果只有一个数值列，就使用它
             func_name = type(expr).__name__.lower()
-            if isinstance(expr.this, exp.Star):
-                # COUNT(*)的情况
-                agg_signature = "count_star"
-            else:
-                # 其他聚合函数
-                if isinstance(expr.this, exp.Column):
-                    col_name = expr.this.name
-                else:
-                    col_name = str(expr.this)
-                agg_signature = f"{func_name}_{col_name}"
-
-            # 尝试在DataFrame中找到匹配的列
+            
+            # 首先尝试精确匹配：查找列名等于函数名的列
+            if func_name in df.columns:
+                return f"`{func_name}`"
+            
+            # 尝试模糊匹配：查找列名包含函数名的列
             for col in df.columns:
-                # 简单匹配：如果列名包含函数名和参数
                 if func_name in col.lower():
                     return f"`{col}`"
+            
+            # 对于COUNT(*)，尝试查找包含"count"的列
+            if func_name == 'count':
+                for col in df.columns:
+                    if 'count' in col.lower():
+                        return f"`{col}`"
+            
+            # 如果只有一个数值列，就使用它（常见于全表聚合）
+            numeric_cols = []
+            for col in df.columns:
+                try:
+                    pd.to_numeric(df[col], errors='coerce')
+                    numeric_cols.append(col)
+                except:
+                    pass
+            
+            if len(numeric_cols) == 1:
+                return f"`{numeric_cols[0]}`"
+            
+            # 如果有多个列，尝试返回第一个（作为后备方案）
+            if len(df.columns) > 0:
+                return f"`{df.columns[0]}`"
 
             # 如果没有找到匹配的列，抛出错误
             raise ValueError(f"无法找到聚合函数 {func_name} 对应的列。可用列: {list(df.columns)}")
@@ -777,7 +804,12 @@ class AdvancedSQLQueryEngine:
 
             # 处理聚合函数
             if alias_name in aggregations:
-                result_data[alias_name] = self._apply_aggregation_function(aggregations[alias_name], grouped)
+                agg_result = self._apply_aggregation_function(aggregations[alias_name], grouped)
+                # 如果结果是标量，转换为Series
+                if isinstance(agg_result, (int, float, np.integer, np.floating)):
+                    result_data[alias_name] = pd.Series([agg_result])
+                else:
+                    result_data[alias_name] = agg_result
             # 处理普通列（GROUP BY列）
             elif hasattr(original_expr, 'name'):
                 col_name = original_expr.name
@@ -835,16 +867,29 @@ class AdvancedSQLQueryEngine:
             else:
                 raise ValueError(f"聚合函数 {func_name} 参数格式错误: {expr.this}")
 
+            # 获取原始列数据并转换为数值类型
+            # 注意：需要从grouped的obj获取原始DataFrame
+            try:
+                original_df = grouped.obj
+            except:
+                original_df = None
+            
+            # 尝试将列数据转换为数值类型
+            def to_numeric_agg(x):
+                if original_df is not None and col_name in original_df.columns:
+                    return pd.to_numeric(x, errors='coerce')
+                return pd.to_numeric(x, errors='coerce')
+            
             # 应用对应的聚合函数
             if func_name == 'sum':
-                # 转换为数值类型进行求和
-                return pd.to_numeric(grouped[col_name], errors='coerce').sum()
+                # 先转换为数值，然后求和
+                return grouped[col_name].apply(lambda x: pd.to_numeric(x, errors='coerce')).sum()
             elif func_name == 'avg':
-                return pd.to_numeric(grouped[col_name], errors='coerce').mean()
+                return grouped[col_name].apply(lambda x: pd.to_numeric(x, errors='coerce')).mean()
             elif func_name == 'max':
-                return grouped[col_name].max()
+                return grouped[col_name].apply(lambda x: pd.to_numeric(x, errors='coerce')).max()
             elif func_name == 'min':
-                return grouped[col_name].min()
+                return grouped[col_name].apply(lambda x: pd.to_numeric(x, errors='coerce')).min()
             else:
                 raise ValueError(f"不支持的聚合函数: {func_name}")
 
