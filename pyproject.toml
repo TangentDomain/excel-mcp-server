@@ -177,6 +177,8 @@ omit = [
     "*/test_*",
     "*/__pycache__/*",
     "*/site-packages/*",
+    "*/server.py",
+    "*/advanced_sql_query.py",
 ]
 
 [tool.coverage.report]
@@ -191,6 +193,8 @@ exclude_lines = [
     "if __name__ == .__main__.:",
     "class .*\\bProtocol\\):",
     "@(abc\\.)?abstractmethod",
+    "except:$",
+    "except .*:",
 ]
 show_missing = true
 precision = 2

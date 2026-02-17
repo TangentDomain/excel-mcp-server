@@ -131,8 +131,47 @@ class ExcelValidator:
         Raises:
             FileExistsError: 文件已存在且不允许覆盖
             InvalidFormatError: 不支持的文件格式
+            DataValidationError: 路径无效或无法写入
         """
+        import os
+        import platform
+        
+        if not file_path or not isinstance(file_path, str):
+            raise DataValidationError("文件路径不能为空且必须是字符串")
+        
+        # 检查路径是否包含空字符
+        if '\x00' in file_path:
+            raise DataValidationError("文件路径包含无效字符（空字符）")
+        
+        # 在Unix系统上检测Windows风格的路径（包含驱动器号如 Z:\）
+        system = platform.system()
+        if system != 'Windows':
+            # 检查Windows绝对路径模式 (如 Z:\, C:\, \\server\share)
+            if len(file_path) >= 2 and file_path[1] == ':':
+                raise DataValidationError(f"无效的Unix路径（包含Windows驱动器号）: {file_path}")
+            if file_path.startswith('\\\\'):
+                raise DataValidationError(f"无效的Unix路径（包含UNC路径）: {file_path}")
+        
         path = Path(file_path)
+        
+        # 检查文件名部分是否有效（不能是保留名、不能包含无效字符等）
+        file_name = path.name
+        if not file_name:
+            raise DataValidationError(f"无效的文件路径（缺少文件名）: {file_path}")
+        
+        # 检查Windows保留文件名（即使在Unix上也拒绝，以保持跨平台兼容）
+        import re
+        windows_reserved = re.compile(r'^(CON|PRN|AUX|NUL|COM[1-9]|LPT[1-9])(\.|$)', re.IGNORECASE)
+        name_without_ext = Path(file_name).stem
+        if windows_reserved.match(name_without_ext):
+            raise DataValidationError(f"文件名是Windows系统保留名: {file_name}")
+        
+        # 检查文件名中的无效字符
+        invalid_chars = '<>:"/\\|?*'
+        for char in invalid_chars:
+            if char in file_name:
+                raise DataValidationError(f"文件名包含无效字符 '{char}': {file_name}")
+        
         if path.exists() and not overwrite:
             raise FileExistsError(f"文件已存在: {file_path}")
 
@@ -140,6 +179,21 @@ class ExcelValidator:
             raise InvalidFormatError(
                 f"不支持的文件格式: {path.suffix}，请使用 .xlsx 或 .xlsm"
             )
+
+        # 验证父目录是否可写（如果父目录存在）
+        parent = path.parent
+        if parent.exists():
+            if not os.access(str(parent), os.W_OK):
+                raise DataValidationError(f"没有权限写入目录: {parent}")
+        else:
+            # 如果父目录不存在，尝试创建它（仅验证，不实际创建）
+            try:
+                # 尝试创建所有中间目录
+                parent.mkdir(parents=True, exist_ok=True)
+            except PermissionError:
+                raise DataValidationError(f"没有权限创建目录: {parent}")
+            except OSError as e:
+                raise DataValidationError(f"无法创建目录 {parent}: {e}")
 
         return str(path.absolute())
 

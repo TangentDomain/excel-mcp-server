@@ -483,9 +483,15 @@ class AdvancedSQLQueryEngine:
     def _get_from_table(self, parsed_sql: exp.Expression) -> str:
         """获取FROM子句中的表名"""
         from_clause = parsed_sql.args.get('from')
+        if not from_clause:
+            # 尝试使用 from_ 键（sqlglot的另一种存储方式）
+            from_clause = parsed_sql.args.get('from_')
         if from_clause:
             if hasattr(from_clause, 'this') and hasattr(from_clause.this, 'name'):
                 return from_clause.this.name
+            # 兼容 Table 对象
+            if hasattr(from_clause, 'this') and hasattr(from_clause.this, 'this'):
+                return from_clause.this.this
 
         # 如果没有明确的FROM子句，返回第一个表名
         raise ValueError("无法确定FROM子句中的表名")
