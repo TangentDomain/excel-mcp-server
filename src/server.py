@@ -161,24 +161,14 @@ mcp = FastMCP(
 
 @mcp.tool()
 def excel_list_sheets(file_path: str) -> Dict[str, Any]:
-    """
-    列出Excel文件中所有工作表名称
+    """列出所有工作表名称
+    
+Args:
+    file_path: Excel文件路径
 
-    Args:
-        file_path: Excel文件路径 (.xlsx/.xlsm)
-
-    Returns:
-        Dict: 包含success、sheets、total_sheets
-
-    Example:
-        # 列出工作表名称
-        result = excel_list_sheets("data.xlsx")
-        # 返回: {
-        #   'success': True,
-        #   'sheets': ['Sheet1', 'Sheet2'],
-        #   'total_sheets': 2
-        # }
-    """
+Returns:
+    {success, sheets, total_sheets}
+"""
     return ExcelOperations.list_sheets(file_path)
 
 
@@ -258,68 +248,17 @@ def excel_search(
     include_formulas: bool = False,
     range: Optional[str] = None
 ) -> Dict[str, Any]:
-    """
-    在Excel文件中搜索单元格内容（VSCode风格搜索选项）
+    """文本搜索 - 返回单元格位置信息
+    
+Args:
+    file_path: Excel文件路径
+    pattern: 搜索关键词
+    sheet_name: 工作表名(可选)
+    case_sensitive: 是否区分大小写
 
-    💡 **优先推荐**: 对于数据搜索和筛选任务，建议使用 excel_query
-    excel_query 提供更强大的搜索能力，支持复杂条件组合和结构化查询结果
-
-    📊 使用场景对比：
-    • 简单文本搜索: 使用此API
-    • 结构化数据搜索: 优先使用 excel_query
-
-    🎯 推荐用法：
-    ```python
-    # ❌ 简单搜索 - 需要后续处理
-    result = excel_search("skills.xlsx", "火球", "技能配置表")
-    # 需要手动解析搜索结果
-
-    # ✅ SQL搜索 - 直接返回结构化数据
-    result = excel_query("skills.xlsx", "SELECT * FROM 技能配置表 WHERE 技能名 LIKE '%火球%' ORDER BY 伤害 DESC")
-    # 直接获得筛选后的数据
-    ```
-
-    🔍 搜索能力对比：
-    • 此API: 文本匹配搜索
-    • excel_query: SQL条件查询 + 聚合分析 + 排序限制
-
-    Args:
-        file_path: Excel文件路径 (.xlsx/.xlsm)
-        pattern: 搜索模式。当use_regex=True时为正则表达式，否则为字面字符串
-        sheet_name: 工作表名称 (可选，不指定时搜索所有工作表)
-        case_sensitive: 大小写敏感 (默认False，即忽略大小写)
-        whole_word: 全词匹配 (默认False，即部分匹配)
-        use_regex: 启用正则表达式 (默认False，即字面字符串搜索)
-        include_values: 是否搜索单元格值
-        include_formulas: 是否搜索公式内容
-        range: 搜索范围表达式，支持多种格式：
-            - 单元格范围: "A1:C10" 或 "Sheet1!A1:C10"
-            - 行范围: "3:5" 或 "Sheet1!3:5" (第3行到第5行)
-            - 列范围: "B:D" 或 "Sheet1!B:D" (B列到D列)
-            - 单行: "7" 或 "Sheet1!7" (仅第7行)
-            - 单列: "C" 或 "Sheet1!C" (仅C列)
-
-    Returns:
-        Dict: 包含 success、matches(List[Dict])、match_count、searched_sheets
-
-    Example:
-        # 普通字符串搜索（默认忽略大小写）
-        result = excel_search("data.xlsx", "总计")
-        # 大小写敏感搜索
-        result = excel_search("data.xlsx", "Total", case_sensitive=True)
-        # 全词匹配搜索（只匹配完整单词）
-        result = excel_search("data.xlsx", "sum", whole_word=True)
-        # 正则表达式搜索邮箱格式
-        result = excel_search("data.xlsx", r'\\w+@\\w+\\.\\w+', use_regex=True)
-        # 正则表达式搜索数字（大小写敏感）
-        result = excel_search("data.xlsx", r'\\d+', use_regex=True, case_sensitive=True)
-        # 搜索指定范围
-        result = excel_search("data.xlsx", "金额", range="Sheet1!A1:C10", whole_word=True)
-        # 搜索指定工作表
-        result = excel_search("data.xlsx", "error", sheet_name="Sheet1", case_sensitive=True)
-        # 搜索数字并包含公式
-        result = excel_search("data.xlsx", r'\\d+', use_regex=True, include_formulas=True)
-    """
+Returns:
+    {success, matches, total}
+"""
     return ExcelOperations.search(file_path, pattern, sheet_name, case_sensitive, whole_word, use_regex, include_values, include_formulas, range)
 
 
@@ -377,51 +316,16 @@ def excel_get_range(
     range: str,
     include_formatting: bool = False
 ) -> Dict[str, Any]:
-    """
-    读取Excel指定范围的数据
+    """读取指定范围的单元格数据
+    
+Args:
+    file_path: Excel文件路径
+    range: 范围表达式 (如 "Sheet1!A1:C10")
+    include_formatting: 是否包含格式
 
-    💡 **优先推荐**: 对于数据查询和分析任务，建议使用 excel_query
-    excel_query 提供更强大的SQL查询能力，支持复杂条件筛选、聚合统计和数据挖掘
-
-    📊 使用场景对比：
-    • 简单数据读取: 使用此API
-    • 复杂查询分析: 优先使用 excel_query
-
-    🎯 推荐用法：
-    ```python
-    # ❌ 复杂条件筛选 - 多步骤处理
-    data = excel_get_range("skills.xlsx", "技能配置表!A1:Z1000")
-    filtered = [row for row in data if row[3] > 50 and '火' in row[1]]
-
-    # ✅ SQL查询 - 一步搞定
-    result = excel_query("skills.xlsx", "SELECT * FROM 技能配置表 WHERE 伤害 > 50 AND 技能名 LIKE '%火%' ORDER BY 伤害 DESC")
-    ```
-
-    Args:
-        file_path (str): Excel文件路径 (.xlsx/.xlsm) [必需]
-        range (str): 范围表达式，必须包含工作表名 [必需]
-            支持格式：
-            - 标准单元格范围: "Sheet1!A1:C10"、"TrSkill!A1:Z100"
-            - 行范围: "Sheet1!1:1"、"数据!5:10"
-            - 列范围: "Sheet1!A:C"、"统计!B:E"
-            - 单行/单列: "Sheet1!5"、"数据!C"
-        include_formatting (bool, 可选): 是否包含单元格格式，默认 False
-
-    Returns:
-        Dict: 包含 success、data(List[List])、range_info
-
-    注意:
-        为保持API一致性和清晰度，range必须包含工作表名。
-        这消除了参数间的条件依赖，提高了可预测性。
-
-    Example:
-        # 读取单元格范围
-        result = excel_get_range("data.xlsx", "Sheet1!A1:C10")
-        # 读取整行
-        result = excel_get_range("data.xlsx", "Sheet1!1:1")
-        # 读取列范围
-        result = excel_get_range("data.xlsx", "数据!A:C")
-    """
+Returns:
+    {success, data, range_info}
+"""
     # 增强参数验证
     from .utils.validators import ExcelValidator, DataValidationError
 
@@ -467,46 +371,16 @@ def excel_get_headers(
     header_row: int = 1,
     max_columns: Optional[int] = None
 ) -> Dict[str, Any]:
-    """
-    获取Excel工作表的双行表头信息（游戏开发专用）
+    """获取工作表表头信息
+    
+Args:
+    file_path: Excel文件路径
+    sheet_name: 工作表名
+    header_row: 表头行号
 
-    专为游戏配置表设计，同时获取字段描述（第1行）和字段名（第2行）
-
-    Args:
-        file_path: Excel文件路径 (.xlsx/.xlsm)
-        sheet_name: 工作表名称
-        header_row: 表头起始行号 (1-based，默认从第1行开始获取两行)
-        max_columns: 最大读取列数限制 (可选)
-            - 指定数值: 精确读取指定列数，如 max_columns=10 读取A-J列
-            - None(默认): 读取前100列范围 (A-CV列)，然后截取到第一个空列
-
-    Returns:
-        Dict: 包含双行表头信息
-        {
-            'success': bool,
-            'data': List[str],          # 字段名列表（兼容性）
-            'headers': List[str],       # 字段名列表（兼容性）
-            'descriptions': List[str],  # 字段描述列表（第1行）
-            'field_names': List[str],   # 字段名列表（第2行）
-            'header_count': int,
-            'sheet_name': str,
-            'header_row': int,
-            'message': str
-        }
-
-    游戏配置表标准格式:
-        第1行（descriptions）: ['技能ID描述', '技能名称描述', '技能类型描述', '技能等级描述']
-        第2行（field_names）:   ['skill_id', 'skill_name', 'skill_type', 'skill_level']
-
-    Example:
-        # 获取技能配置表的双行表头
-        result = excel_get_headers("skills.xlsx", "技能配置表")
-        print(result['descriptions'])  # ['技能ID描述', '技能名称描述', ...]
-        print(result['field_names'])   # ['skill_id', 'skill_name', ...]
-
-        # 获取装备表第3-4行作为表头，精确读取8列
-        result = excel_get_headers("items.xlsx", "装备配置表", header_row=3, max_columns=8)
-    """
+Returns:
+    {success, headers, descriptions}
+"""
     return ExcelOperations.get_headers(file_path, sheet_name, header_row, max_columns)
 
 
@@ -518,37 +392,17 @@ def excel_update_range(
     preserve_formulas: bool = True,
     insert_mode: bool = True
 ) -> Dict[str, Any]:
-    """
-更新Excel指定范围的数据。默认使用安全的插入模式。
-
+    """更新指定范围的单元格数据
+    
 Args:
-    file_path: Excel文件路径 (.xlsx/.xlsm)
-    range: 范围表达式，必须包含工作表名，支持格式：
-        - 标准单元格范围: "Sheet1!A1:C10"、"TrSkill!A1:Z100"
-        - 不支持行范围格式，必须使用明确单元格范围
-    data: 二维数组数据 [[row1], [row2], ...]
-    preserve_formulas: 保留已有公式 (默认值: True)
-        - True: 如果目标单元格包含公式，则保留公式不覆盖
-        - False: 覆盖所有内容，包括公式
-    insert_mode: 数据写入模式 (默认值: True - 安全优先)
-        - True: 插入模式，在指定位置插入新行然后写入数据（默认安全）
-        - False: 覆盖模式，直接覆盖目标范围的现有数据（谨慎使用）
+    file_path: Excel文件路径
+    range: 范围表达式
+    data: 更新的数据(二维数组)
+    insert_mode: 是否插入模式(默认覆盖)
 
 Returns:
-    Dict: 包含 success、updated_cells(int)、message
-
-⚠️ 安全提示:
-    - 默认使用插入模式防止数据覆盖
-    - 如需覆盖现有数据，请明确设置 insert_mode=False
-    - 建议先使用 excel_get_range 预览当前数据
-
-Example:
-    data = [["姓名", "年龄"], ["张三", 25]]
-    # 安全插入模式（默认）
-    result = excel_update_range("test.xlsx", "Sheet1!A1:B2", data)
-    # 覆盖模式（需要明确指定）
-    result = excel_update_range("test.xlsx", "Sheet1!A1:B2", data, insert_mode=False)
-    """
+    {success, updated_range, message}
+"""
     # 增强参数验证
     from .utils.validators import ExcelValidator, DataValidationError
 
@@ -1292,24 +1146,17 @@ def excel_insert_rows(
     row_index: int,
     count: int = 1
 ) -> Dict[str, Any]:
-    """
-    在指定位置插入空行
+    """插入行
+    
+Args:
+    file_path: Excel文件路径
+    sheet_name: 工作表名
+    row_index: 插入位置
+    count: 插入数量
 
-    Args:
-        file_path: Excel文件路径 (.xlsx/.xlsm)
-        sheet_name: 工作表名称
-        row_index: 插入位置 (1-based，即第1行对应Excel中的第1行)
-        count: 插入行数 (默认值: 1，即插入1行)
-
-    Returns:
-        Dict: 包含 success、inserted_rows、message
-
-    Example:
-        # 在第3行插入1行（使用默认count=1）
-        result = excel_insert_rows("data.xlsx", "Sheet1", 3)
-        # 在第5行插入3行（明确指定count）
-        result = excel_insert_rows("data.xlsx", "Sheet1", 5, 3)
-    """
+Returns:
+    {success, inserted_count, message}
+"""
     return ExcelOperations.insert_rows(file_path, sheet_name, row_index, count)
 
 
@@ -1347,28 +1194,15 @@ def excel_find_last_row(
     sheet_name: str,
     column: Optional[Union[str, int]] = None
 ) -> Dict[str, Any]:
-    """
-    查找表格中最后一行有数据的位置
+    """查找最后一行
+    
+Args:
+    file_path: Excel文件路径
+    sheet_name: 工作表名
 
-    Args:
-        file_path: Excel文件路径 (.xlsx/.xlsm)
-        sheet_name: 工作表名称
-        column: 指定列来查找最后一行（可选）
-            - None: 查找整个工作表的最后一行
-            - 整数: 列索引 (1-based，1=A列)
-            - 字符串: 列名 (A, B, C...)
-
-    Returns:
-        Dict: 包含 success、last_row、message 等信息
-
-    Example:
-        # 查找整个工作表的最后一行
-        result = excel_find_last_row("data.xlsx", "Sheet1")
-        # 查找A列的最后一行有数据的位置
-        result = excel_find_last_row("data.xlsx", "Sheet1", "A")
-        # 查找第3列的最后一行有数据的位置
-        result = excel_find_last_row("data.xlsx", "Sheet1", 3)
-    """
+Returns:
+    {success, last_row}
+"""
     return ExcelOperations.find_last_row(file_path, sheet_name, column)
 
 
@@ -1377,25 +1211,14 @@ def excel_create_file(
     file_path: str,
     sheet_names: Optional[List[str]] = None
 ) -> Dict[str, Any]:
-    """
-    创建新的Excel文件
+    """创建新的Excel文件
+    
+Args:
+    file_path: 新文件路径
 
-    Args:
-        file_path: 新文件路径 (必须以.xlsx或.xlsm结尾)
-        sheet_names: 工作表名称列表 (默认值: None)
-            - None: 创建包含一个默认工作表"Sheet1"的文件
-            - []: 创建空的工作簿
-            - ["名称1", "名称2"]: 创建包含指定名称工作表的文件
-
-    Returns:
-        Dict: 包含 success、file_path、sheets
-
-    Example:
-        # 创建简单文件（使用默认sheet_names=None，会有一个"Sheet1"）
-        result = excel_create_file("new_file.xlsx")
-        # 创建包含多个工作表的文件
-        result = excel_create_file("report.xlsx", ["数据", "图表", "汇总"])
-    """
+Returns:
+    {success, message}
+"""
     return ExcelOperations.create_file(file_path, sheet_names)
 
 
@@ -1547,26 +1370,15 @@ def excel_create_sheet(
     sheet_name: str,
     index: Optional[int] = None
 ) -> Dict[str, Any]:
-    """
-    在文件中创建新工作表
+    """创建新工作表
+    
+Args:
+    file_path: Excel文件路径
+    sheet_name: 新工作表名
 
-    Args:
-        file_path: Excel文件路径 (.xlsx/.xlsm)
-        sheet_name: 新工作表名称 (不能与现有工作表重复)
-        index: 插入位置 (0-based，默认值: None)
-            - None: 在所有工作表的最后位置创建
-            - 0: 在第一个位置创建
-            - 1: 在第二个位置创建，以此类推
-
-    Returns:
-        Dict: 包含 success、sheet_name、total_sheets
-
-    Example:
-        # 创建新工作表到末尾（使用默认index=None）
-        result = excel_create_sheet("data.xlsx", "新数据")
-        # 创建新工作表到第一个位置（index=0）
-        result = excel_create_sheet("data.xlsx", "首页", 0)
-    """
+Returns:
+    {success, message}
+"""
     return ExcelOperations.create_sheet(file_path, sheet_name, index)
 
 
@@ -1575,20 +1387,15 @@ def excel_delete_sheet(
     file_path: str,
     sheet_name: str
 ) -> Dict[str, Any]:
-    """
-    删除指定工作表
+    """删除工作表
+    
+Args:
+    file_path: Excel文件路径
+    sheet_name: 要删除的工作表名
 
-    Args:
-        file_path: Excel文件路径 (.xlsx/.xlsm)
-        sheet_name: 要删除的工作表名称
-
-    Returns:
-        Dict: 包含 success、deleted_sheet、remaining_sheets
-
-    Example:
-        # 删除指定工作表
-        result = excel_delete_sheet("data.xlsx", "临时数据")
-    """
+Returns:
+    {success, message}
+"""
     # 开始操作会话
     operation_logger.start_session(file_path)
 
@@ -1655,24 +1462,17 @@ def excel_delete_rows(
     row_index: int,
     count: int = 1
 ) -> Dict[str, Any]:
-    """
-    删除指定行
+    """删除行
+    
+Args:
+    file_path: Excel文件路径
+    sheet_name: 工作表名
+    row_index: 删除起始位置
+    count: 删除数量
 
-    Args:
-        file_path: Excel文件路径 (.xlsx/.xlsm)
-        sheet_name: 工作表名称
-        row_index: 起始行号 (1-based，即第1行对应Excel中的第1行)
-        count: 删除行数 (默认值: 1，即删除1行)
-
-    Returns:
-        Dict: 包含 success、deleted_rows、message
-
-    Example:
-        # 删除第5行（使用默认count=1）
-        result = excel_delete_rows("data.xlsx", "Sheet1", 5)
-        # 删除第3-5行（删除3行，从第3行开始）
-        result = excel_delete_rows("data.xlsx", "Sheet1", 3, 3)
-    """
+Returns:
+    {success, deleted_count, message}
+"""
     # 开始操作会话
     operation_logger.start_session(file_path)
 
@@ -1828,404 +1628,21 @@ def excel_query(
     query_expression: str,
     include_headers: bool = True
 ) -> Dict[str, Any]:
-    """
-    高级SQL查询工具 - 纯SQL设计的Excel数据分析引擎
-
-    这是一个强大的SQL查询引擎，基于SQLGlot实现完整的SQL语法支持。采用纯SQL设计理念，
-    所有查询功能都通过标准SQL语法表达，无需学习额外的参数API。
-
-    ## 🎯 设计理念：纯SQL驱动
-    - **无冗余参数**: 所有功能都通过标准SQL语法实现
-    - **表名自动识别**: 通过SQL的FROM子句自动识别工作表，无需手动指定
-    - **完整语法支持**: 支持WHERE、GROUP BY、HAVING、ORDER BY、LIMIT等完整SQL功能
-
-    ## 📋 参数说明
-
-    ### file_path (必需) 🔴
-    - **用途**: 指定要查询的Excel文件路径
-    - **格式**: 支持 .xlsx 和 .xlsm 格式
-    - **注意**: 这是唯一无法在SQL中表达的信息，必须作为参数提供
-
-    ### query_expression (必需) 🔴
-    - **用途**: 完整的SQL查询语句
-    - **语法**: 标准SQL SELECT语法，支持复杂的查询组合
-    - **表名**: FROM子句中的表名对应Excel的工作表名称
-
-    ### include_headers (可选) 🟢
-    - **用途**: 控制结果是否包含表头行
-    - **默认值**: True (包含表头)
-    - **影响**: 仅影响输出格式，不影响查询逻辑
-
-    ## 🚀 SQL功能支持
-
-    ### 基础查询
-    ```sql
-    -- 选择所有列
-    SELECT * FROM 工作表名
-
-    -- 选择指定列
-    SELECT 列1, 列2 FROM 工作表名
-
-    -- 带计算字段
-    SELECT 列1, 列2*2 AS 双倍值 FROM 工作表名
-    ```
-
-    ### 条件筛选 (WHERE)
-    ```sql
-    -- 基础条件
-    SELECT * FROM 技能配置表 WHERE 伤害 > 50
-
-    -- 复合条件
-    SELECT * FROM 装备数据 WHERE 品质 = '传说' AND 价格 > 1000
-
-    -- 模糊匹配
-    SELECT * FROM 反馈数据 WHERE 内容 LIKE '%卡顿%'
-
-    -- 范围查询
-    SELECT * FROM 玩家数据 WHERE 等级 BETWEEN 10 AND 20
-
-    -- 集合查询
-    SELECT * FROM 物品配置 WHERE 类型 IN ('武器', '防具')
-    ```
-
-    ### 聚合统计 (GROUP BY)
-    ```sql
-    -- 基础聚合
-    SELECT 游戏名, COUNT(*) AS 反馈数 FROM 反馈数据 GROUP BY 游戏名
-
-    -- 多列聚合
-    SELECT 游戏名, 反馈类型, AVG(评分) AS 平均分
-    FROM 反馈数据
-    GROUP BY 游戏名, 反馈类型
-
-    -- 带聚合函数过滤
-    SELECT 技能类型, AVG(伤害) AS 平均伤害
-    FROM 技能配置表
-    GROUP BY 技能类型
-    HAVING AVG(伤害) > 50
-    ```
-
-    ### 排序和限制 (ORDER BY + LIMIT)
-    ```sql
-    -- 单列排序
-    SELECT * FROM 技能配置表 ORDER BY 伤害 DESC
-
-    -- 多列排序
-    SELECT * from 玩家数据 ORDER BY 等级 DESC, 经验 ASC
-
-    -- 限制结果数量
-    SELECT * FROM 装备数据 ORDER BY 价格 DESC LIMIT 10
-
-    -- 分页查询
-    SELECT * FROM 反馈数据 ORDER BY 时间 DESC LIMIT 20
-    ```
-
-    ## ✅ 已支持的SQL功能
-
-    | 功能 | 示例 | 状态 |
-    |------|------|------|
-    | SELECT基础 | `SELECT * FROM 表名` | ✅ |
-    | 列选择 | `SELECT 列1, 列2 FROM 表名` | ✅ |
-    | 别名 (AS) | `SELECT 列 AS 别名 FROM 表名` | ✅ |
-    | DISTINCT | `SELECT DISTINCT 列 FROM 表名` | ✅ |
-    | WHERE条件 | `SELECT * FROM 表名 WHERE 列 > 10` | ✅ |
-    | 比较运算符 | `=`, `>`, `<`, `>=`, `<=`, `<>` | ✅ |
-    | AND/OR条件 | `WHERE 条件1 AND 条件2` | ✅ |
-    | LIKE模糊匹配 | `WHERE 列 LIKE '%关键词%'` | ✅ |
-    | IN集合查询 | `WHERE 列 IN ('A', 'B')` | ✅ |
-    | BETWEEN范围 | `WHERE 列 BETWEEN 10 AND 20` | ✅ |
-    | ORDER BY排序 | `ORDER BY 列 DESC` | ✅ |
-    | 多列排序 | `ORDER BY 列1 DESC, 列2 ASC` | ✅ |
-    | LIMIT限制 | `LIMIT 10` | ✅ |
-    | OFFSET偏移 | `LIMIT 10 OFFSET 5` | ✅ |
-    | GROUP BY分组 | `GROUP BY 列` | ✅ |
-    | 多列GROUP BY | `GROUP BY 列1, 列2` | ✅ |
-    | COUNT(*)聚合 | `SELECT COUNT(*) FROM 表名` | ✅ |
-    | COUNT(列)聚合 | `SELECT COUNT(列) FROM 表名` | ✅ |
-    | SUM()求和 | `SELECT SUM(列) FROM 表名` | ✅ |
-    | AVG()平均 | `SELECT AVG(列) FROM 表名` | ✅ |
-    | MAX()最大值 | `SELECT MAX(列) FROM 表名` | ✅ |
-    | MIN()最小值 | `SELECT MIN(列) FROM 表名` | ✅ |
-    | HAVING过滤 | `HAVING COUNT(*) > 5` | ✅ |
-    | 无GROUP聚合 | `SELECT SUM(列) FROM 表名` | ✅ |
-    | 算术运算 | `SELECT 列*2 FROM 表名` | ✅ |
-    | 空值处理 | 聚合函数自动跳过NULL值 | ✅ |
-
-    ## ❌ 不支持的SQL功能
-
-    | 功能 | 示例 | 状态 | 替代方案 |
-    |------|------|------|----------|
-    | 子查询 | `SELECT * FROM (SELECT...)` | ❌ | 分步查询 |
-    | WITH/CTE | `WITH cte AS (...)` | ❌ | 分步查询 |
-    | JOIN | `SELECT * FROM a JOIN b` | ❌ | excel_search |
-    | UNION | `SELECT ... UNION SELECT...` | ❌ | 分步查询 |
-    | 窗口函数 | `ROW_NUMBER() OVER()` | ❌ | excel_search |
-    | CASE WHEN | `CASE WHEN ... THEN...` | ❌ | 分步处理 |
-    | EXISTS | `WHERE EXISTS (...)` | ❌ | 使用IN |
-    | INSERT | `INSERT INTO ...` | ❌ | excel_update_range |
-    | UPDATE | `UPDATE ... SET ...` | ❌ | excel_update_range |
-    | DELETE | `DELETE FROM ...` | ❌ | excel_delete_rows |
-    | 跨表查询 | 多表关联 | ❌ | 多次查询合并 |
-
-    ### ⚠️ 使用限制说明
-
-    - **只读查询**: 仅支持SELECT查询，不支持数据修改
-    - **单表为主**: 聚合查询主要针对单个工作表
-    - **文件大小**: 建议文件小于100MB以获得最佳性能
-    - **HAVING限制**: 复杂HAVING条件可能存在边缘情况
-
-    ## 🎮 游戏开发应用示例
-
-    ### 技能平衡分析
-    ```python
-    # 分析各技能类型的平均伤害
-    result = excel_query(
-        "skills.xlsx",
-        "SELECT 技能类型, AVG(伤害) AS 平均伤害, COUNT(*) AS 技能数量 "
-        "FROM 技能配置表 "
-        "GROUP BY 技能类型 "
-        "ORDER BY 平均伤害 DESC"
-    )
-
-    # 找出效率最高的技能 (伤害/冷却时间)
-    result = excel_query(
-        "skills.xlsx",
-        "SELECT 技能名, 伤害, 冷却时间, 伤害/冷却时间 AS 效率 "
-        "FROM 技能配置表 "
-        "WHERE 伤害 > 0 AND 冷却时间 > 0 "
-        "ORDER BY 效率 DESC "
-        "LIMIT 10"
-    )
-    ```
-
-    ### 装备统计分析
-    ```python
-    # 统计各品质装备数量
-    result = excel_query(
-        "items.xlsx",
-        "SELECT 品质, COUNT(*) AS 数量, AVG(价格) AS 平均价格 "
-        "FROM 装备数据 "
-        "GROUP BY 品质 "
-        "ORDER BY 数量 DESC"
-    )
-
-    # 查找高价值装备
-    result = excel_query(
-        "items.xlsx",
-        "SELECT 装备名, 品质, 价格, 价格/等级 AS 性价比 "
-        "FROM 装备数据 "
-        "WHERE 品质 IN ('传说', '史诗') AND 价格 > 5000 "
-        "ORDER BY 性价比 DESC"
-    )
-    ```
-
-    ### 玩家反馈分析
-    ```python
-    # 分析各游戏的反馈分布
-    result = excel_query(
-        "feedback.xlsx",
-        "SELECT 游戏名, 反馈类型, COUNT(*) AS 数量, AVG(评分) AS 平均评分 "
-        "FROM 反馈数据 "
-        "WHERE 评分 > 0 "
-        "GROUP BY 游戏名, 反馈类型 "
-        "ORDER BY 数量 DESC"
-    )
-
-    # 找出需要关注的低分反馈
-    result = excel_query(
-        "feedback.xlsx",
-        "SELECT * FROM 反馈数据 "
-        "WHERE 评分 <= 2 AND 反馈类型 = 'BugReport' "
-        "ORDER BY 评分 ASC, 时间 DESC "
-        "LIMIT 20"
-    )
-    ```
-
-    Args:
-        file_path: Excel文件路径 (.xlsx/.xlsm) [必需]
-            指定要分析的Excel文件，支持包含中文路径
-        query_expression: 完整的SQL查询语句 [必需]
-            使用标准SQL语法，FROM子句中的表名对应Excel工作表名
-            支持中文列名和中文工作表名
-        include_headers: 结果是否包含表头行 (默认True)
-            True: 返回 [表头, 数据行...] 格式
-            False: 只返回数据行格式
-
-    Returns:
-        Dict: 查询结果
-        {
-            'success': bool,
-            'data': List[List],           # 查询结果数据 (二维数组)
-            'query_info': {
-                'original_rows': int,     # 原始数据行数
-                'filtered_rows': int,     # 查询结果行数
-                'query_applied': bool,    # 是否应用了查询
-                'sql_query': str,         # 实际执行的SQL语句
-                'available_tables': list, # 可用的工作表列表
-                'returned_columns': list, # 返回的列名
-                'data_types': dict       # 各列的数据类型
-            },
-            'message': str               # 结果说明
-        }
-
-    ## 📝 使用示例
-
-    ### 快速开始
-    ```python
-    # 最简单的使用方式 - 只需文件路径和SQL语句
-    result = excel_query(
-        "game_data.xlsx",
-        "SELECT * FROM 玩家数据 WHERE 等级 > 10"
-    )
-
-    # 检查查询结果
-    if result['success']:
-        data = result['data']
-        print(f"查询成功，返回 {len(data)} 行数据")
-    else:
-        print(f"查询失败: {result['message']}")
-    ```
-
-    ### 实际应用场景
-    ```python
-    # 🎮 游戏反馈统计
-    result = excel_query(
-        "feedback.xlsx",
-        "SELECT 游戏名, 反馈类型, COUNT(*) AS 数量 "
-        "FROM 反馈数据 "
-        "GROUP BY 游戏名, 反馈类型 "
-        "ORDER BY 数量 DESC"
-    )
-
-    # ⚔️ 技能平衡分析
-    result = excel_query(
-        "skills.xlsx",
-        "SELECT 技能类型, AVG(伤害) AS 平均伤害, "
-        "       AVG(冷却时间) AS 平均冷却, COUNT(*) AS 技能数量 "
-        "FROM 技能配置表 "
-        "GROUP BY 技能类型 "
-        "HAVING COUNT(*) > 5 "
-        "ORDER BY 平均伤害 DESC"
-    )
-
-    # 🛡️ 装备价值分析
-    result = excel_query(
-        "items.xlsx",
-        "SELECT 装备名, 品质, 价格/等级 AS 性价比 "
-        "FROM 装备数据 "
-        "WHERE 品质 IN ('传说', '史诗') AND 价格 > 1000 "
-        "ORDER BY 性价比 DESC "
-        "LIMIT 20"
-    )
-    ```
-
-    ### 结果数据处理
-    ```python
-    result = excel_query("data.xlsx", "SELECT * FROM 表名 LIMIT 10")
-
-    if result['success']:
-        data = result['data']
-
-        # 默认包含表头 (include_headers=True)
-        if len(data) > 1:
-            headers = data[0]      # ['列1', '列2', '列3']
-            rows = data[1:]        # [['值1', '值2', '值3'], ...]
-
-            print(f"📊 列名: {headers}")
-            print(f"📈 数据行数: {len(rows)}")
-
-            # 遍历数据行
-            for i, row in enumerate(rows, 1):
-                print(f"数据行{i}: {row}")
-
-        # 查询元信息
-        query_info = result.get('query_info', {})
-        print(f"🎯 执行的SQL: {query_info.get('sql_query')}")
-        print(f"📋 返回列: {query_info.get('returned_columns')}")
-        print(f"📊 数据类型: {query_info.get('data_types')}')
-
-    else:
-        print(f"❌ 查询失败: {result['message']}")
-    ```
-
-    ## ⚠️ 重要说明：与excel_search的区别
-
-    ### excel_search vs excel_query 对比
-    ```python
-    # 📄 excel_search - 返回位置信息
-    result = excel_search("data.xlsx", "关键词")
-    # 优势: 包含具体单元格位置 (row, column)
-    # 适用: 需要精确定位单元格的场景
-
-    # 📊 excel_query - 返回结构化数据
-    result = excel_query("data.xlsx", "SELECT * FROM 表名 WHERE 列名 LIKE '%关键词%'")
-    # 优势: 支持复杂查询、聚合统计、排序等
-    # 局限: 不返回具体的单元格位置信息
-    ```
-
-    ### 💡 推荐组合使用策略
-    ```python
-    # 第一步：使用excel_query进行精确查询分析
-    analysis_result = excel_query("data.xlsx",
-        "SELECT 列名, COUNT(*) as 数量 FROM 表名 WHERE 列名 LIKE '%关键词%' GROUP BY 列名")
-
-    # 第二步：如果需要具体位置，使用excel_search定位
-    if analysis_result['success']:
-        location_result = excel_search("data.xlsx", "关键词")
-        # 结合分析结果和位置信息
-    ```
-
-    ### 🎯 选择建议
-    - **需要数据分析和统计** → 使用 excel_query
-    - **需要精确定位单元格** → 使用 excel_search
-    - **需要两者结合** → 先用excel_query分析，再用excel_search定位
-
-    ## 🎯 设计优势
-
-    ### 纯SQL设计理念
-    - **零学习成本**: 如果你会SQL，就会使用excel_query
-    - **功能完整**: 所有查询功能都通过标准SQL语法实现
-    - **表名自动识别**: FROM子句中的表名直接对应Excel工作表名
-    - **参数精简**: 只保留无法在SQL中表达的必要参数
-
-    ### 实际使用优势
-    - **无需记忆参数**: 不需要记住limit、sheet_name等冗余参数
-    - **标准语法**: 支持复杂的SQL查询组合和嵌套
-    - **强大功能**: 一行SQL就能实现复杂的数据分析
-    - **中文友好**: 完全支持中文列名和工作表名
-
-    ## ⚠️ 重要说明
-
-    ### 必需参数验证
-    - `file_path` 和 `query_expression` 都是必需参数
-    - 空的SQL语句或文件路径会返回明确的错误信息
-
-    ### 表名映射规则
-    - SQL中的表名 = Excel中的工作表名
-    - 支持中文工作表名，如 `FROM 技能配置表`
-    - 支持英文工作表名，如 `FROM Skills`
-
-    ### 性能特性
-    - 🔥 完整SQL语法支持: 基于SQLGlot解析器，支持标准SQL语法
-    - ⚡ 高性能处理: 优化内存使用，支持大数据集处理
-    - 🛡️ 安全查询: 只支持SELECT查询，不支持数据修改操作
-    - 📊 智能聚合: 支持GROUP BY、HAVING等复杂聚合功能
-
-    ## 🔧 依赖要求
-
-    ```bash
-    # 安装SQL引擎依赖
-    pip install sqlglot
-
-    # 如果未安装sqlglot，会自动提示安装方法
-    ```
-
-    ### 错误处理
-    - **参数验证**: 自动检查必需参数是否为空
-    - **SQL语法**: 自动解析和验证SQL语法错误
-    - **文件检查**: 自动验证Excel文件存在性和格式
-    - **依赖检查**: 自动检测SQLGlot是否已安装
-    """
+    """SQL查询 - 优先使用的查询分析工具
+    
+支持: WHERE, GROUP BY, HAVING, ORDER BY, LIMIT
+聚合: COUNT, SUM, AVG, MAX, MIN
+
+Args:
+    file_path: Excel文件路径
+    query_expression: SQL语句
+    include_headers: 是否包含表头
+
+Returns:
+    {success, data, query_info, message}
+
+示例: excel_query("data.xlsx", "SELECT type, AVG(伤害) FROM 技能表 GROUP BY type")
+"""
     # 参数验证
     if not file_path or not file_path.strip():
         return {
@@ -2322,32 +1739,17 @@ def excel_format_cells(
     formatting: Optional[Dict[str, Any]] = None,
     preset: Optional[str] = None
 ) -> Dict[str, Any]:
-    """
-    设置单元格格式（字体、颜色、对齐等）- 支持自定义和预设两种模式
+    """格式化单元格 - 颜色、字体、对齐等
+    
+Args:
+    file_path: Excel文件路径
+    sheet_name: 工作表名
+    range: 范围表达式
+    preset: 预设样式 (highlight/warning/success)
 
-    Args:
-        file_path: Excel文件路径 (.xlsx/.xlsm)
-        sheet_name: 工作表名称
-        range: 目标范围 (如"A1:C10")
-        formatting: 自定义格式配置字典（可选）：
-            - font: {'name': '宋体', 'size': 12, 'bold': True, 'color': 'FF0000'}
-            - fill: {'color': 'FFFF00'}
-            - alignment: {'horizontal': 'center', 'vertical': 'center'}
-        preset: 预设样式（可选），可选值: "title", "header", "data", "highlight", "currency"
-
-    注意: formatting 和 preset 必须指定其中一个，如果同时指定，preset 优先
-
-    Returns:
-        Dict: 包含 success、formatted_count、message
-
-    Example:
-        # 使用预设样式
-        result = excel_format_cells("data.xlsx", "Sheet1", "A1:D1", preset="title")
-
-        # 使用自定义格式
-        result = excel_format_cells("data.xlsx", "Sheet1", "A1:D1",
-            formatting={'font': {'bold': True, 'color': 'FF0000'}})
-    """
+Returns:
+    {success, formatted_count, message}
+"""
     return ExcelOperations.format_cells(file_path, sheet_name, range, formatting, preset)
 
 
@@ -2596,68 +1998,18 @@ def excel_compare_sheets(
     id_column: Union[int, str] = 1,
     header_row: int = 1
 ) -> Dict[str, Any]:
-    """
-    比较两个Excel工作表，识别ID对象的新增、删除、修改。
+    """比较两个工作表的差异
+    
+Args:
+    file1_path: 第一个文件
+    sheet1_name: 第一个工作表
+    file2_path: 第二个文件
+    sheet2_name: 第二个工作表
+    id_column: ID列位置
 
-    专为游戏配置表设计，使用紧凑数组格式提高传输效率。
-
-    Args:
-        file1_path: 第一个Excel文件路径
-        sheet1_name: 第一个工作表名称
-        file2_path: 第二个Excel文件路径
-        sheet2_name: 第二个工作表名称
-        id_column: ID列位置（1-based数字或列名），默认第一列
-        header_row: 表头行号（1-based），默认第一行
-
-    Returns:
-        Dict: 比较结果
-        {
-            "success": true,
-            "message": "成功比较工作表，发现3处差异",
-            "data": {
-                "sheet_name": "TrSkill vs TrSkill",
-                "total_differences": 3,
-                "row_differences": [
-                    // 字段定义
-                    ["row_id", "difference_type", "row_index1", "row_index2", "sheet_name", "field_differences"],
-
-                    // 新增行
-                    ["100001", "row_added", 0, 5, "TrSkill", null],
-
-                    // 删除行
-                    ["100002", "row_removed", 8, 0, "TrSkill", null],
-
-                    // 修改行 - 包含变化的字段
-                    ["100003", "row_modified", 10, 10, "TrSkill",
-                        // field_differences: 变化的字段数组，每个元素格式 [字段名, 旧值, 新值, 变化类型]
-                        [["技能名称", "火球术", "冰球术", "text_change"]]
-                    ]
-                ],
-                "structural_changes": {
-                    "max_row": {"sheet1": 100, "sheet2": 101, "difference": 1}
-                }
-            }
-        }
-
-    数据解析：
-        row_differences[0] = 字段定义（索引说明）
-        row_differences[1+] = 实际数据行
-
-        对于row_modified类型：
-        - field_differences: 变化的字段数组
-          格式：[[字段名, 旧值, 新值, 变化类型], ...]
-          变化类型："text_change" | "numeric_change" | "formula_change"
-
-        对于row_added/row_removed类型：
-        - field_differences为null，因为整行都是变化
-
-    Example:
-        result = excel_compare_sheets("old.xlsx", "Sheet1", "new.xlsx", "Sheet1")
-        differences = result['data']['row_differences']
-        for row in differences[1:]:  # 跳过字段定义行
-            row_id, diff_type = row[0], row[1]
-            print(f"{diff_type}: {row_id}")
-    """
+Returns:
+    {success, data: {added, removed, modified}, message}
+"""
     return ExcelOperations.compare_sheets(file1_path, sheet1_name, file2_path, sheet2_name, id_column, header_row)
 # ==================== 主程序 ====================
 if __name__ == "__main__":
