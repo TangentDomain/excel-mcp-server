@@ -10,11 +10,11 @@
 [![Python Version](https://img.shields.io/badge/python-3.10+-blue.svg)](https://www.python.org/downloads/)
 [![Powered by: FastMCP](https://img.shields.io/badge/Powered%20by-FastMCP-orange)](https://github.com/jlowin/fastmcp)
 ![Status](https://img.shields.io/badge/status-stable-green.svg)
-![Tests](https://img.shields.io/badge/tests-698%20passed-brightgreen.svg)
-![Coverage](https://img.shields.io/badge/coverage-78.58%25-blue.svg)
+![Tests](https://img.shields.io/badge/tests-1137%20passed-brightgreen.svg)
+![Coverage](https://img.shields.io/badge/coverage-92.03%25-blue.svg)
 ![Tools](https://img.shields.io/badge/tools-38%20verified%20tools-green.svg)
 
-**ExcelMCP** is an Excel configuration table management MCP server specially designed for game development. Through AI natural language commands, it enables intelligent operations on game configurations such as skill tables, equipment data, and monster attributes. Built with **FastMCP** and **openpyxl**, it features **38 professional tools** and **698 test cases**, ensuring enterprise-grade reliability.
+**ExcelMCP** is an Excel configuration table management MCP server specially designed for game development. Through AI natural language commands, it enables intelligent operations on game configurations such as skill tables, equipment data, and monster attributes. Built with **FastMCP** and **openpyxl**, it features **38 professional tools** and **1137 test cases**, ensuring enterprise-grade reliability.
 
 🎯 **Core Features**: Skill systems, equipment management, monster configuration, numerical balancing, version comparison, designer toolchain
 

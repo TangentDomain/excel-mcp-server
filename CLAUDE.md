@@ -5,7 +5,7 @@
 
 ## 项目概览
 
-ExcelMCP 是专为游戏开发设计的 Excel 配置表管理 MCP (Model Context Protocol) 服务器。提供 30 个专业工具管理 Excel 文件，配备 698 个测试用例确保高质量覆盖和企业级可靠性。
+ExcelMCP 是专为游戏开发设计的 Excel 配置表管理 MCP (Model Context Protocol) 服务器。提供 38 个专业工具管理 Excel 文件，配备 1137 个测试用例确保高质量覆盖（92.03%）和企业级可靠性。
 
 ### 核心用途
 - **游戏开发专业化**: 专精于技能配置表、装备数据、怪物属性和游戏配置管理
@@ -107,9 +107,14 @@ python -m pytest tests/test_api_excel_operations.py::TestExcelOperations::test_g
 **注意**: 推荐使用 `python -m pytest` 而不是直接 `pytest`，这样可以避免Python路径问题。
 
 ### 测试结构
-- **API 测试**: `test_api_excel_operations.py` - 使用 Mock 隔离测试业务逻辑
-- **核心测试**: `test_core.py` - 测试 Excel 操作模块
+- **API 测试**: `test_api_*.py` - 测试 API 层业务逻辑
+  - `test_api_excel_operations.py` - 核心 API 测试
+  - `test_api_excel_operations_advanced.py` - 高级功能测试
+  - `test_api_excel_operations_coverage.py` - 覆盖率补充测试
+  - `test_api_coverage_supplement.py` - 新增 API 覆盖测试（query_excel_data 等）
+- **核心测试**: `test_core*.py` - 测试 Excel 操作模块
 - **MCP 测试**: `test_server.py` - 测试 MCP 接口委托
+- **Writer 测试**: `test_writer_coverage_supplement.py` - 公式解析和统计函数测试
 - **功能测试**: 各种功能特定的测试文件
 - **配置**: `conftest.py` 提供临时 Excel 文件的 fixtures
 
@@ -170,7 +175,7 @@ python -m pytest tests/test_api_excel_operations.py::TestExcelOperations::test_g
 
 ## 工具分类
 
-### 30 个专业工具 (已启用)
+### 38 个专业工具 (已启用)
 1. **文件和工作表管理** (8个工具):
    - `excel_list_sheets` - 列出工作表
    - `excel_get_file_info` - 获取文件信息

@@ -15,9 +15,9 @@
 
 ### 项目统计
 
-- 测试用例: 698个（通过率>99%）
-- 代码覆盖率: ~78%
-- 代码总行数: 13,500+行（仅测试代码）
+- 测试用例: 1137个（通过率>99%）
+- 代码覆盖率: 92.03%
+- 代码总行数: 15,000+行（仅测试代码）
 - Python版本要求: >= 3.10
 
 ---
@@ -128,12 +128,17 @@ src/
     ├── formula_cache.py         # 公式缓存
     └── temp_file_manager.py     # 临时文件管理
 
-tests/                           # 测试目录（49个测试文件）
+tests/                           # 测试目录（52个测试文件）
 ├── conftest.py                  # pytest配置和fixture
 ├── test_server.py               # 服务器接口测试
 ├── test_api_*.py                # API层测试
+│   ├── test_api_excel_operations.py         # 核心API测试
+│   ├── test_api_excel_operations_advanced.py # 高级功能测试
+│   ├── test_api_excel_operations_coverage.py # 覆盖率补充测试
+│   └── test_api_coverage_supplement.py       # query_excel_data等新增测试
 ├── test_core.py                 # 核心模块测试
 ├── test_excel_*.py              # 各功能模块测试
+├── test_writer_coverage_supplement.py  # Writer公式解析和统计函数测试
 └── test_security_features.py    # 安全功能测试
 ```
 
@@ -267,8 +272,13 @@ make dev-setup
 
 ### 测试覆盖率要求
 
-- 目标覆盖率: >78%
+- 目标覆盖率: >90% (当前 92.03%)
 - 核心模块: 必须覆盖主要执行路径
+- 关键模块目标:
+  - `excel_reader.py`: 96.52% ✅
+  - `excel_writer.py`: 94.76% ✅
+  - `excel_converter.py`: 100% ✅
+  - `excel_operations.py`: 91.40% ✅
 - 新增功能: 必须包含对应的测试用例
 
 ### 测试文件命名
