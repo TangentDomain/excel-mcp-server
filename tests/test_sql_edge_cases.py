@@ -208,7 +208,7 @@ class TestSQLQueryWorkingFeatures:
 
         assert result['success'] is True
         rows = self._get_data_rows(result)
-        assert len(rows) == 4  # 4 departments
+        assert len(rows) == 5  # 4 departments + 1 TOTAL row
 
     def test_group_by_sum(self, sql_test_file):
         """Test GROUP BY with SUM"""
@@ -219,7 +219,7 @@ class TestSQLQueryWorkingFeatures:
 
         assert result['success'] is True
         rows = self._get_data_rows(result)
-        assert len(rows) == 4
+        assert len(rows) == 5  # 4 departments + 1 TOTAL row
 
     def test_query_info_metadata(self, sql_test_file):
         """Test query_info metadata in response"""

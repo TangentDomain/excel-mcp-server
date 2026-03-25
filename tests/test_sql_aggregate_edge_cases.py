@@ -204,7 +204,7 @@ class TestHavingClause:
         
         assert result['success'] is True
         # Sales和IT各有2人 > 1
-        assert len(result['data']) == 3  # header + 2 rows
+        assert len(result['data']) == 4  # header + 2 rows + 1 TOTAL
 
     def test_having_min_max(self, test_excel_file):
         """测试HAVING MIN/MAX()"""

@@ -177,13 +177,15 @@ class AdvancedSQLQueryEngine:
                 # 执行查询
                 result_data = self._execute_query(parsed_sql, worksheets_data, limit)
 
-                # 格式化结果
+                # 格式化结果（传入parsed_sql判断是否需要总计行）
+                has_group_by = parsed_sql.args.get('group') is not None
                 return self._format_query_result(
                     result_data,
                     file_path,
                     sql,
                     worksheets_data,
-                    include_headers
+                    include_headers,
+                    has_group_by=has_group_by
                 )
 
             except ParseError as e:
@@ -1301,9 +1303,14 @@ class AdvancedSQLQueryEngine:
         file_path: str,
         sql: str,
         worksheets_data: Dict[str, pd.DataFrame],
-        include_headers: bool
+        include_headers: bool,
+        has_group_by: bool = False
     ) -> Dict[str, Any]:
-        """格式化查询结果"""
+        """格式化查询结果
+
+        Args:
+            has_group_by: 如果为True且有数值聚合列，自动追加TOTAL行
+        """
 
         # 计算原始数据统计
         total_original_rows = sum(len(df) for df in worksheets_data.values())
@@ -1341,6 +1348,28 @@ class AdvancedSQLQueryEngine:
                 for _, row in result_df.iterrows():
                     data.append([_serialize_value(val) for val in row])
 
+        # GROUP BY 聚合结果自动追加 TOTAL 行
+        has_total_row = False
+        if has_group_by and not result_df.empty and len(result_df) > 1 and include_headers:
+            numeric_cols = []
+            for i, col in enumerate(result_df.columns):
+                # 检测数值列（聚合结果通常是数值）
+                series = pd.to_numeric(result_df[col], errors='coerce')
+                if series.notna().sum() > len(result_df) * 0.5:
+                    numeric_cols.append(i)
+            if numeric_cols:
+                total_row = [''] * len(result_df.columns)
+                total_row[0] = 'TOTAL'
+                for i in numeric_cols:
+                    col_sum = 0.0
+                    for row_idx in range(1, len(data)):  # 跳过表头行
+                        val = data[row_idx][i]
+                        if isinstance(val, (int, float)):
+                            col_sum += val
+                    total_row[i] = _serialize_value(col_sum)
+                data.append(total_row)
+                has_total_row = True
+
         # 双行表头：构建列描述映射
         column_descriptions = {}
         if hasattr(self, '_header_descriptions') and self._header_descriptions:
@@ -1351,7 +1380,7 @@ class AdvancedSQLQueryEngine:
 
         result = {
             'success': True,
-            'message': f'SQL查询成功执行，返回 {len(result_df)} 行结果',
+            'message': f'SQL查询成功执行，返回 {len(result_df)} 行结果' + ('（含TOTAL汇总行）' if has_total_row else ''),
             'data': data,
             'query_info': {
                 'original_rows': total_original_rows,
