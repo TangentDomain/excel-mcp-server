@@ -461,6 +461,28 @@ class AdvancedSQLQueryEngine:
 
         return protected_sql
 
+    def _suggest_column_name(self, col_name: str, available_cols: List[str], max_suggestions: int = 3) -> str:
+        """
+        当列名不存在时，用编辑距离找出最相似的列名作为建议。
+
+        Args:
+            col_name: 用户输入的列名
+            available_cols: 可用的列名列表
+            max_suggestions: 最多返回几个建议
+
+        Returns:
+            str: 格式化的建议字符串，如 "你是否想用: skill_name, skill_id, skill_type?"
+        """
+        import difflib
+        if not available_cols:
+            return ""
+
+        matches = difflib.get_close_matches(col_name, available_cols, n=max_suggestions, cutoff=0.3)
+        if not matches:
+            return ""
+
+        return f" 你是否想用: {', '.join(matches)}?"
+
     def _execute_query(
         self,
         parsed_sql: exp.Expression,
@@ -582,7 +604,8 @@ class AdvancedSQLQueryEngine:
                     if column_name in df.columns:
                         result_data[alias_name] = df[column_name]
                     else:
-                        raise ValueError(f"列 '{column_name}' 不存在")
+                        suggestion = self._suggest_column_name(column_name, list(df.columns))
+                        raise ValueError(f"列 '{column_name}' 不存在。可用列: {list(df.columns)}。{suggestion}")
 
                 elif self._is_mathematical_expression(original_expr):
                     # 数学表达式
@@ -759,7 +782,8 @@ class AdvancedSQLQueryEngine:
         if isinstance(expr, exp.Column):
             col_name = expr.name
             if col_name not in df.columns:
-                raise ValueError(f"列 '{col_name}' 不存在。可用列: {list(df.columns)}")
+                suggestion = self._suggest_column_name(col_name, list(df.columns))
+                raise ValueError(f"列 '{col_name}' 不存在。可用列: {list(df.columns)}。{suggestion}")
             return f"`{col_name}`"
 
         elif isinstance(expr, exp.Literal):
@@ -831,7 +855,8 @@ class AdvancedSQLQueryEngine:
         elif isinstance(expr, exp.Column):
             col_name = expr.name
             if col_name not in df.columns:
-                raise ValueError(f"列 '{col_name}' 不存在")
+                suggestion = self._suggest_column_name(col_name, list(df.columns))
+                raise ValueError(f"列 '{col_name}' 不存在。可用列: {list(df.columns)}。{suggestion}")
             return f"`{col_name}`"
 
         elif isinstance(expr, exp.AggFunc):
@@ -1171,7 +1196,8 @@ class AdvancedSQLQueryEngine:
                 # 先查SELECT别名，再查原始列
                 resolved_name = self._resolve_order_column(col_name, df, select_aliases)
                 if resolved_name is None:
-                    raise ValueError(f"排序列 '{col_name}' 不存在。可用列: {list(df.columns)}")
+                    suggestion = self._suggest_column_name(col_name, list(df.columns))
+                    raise ValueError(f"排序列 '{col_name}' 不存在。可用列: {list(df.columns)}。{suggestion}")
 
                 sort_columns.append(resolved_name)
                 is_desc = order_expr.args.get('desc', False)
@@ -1182,7 +1208,8 @@ class AdvancedSQLQueryEngine:
                     col_name = order_expr.name
                     resolved_name = self._resolve_order_column(col_name, df, select_aliases)
                     if resolved_name is None:
-                        raise ValueError(f"排序列 '{col_name}' 不存在。可用列: {list(df.columns)}")
+                        suggestion = self._suggest_column_name(col_name, list(df.columns))
+                        raise ValueError(f"排序列 '{col_name}' 不存在。可用列: {list(df.columns)}。{suggestion}")
 
                     sort_columns.append(resolved_name)
                     ascending.append(True)

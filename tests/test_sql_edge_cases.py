@@ -271,3 +271,20 @@ class TestSQLQueryKnownLimitations:
         result = excel_query(sql_test_file, "SELECT Name FROM Employees WHERE Age IS NULL")
 
         assert result['success'] is False
+
+    def test_column_name_typo_suggestion(self, sql_test_file):
+        """When column name is misspelled, suggest similar column names"""
+        result = excel_query(sql_test_file, "SELECT Nam FROM Employees")
+
+        assert result['success'] is False
+        # Should include suggestion for "Name"
+        assert "Nam" in result['message']
+        assert "Name" in result['message']
+
+    def test_order_by_typo_suggestion(self, sql_test_file):
+        """ORDER BY with typo should suggest correct column"""
+        result = excel_query(sql_test_file, "SELECT * FROM Employees ORDER BY Ag DESC")
+
+        assert result['success'] is False
+        assert "Ag" in result['message']
+        assert "Age" in result['message']
