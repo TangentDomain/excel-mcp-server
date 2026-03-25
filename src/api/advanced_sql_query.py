@@ -375,6 +375,27 @@ class AdvancedSQLQueryEngine:
                     'error': '不支持窗口函数（OVER子句）'
                 }
 
+            # 检查不支持的JOIN
+            if parsed_sql.args.get('joins') or parsed_sql.find(exp.Join):
+                available_tables = list(self._pending_tables) if hasattr(self, '_pending_tables') else []
+                return {
+                    'valid': False,
+                    'error': '不支持JOIN查询。💡 游戏配置表关联查询替代方案：\n'
+                             '1. 先用 excel_get_range 读取两个表的数据\n'
+                             '2. 在AI层面做关联匹配\n'
+                             '3. 或将需要关联的字段合并到同一个工作表中'
+                }
+
+            # 检查不支持的CASE WHEN
+            if parsed_sql.find(exp.Case):
+                return {
+                    'valid': False,
+                    'error': '不支持CASE WHEN表达式。💡 替代方案：\n'
+                             '1. 用多个 WHERE 条件分别查询再合并\n'
+                             '2. 用 excel_update_range 批量修改数据\n'
+                             '3. 使用 excel_get_range 读取后在外部处理条件逻辑'
+                }
+
             return {'valid': True}
 
         except Exception as e:
