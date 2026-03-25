@@ -559,6 +559,15 @@ class AdvancedSQLQueryEngine:
             # 应用SELECT表达式（裁剪列、计算字段、别名）
             base_df = self._apply_select_expressions(parsed_sql, base_df)
 
+        # 应用OFFSET（在LIMIT之前）
+        offset_clause = parsed_sql.args.get('offset')
+        if offset_clause:
+            if hasattr(offset_clause, 'expression'):
+                offset_value = int(offset_clause.expression.this)
+            else:
+                offset_value = int(offset_clause.this)
+            base_df = base_df.iloc[offset_value:]
+
         # 应用LIMIT
         limit_clause = parsed_sql.args.get('limit')
         if limit_clause:
@@ -775,9 +784,25 @@ class AdvancedSQLQueryEngine:
             return self._sql_condition_to_pandas(condition.this, df)
 
         elif isinstance(condition, exp.Not):
-            # NOT表达式：IS NOT NULL会被解析为Not(Is(...))
-            inner = self._sql_condition_to_pandas(condition.this, df)
-            return f"~({inner})"
+            inner = condition.this
+            # NOT LIKE: NOT > Like → 排除匹配行
+            if isinstance(inner, exp.Like):
+                left = self._expression_to_column_reference(inner.this, df)
+                right = self._expression_to_value(inner.expression, df)
+                pattern = str(right).strip("'\"")
+                pattern = pattern.replace('%', '.*').replace('_', '.')
+                return f"~{left}.str.match('{pattern}', na=False)"
+            # NOT IN: NOT > In → 排除列表中值
+            if isinstance(inner, exp.In):
+                left = self._expression_to_column_reference(inner.this, df)
+                values = []
+                for value in inner.expressions:
+                    values.append(self._expression_to_value(value, df))
+                values_str = ', '.join(str(v) for v in values)
+                return f"~{left}.isin([{values_str}])"
+            # 其他NOT表达式（IS NOT NULL等）
+            pandas_expr = self._sql_condition_to_pandas(inner, df)
+            return f"~({pandas_expr})"
 
         elif isinstance(condition, exp.Like):
             left = self._expression_to_column_reference(condition.this, df)

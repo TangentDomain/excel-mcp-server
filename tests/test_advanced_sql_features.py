@@ -324,3 +324,89 @@ class TestAdvancedSQLFeatures:
         
         # 语法错误应该失败
         assert result is not None
+
+    # ==================== OFFSET分页测试 ====================
+
+    def test_offset_only(self, test_excel_file):
+        """测试OFFSET跳过前N行"""
+        from src.api.advanced_sql_query import execute_advanced_sql_query
+        
+        result_all = execute_advanced_sql_query(
+            file_path=test_excel_file,
+            sql="SELECT Name FROM Employees ORDER BY Name LIMIT 10"
+        )
+        result_offset = execute_advanced_sql_query(
+            file_path=test_excel_file,
+            sql="SELECT Name FROM Employees ORDER BY Name LIMIT 10 OFFSET 2"
+        )
+        
+        assert result_all['success'] is True
+        assert result_offset['success'] is True
+        
+        # data[0]是header，data[1:]是实际数据
+        all_names = [row[0] for row in result_all['data'][1:]]
+        offset_names = [row[0] for row in result_offset['data'][1:]]
+        
+        # OFFSET后的结果数应比全部少2
+        assert len(all_names) - len(offset_names) == 2
+        # offset结果从all的第3个开始
+        assert offset_names == all_names[2:]
+
+    def test_offset_with_limit(self, test_excel_file):
+        """测试OFFSET+LIMIT组合分页 - 验证分页不重叠"""
+        from src.api.advanced_sql_query import execute_advanced_sql_query
+        
+        # 全量
+        result_all = execute_advanced_sql_query(
+            file_path=test_excel_file,
+            sql="SELECT Name FROM Employees ORDER BY Name LIMIT 100"
+        )
+        # 分页1: OFFSET 0 LIMIT 3
+        page1 = execute_advanced_sql_query(
+            file_path=test_excel_file,
+            sql="SELECT Name FROM Employees ORDER BY Name LIMIT 3 OFFSET 0"
+        )
+        # 分页2: OFFSET 3 LIMIT 3
+        page2 = execute_advanced_sql_query(
+            file_path=test_excel_file,
+            sql="SELECT Name FROM Employees ORDER BY Name LIMIT 3 OFFSET 3"
+        )
+        
+        assert page1['success'] is True
+        assert page2['success'] is True
+        
+        all_data = [row[0] for row in result_all['data'][1:]]
+        p1_data = [row[0] for row in page1['data'][1:]]
+        p2_data = [row[0] for row in page2['data'][1:]]
+        
+        # 合并两页应等于全量
+        assert p1_data + p2_data == all_data
+        # 两页不应有重叠
+        assert len(set(p1_data) & set(p2_data)) == 0
+
+    # ==================== NOT LIKE测试 ====================
+
+    def test_not_like(self, test_excel_file):
+        """测试NOT LIKE排除匹配"""
+        from src.api.advanced_sql_query import execute_advanced_sql_query
+        
+        # LIKE匹配含'l'的（Alice, Charlie）
+        result_like = execute_advanced_sql_query(
+            file_path=test_excel_file,
+            sql="SELECT Name FROM Employees WHERE Name LIKE '%l%'"
+        )
+        # NOT LIKE排除含'l'的
+        result_not_like = execute_advanced_sql_query(
+            file_path=test_excel_file,
+            sql="SELECT Name FROM Employees WHERE Name NOT LIKE '%l%'"
+        )
+        
+        assert result_like['success'] is True
+        assert result_not_like['success'] is True
+        
+        # 过滤掉可能的header行
+        like_names = set(row[0] for row in result_like['data'] if row[0] != 'Name')
+        not_like_names = set(row[0] for row in result_not_like['data'] if row[0] != 'Name')
+        
+        # 两集合不应有交集
+        assert len(like_names & not_like_names) == 0
