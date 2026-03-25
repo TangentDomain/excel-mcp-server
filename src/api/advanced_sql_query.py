@@ -161,6 +161,8 @@ class AdvancedSQLQueryEngine:
             sql = self._replace_cn_columns_in_sql(sql, worksheets_data)
 
             # 解析和执行SQL
+            import time as _time
+            _query_start = _time.time()
             try:
                 parsed_sql = sqlglot.parse_one(sql, dialect="mysql")
 
@@ -176,10 +178,11 @@ class AdvancedSQLQueryEngine:
 
                 # 执行查询
                 result_data = self._execute_query(parsed_sql, worksheets_data, limit)
+                _query_elapsed = (_time.time() - _query_start) * 1000
 
                 # 格式化结果（传入parsed_sql判断是否需要总计行）
                 has_group_by = parsed_sql.args.get('group') is not None
-                return self._format_query_result(
+                result = self._format_query_result(
                     result_data,
                     file_path,
                     sql,
@@ -187,6 +190,9 @@ class AdvancedSQLQueryEngine:
                     include_headers,
                     has_group_by=has_group_by
                 )
+                # 注入执行时间
+                result['query_info']['execution_time_ms'] = round(_query_elapsed, 1)
+                return result
 
             except ParseError as e:
                 err_str = str(e)
@@ -802,7 +808,7 @@ class AdvancedSQLQueryEngine:
                 right = self._expression_to_value(inner.expression, df)
                 pattern = str(right).strip("'\"")
                 pattern = pattern.replace('%', '.*').replace('_', '.')
-                return f"~{left}.str.match('{pattern}', na=False)"
+                return f"~{left}.str.match('{pattern}', case=False, na=False)"
             # NOT IN: NOT > In → 排除列表中值
             if isinstance(inner, exp.In):
                 left = self._expression_to_column_reference(inner.this, df)
@@ -819,9 +825,9 @@ class AdvancedSQLQueryEngine:
             left = self._expression_to_column_reference(condition.this, df)
             right = self._expression_to_value(condition.expression, df)
             pattern = str(right).strip("'\"")
-            # 转换SQL LIKE模式为pandas str.contains
+            # 转换SQL LIKE模式为pandas str.contains（默认大小写不敏感，适配游戏配置表场景）
             pattern = pattern.replace('%', '.*').replace('_', '.')
-            return f"{left}.str.match('{pattern}', na=False)"
+            return f"{left}.str.match('{pattern}', case=False, na=False)"
 
         elif isinstance(condition, exp.In):
             left = self._expression_to_column_reference(condition.this, df)
@@ -1406,6 +1412,20 @@ class AdvancedSQLQueryEngine:
         # 空结果友好提示
         if result_df.empty:
             result['query_info']['suggestion'] = '查询返回0行数据。可能原因：WHERE条件过严、列名拼写错误（可用DESCRIBE查看列名）、或数据尚未录入。'
+
+        # 生成Markdown表格（方便AI和人类阅读）
+        if data and len(data) > 0:
+            md_lines = []
+            # 表头
+            md_lines.append('| ' + ' | '.join(str(c) for c in data[0]) + ' |')
+            md_lines.append('| ' + ' | '.join(['---'] * len(data[0])) + ' |')
+            # 数据行（最多50行，避免超大输出）
+            max_md_rows = min(len(data) - 1, 50)
+            for row in data[1:1 + max_md_rows]:
+                md_lines.append('| ' + ' | '.join(str(c) for c in row) + ' |')
+            if len(data) - 1 > 50:
+                md_lines.append(f'| ... 共{len(data) - 1}行，仅显示前50行 |')
+            result['query_info']['markdown_table'] = '\n'.join(md_lines)
 
         # 双行表头时附加描述信息
         if column_descriptions:

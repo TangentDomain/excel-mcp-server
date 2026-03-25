@@ -411,6 +411,35 @@ class TestAdvancedSQLFeatures:
         # 两集合不应有交集
         assert len(like_names & not_like_names) == 0
 
+    def test_like_case_insensitive(self, test_excel_file):
+        """测试LIKE大小写不敏感（游戏配置表场景：搜Fire和fire应匹配同一行）"""
+        from src.api.advanced_sql_query import execute_advanced_sql_query
+        
+        result_lower = execute_advanced_sql_query(
+            file_path=test_excel_file,
+            sql="SELECT Name FROM Employees WHERE Name LIKE '%alice%'"
+        )
+        result_upper = execute_advanced_sql_query(
+            file_path=test_excel_file,
+            sql="SELECT Name FROM Employees WHERE Name LIKE '%ALICE%'"
+        )
+        result_mixed = execute_advanced_sql_query(
+            file_path=test_excel_file,
+            sql="SELECT Name FROM Employees WHERE Name LIKE '%Alice%'"
+        )
+        
+        assert result_lower['success'] is True
+        assert result_upper['success'] is True
+        assert result_mixed['success'] is True
+        
+        # 三种大小写应返回相同结果
+        names_lower = set(row[0] for row in result_lower['data'] if row[0] != 'Name')
+        names_upper = set(row[0] for row in result_upper['data'] if row[0] != 'Name')
+        names_mixed = set(row[0] for row in result_mixed['data'] if row[0] != 'Name')
+        
+        assert names_lower == names_upper == names_mixed
+        assert 'Alice' in names_lower
+
     # ==================== COUNT(DISTINCT)测试 ====================
 
     def test_count_distinct_no_group_by(self, test_excel_file):
