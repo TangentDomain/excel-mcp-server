@@ -95,6 +95,10 @@ python -m pytest tests/ --tb=short -q
 | 装备配置管理 | `excel_format_cells` + `excel_get_range` | "用金色标记所有传说装备" |
 | 怪物数据验证 | `excel_check_duplicate_ids` + `excel_search` | "确保怪物ID唯一，血量合理" |
 | 版本对比分析 | `excel_compare_sheets` + `excel_compare_files` | "对比新旧版本配置表差异" |
+| 数据统计查询 | `excel_query` | "查询技能表中各职业平均攻击力" |
+| 批量修改前预览 | `excel_preview_operation` + `excel_assess_data_impact` | "预览删除第5-10行的影响" |
+| 修改前备份 | `excel_create_backup` | "备份当前技能表再修改" |
+| 公式试算 | `excel_evaluate_formula` | "临时计算SUM(A2:A100)看结果" |
 
 ### 🔧 范围表达式参考
 
@@ -107,7 +111,7 @@ python -m pytest tests/ --tb=short -q
 
 ---
 
-## 🛠️ 完整工具列表（38个专业工具）
+## 🛠️ 完整工具列表（39个专业工具）
 
 ### 📁 文件与工作表管理
 - `excel_create_file` - 创建新Excel文件，支持自定义工作表
@@ -128,19 +132,32 @@ python -m pytest tests/ --tb=short -q
 - `excel_insert_columns` - 插入空列
 - `excel_delete_columns` - 删除列范围
 - `excel_find_last_row` - 查找最后一行有数据位置
+- `excel_set_formula` - 设置单元格公式（自动计算）
+- `excel_evaluate_formula` - 临时执行公式返回结果，不修改文件
 
 ### 🔍 搜索与分析
 - `excel_search` - 正则表达式搜索
 - `excel_search_directory` - 目录批量搜索
+- `excel_query` - SQL查询（支持WHERE/GROUP BY/ORDER BY/LIMIT及聚合函数）
 - `excel_compare_sheets` - 工作表对比（游戏配置优化）
 - `excel_compare_files` - 多工作表文件对比
 - `excel_check_duplicate_ids` - ID重复检测
+
+### 🛡️ 安全与备份
+- `excel_create_backup` - 创建文件自动备份
+- `excel_restore_backup` - 从备份恢复文件
+- `excel_list_backups` - 列出所有备份记录
+- `excel_preview_operation` - 预览操作影响范围和当前数据
+- `excel_assess_data_impact` - 全面评估操作的潜在影响
+
+### 📜 操作历史
+- `excel_get_operation_history` - 获取操作历史记录和统计
 
 ### 🎨 格式化与样式
 - `excel_format_cells` - 应用字体、颜色、对齐格式
 - `excel_set_borders` - 设置单元格边框
 - `excel_merge_cells` - 合并单元格范围
-- `excel_unmerge_cells` - 取消合并单元格
+- `excel_unmerge_cells` - 取消合并单元格范围
 - `excel_set_column_width` - 调整列宽
 - `excel_set_row_height` - 调整行高
 
