@@ -138,7 +138,7 @@ python -m pytest tests/ --tb=short -q
 ### 🔍 搜索与分析
 - `excel_search` - 正则表达式搜索
 - `excel_search_directory` - 目录批量搜索
-- `excel_query` - SQL查询（支持WHERE/GROUP BY/ORDER BY/LIMIT及聚合函数）
+- `excel_query` - SQL查询（支持双行表头自动识别、WHERE/GROUP BY/HAVING/ORDER BY/LIMIT、聚合函数、数学表达式）
 - `excel_compare_sheets` - 工作表对比（游戏配置优化）
 - `excel_compare_files` - 多工作表文件对比
 - `excel_check_duplicate_ids` - ID重复检测
@@ -172,11 +172,13 @@ python -m pytest tests/ --tb=short -q
 
 ### 🎮 游戏配置表标准格式
 
-**双行表头系统** (游戏开发专用):
+**双行表头系统** (游戏开发专用，自动识别):
 ```
 第1行(描述): ['技能ID描述', '技能名称描述', '技能类型描述']
 第2行(字段): ['skill_id', 'skill_name', 'skill_type']
 ```
+
+`excel_query` 会自动检测双行表头格式（第1行中文描述 + 第2行英文字段名），无需手动指定。查询结果中会附带 `column_descriptions` 映射，方便理解字段含义。
 
 **常见配置表结构**:
 - **技能配置表**: ID|名称|类型|等级|消耗|冷却|伤害|描述
@@ -192,7 +194,39 @@ python -m pytest tests/ --tb=short -q
 5. **美化显示**: 使用 `excel_format_cells` 标记重要数据
 6. **验证结果**: 重新读取确认更新成功
 
-### 🚨 故障排除
+### 🔍 SQL查询参考
+
+`excel_query` 基于sqlglot + pandas实现，支持以下SQL语法：
+
+**支持的语法：**
+```sql
+-- 基础查询
+SELECT * FROM 技能表 WHERE level >= 10 LIMIT 20
+SELECT skill_name, damage FROM 技能表 ORDER BY damage DESC
+
+-- 聚合统计
+SELECT skill_type, AVG(damage) as avg_dmg, COUNT(*) as cnt FROM 技能表 GROUP BY skill_type
+
+-- HAVING过滤
+SELECT skill_type, SUM(damage) as total FROM 技能表 GROUP BY skill_type HAVING total > 1000
+
+-- 数学表达式
+SELECT skill_name, damage * 1.2 as boosted_dmg FROM 技能表 WHERE level >= 5
+
+-- LIKE模糊搜索
+SELECT * FROM 技能表 WHERE skill_name LIKE '%火%'
+```
+
+**不支持的语法（有清晰替代方案提示）：**
+- JOIN（提示：读取两表在AI层关联）
+- CASE WHEN（提示：分条件查询或外部处理）
+- 子查询 / CTE / 窗口函数
+
+**双行表头自动识别：**
+```
+# 自动检测到双行表头后，查询结果包含column_descriptions映射
+# 例：查询 "技能表" 的 skill_name 列，返回时附带 "技能名称" 描述
+```
 
 **常见问题解决**:
 - **文件被锁定**: 关闭Excel程序后重试
@@ -244,7 +278,7 @@ API业务逻辑层 (集中式处理)
 python -m pytest tests/ -v
 
 # 验证工具完整性
-grep -r "@mcp.tool" src/ | wc -l  # 应输出: 38
+grep -r "@mcp.tool" src/ | wc -l  # 应输出: 39
 
 # 生成覆盖率报告
 python -m pytest tests/ --cov=src --cov-report=html

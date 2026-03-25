@@ -887,8 +887,11 @@ class AdvancedSQLQueryEngine:
                 alias_name = select_expr.alias
                 original_expr = select_expr.this
             else:
-                # 对于没有别名的列，使用列名作为别名
-                if hasattr(select_expr, 'name'):
+                # 对于没有别名的表达式，生成有意义的别名
+                if self._is_aggregate_function(select_expr):
+                    # 聚合函数无别名：生成如 count_star, avg_damage, sum_hp 等
+                    alias_name = self._generate_aggregate_alias(select_expr)
+                elif hasattr(select_expr, 'name') and select_expr.name:
                     alias_name = select_expr.name
                 else:
                     alias_name = f"col_{i}"
@@ -933,6 +936,25 @@ class AdvancedSQLQueryEngine:
         elif isinstance(expr, exp.Alias):
             return self._is_aggregate_function(expr.this)
         return False
+
+    def _generate_aggregate_alias(self, expr: exp.Expression) -> str:
+        """为无别名的聚合函数生成有意义的列名
+
+        例: COUNT(*) → count_star, AVG(damage) → avg_damage, SUM(hp) → sum_hp
+        """
+        func_name = type(expr).__name__.lower()  # count, sum, avg, max, min
+
+        # 提取参数
+        if isinstance(expr.this, exp.Star):
+            arg_name = "star"
+        elif isinstance(expr.this, exp.Column):
+            arg_name = expr.this.name
+        elif hasattr(expr.this, 'name') and expr.this.name:
+            arg_name = expr.this.name
+        else:
+            arg_name = "expr"
+
+        return f"{func_name}_{arg_name}"
 
     def _apply_aggregation_function(self, expr: exp.Expression, grouped) -> pd.Series:
         """应用聚合函数"""
