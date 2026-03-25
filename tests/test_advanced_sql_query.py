@@ -408,25 +408,44 @@ def test_integration_with_original_interface(sample_excel_file):
     sheet_name = actual_sheet_names[0]
     print(f"使用工作表: {sheet_name}")
 
-    # 检查工作表的列名
-    df_sample = pd.read_excel(sample_excel_file, sheet_name=sheet_name)
+    # 检查工作表的列名（使用SQL引擎相同的方式，支持双行表头）
+    # 先尝试 openpyxl 读取前两行检测双行表头
+    import openpyxl, re
+    wb = openpyxl.load_workbook(sample_excel_file, read_only=True, data_only=True)
+    ws = wb[sheet_name]
+    rows_iter = ws.iter_rows(max_row=2, values_only=False)
+    first_row_cells = next(rows_iter, None)
+    second_row_cells = next(rows_iter, None)
+    wb.close()
+
+    is_dual_header = False
+    if first_row_cells and second_row_cells:
+        second_vals = [str(c.value).strip() if c.value else '' for c in second_row_cells]
+        first_vals = [str(c.value).strip() if c.value else '' for c in first_row_cells]
+        non_empty_second = [v for v in second_vals if v]
+        non_empty_first = [v for v in first_vals if v]
+        if len(non_empty_second) >= 3:
+            second_all_field = all(re.match(r'^[a-zA-Z_][a-zA-Z0-9_]*$', v) for v in non_empty_second)
+            first_all_field = all(re.match(r'^[a-zA-Z_][a-zA-Z0-9_]*$', v) for v in non_empty_first) if non_empty_first else False
+            if second_all_field and not first_all_field:
+                is_dual_header = True
+
+    if is_dual_header:
+        df_sample = pd.read_excel(sample_excel_file, sheet_name=sheet_name, header=1, keep_default_na=False)
+    else:
+        df_sample = pd.read_excel(sample_excel_file, sheet_name=sheet_name, keep_default_na=False)
+    df_sample = df_sample.dropna(how='all').dropna(axis=1, how='all').reset_index(drop=True)
+
     actual_columns = df_sample.columns.tolist()
-    print(f"实际列名: {actual_columns}")
+    print(f"实际列名: {actual_columns}, 双行表头: {is_dual_header}")
 
     # 根据实际列名调整SQL查询
-    if 'GameName' in actual_columns:
-        sql_query = f"SELECT GameName, COUNT(*) as Count FROM {sheet_name} GROUP BY GameName"
-    elif 'Game' in actual_columns:
-        sql_query = f"SELECT Game, COUNT(*) as Count FROM {sheet_name} GROUP BY Game"
+    string_cols = [col for col in actual_columns if df_sample[col].dtype == 'object']
+    if string_cols:
+        group_col = string_cols[0]
+        sql_query = f"SELECT {group_col}, COUNT(*) as Count FROM {sheet_name} GROUP BY {group_col}"
     else:
-        # 使用第一个字符串列进行分组
-        string_cols = [col for col in actual_columns if df_sample[col].dtype == 'object']
-        if string_cols:
-            group_col = string_cols[0]
-            sql_query = f"SELECT {group_col}, COUNT(*) as Count FROM {sheet_name} GROUP BY {group_col}"
-        else:
-            # 简单查询所有数据
-            sql_query = f"SELECT *, COUNT(*) as Count FROM {sheet_name} GROUP BY *"
+        sql_query = f"SELECT *, COUNT(*) as Count FROM {sheet_name}"
 
     print(f"执行SQL: {sql_query}")
 

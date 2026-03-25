@@ -191,7 +191,14 @@ class AdvancedSQLQueryEngine:
 
     def _load_excel_data(self, file_path: str, sheet_name: Optional[str] = None) -> Dict[str, pd.DataFrame]:
         """
-        加载Excel数据到DataFrame字典
+        加载Excel数据到DataFrame字典，支持游戏配置表双行表头
+
+        游戏配置表通常有双行表头：
+          第1行：中文描述（如"技能ID"、"技能名称"）
+          第2行：字段名（如"skill_id"、"skill_name"）
+        
+        本方法自动检测双行表头，用第二行（字段名）做列名，
+        第一行（描述）保存在 self._header_descriptions 中。
 
         Args:
             file_path: Excel文件路径
@@ -201,30 +208,80 @@ class AdvancedSQLQueryEngine:
             Dict[str, pd.DataFrame]: 工作表名到DataFrame的映射
         """
         worksheets_data = {}
+        self._header_descriptions = {}  # {sheet_name: {field_name: description}}
 
         try:
             if sheet_name:
-                # 加载指定工作表
-                df = pd.read_excel(
-                    file_path,
-                    sheet_name=sheet_name,
-                    engine='openpyxl',
-                    keep_default_na=False     # 减少空值转换警告
-                )
-                df = self._clean_dataframe(df)
-                worksheets_data[sheet_name] = df
+                sheets_to_load = [sheet_name]
             else:
-                # 加载所有工作表
                 excel_file = pd.ExcelFile(file_path, engine='openpyxl')
-                for sheet in excel_file.sheet_names:
+                sheets_to_load = excel_file.sheet_names
+
+            for sheet in sheets_to_load:
+                # 先用 openpyxl 读取前两行，检测双行表头
+                try:
+                    wb = openpyxl.load_workbook(file_path, read_only=True, data_only=True)
+                    ws = wb[sheet]
+                    rows_iter = ws.iter_rows(max_row=2, values_only=False)
+                    first_row_cells = next(rows_iter, None)
+                    second_row_cells = next(rows_iter, None)
+                    wb.close()
+                except Exception:
+                    first_row_cells = None
+                    second_row_cells = None
+
+                is_dual_header = False
+                if first_row_cells and second_row_cells:
+                    second_row_values = [str(c.value).strip() if c.value else '' for c in second_row_cells]
+                    first_row_values = [str(c.value).strip() if c.value else '' for c in first_row_cells]
+                    
+                    non_empty_second = [v for v in second_row_values if v]
+                    non_empty_first = [v for v in first_row_values if v]
+                    
+                    # 严格双行表头检测：
+                    # 1. 至少3个非空值
+                    # 2. 第二行全部匹配字段名模式（^[a-zA-Z_]\w*$）
+                    # 3. 第一行不全匹配字段名模式（排除两行都是字段名的普通表）
+                    if len(non_empty_second) >= 3:
+                        second_all_field = all(
+                            re.match(r'^[a-zA-Z_][a-zA-Z0-9_]*$', v)
+                            for v in non_empty_second
+                        )
+                        first_all_field = all(
+                            re.match(r'^[a-zA-Z_][a-zA-Z0-9_]*$', v)
+                            for v in non_empty_first
+                        ) if non_empty_first else False
+                        if second_all_field and not first_all_field:
+                            is_dual_header = True
+
+                if is_dual_header:
+                    # 双行表头：用第二行做列名，跳过第一行
                     df = pd.read_excel(
                         file_path,
                         sheet_name=sheet,
                         engine='openpyxl',
-                        keep_default_na=False     # 减少空值转换警告
+                        header=1,  # 第二行做列名
+                        keep_default_na=False
                     )
-                    df = self._clean_dataframe(df)
-                    worksheets_data[sheet] = df
+                    # 记录描述映射
+                    field_names = [str(c.value).strip() if c.value else '' for c in second_row_cells]
+                    descriptions = [str(c.value).strip() if c.value else '' for c in first_row_cells]
+                    desc_map = {}
+                    for fname, desc in zip(field_names, descriptions):
+                        if fname:
+                            desc_map[fname] = desc
+                    self._header_descriptions[sheet] = desc_map
+                else:
+                    # 单行表头
+                    df = pd.read_excel(
+                        file_path,
+                        sheet_name=sheet,
+                        engine='openpyxl',
+                        keep_default_na=False
+                    )
+
+                df = self._clean_dataframe(df)
+                worksheets_data[sheet] = df
 
         except Exception as e:
             print(f"加载Excel数据失败: {e}")
@@ -997,7 +1054,15 @@ class AdvancedSQLQueryEngine:
                 for _, row in result_df.iterrows():
                     data.append([str(val) if val is not None else '' for val in row])
 
-        return {
+        # 双行表头：构建列描述映射
+        column_descriptions = {}
+        if hasattr(self, '_header_descriptions') and self._header_descriptions:
+            for table_name, desc_map in self._header_descriptions.items():
+                for col in (result_df.columns if not result_df.empty else []):
+                    if col in desc_map:
+                        column_descriptions[col] = desc_map[col]
+
+        result = {
             'success': True,
             'message': f'SQL查询成功执行，返回 {len(result_df)} 行结果',
             'data': data,
@@ -1012,6 +1077,13 @@ class AdvancedSQLQueryEngine:
                 'data_types': self._infer_data_types(result_df) if not result_df.empty else {}
             }
         }
+
+        # 双行表头时附加描述信息
+        if column_descriptions:
+            result['query_info']['dual_header'] = True
+            result['query_info']['column_descriptions'] = column_descriptions
+
+        return result
 
     def _infer_data_types(self, df: pd.DataFrame) -> Dict[str, str]:
         """推断列的数据类型"""
