@@ -790,13 +790,22 @@ class AdvancedSQLQueryEngine:
             values_str = ', '.join(str(v) for v in values)
             return f"{left}.isin([{values_str}])"
 
-        # elif isinstance(condition, exp.IsNull):
-        #     left = self._expression_to_column_reference(condition.this, df)
-        #     return f"{left}.isna()"
+        # IS NULL
+        elif isinstance(condition, exp.IsNull):
+            left = self._expression_to_column_reference(condition.this, df)
+            return f"{left}.isna()"
 
-        # elif isinstance(condition, exp.NotNull):
-        #     left = self._expression_to_column_reference(condition.this, df)
-        #     return f"~{left}.isna()"
+        # IS NOT NULL
+        elif isinstance(condition, exp.NotNull):
+            left = self._expression_to_column_reference(condition.this, df)
+            return f"~{left}.isna()"
+
+        # BETWEEN x AND y
+        elif isinstance(condition, exp.Between):
+            left = self._expression_to_column_reference(condition.this, df)
+            low = self._expression_to_value(condition.args['low'], df)
+            high = self._expression_to_value(condition.args['high'], df)
+            return f"({left} >= {low}) & ({left} <= {high})"
 
         else:
             raise ValueError(f"不支持的条件类型: {type(condition)}")

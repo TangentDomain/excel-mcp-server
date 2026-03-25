@@ -1630,8 +1630,9 @@ def excel_query(
 ) -> Dict[str, Any]:
     """SQL查询 - 优先使用的查询分析工具
     
-支持: WHERE, GROUP BY, HAVING, ORDER BY, LIMIT
+支持: WHERE, GROUP BY, HAVING, ORDER BY, LIMIT, DISTINCT, IN, BETWEEN, IS NULL/NOT NULL
 聚合: COUNT, SUM, AVG, MAX, MIN
+中文列名: 自动替换，策划可直接用中文字段名查询
 
 Args:
     file_path: Excel文件路径

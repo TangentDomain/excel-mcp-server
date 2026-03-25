@@ -219,6 +219,16 @@ SELECT * FROM 技能表 WHERE skill_name LIKE '%火%'
 
 -- DISTINCT去重
 SELECT DISTINCT skill_type FROM 技能表
+
+-- IN条件
+SELECT * FROM 技能表 WHERE skill_type IN ('攻击', '辅助')
+
+-- BETWEEN范围
+SELECT * FROM 怪物表 WHERE level BETWEEN 10 AND 20
+
+-- IS NULL / IS NOT NULL 空值检测
+SELECT * FROM 技能表 WHERE description IS NULL
+SELECT * FROM 技能表 WHERE description IS NOT NULL
 ```
 
 **不支持的语法（有清晰替代方案提示）：**
