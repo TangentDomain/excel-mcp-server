@@ -79,9 +79,14 @@ class AdvancedSQLQueryEngine:
         self.disable_streaming_aggregate = disable_streaming_aggregate
         # DataFrame缓存：{file_path: (mtime, worksheets_data, header_descriptions)}
         self._df_cache = {}
+        self._max_cache_size = 10  # 最大缓存文件数，防止内存泄漏
 
         if not SQLGLOT_AVAILABLE:
             raise ImportError("SQLGlot未安装，请运行: pip install sqlglot")
+
+    def clear_cache(self):
+        """清除DataFrame缓存，释放内存"""
+        self._df_cache.clear()
 
     def execute_sql_query(
         self,
@@ -140,6 +145,9 @@ class AdvancedSQLQueryEngine:
             else:
                 worksheets_data = self._load_excel_data(file_path, sheet_name)
                 self._df_cache[cache_key] = (mtime, worksheets_data, self._header_descriptions)
+                # LRU淘汰：超过最大缓存数时删除最早缓存的文件
+                while len(self._df_cache) > self._max_cache_size:
+                    self._df_cache.pop(next(iter(self._df_cache)))
 
             if not worksheets_data:
                 return {
