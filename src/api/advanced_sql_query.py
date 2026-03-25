@@ -77,6 +77,8 @@ class AdvancedSQLQueryEngine:
             disable_streaming_aggregate: 禁用流式聚合优化（大文件处理）
         """
         self.disable_streaming_aggregate = disable_streaming_aggregate
+        # DataFrame缓存：{file_path: (mtime, worksheets_data, header_descriptions)}
+        self._df_cache = {}
 
         if not SQLGLOT_AVAILABLE:
             raise ImportError("SQLGlot未安装，请运行: pip install sqlglot")
@@ -122,8 +124,22 @@ class AdvancedSQLQueryEngine:
                     'query_info': {'error_type': 'file_too_large', 'size_mb': file_size_mb}
                 }
 
-            # 加载Excel数据
-            worksheets_data = self._load_excel_data(file_path, sheet_name)
+            # 加载Excel数据（带缓存）
+            import time as _time
+            mtime = os.path.getmtime(file_path)
+            cache_key = file_path
+            if cache_key in self._df_cache:
+                cached_mtime, cached_data, cached_desc = self._df_cache[cache_key]
+                if cached_mtime == mtime:
+                    worksheets_data = cached_data
+                    self._header_descriptions = cached_desc
+                else:
+                    # 文件已修改，重新加载
+                    worksheets_data = self._load_excel_data(file_path, sheet_name)
+                    self._df_cache[cache_key] = (mtime, worksheets_data, self._header_descriptions)
+            else:
+                worksheets_data = self._load_excel_data(file_path, sheet_name)
+                self._df_cache[cache_key] = (mtime, worksheets_data, self._header_descriptions)
 
             if not worksheets_data:
                 return {
