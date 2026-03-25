@@ -331,8 +331,8 @@ class AdvancedSQLQueryEngine:
 
         df = df.rename(columns=clean_columns)
 
-        # 清理数据中的空值
-        df = df.where(pd.notnull(df), None)
+        # 保持原始数据不做空值替换
+        # pandas groupby 默认跳过 NaN 行，不需要手动处理
 
         return df
 
@@ -943,22 +943,16 @@ class AdvancedSQLQueryEngine:
             except:
                 original_df = None
             
-            # 尝试将列数据转换为数值类型
-            def to_numeric_agg(x):
-                if original_df is not None and col_name in original_df.columns:
-                    return pd.to_numeric(x, errors='coerce')
-                return pd.to_numeric(x, errors='coerce')
-            
             # 应用对应的聚合函数
+            # 直接使用 groupby agg，避免 apply+func 返回标量的问题
             if func_name == 'sum':
-                # 先转换为数值，然后求和
-                return grouped[col_name].apply(lambda x: pd.to_numeric(x, errors='coerce')).sum()
+                return grouped[col_name].agg(lambda x: pd.to_numeric(x, errors='coerce').sum())
             elif func_name == 'avg':
-                return grouped[col_name].apply(lambda x: pd.to_numeric(x, errors='coerce')).mean()
+                return grouped[col_name].agg(lambda x: pd.to_numeric(x, errors='coerce').mean())
             elif func_name == 'max':
-                return grouped[col_name].apply(lambda x: pd.to_numeric(x, errors='coerce')).max()
+                return grouped[col_name].agg(lambda x: pd.to_numeric(x, errors='coerce').max())
             elif func_name == 'min':
-                return grouped[col_name].apply(lambda x: pd.to_numeric(x, errors='coerce')).min()
+                return grouped[col_name].agg(lambda x: pd.to_numeric(x, errors='coerce').min())
             else:
                 raise ValueError(f"不支持的聚合函数: {func_name}")
 
