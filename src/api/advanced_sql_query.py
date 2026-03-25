@@ -505,6 +505,7 @@ class AdvancedSQLQueryEngine:
     def _suggest_column_name(self, col_name: str, available_cols: List[str], max_suggestions: int = 3) -> str:
         """
         当列名不存在时，用编辑距离找出最相似的列名作为建议。
+        同时检查中文列名描述（双行表头场景）。
 
         Args:
             col_name: 用户输入的列名
@@ -512,17 +513,36 @@ class AdvancedSQLQueryEngine:
             max_suggestions: 最多返回几个建议
 
         Returns:
-            str: 格式化的建议字符串，如 "你是否想用: skill_name, skill_id, skill_type?"
+            str: 格式化的建议字符串
         """
         import difflib
         if not available_cols:
             return ""
 
         matches = difflib.get_close_matches(col_name, available_cols, n=max_suggestions, cutoff=0.3)
-        if not matches:
-            return ""
+        if matches:
+            return f" 你是否想用: {', '.join(matches)}?"
 
-        return f" 你是否想用: {', '.join(matches)}?"
+        # 英文列名匹配不到时，尝试匹配中文列名描述（双行表头）
+        if hasattr(self, '_header_descriptions') and self._header_descriptions:
+            cn_names = []
+            for sheet_name, desc_map in self._header_descriptions.items():
+                for eng_name, cn_desc in desc_map.items():
+                    if cn_desc:
+                        cn_names.append(cn_desc)
+            if cn_names:
+                cn_matches = difflib.get_close_matches(col_name, cn_names, n=max_suggestions, cutoff=0.3)
+                if cn_matches:
+                    # 反查中文→英文映射
+                    en_lookup = {}
+                    for desc_map in self._header_descriptions.values():
+                        for eng_name, cn_desc in desc_map.items():
+                            if cn_desc:
+                                en_lookup[cn_desc] = eng_name
+                    mapped = [f"{cn}({en_lookup.get(cn, '?')})" for cn in cn_matches]
+                    return f" 中文名称匹配: {', '.join(mapped)}"
+
+        return ""
 
     def _execute_query(
         self,
