@@ -10,11 +10,11 @@
 [![Python 版本](https://img.shields.io/badge/python-3.10+-blue.svg)](https://www.python.org/downloads/)
 [![技术支持: FastMCP](https://img.shields.io/badge/Powered%20by-FastMCP-orange)](https://github.com/jlowin/fastmcp)
 ![状态](https://img.shields.io/badge/status-stable-green.svg)
-![测试覆盖](https://img.shields.io/badge/tests-1137%20passed-brightgreen.svg)
+![测试覆盖](https://img.shields.io/badge/tests-1166%20tests-brightgreen.svg)
 ![覆盖率](https://img.shields.io/badge/coverage-92.03%25-blue.svg)
-![工具数量](https://img.shields.io/badge/tools-38%20verified%20tools-green.svg)
+![工具数量](https://img.shields.io/badge/tools-39%20verified%20tools-green.svg)
 
-**ExcelMCP** 是专为游戏开发设计的Excel配置表管理MCP服务器。通过AI自然语言指令，实现技能配置表、装备数据、怪物属性等游戏配置的智能化操作。基于**FastMCP**和**openpyxl**构建，拥有**38个专业工具**和**1137个测试用例**，确保企业级可靠性。
+**ExcelMCP** 是专为游戏开发设计的Excel配置表管理MCP服务器。通过AI自然语言指令，实现技能配置表、装备数据、怪物属性等游戏配置的智能化操作。基于**FastMCP**和**openpyxl**构建，拥有**39个专业工具**和**1166个测试用例**，确保企业级可靠性。
 
 🎯 **核心功能**: 技能系统、装备管理、怪物配置、数值平衡、版本对比、策划工具链
 
@@ -94,7 +94,7 @@ python -m pytest tests/ --tb=short -q
 | 技能平衡调整 | `excel_search` + `excel_update_range` | "将所有火系技能伤害提升20%" |
 | 装备配置管理 | `excel_format_cells` + `excel_get_range` | "用金色标记所有传说装备" |
 | 怪物数据验证 | `excel_check_duplicate_ids` + `excel_search` | "确保怪物ID唯一，血量合理" |
-| 版本对比分析 | `excel_compare_sheets` | "对比新旧版本配置表差异" |
+| 版本对比分析 | `excel_compare_sheets` + `excel_compare_files` | "对比新旧版本配置表差异" |
 
 ### 🔧 范围表达式参考
 
@@ -133,6 +133,7 @@ python -m pytest tests/ --tb=short -q
 - `excel_search` - 正则表达式搜索
 - `excel_search_directory` - 目录批量搜索
 - `excel_compare_sheets` - 工作表对比（游戏配置优化）
+- `excel_compare_files` - 多工作表文件对比
 - `excel_check_duplicate_ids` - ID重复检测
 
 ### 🎨 格式化与样式
@@ -215,10 +216,9 @@ API业务逻辑层 (集中式处理)
 ## 📊 项目信息
 
 ### 质量验证指标
-- **测试用例**: 699个 (698通过, 1跳过)
+- **测试用例**: 1166个
 - **测试代码**: 13,515行 (全面验证)
-- **工具数量**: 38个 (@mcp.tool装饰器验证)
-- **测试覆盖**: 78.58%
+- **工具数量**: 39个 (@mcp.tool装饰器验证)
 - **架构层次**: 4层分层设计 (MCP→API→Core→Utils)
 
 ### 验证命令

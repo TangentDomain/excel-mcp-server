@@ -1893,29 +1893,34 @@ def excel_set_column_width(
 
 # ==================== Excel比较功能 ====================
 
-# @mcp.tool()
+@mcp.tool()
 def excel_compare_files(
     file1_path: str,
-    file2_path: str,
-    id_column: Union[int, str] = 1,
-    header_row: int = 1
+    file2_path: str
 ) -> Dict[str, Any]:
     """
-    比较两个Excel文件 - 游戏开发专用版
+    比较两个Excel文件的所有工作表差异
 
-    专注于ID对象的新增、删除、修改检测，自动识别配置表变化。
+    逐工作表对比两个文件，检测结构差异（增删工作表）和单元格级别的值变化。
+
+    💡 **提示**: 如需按ID列做对象级对比（新增/删除/修改），请使用 excel_compare_sheets 对指定工作表进行精确对比。
 
     Args:
-        file1_path: 第一个Excel文件路径
-        file2_path: 第二个Excel文件路径
-        id_column: ID列位置（1-based数字或列名），默认第一列
-        header_row: 表头行号（1-based），默认第一行
+        file1_path: 第一个Excel文件路径（基准版本）
+        file2_path: 第二个Excel文件路径（对比版本）
 
     Returns:
-        Dict: 比较结果，包含新增、删除、修改的ID对象信息
-        - 🆕 新增对象：ID在文件2中新出现
-        - 🗑️ 删除对象：ID在文件1中存在但文件2中消失
-        - 🔄 修改对象：ID存在于两文件中但属性发生变化
+        Dict: 比较结果
+        - identical: 文件是否完全相同
+        - structural_differences: 工作表增减等结构差异
+        - sheet_comparisons: 各工作表的详细对比结果
+        - summary: 差异统计摘要
+
+    Example:
+        # 对比技能表两个版本
+        result = excel_compare_files("skills_v1.xlsx", "skills_v2.xlsx")
+        # 对比整批配置表
+        result = excel_compare_files("config_old.xlsx", "config_new.xlsx")
     """
     return ExcelOperations.compare_files(file1_path, file2_path)
 
