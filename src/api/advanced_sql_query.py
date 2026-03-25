@@ -189,11 +189,20 @@ class AdvancedSQLQueryEngine:
                 )
 
             except ParseError as e:
+                err_str = str(e)
+                # 提取常见拼写错误的友好提示
+                hint = ''
+                if 'SELEC' in sql.upper() and 'SELECT' not in sql.upper():
+                    hint = '\n💡 提示：可能是拼写错误，SELECT关键字是否拼对了？'
+                elif 'FORM' in sql.upper() and 'FROM' not in sql.upper():
+                    hint = '\n💡 提示：可能是拼写错误，FROM关键字是否拼对了？'
+                elif 'WHER' in sql.upper() and 'WHERE' not in sql.upper():
+                    hint = '\n💡 提示：可能是拼写错误，WHERE关键字是否拼对了？'
                 return {
                     'success': False,
-                    'message': f'SQL语法错误: {str(e)}',
+                    'message': f'SQL语法错误: {err_str}{hint}',
                     'data': [],
-                    'query_info': {'error_type': 'syntax_error', 'details': str(e)}
+                    'query_info': {'error_type': 'syntax_error', 'details': err_str}
                 }
             except UnsupportedError as e:
                 return {
@@ -1393,6 +1402,10 @@ class AdvancedSQLQueryEngine:
                 'data_types': self._infer_data_types(result_df) if not result_df.empty else {}
             }
         }
+
+        # 空结果友好提示
+        if result_df.empty:
+            result['query_info']['suggestion'] = '查询返回0行数据。可能原因：WHERE条件过严、列名拼写错误（可用DESCRIBE查看列名）、或数据尚未录入。'
 
         # 双行表头时附加描述信息
         if column_descriptions:
