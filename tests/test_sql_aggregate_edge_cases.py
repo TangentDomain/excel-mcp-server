@@ -49,7 +49,7 @@ class TestAggregateFunctionsWithoutGroupBy:
         )
         
         assert result['success'] is True
-        assert result['data'][-1][0] == '5'
+        assert result['data'][-1][0] == 5
 
     def test_sum_without_group_by(self, test_excel_file):
         """测试无GROUP BY的SUM()"""
@@ -62,7 +62,7 @@ class TestAggregateFunctionsWithoutGroupBy:
         
         assert result['success'] is True
         # 50000 + 60000 + 55000 + 70000 + 65000 = 300000
-        assert result['data'][-1][0] == '300000'
+        assert result['data'][-1][0] == 300000
 
     def test_avg_without_group_by(self, test_excel_file):
         """测试无GROUP BY的AVG()"""
@@ -75,7 +75,7 @@ class TestAggregateFunctionsWithoutGroupBy:
         
         assert result['success'] is True
         # (25 + 30 + 35 + 40 + 45) / 5 = 35
-        assert result['data'][-1][0] == '35.0'
+        assert result['data'][-1][0] == 35
 
     def test_max_without_group_by(self, test_excel_file):
         """测试无GROUP BY的MAX()"""
@@ -87,7 +87,7 @@ class TestAggregateFunctionsWithoutGroupBy:
         )
         
         assert result['success'] is True
-        assert result['data'][-1][0] == '70000'
+        assert result['data'][-1][0] == 70000
 
     def test_min_without_group_by(self, test_excel_file):
         """测试无GROUP BY的MIN()"""
@@ -99,7 +99,7 @@ class TestAggregateFunctionsWithoutGroupBy:
         )
         
         assert result['success'] is True
-        assert result['data'][-1][0] == '25'
+        assert result['data'][-1][0] == 25
 
     def test_count_column_without_group_by(self, test_excel_file):
         """测试无GROUP BY的COUNT(column)"""
@@ -111,7 +111,7 @@ class TestAggregateFunctionsWithoutGroupBy:
         )
         
         assert result['success'] is True
-        assert result['data'][-1][0] == '5'
+        assert result['data'][-1][0] == 5
 
     def test_multiple_aggregates_without_group_by(self, test_excel_file):
         """测试无GROUP BY的多个聚合函数"""

@@ -893,8 +893,13 @@ class AdvancedSQLQueryEngine:
             ordered_columns.append(alias_name)
 
             # 处理聚合函数
-            if alias_name in aggregations:
-                agg_result = self._apply_aggregation_function(aggregations[alias_name], grouped)
+            # 检查当前表达式（或其内部表达式）是否是聚合函数
+            is_agg = self._is_aggregate_function(select_expr if not isinstance(select_expr, exp.Alias) else select_expr.this)
+            
+            if is_agg:
+                # 找到对应的聚合表达式
+                agg_expr = original_expr if isinstance(select_expr, exp.Alias) else select_expr
+                agg_result = self._apply_aggregation_function(agg_expr, grouped)
                 # 如果结果是标量，转换为Series
                 if isinstance(agg_result, (int, float, np.integer, np.floating)):
                     result_data[alias_name] = pd.Series([agg_result])
@@ -1053,6 +1058,19 @@ class AdvancedSQLQueryEngine:
         total_original_rows = sum(len(df) for df in worksheets_data.values())
 
         # 准备返回数据
+        def _serialize_value(val):
+            """智能序列化值：数值保持数值类型，None转空字符串"""
+            if val is None:
+                return ''
+            if isinstance(val, float) and val == int(val):
+                return int(val)  # 170.0 → 170
+            if isinstance(val, (np.integer,)):
+                return int(val)
+            if isinstance(val, (np.floating,)):
+                f = float(val)
+                return int(f) if f == int(f) else f
+            return val
+
         data = []
         if include_headers:
             # 包含表头（无论是否有数据）
@@ -1062,12 +1080,12 @@ class AdvancedSQLQueryEngine:
             # 添加数据行（如果有的话）
             if not result_df.empty:
                 for _, row in result_df.iterrows():
-                    data.append([str(val) if val is not None else '' for val in row])
+                    data.append([_serialize_value(val) for val in row])
         else:
             # 不包含表头，只返回数据
             if not result_df.empty:
                 for _, row in result_df.iterrows():
-                    data.append([str(val) if val is not None else '' for val in row])
+                    data.append([_serialize_value(val) for val in row])
 
         # 双行表头：构建列描述映射
         column_descriptions = {}

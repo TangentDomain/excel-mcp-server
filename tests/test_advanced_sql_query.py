@@ -445,7 +445,12 @@ def test_integration_with_original_interface(sample_excel_file):
         group_col = string_cols[0]
         sql_query = f"SELECT {group_col}, COUNT(*) as Count FROM {sheet_name} GROUP BY {group_col}"
     else:
-        sql_query = f"SELECT *, COUNT(*) as Count FROM {sheet_name}"
+        # 没有字符串列时用数值列做COUNT
+        numeric_cols = [col for col in actual_columns if df_sample[col].dtype in ['int64', 'float64']]
+        if numeric_cols:
+            sql_query = f"SELECT {numeric_cols[0]}, COUNT(*) as Count FROM {sheet_name} GROUP BY {numeric_cols[0]}"
+        else:
+            sql_query = f"SELECT COUNT(*) as total_count FROM {sheet_name}"
 
     print(f"执行SQL: {sql_query}")
 

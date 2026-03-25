@@ -248,19 +248,23 @@ class TestSQLQueryKnownLimitations:
     """Document and test known limitations of the SQL engine"""
 
     def test_count_star_no_group_by(self, sql_test_file):
-        """Known limitation: COUNT(*) without GROUP BY returns 0 rows"""
+        """COUNT(*) without GROUP BY now works - returns single aggregated value"""
         result = excel_query(sql_test_file, "SELECT COUNT(*) FROM Employees")
 
         assert result['success'] is True
-        # Engine returns empty result for aggregation without GROUP BY
-        assert len(result['data']) <= 1
+        # include_headers=True: 1 header row + 1 data row = 2
+        assert len(result['data']) == 2
+        # First row is header, second is the count value
+        assert result['data'][1][0] == 7
 
     def test_sum_no_group_by(self, sql_test_file):
-        """Known limitation: SUM without GROUP BY returns 0 rows"""
+        """SUM without GROUP BY now works - returns single aggregated value"""
         result = excel_query(sql_test_file, "SELECT SUM(Salary) FROM Employees")
 
         assert result['success'] is True
-        assert len(result['data']) <= 1
+        # include_headers=True: 1 header row + 1 data row = 2
+        assert len(result['data']) == 2
+        assert result['data'][1][0] == 565000
 
     def test_is_null_not_supported(self, sql_test_file):
         """Known limitation: IS NULL is not supported"""
