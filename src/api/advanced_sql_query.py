@@ -1028,7 +1028,8 @@ class AdvancedSQLQueryEngine:
                     raise ValueError(f"排序列 '{col_name}' 不存在")
 
                 sort_columns.append(col_name)
-                ascending.append(order_expr.args.get('asc', True))
+                is_desc = order_expr.args.get('desc', False)
+                ascending.append(not is_desc if is_desc is not None else True)
             else:
                 # 简单列引用，默认升序
                 if isinstance(order_expr, exp.Column):
