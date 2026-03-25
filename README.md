@@ -14,7 +14,7 @@
 ![覆盖率](https://img.shields.io/badge/coverage-92.03%25-blue.svg)
 ![工具数量](https://img.shields.io/badge/tools-39%20verified%20tools-green.svg)
 
-**ExcelMCP** 是专为游戏开发设计的Excel配置表管理MCP服务器。通过AI自然语言指令，实现技能配置表、装备数据、怪物属性等游戏配置的智能化操作。基于**FastMCP**和**openpyxl**构建，拥有**39个专业工具**和**1166个测试用例**，确保企业级可靠性。
+**ExcelMCP** 是专为游戏开发设计的Excel配置表管理MCP服务器。通过AI自然语言指令，实现技能配置表、装备数据、怪物属性等游戏配置的智能化操作。基于**FastMCP**和**openpyxl**构建，拥有**40个专业工具**和**1166个测试用例**，确保企业级可靠性。
 
 🎯 **核心功能**: 技能系统、装备管理、怪物配置、数值平衡、版本对比、策划工具链
 
@@ -111,7 +111,7 @@ python -m pytest tests/ --tb=short -q
 
 ---
 
-## 🛠️ 完整工具列表（39个专业工具）
+## 🛠️ 完整工具列表（40个专业工具）
 
 ### 📁 文件与工作表管理
 - `excel_create_file` - 创建新Excel文件，支持自定义工作表
@@ -138,7 +138,8 @@ python -m pytest tests/ --tb=short -q
 ### 🔍 搜索与分析
 - `excel_search` - 正则表达式搜索
 - `excel_search_directory` - 目录批量搜索
-- `excel_query` - SQL查询（支持双行表头自动识别、WHERE/GROUP BY/HAVING/ORDER BY/LIMIT、聚合函数、数学表达式）
+- `excel_query` - SQL查询（支持双行表头自动识别、WHERE/GROUP BY/HAVING/ORDER BY/LIMIT、聚合函数、数学表达式、DISTINCT）
+- `excel_describe_table` - 查看表结构（列名、类型、描述、样本值，自动识别双行表头）
 - `excel_compare_sheets` - 工作表对比（游戏配置优化）
 - `excel_compare_files` - 多工作表文件对比
 - `excel_check_duplicate_ids` - ID重复检测
@@ -215,6 +216,9 @@ SELECT skill_name, damage * 1.2 as boosted_dmg FROM 技能表 WHERE level >= 5
 
 -- LIKE模糊搜索
 SELECT * FROM 技能表 WHERE skill_name LIKE '%火%'
+
+-- DISTINCT去重
+SELECT DISTINCT skill_type FROM 技能表
 ```
 
 **不支持的语法（有清晰替代方案提示）：**
@@ -334,7 +338,7 @@ A: 使用专门的配置表对比工具，支持ID对象跟踪
 
 | 🎯 **快速开始** | 🛠️ **工具参考** | 📚 **学习指南** |
 |----------------|----------------|----------------|
-| [🚀 安装配置](#-快速入门-3分钟设置) | [📋 完整工具列表](#️-完整工具列表38个专业工具) | [📖 使用指南](#-使用指南) |
+| [🚀 安装配置](#-快速入门-3分钟设置) | [📋 完整工具列表](#️-完整工具列表40个专业工具) | [📖 使用指南](#-使用指南) |
 | [⚡ 命令速查](#-快速参考) | [🏗️ 技术架构](#️-技术架构) | [🚨 故障排除](#-故障排除) |
 | [🎮 游戏配置管理](#-使用指南) | [📊 项目信息](#-项目信息) | [❓ 常见问题](#-常见问题) |
 
