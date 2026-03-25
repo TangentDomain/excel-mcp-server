@@ -429,6 +429,18 @@ class AdvancedSQLQueryEngine:
 
         base_df = worksheets_data[from_table].copy()
 
+        # 双行表头：注册中文列名别名，让策划可以用中文名查询
+        # 将中文名映射为英文列名（仅用于SQL解析时替换）
+        cn_to_en_map = {}
+        if hasattr(self, '_header_descriptions') and from_table in self._header_descriptions:
+            desc_map = self._header_descriptions[from_table]
+            for eng_name, cn_desc in desc_map.items():
+                if eng_name in base_df.columns and cn_desc:
+                    cn_to_en_map[cn_desc] = eng_name
+                    # 同时注册到DataFrame中，让SQL引擎能识别
+                    if cn_desc not in base_df.columns:
+                        base_df[cn_desc] = base_df[eng_name]
+
         # 应用WHERE条件
         base_df = self._apply_where_clause(parsed_sql, base_df)
 
@@ -465,6 +477,24 @@ class AdvancedSQLQueryEngine:
             base_df = base_df.head(limit_value)
         elif limit:
             base_df = base_df.head(limit)
+
+        # 双行表头：SELECT * 时，移除别名列，只保留原始英文列名
+        if cn_to_en_map:
+            # 判断是否是SELECT *（结果列数等于原始列数+别名列数）
+            original_cols = [c for c in worksheets_data[from_table].columns]
+            alias_cols = list(cn_to_en_map.keys())
+            # 如果结果中包含别名列，替换为英文列名
+            result_cols = list(base_df.columns)
+            new_cols = []
+            for col in result_cols:
+                if col in cn_to_en_map:
+                    # 将中文列名替换回英文列名
+                    new_cols.append(cn_to_en_map[col])
+                else:
+                    new_cols.append(col)
+            base_df.columns = new_cols
+            # 去重（中文和英文列名可能同时存在于结果中）
+            base_df = base_df.loc[:, ~base_df.columns.duplicated()]
 
         return base_df
 
