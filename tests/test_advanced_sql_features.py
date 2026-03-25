@@ -410,3 +410,48 @@ class TestAdvancedSQLFeatures:
         
         # 两集合不应有交集
         assert len(like_names & not_like_names) == 0
+
+    # ==================== COUNT(DISTINCT)测试 ====================
+
+    def test_count_distinct_no_group_by(self, test_excel_file):
+        """测试COUNT(DISTINCT)不带GROUP BY"""
+        from src.api.advanced_sql_query import execute_advanced_sql_query
+        
+        result = execute_advanced_sql_query(
+            file_path=test_excel_file,
+            sql="SELECT COUNT(DISTINCT Department) FROM Employees"
+        )
+        
+        assert result['success'] is True
+        # 应返回不同部门的数量
+        data_values = [row[0] for row in result['data'] if row[0] != 'count_distinct_Department']
+        assert len(data_values) == 1
+        assert isinstance(data_values[0], int)
+        assert data_values[0] >= 1
+
+    def test_count_distinct_with_group_by(self, test_excel_file):
+        """测试COUNT(DISTINCT)带GROUP BY"""
+        from src.api.advanced_sql_query import execute_advanced_sql_query
+        
+        result = execute_advanced_sql_query(
+            file_path=test_excel_file,
+            sql="SELECT Department, COUNT(DISTINCT Name) FROM Employees GROUP BY Department"
+        )
+        
+        assert result['success'] is True
+        data_rows = [row for row in result['data'] if row[0] != 'Department']
+        assert len(data_rows) >= 1
+        for row in data_rows:
+            assert isinstance(row[1], int)
+
+    def test_count_distinct_with_alias(self, test_excel_file):
+        """测试COUNT(DISTINCT)带别名"""
+        from src.api.advanced_sql_query import execute_advanced_sql_query
+        
+        result = execute_advanced_sql_query(
+            file_path=test_excel_file,
+            sql="SELECT COUNT(DISTINCT Department) AS dept_count FROM Employees"
+        )
+        
+        assert result['success'] is True
+        assert 'dept_count' in result.get('query_info', {}).get('returned_columns', [])

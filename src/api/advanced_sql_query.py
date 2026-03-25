@@ -1091,16 +1091,23 @@ class AdvancedSQLQueryEngine:
         func_name = type(expr).__name__.lower()  # count, sum, avg, max, min
 
         # 提取参数
-        if isinstance(expr.this, exp.Star):
+        is_distinct = isinstance(expr.this, exp.Distinct)
+        if is_distinct:
+            target = expr.this.expressions[0]
+        else:
+            target = expr.this
+
+        if isinstance(target, exp.Star):
             arg_name = "star"
-        elif isinstance(expr.this, exp.Column):
-            arg_name = expr.this.name
-        elif hasattr(expr.this, 'name') and expr.this.name:
-            arg_name = expr.this.name
+        elif isinstance(target, exp.Column):
+            arg_name = target.name
+        elif hasattr(target, 'name') and target.name:
+            arg_name = target.name
         else:
             arg_name = "expr"
 
-        return f"{func_name}_{arg_name}"
+        distinct_prefix = "distinct_" if is_distinct else ""
+        return f"{func_name}_{distinct_prefix}{arg_name}"
 
     def _apply_aggregation_function(self, expr: exp.Expression, grouped) -> pd.Series:
         """应用聚合函数"""
@@ -1113,6 +1120,16 @@ class AdvancedSQLQueryEngine:
                 if isinstance(expr.this, exp.Star):
                     # COUNT(*)的情况
                     return grouped.size()
+                elif isinstance(expr.this, exp.Distinct):
+                    # COUNT(DISTINCT column)的情况
+                    distinct_expr = expr.this.expressions[0]
+                    if isinstance(distinct_expr, exp.Column):
+                        col_name = distinct_expr.name
+                    elif hasattr(distinct_expr, 'name'):
+                        col_name = distinct_expr.name
+                    else:
+                        raise ValueError(f"COUNT(DISTINCT)参数格式错误: {distinct_expr}")
+                    return grouped[col_name].nunique()
                 else:
                     # COUNT(column)的情况
                     if isinstance(expr.this, exp.Column):
