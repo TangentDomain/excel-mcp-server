@@ -774,6 +774,11 @@ class AdvancedSQLQueryEngine:
             # 括号表达式，直接处理内部表达式
             return self._sql_condition_to_pandas(condition.this, df)
 
+        elif isinstance(condition, exp.Not):
+            # NOT表达式：IS NOT NULL会被解析为Not(Is(...))
+            inner = self._sql_condition_to_pandas(condition.this, df)
+            return f"~({inner})"
+
         elif isinstance(condition, exp.Like):
             left = self._expression_to_column_reference(condition.this, df)
             right = self._expression_to_value(condition.expression, df)
@@ -790,15 +795,11 @@ class AdvancedSQLQueryEngine:
             values_str = ', '.join(str(v) for v in values)
             return f"{left}.isin([{values_str}])"
 
-        # IS NULL
-        elif isinstance(condition, exp.IsNull):
+        # IS NULL (sqlglot解析为 exp.Is)
+        elif isinstance(condition, exp.Is):
             left = self._expression_to_column_reference(condition.this, df)
+            # IS NOT NULL会被解析为 Not > Is
             return f"{left}.isna()"
-
-        # IS NOT NULL
-        elif isinstance(condition, exp.NotNull):
-            left = self._expression_to_column_reference(condition.this, df)
-            return f"~{left}.isna()"
 
         # BETWEEN x AND y
         elif isinstance(condition, exp.Between):

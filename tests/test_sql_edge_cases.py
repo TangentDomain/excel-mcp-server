@@ -266,11 +266,15 @@ class TestSQLQueryKnownLimitations:
         assert len(result['data']) == 2
         assert result['data'][1][0] == 565000
 
-    def test_is_null_not_supported(self, sql_test_file):
-        """Known limitation: IS NULL is not supported"""
+    def test_is_null_supported(self, sql_test_file):
+        """IS NULL is now supported"""
         result = excel_query(sql_test_file, "SELECT Name FROM Employees WHERE Age IS NULL")
+        assert result['success'] is True
 
-        assert result['success'] is False
+    def test_is_not_null_supported(self, sql_test_file):
+        """IS NOT NULL is now supported"""
+        result = excel_query(sql_test_file, "SELECT Name FROM Employees WHERE Age IS NOT NULL")
+        assert result['success'] is True
 
     def test_column_name_typo_suggestion(self, sql_test_file):
         """When column name is misspelled, suggest similar column names"""
