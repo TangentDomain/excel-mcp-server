@@ -479,6 +479,10 @@ class AdvancedSQLQueryEngine:
         elif limit:
             base_df = base_df.head(limit)
 
+        # 应用SELECT DISTINCT去重
+        if parsed_sql.args.get('distinct'):
+            base_df = base_df.drop_duplicates()
+
         # 双行表头：SELECT * 时，移除别名列，只保留原始英文列名
         if cn_to_en_map:
             # 判断是否是SELECT *（结果列数等于原始列数+别名列数）
