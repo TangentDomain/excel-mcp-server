@@ -1732,6 +1732,138 @@ Returns:
 
 
 @mcp.tool()
+def excel_describe_table(
+    file_path: str,
+    sheet_name: str = None
+) -> Dict[str, Any]:
+    """查看表结构 - 快速了解Excel工作表的列信息、数据类型和统计摘要
+
+无需写SQL即可了解表结构，适合在查询前快速了解数据概况。
+自动识别双行表头（第1行中文描述+第2行英文字段名）。
+
+Args:
+    file_path: Excel文件路径
+    sheet_name: 工作表名（可选，不填则返回第一个工作表）
+
+Returns:
+    {success, columns, row_count, sheet_name, header_type, query_info}
+    columns: [{name, type, description, non_null, sample_values}]
+
+示例: excel_describe_table("技能配置.xlsx", "SkillConfig")
+"""
+    if not file_path or not file_path.strip():
+        return {'success': False, 'message': '文件路径不能为空', 'data': []}
+
+    try:
+        import openpyxl
+        wb = openpyxl.load_workbook(file_path, read_only=True, data_only=True)
+    except Exception as e:
+        return {'success': False, 'message': f'无法打开文件: {e}', 'data': []}
+
+    try:
+        # 选择工作表
+        if sheet_name:
+            if sheet_name not in wb.sheetnames:
+                return {
+                    'success': False,
+                    'message': f'工作表 "{sheet_name}" 不存在。可用工作表: {wb.sheetnames}',
+                    'data': []
+                }
+            ws = wb[sheet_name]
+        else:
+            ws = wb.worksheets[0]
+            sheet_name = ws.title
+
+        # 读取前几行来判断表头类型
+        rows = list(ws.iter_rows(max_row=4, values_only=True))
+        if not rows:
+            return {'success': False, 'message': '工作表为空', 'data': []}
+
+        # 检测双行表头：第2行全是合法英文字段名
+        is_dual_header = False
+        header_row_idx = 0
+        if len(rows) >= 2:
+            second_row = rows[1]
+            if second_row and len(second_row) >= 3:
+                all_valid = all(
+                    isinstance(c, str) and c.strip().startswith(tuple('abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ_'))
+                    for c in second_row if c is not None
+                )
+                first_row = rows[0]
+                any_chinese = any(
+                    isinstance(c, str) and any('\u4e00' <= ch <= '\u9fff' for ch in c)
+                    for c in first_row if c is not None
+                )
+                if all_valid and any_chinese:
+                    is_dual_header = True
+                    header_row_idx = 1
+
+        headers = rows[header_row_idx]
+        descriptions = rows[0] if is_dual_header else None
+
+        # 读取所有数据行统计信息
+        data_start = header_row_idx + 1
+        col_stats = {}
+        for col_idx, col_name in enumerate(headers):
+            if col_name is None:
+                col_name = f"column_{col_idx + 1}"
+            col_name = str(col_name).strip()
+            if not col_name:
+                col_name = f"column_{col_idx + 1}"
+
+            values = []
+            sample_values = []
+            non_null_count = 0
+            for row in ws.iter_rows(min_row=data_start + 1, min_col=col_idx + 1, max_col=col_idx + 1, values_only=True):
+                val = row[0]
+                if val is not None:
+                    non_null_count += 1
+                    values.append(val)
+                    if len(sample_values) < 3:
+                        sample_values.append(val)
+
+            # 推断类型
+            if not values:
+                col_type = "empty"
+            elif all(isinstance(v, (int, float)) and not isinstance(v, bool) for v in values[:100]):
+                col_type = "number"
+            elif all(isinstance(v, str) for v in values[:100]):
+                col_type = "text"
+            else:
+                col_type = "mixed"
+
+            description = str(descriptions[col_idx]).strip() if is_dual_header and descriptions and col_idx < len(descriptions) and descriptions[col_idx] else None
+
+            col_stats[col_name] = {
+                'name': col_name,
+                'type': col_type,
+                'description': description,
+                'non_null': non_null_count,
+                'sample_values': sample_values[:3]
+            }
+
+        # 统计行数
+        row_count = ws.max_row - data_start if ws.max_row > data_start else 0
+
+        wb.close()
+
+        columns = list(col_stats.values())
+        return {
+            'success': True,
+            'sheet_name': sheet_name,
+            'header_type': 'dual' if is_dual_header else 'single',
+            'row_count': row_count,
+            'column_count': len(columns),
+            'columns': columns,
+            'message': f"表 '{sheet_name}': {len(columns)}列, {row_count}行数据, {'双行表头' if is_dual_header else '单行表头'}"
+        }
+    except Exception as e:
+        return {'success': False, 'message': f'查看表结构失败: {e}', 'data': []}
+    finally:
+        wb.close()
+
+
+@mcp.tool()
 def excel_format_cells(
     file_path: str,
     sheet_name: str,
