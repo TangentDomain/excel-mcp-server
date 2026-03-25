@@ -10,11 +10,11 @@
 [![Python Version](https://img.shields.io/badge/python-3.10+-blue.svg)](https://www.python.org/downloads/)
 [![Powered by: FastMCP](https://img.shields.io/badge/Powered%20by-FastMCP-orange)](https://github.com/jlowin/fastmcp)
 ![Status](https://img.shields.io/badge/status-stable-green.svg)
-![Tests](https://img.shields.io/badge/tests-1137%20passed-brightgreen.svg)
+![Tests](https://img.shields.io/badge/tests-1174%20passed-brightgreen.svg)
 ![Coverage](https://img.shields.io/badge/coverage-92.03%25-blue.svg)
-![Tools](https://img.shields.io/badge/tools-38%20verified%20tools-green.svg)
+![Tools](https://img.shields.io/badge/tools-39%20verified%20tools-green.svg)
 
-**ExcelMCP** is an Excel configuration table management MCP server specially designed for game development. Through AI natural language commands, it enables intelligent operations on game configurations such as skill tables, equipment data, and monster attributes. Built with **FastMCP** and **openpyxl**, it features **38 professional tools** and **1137 test cases**, ensuring enterprise-grade reliability.
+**ExcelMCP** is an Excel configuration table management MCP server specially designed for game development. Through AI natural language commands, it enables intelligent operations on game configurations such as skill tables, equipment data, and monster attributes. Built with **FastMCP** and **openpyxl**, it features **39 professional tools** and **1174 test cases**, ensuring enterprise-grade reliability.
 
 🎯 **Core Features**: Skill systems, equipment management, monster configuration, numerical balancing, version comparison, designer toolchain
 
@@ -94,7 +94,11 @@ Attribute adjustment: "Increase attributes of legendary equipment by 25%"
 | Skill balance adjustment | `excel_search` + `excel_update_range` | "Increase damage of all fire skills by 20%" |
 | Equipment configuration management | `excel_format_cells` + `excel_get_range` | "Mark all legendary equipment with gold color" |
 | Monster data validation | `excel_check_duplicate_ids` + `excel_search` | "Ensure monster IDs are unique and HP is reasonable" |
-| Version comparison analysis | `excel_compare_sheets` | "Compare differences between old and new version config tables" |
+| Version comparison analysis | `excel_compare_sheets` + `excel_compare_files` | "Compare differences between old and new version config tables" |
+| Data statistics query | `excel_query` | "Query average attack power by class in skill table" |
+| Pre-modification preview | `excel_preview_operation` + `excel_assess_data_impact` | "Preview impact of deleting rows 5-10" |
+| Pre-modification backup | `excel_create_backup` | "Backup skill table before modifying" |
+| Formula evaluation | `excel_evaluate_formula` | "Temporarily calculate SUM(A2:A100) to see result" |
 
 ### 🔧 Range Expression Reference
 
@@ -107,7 +111,7 @@ Attribute adjustment: "Increase attributes of legendary equipment by 25%"
 
 ---
 
-## 🛠️ Complete Tool List (38 Professional Tools)
+## 🛠️ Complete Tool List (39 Professional Tools)
 
 ### 📁 File & Worksheet Management
 - `excel_create_file` - Create new Excel files with custom worksheets
@@ -128,11 +132,15 @@ Attribute adjustment: "Increase attributes of legendary equipment by 25%"
 - `excel_insert_columns` - Insert empty columns
 - `excel_delete_columns` - Delete column ranges
 - `excel_find_last_row` - Find last row with data
+- `excel_set_formula` - Set cell formulas
+- `excel_evaluate_formula` - Evaluate formulas without writing to files
 
 ### 🔍 Search & Analysis
 - `excel_search` - Regex expression search
 - `excel_search_directory` - Directory batch search
+- `excel_query` - SQL query engine (SELECT/WHERE/GROUP BY/ORDER BY/LIMIT)
 - `excel_compare_sheets` - Worksheet comparison (game config optimized)
+- `excel_compare_files` - Multi-worksheet file comparison
 - `excel_check_duplicate_ids` - ID duplicate detection
 
 ### 🎨 Formatting & Styling
@@ -147,6 +155,16 @@ Attribute adjustment: "Increase attributes of legendary equipment by 25%"
 - `excel_export_to_csv` - Export CSV format
 - `excel_import_from_csv` - Create Excel files from CSV
 - `excel_convert_format` - Format conversion (.xlsx/.xlsm/.csv/.json)
+
+### 🛡️ Safety & Backup
+- `excel_create_backup` - Create file backups before risky operations
+- `excel_restore_backup` - Restore from backup files
+- `excel_list_backups` - List available backups
+- `excel_preview_operation` - Preview operation results without executing
+- `excel_assess_data_impact` - Assess potential data impact
+
+### 📜 Operation History
+- `excel_get_operation_history` - Get recent operation logs
 
 ---
 
@@ -215,10 +233,10 @@ Tool Layer (Common Functions)
 ## 📊 Project Information
 
 ### Quality Validation Metrics
-- **Test Cases**: 699 (698 passed, 1 skipped)
-- **Test Code**: 13,515 lines (comprehensive validation)
-- **Tool Count**: 38 (verified with @mcp.tool decorators)
-- **Test Coverage**: 78.58%
+- **Test Cases**: 1174 (all passed)
+- **Test Code**: 14,000+ lines (comprehensive validation)
+- **Tool Count**: 39 (verified with @mcp.tool decorators)
+- **Test Coverage**: 92%+
 - **Architecture Layers**: 4-layer design (MCP→API→Core→Utils)
 
 ### Verification Commands
@@ -227,7 +245,7 @@ Tool Layer (Common Functions)
 python -m pytest tests/ -v
 
 # Verify tool completeness
-grep -r "@mcp.tool" src/ | wc -l  # Should output: 38
+grep -r "@mcp.tool" src/ | wc -l  # Should output: 39
 
 # Generate coverage report
 python -m pytest tests/ --cov=src --cov-report=html
@@ -237,7 +255,7 @@ python -m pytest tests/ --cov=src --cov-report=html
 - **Pure Delegation Pattern**: server.py strictly delegates to ExcelOperations
 - **Centralized Business Logic**: Unified validation, error handling, result formatting
 - **Branch Naming**: All feature branches must start with `feature/`
-- **Test Coverage**: Maintain 78%+ test coverage
+- **Test Coverage**: Maintain 92%+ test coverage
 
 ---
 
@@ -283,7 +301,7 @@ A: Use specialized configuration table comparison tools with ID object tracking
 
 | 🎯 **Quick Start** | 🛠️ **Tool Reference** | 📚 **Learning Guide** |
 |-------------------|------------------------|---------------------|
-| [🚀 Installation](#-quick-start-3-minute-setup) | [📋 Complete Tool List](#️-complete-tool-list-38-professional-tools) | [📖 Usage Guide](#-usage-guide) |
+| [🚀 Installation](#-quick-start-3-minute-setup) | [📋 Complete Tool List](#️-complete-tool-list-39-professional-tools) | [📖 Usage Guide](#-usage-guide) |
 | [⚡ Command Cheat Sheet](#-quick-reference) | [🏗️ Technical Architecture](#️-technical-architecture) | [🚨 Troubleshooting](#-troubleshooting) |
 | [🎮 Game Config Management](#-usage-guide) | [📊 Project Info](#-project-information) | [❓ FAQ](#-frequently-asked-questions) |
 
