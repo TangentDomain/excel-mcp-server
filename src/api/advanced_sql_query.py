@@ -460,9 +460,10 @@ class AdvancedSQLQueryEngine:
             if parsed_sql.args.get('order'):
                 base_df = self._apply_order_by(parsed_sql, base_df)
         else:
-            # 非聚合查询：ORDER BY 在 SELECT 之前（允许引用任意列）
+            # 非聚合查询：提取SELECT别名，然后ORDER BY（支持引用别名和原始列），最后SELECT
+            select_aliases = self._extract_select_aliases(parsed_sql)
             if parsed_sql.args.get('order'):
-                base_df = self._apply_order_by(parsed_sql, base_df)
+                base_df = self._apply_order_by(parsed_sql, base_df, select_aliases=select_aliases)
 
             # 应用SELECT表达式（裁剪列、计算字段、别名）
             base_df = self._apply_select_expressions(parsed_sql, base_df)
@@ -1068,8 +1069,64 @@ class AdvancedSQLQueryEngine:
 
         return df
 
-    def _apply_order_by(self, parsed_sql: exp.Expression, df: pd.DataFrame) -> pd.DataFrame:
-        """应用ORDER BY排序"""
+    def _extract_select_aliases(self, parsed_sql: exp.Expression) -> Dict[str, Any]:
+        """提取SELECT子句中的别名映射
+
+        Returns:
+            Dict: {alias_name: original_expression} 或 {column_name: column_name}
+        """
+        aliases = {}
+        for i, select_expr in enumerate(parsed_sql.expressions):
+            if isinstance(select_expr, exp.Alias):
+                aliases[select_expr.alias] = select_expr.this
+            elif isinstance(select_expr, exp.Column) and hasattr(select_expr, 'name'):
+                aliases[select_expr.name] = select_expr
+            elif self._is_aggregate_function(select_expr):
+                # 无别名的聚合函数，生成列名
+                aliases[self._generate_aggregate_alias(select_expr)] = select_expr
+        return aliases
+
+    def _resolve_order_column(self, col_name: str, df: pd.DataFrame, select_aliases: Optional[Dict] = None) -> Optional[str]:
+        """解析ORDER BY列名：先查SELECT别名对应的基础列，再查原始列名
+
+        Args:
+            col_name: ORDER BY中引用的列名
+            df: 当前DataFrame
+            select_aliases: SELECT别名映射
+
+        Returns:
+            解析后的实际列名，找不到返回None
+        """
+        # 1. 如果列名直接在DataFrame中，直接返回
+        if col_name in df.columns:
+            return col_name
+
+        # 2. 如果有SELECT别名映射，检查别名对应的基础列
+        if select_aliases and col_name in select_aliases:
+            expr = select_aliases[col_name]
+            if isinstance(expr, exp.Column) and expr.name in df.columns:
+                return expr.name
+            # 别名对应的是计算表达式，无法在SELECT之前排序
+            # 这种情况需要特殊处理：先计算表达式列，排序后删除
+            if self._is_mathematical_expression(expr):
+                # 临时计算该表达式
+                temp_col = f"__order_temp_{col_name}"
+                df[temp_col] = self._evaluate_math_expression(expr, df)
+                # 重命名到目标列名（SELECT后会被处理）
+                df.rename(columns={temp_col: col_name}, inplace=True)
+                return col_name
+
+        # 3. 列名不存在
+        return None
+
+    def _apply_order_by(self, parsed_sql: exp.Expression, df: pd.DataFrame, select_aliases: Optional[Dict] = None) -> pd.DataFrame:
+        """应用ORDER BY排序
+
+        Args:
+            parsed_sql: 解析后的SQL表达式
+            df: 数据DataFrame
+            select_aliases: SELECT子句的别名映射（允许ORDER BY引用别名）
+        """
         order_clause = parsed_sql.args.get('order')
         if not order_clause:
             return df
@@ -1080,20 +1137,23 @@ class AdvancedSQLQueryEngine:
         for order_expr in order_clause.expressions:
             if isinstance(order_expr, exp.Ordered):
                 col_name = order_expr.this.name
-                if col_name not in df.columns:
+                # 先查SELECT别名，再查原始列
+                resolved_name = self._resolve_order_column(col_name, df, select_aliases)
+                if resolved_name is None:
                     raise ValueError(f"排序列 '{col_name}' 不存在。可用列: {list(df.columns)}")
 
-                sort_columns.append(col_name)
+                sort_columns.append(resolved_name)
                 is_desc = order_expr.args.get('desc', False)
                 ascending.append(not is_desc if is_desc is not None else True)
             else:
                 # 简单列引用，默认升序
                 if isinstance(order_expr, exp.Column):
                     col_name = order_expr.name
-                    if col_name not in df.columns:
+                    resolved_name = self._resolve_order_column(col_name, df, select_aliases)
+                    if resolved_name is None:
                         raise ValueError(f"排序列 '{col_name}' 不存在。可用列: {list(df.columns)}")
 
-                    sort_columns.append(col_name)
+                    sort_columns.append(resolved_name)
                     ascending.append(True)
 
         if sort_columns:
