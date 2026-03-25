@@ -133,6 +133,9 @@ class AdvancedSQLQueryEngine:
                     'query_info': {'error_type': 'data_load_failed'}
                 }
 
+            # 中文列名替换：将SQL中的中文列名替换为英文列名（在解析前）
+            sql = self._replace_cn_columns_in_sql(sql, worksheets_data)
+
             # 解析和执行SQL
             try:
                 parsed_sql = sqlglot.parse_one(sql, dialect="mysql")
@@ -404,6 +407,60 @@ class AdvancedSQLQueryEngine:
                 'error': f'SQL验证失败: {str(e)}'
             }
 
+    def _replace_cn_columns_in_sql(self, sql: str, worksheets_data: Dict[str, pd.DataFrame]) -> str:
+        """
+        将SQL中的中文列名替换为英文列名（在sqlglot解析前）。
+
+        双行表头的游戏配置表中，第1行是中文描述，第2行是英文字段名。
+        策划习惯用中文名查询，但SQL引擎需要英文列名。
+        本方法在SQL文本层面做替换，避免给DataFrame添加临时列。
+
+        Args:
+            sql: 原始SQL语句
+            worksheets_data: 已加载的工作表数据
+
+        Returns:
+            str: 替换后的SQL语句
+        """
+        if not hasattr(self, '_header_descriptions') or not self._header_descriptions:
+            return sql
+
+        # 收集所有中文→英文映射（去重）
+        cn_to_en = {}
+        for sheet_name, desc_map in self._header_descriptions.items():
+            for eng_name, cn_desc in desc_map.items():
+                if cn_desc and cn_desc != eng_name:
+                    cn_to_en[cn_desc] = eng_name
+
+        if not cn_to_en:
+            return sql
+
+        # 按中文列名长度降序排列，避免短名称部分匹配长名称
+        sorted_names = sorted(cn_to_en.keys(), key=len, reverse=True)
+
+        # 用正则替换：只替换SQL标识符位置（非字符串字面量中的中文）
+        # 策略：先把字符串字面量占位保护，替换中文标识符，再恢复字符串
+        string_literals = []
+        protected_sql = sql
+
+        # 保护单引号字符串
+        def protect_string(match):
+            string_literals.append(match.group(0))
+            return f'__PROTECTED_STR_{len(string_literals) - 1}__'
+
+        protected_sql = re.sub(r"'[^']*'", protect_string, protected_sql)
+
+        # 替换中文列名
+        for cn_name in sorted_names:
+            en_name = cn_to_en[cn_name]
+            protected_sql = re.sub(re.escape(cn_name), en_name, protected_sql)
+
+        # 恢复字符串字面量
+        for i, s in enumerate(string_literals):
+            protected_sql = protected_sql.replace(f'__PROTECTED_STR_{i}__', s)
+
+        return protected_sql
+
     def _execute_query(
         self,
         parsed_sql: exp.Expression,
@@ -428,18 +485,6 @@ class AdvancedSQLQueryEngine:
             raise ValueError(f"表 '{from_table}' 不存在。可用表: {list(worksheets_data.keys())}")
 
         base_df = worksheets_data[from_table].copy()
-
-        # 双行表头：注册中文列名别名，让策划可以用中文名查询
-        # 将中文名映射为英文列名（仅用于SQL解析时替换）
-        cn_to_en_map = {}
-        if hasattr(self, '_header_descriptions') and from_table in self._header_descriptions:
-            desc_map = self._header_descriptions[from_table]
-            for eng_name, cn_desc in desc_map.items():
-                if eng_name in base_df.columns and cn_desc:
-                    cn_to_en_map[cn_desc] = eng_name
-                    # 同时注册到DataFrame中，让SQL引擎能识别
-                    if cn_desc not in base_df.columns:
-                        base_df[cn_desc] = base_df[eng_name]
 
         # 应用WHERE条件
         base_df = self._apply_where_clause(parsed_sql, base_df)
@@ -482,24 +527,6 @@ class AdvancedSQLQueryEngine:
         # 应用SELECT DISTINCT去重
         if parsed_sql.args.get('distinct'):
             base_df = base_df.drop_duplicates()
-
-        # 双行表头：SELECT * 时，移除别名列，只保留原始英文列名
-        if cn_to_en_map:
-            # 判断是否是SELECT *（结果列数等于原始列数+别名列数）
-            original_cols = [c for c in worksheets_data[from_table].columns]
-            alias_cols = list(cn_to_en_map.keys())
-            # 如果结果中包含别名列，替换为英文列名
-            result_cols = list(base_df.columns)
-            new_cols = []
-            for col in result_cols:
-                if col in cn_to_en_map:
-                    # 将中文列名替换回英文列名
-                    new_cols.append(cn_to_en_map[col])
-                else:
-                    new_cols.append(col)
-            base_df.columns = new_cols
-            # 去重（中文和英文列名可能同时存在于结果中）
-            base_df = base_df.loc[:, ~base_df.columns.duplicated()]
 
         return base_df
 
