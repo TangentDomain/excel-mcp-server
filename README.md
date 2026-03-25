@@ -111,6 +111,152 @@ python -m pytest tests/ --tb=short -q
 
 ---
 
+## 🎮 游戏策划完整工作流教程
+
+> 从零开始，手把手教你用自然语言操作Excel配置表。不需要记住任何命令格式，用中文描述你想做什么就行。
+
+### 📦 第一步：了解你的表（DESCRIBE）
+
+拿到一张配置表，先看看有什么数据：
+
+```
+"查看 skills.xlsx 的技能表结构"
+→ excel_describe_table("skills.xlsx", "SkillConfig")
+```
+
+返回结果：
+```
+列名          | 类型    | 描述     | 非空 | 样本值
+skill_id     | int     | 技能ID   | 10/10 | 1001, 1002
+skill_name   | str     | 技能名称 | 10/10 | 火球术, 治愈之光
+damage       | float   | 伤害值   | 9/10  | 150.0, 200.5
+cooldown     | int     | 冷却时间 | 10/10 | 5, 10
+```
+
+💡 **小贴士**：双行表头的配置表（第1行中文描述+第2行英文字段名）会被自动识别，列描述自动关联。
+
+### 🔍 第二步：搜索定位（SEARCH）
+
+找特定数据：
+
+```
+"在 skills.xlsx 中搜索所有火系技能"
+→ excel_search("skills.xlsx", "火")
+
+"搜索所有包含'传说'的装备名称"
+→ excel_search("equipment.xlsx", "传说", "EquipmentConfig")
+```
+
+### 📊 第三步：SQL查询分析（QUERY）
+
+这是最强大的功能。用标准SQL语法查询配置表：
+
+**基础查询 — 找数据：**
+```sql
+-- 查看所有10级以上技能
+SELECT * FROM SkillConfig WHERE level >= 10
+
+-- 只看技能名和伤害，按伤害排序
+SELECT skill_name, damage FROM SkillConfig ORDER BY damage DESC LIMIT 10
+
+-- 分页查看：每页5条，看第3页
+SELECT * FROM MonsterConfig ORDER BY level LIMIT 5 OFFSET 10
+```
+
+**中文列名查询 — 策划友好：**
+```sql
+-- 双行表头时直接用中文名查询
+SELECT 技能名称, 伤害值 FROM SkillConfig WHERE 等级 >= 10
+
+-- 中文列名 + 英文列名混用也可以
+SELECT skill_name, 伤害值 FROM SkillConfig WHERE 技能类型 = '攻击'
+```
+
+**聚合统计 — 数值分析：**
+```sql
+-- 各职业平均伤害
+SELECT skill_type, AVG(damage) as avg_dmg, COUNT(*) as cnt
+FROM SkillConfig GROUP BY skill_type
+
+-- 哪些技能类型总伤害超过1000
+SELECT skill_type, SUM(damage) as total
+FROM SkillConfig GROUP BY skill_type HAVING total > 1000
+
+-- 装备品质分布
+SELECT DISTINCT quality FROM EquipmentConfig
+```
+
+**DPM数值平衡分析：**
+```sql
+-- 每秒伤害排名（DPM = damage / cooldown）
+SELECT skill_name, damage * 1.0 / cooldown as dpm
+FROM SkillConfig ORDER BY dpm DESC LIMIT 10
+```
+
+**数据质量检查：**
+```sql
+-- 找出有缺失值的配置
+SELECT skill_name, description FROM SkillConfig WHERE description IS NULL
+
+-- 找出特定等级范围的怪物
+SELECT name, level, hp FROM MonsterConfig WHERE level BETWEEN 10 AND 20
+
+-- 排除测试数据
+SELECT * FROM SkillConfig WHERE skill_name NOT LIKE '%测试%'
+```
+
+### ✏️ 第四步：批量修改（UPDATE）
+
+找到要改的数据后，批量修改：
+
+```
+"将 skills.xlsx 第2行到第50行的伤害列数值全部乘以1.15"
+→ excel_update_range("skills.xlsx", "SkillConfig!E2:E50",
+    [[原有值*1.15 for each cell]])
+```
+
+⚠️ **修改前一定要备份：**
+```
+"备份 skills.xlsx"
+→ excel_create_backup("skills.xlsx")
+```
+
+### 🔄 第五步：版本对比（COMPARE）
+
+改完之后对比一下：
+
+```
+"对比 v1.0 和 v1.1 的技能表差异"
+→ excel_compare_sheets("skills_v1.0.xlsx", "SkillConfig",
+                        "skills_v1.1.xlsx", "SkillConfig")
+```
+
+### 📋 常用策划场景速查
+
+| 我想做 | 怎么说 |
+|--------|--------|
+| 看看表里有什么 | "查看xxx表结构" |
+| 找某个技能/装备 | "搜索xxx" |
+| 按条件筛选 | "查询等级>10的技能" |
+| 统计各类型数量 | "各职业技能有多少个" |
+| 找最强的技能 | "DPM最高的10个技能" |
+| 找有问题的数据 | "哪些技能描述是空的" |
+| 批量改数值 | "把所有火系技能伤害提升20%" |
+| 对比版本差异 | "对比v1和v2的配置表" |
+
+### ❓ 常见错误和解决
+
+**Q: 列名拼错了怎么办？**
+A: 系统会自动推荐相似列名。比如你写 `skil_name`，会提示"你是否想用: skill_name?"
+
+**Q: 表太大查询慢？**
+A: 同一张表重复查询会自动缓存，第二次查询速度提升30-100倍。2000行的大表首次~230ms，缓存后仅需2-8ms。
+
+**Q: JOIN不支持怎么办？**
+A: 分别查询两张表，让AI在结果层帮你关联。
+
+---
+
 ## 🛠️ 完整工具列表（40个专业工具）
 
 ### 📁 文件与工作表管理
@@ -229,6 +375,14 @@ SELECT * FROM 怪物表 WHERE level BETWEEN 10 AND 20
 -- IS NULL / IS NOT NULL 空值检测
 SELECT * FROM 技能表 WHERE description IS NULL
 SELECT * FROM 技能表 WHERE description IS NOT NULL
+
+-- OFFSET分页（大表分批查看）
+SELECT * FROM 怪物表 ORDER BY level LIMIT 20 OFFSET 0
+SELECT * FROM 怪物表 ORDER BY level LIMIT 20 OFFSET 20
+
+-- NOT LIKE / NOT IN 排除匹配
+SELECT * FROM 技能表 WHERE skill_name NOT LIKE '%测试%'
+SELECT * FROM 装备表 WHERE quality NOT IN ('废弃', '内部测试')
 ```
 
 **不支持的语法（有清晰替代方案提示）：**
