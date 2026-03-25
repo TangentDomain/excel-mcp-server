@@ -1267,7 +1267,10 @@ class AdvancedSQLQueryEngine:
                 return int(val)
             if isinstance(val, (np.floating,)):
                 f = float(val)
-                return int(f) if f == int(f) else f
+                if f == int(f):
+                    return int(f)
+                # 非整数浮点数保留2位小数，避免166.66666666666666
+                return round(f, 2)
             return val
 
         data = []
