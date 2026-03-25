@@ -439,17 +439,21 @@ class AdvancedSQLQueryEngine:
         if parsed_sql.args.get('group') or has_aggregate:
             # 有GROUP BY或有聚合函数时，应用分组聚合
             base_df = self._apply_group_by_aggregation(parsed_sql, base_df)
+
+            # 应用HAVING条件
+            if parsed_sql.args.get('having'):
+                base_df = self._apply_having_clause(parsed_sql, base_df)
+
+            # ORDER BY（聚合查询：在GROUP BY之后）
+            if parsed_sql.args.get('order'):
+                base_df = self._apply_order_by(parsed_sql, base_df)
         else:
-            # 没有GROUP BY时，也需要处理SELECT表达式（如计算字段、别名等）
+            # 非聚合查询：ORDER BY 在 SELECT 之前（允许引用任意列）
+            if parsed_sql.args.get('order'):
+                base_df = self._apply_order_by(parsed_sql, base_df)
+
+            # 应用SELECT表达式（裁剪列、计算字段、别名）
             base_df = self._apply_select_expressions(parsed_sql, base_df)
-
-        # 应用HAVING条件
-        if parsed_sql.args.get('having'):
-            base_df = self._apply_having_clause(parsed_sql, base_df)
-
-        # 应用ORDER BY
-        if parsed_sql.args.get('order'):
-            base_df = self._apply_order_by(parsed_sql, base_df)
 
         # 应用LIMIT
         limit_clause = parsed_sql.args.get('limit')
@@ -1025,7 +1029,7 @@ class AdvancedSQLQueryEngine:
             if isinstance(order_expr, exp.Ordered):
                 col_name = order_expr.this.name
                 if col_name not in df.columns:
-                    raise ValueError(f"排序列 '{col_name}' 不存在")
+                    raise ValueError(f"排序列 '{col_name}' 不存在。可用列: {list(df.columns)}")
 
                 sort_columns.append(col_name)
                 is_desc = order_expr.args.get('desc', False)
@@ -1035,7 +1039,7 @@ class AdvancedSQLQueryEngine:
                 if isinstance(order_expr, exp.Column):
                     col_name = order_expr.name
                     if col_name not in df.columns:
-                        raise ValueError(f"排序列 '{col_name}' 不存在")
+                        raise ValueError(f"排序列 '{col_name}' 不存在。可用列: {list(df.columns)}")
 
                     sort_columns.append(col_name)
                     ascending.append(True)
