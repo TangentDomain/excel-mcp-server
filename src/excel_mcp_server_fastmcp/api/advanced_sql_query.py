@@ -279,59 +279,63 @@ class AdvancedSQLQueryEngine:
         self._header_descriptions = {}  # {sheet_name: {field_name: description}}
 
         try:
+            # 性能优化：用一次openpyxl读取完成所有sheet的双行表头检测
+            # 旧方案：每个sheet单独openpyxl.load_workbook+pd.read_excel → 2N+1次文件打开
+            # 新方案：一次openpyxl读取前两行检测 + 一次pd.read_excel读取所有sheet数据 → 2次文件打开
+            wb = openpyxl.load_workbook(file_path, read_only=True, data_only=True)
+
             if sheet_name:
                 sheets_to_load = [sheet_name]
             else:
-                excel_file = pd.ExcelFile(file_path, engine='openpyxl')
-                sheets_to_load = excel_file.sheet_names
+                sheets_to_load = wb.sheetnames
 
+            # 批量检测所有sheet的双行表头（一次openpyxl读取）
+            header_info = {}  # {sheet: (is_dual_header, first_row_cells, second_row_cells)}
             for sheet in sheets_to_load:
-                # 先用 openpyxl 读取前两行，检测双行表头
+                if sheet not in wb.sheetnames:
+                    continue
                 try:
-                    wb = openpyxl.load_workbook(file_path, read_only=True, data_only=True)
                     ws = wb[sheet]
                     rows_iter = ws.iter_rows(max_row=2, values_only=False)
                     first_row_cells = next(rows_iter, None)
                     second_row_cells = next(rows_iter, None)
-                    wb.close()
+
+                    is_dual_header = False
+                    if first_row_cells and second_row_cells:
+                        second_row_values = [str(c.value).strip() if c.value else '' for c in second_row_cells]
+                        first_row_values = [str(c.value).strip() if c.value else '' for c in first_row_cells]
+
+                        non_empty_second = [v for v in second_row_values if v]
+                        non_empty_first = [v for v in first_row_values if v]
+
+                        if len(non_empty_second) >= 3:
+                            second_all_field = all(
+                                re.match(r'^[a-zA-Z_][a-zA-Z0-9_]*$', v)
+                                for v in non_empty_second
+                            )
+                            first_all_field = all(
+                                re.match(r'^[a-zA-Z_][a-zA-Z0-9_]*$', v)
+                                for v in non_empty_first
+                            ) if non_empty_first else False
+                            if second_all_field and not first_all_field:
+                                is_dual_header = True
+
+                    header_info[sheet] = (is_dual_header, first_row_cells, second_row_cells)
                 except Exception:
-                    first_row_cells = None
-                    second_row_cells = None
+                    header_info[sheet] = (False, None, None)
 
-                is_dual_header = False
-                if first_row_cells and second_row_cells:
-                    second_row_values = [str(c.value).strip() if c.value else '' for c in second_row_cells]
-                    first_row_values = [str(c.value).strip() if c.value else '' for c in first_row_cells]
-                    
-                    non_empty_second = [v for v in second_row_values if v]
-                    non_empty_first = [v for v in first_row_values if v]
-                    
-                    # 严格双行表头检测：
-                    # 1. 至少3个非空值
-                    # 2. 第二行全部匹配字段名模式（^[a-zA-Z_]\w*$）
-                    # 3. 第一行不全匹配字段名模式（排除两行都是字段名的普通表）
-                    if len(non_empty_second) >= 3:
-                        second_all_field = all(
-                            re.match(r'^[a-zA-Z_][a-zA-Z0-9_]*$', v)
-                            for v in non_empty_second
-                        )
-                        first_all_field = all(
-                            re.match(r'^[a-zA-Z_][a-zA-Z0-9_]*$', v)
-                            for v in non_empty_first
-                        ) if non_empty_first else False
-                        if second_all_field and not first_all_field:
-                            is_dual_header = True
+            wb.close()
 
+            # 批量读取所有sheet数据（一次pd.read_excel调用）
+            for sheet, (is_dual_header, first_row_cells, second_row_cells) in header_info.items():
                 if is_dual_header:
-                    # 双行表头：用第二行做列名，跳过第一行
                     df = pd.read_excel(
                         file_path,
                         sheet_name=sheet,
                         engine='openpyxl',
-                        header=1,  # 第二行做列名
+                        header=1,
                         keep_default_na=False
                     )
-                    # 记录描述映射
                     field_names = [str(c.value).strip() if c.value else '' for c in second_row_cells]
                     descriptions = [str(c.value).strip() if c.value else '' for c in first_row_cells]
                     desc_map = {}
@@ -340,7 +344,6 @@ class AdvancedSQLQueryEngine:
                             desc_map[fname] = desc
                     self._header_descriptions[sheet] = desc_map
                 else:
-                    # 单行表头
                     df = pd.read_excel(
                         file_path,
                         sheet_name=sheet,

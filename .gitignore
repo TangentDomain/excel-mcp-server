@@ -115,3 +115,5 @@ structure-report.txt
 .pre-commit-hooks-cache/
 temp_excel_files/
 .benchmark-history/
+.cron-focus.md
+.cron-prompt.md
