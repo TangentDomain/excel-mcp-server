@@ -10,11 +10,11 @@
 [![Python 版本](https://img.shields.io/badge/python-3.10+-blue.svg)](https://www.python.org/downloads/)
 [![技术支持: FastMCP](https://img.shields.io/badge/Powered%20by-FastMCP-orange)](https://github.com/jlowin/fastmcp)
 ![状态](https://img.shields.io/badge/status-stable-green.svg)
-![测试覆盖](https://img.shields.io/badge/tests-752%20tests-brightgreen.svg)
+![测试覆盖](https://img.shields.io/badge/tests-779%20tests-brightgreen.svg)
 ![工具数量](https://img.shields.io/badge/tools-42%20verified%20tools-green.svg)
 [![CI](https://github.com/TangentDomain/excel-mcp-server/actions/workflows/ci.yml/badge.svg)](https://github.com/TangentDomain/excel-mcp-server/actions/workflows/ci.yml)
 
-**ExcelMCP** 是专为游戏开发设计的Excel配置表管理MCP服务器。通过AI自然语言指令，实现技能配置表、装备数据、怪物属性等游戏配置的智能化操作。基于**FastMCP**构建，读取使用**python-calamine**（Rust引擎，2300x提速），写入使用**openpyxl**，拥有**42个专业工具**和**752个测试用例**，确保企业级可靠性。
+**ExcelMCP** 是专为游戏开发设计的Excel配置表管理MCP服务器。通过AI自然语言指令，实现技能配置表、装备数据、怪物属性等游戏配置的智能化操作。基于**FastMCP**构建，读取使用**python-calamine**（Rust引擎，2300x提速），写入使用**openpyxl**，拥有**42个专业工具**和**779个测试用例**，确保企业级可靠性。
 
 🎯 **核心功能**: 技能系统、装备管理、怪物配置、数值平衡、版本对比、策划工具链
 
@@ -333,7 +333,7 @@ SELECT a.skill_name, b.equip_name FROM SkillConfig a INNER JOIN EquipConfig b ON
 ### 🔍 搜索与分析
 - `excel_search` - 正则表达式搜索
 - `excel_search_directory` - 目录批量搜索
-- `excel_query` - SQL查询（支持双行表头、WHERE/GROUP BY/HAVING/ORDER BY/LIMIT/OFFSET/DISTINCT/JOIN/数学表达式）
+- `excel_query` - SQL查询（支持双行表头、WHERE/GROUP BY/HAVING/ORDER BY/LIMIT/OFFSET/DISTINCT/JOIN/子查询/CTE/CASE WHEN/COALESCE/字符串函数/数学表达式）
 - `excel_update_query` - SQL UPDATE批量修改（SET常量/列引用/算术，WHERE条件，dry_run预览）
 - `excel_describe_table` - 查看表结构（列名、类型、描述、样本值，自动识别双行表头）
 - `excel_compare_sheets` - 工作表对比（游戏配置优化）
@@ -438,6 +438,30 @@ SELECT * FROM 装备表 WHERE quality NOT IN ('废弃', '内部测试')
 -- JOIN 跨表关联查询（同文件内工作表）
 SELECT a.skill_name, b.equip_name FROM 技能表 a INNER JOIN 装备表 b ON a.equip_id = b.equip_id
 SELECT a.name, b.hp FROM 怪物表 a LEFT JOIN 怪物掉落表 b ON a.id = b.monster_id WHERE a.level > 10
+
+-- 子查询（WHERE col IN / NOT IN / 标量子查询）
+SELECT * FROM 技能表 WHERE skill_type IN (SELECT DISTINCT skill_type FROM 技能表 WHERE damage > 200)
+SELECT * FROM 技能表 WHERE damage > (SELECT AVG(damage) FROM 技能表)
+
+-- EXISTS子查询（关联子查询）
+SELECT * FROM 怪物表 WHERE EXISTS (SELECT 1 FROM 掉落表 WHERE 掉落表.monster_id = 怪物表.id)
+
+-- CASE WHEN条件表达式
+SELECT skill_name, CASE WHEN damage > 200 THEN '高伤' WHEN damage > 100 THEN '中伤' ELSE '低伤' END as tier FROM 技能表
+
+-- CTE (WITH ... AS ...)
+WITH high_dmg AS (SELECT * FROM 技能表 WHERE damage > 150) SELECT * FROM high_dmg ORDER BY damage DESC
+WITH mages AS (SELECT * FROM 技能表 WHERE skill_type='法师'), strong AS (SELECT * FROM mages WHERE damage >= 150) SELECT * FROM strong
+
+-- COALESCE / IFNULL 空值替换
+SELECT skill_name, COALESCE(description, '无描述') as desc FROM 技能表
+
+-- 字符串函数
+SELECT UPPER(skill_name) FROM 技能表 WHERE LOWER(skill_type) = 'mage'
+SELECT CONCAT(skill_type, ':', skill_name) as label FROM 技能表
+SELECT REPLACE(description, '攻击', '打击') FROM 技能表
+SELECT skill_name, LENGTH(skill_name) as name_len FROM 技能表
+SELECT SUBSTRING(skill_name, 1, 3) as short_name FROM 技能表
 ```
 
 **SQL UPDATE 批量修改：**
@@ -456,9 +480,9 @@ UPDATE 技能表 SET 伤害 = 伤害 * 1.1 WHERE 元素 = '火'  -- dry_run=True
 ```
 
 **不支持的语法（有清晰替代方案提示）：**
-- CASE WHEN（提示：分条件查询或外部处理）
-- 子查询 / CTE / 窗口函数
-- RIGHT JOIN / CROSS JOIN（游戏场景极少使用）
+- FROM子查询 `FROM (SELECT ...)`（提示：改用WHERE子查询或CTE）
+- UNION / 窗口函数（提示：分别查询或用子查询+GROUP BY）
+- RIGHT JOIN / CROSS JOIN / FULL JOIN（游戏场景极少使用）
 
 **双行表头自动识别：**
 ```
