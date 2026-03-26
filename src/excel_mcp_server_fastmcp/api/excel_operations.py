@@ -7,12 +7,19 @@ Excel MCP Server - Excel操作API模块
 """
 
 import logging
+import re
+from collections import Counter
 from typing import Dict, Any, List, Optional, Union
-from openpyxl.utils import get_column_letter
+from openpyxl import load_workbook
+from openpyxl.utils import get_column_letter, column_index_from_string
 
 from ..core.excel_reader import ExcelReader
 from ..core.excel_writer import ExcelWriter
 from ..core.excel_manager import ExcelManager
+from ..core.excel_search import ExcelSearcher
+from ..core.excel_compare import ExcelComparer
+from ..core.excel_converter import ExcelConverter
+from ..models.types import ComparisonOptions
 from ..utils.formatter import format_operation_result
 
 logger = logging.getLogger(__name__)
@@ -486,8 +493,6 @@ class ExcelOperations:
             logger.info(f"{cls._LOG_PREFIX} 开始{search_type}搜索({case_info}): {pattern}")
 
         try:
-            from ..core.excel_search import ExcelSearcher
-            import re
 
             searcher = ExcelSearcher(file_path)
 
@@ -552,8 +557,6 @@ class ExcelOperations:
             logger.info(f"{cls._LOG_PREFIX} 开始目录{search_type}搜索({case_info}): {directory_path}")
 
         try:
-            from ..core.excel_search import ExcelSearcher
-            import re
 
             # 构建正则表达式模式
             if use_regex:
@@ -698,7 +701,6 @@ class ExcelOperations:
             logger.info(f"{cls._LOG_PREFIX} 开始插入行: {sheet_name} 第{row_index}行")
 
         try:
-            from ..core.excel_writer import ExcelWriter
             writer = ExcelWriter(file_path)
             result = writer.insert_rows(sheet_name, row_index, count)
             return format_operation_result(result)
@@ -732,7 +734,6 @@ class ExcelOperations:
             logger.info(f"{cls._LOG_PREFIX} 开始插入列: {sheet_name} 第{column_index}列")
 
         try:
-            from ..core.excel_writer import ExcelWriter
             writer = ExcelWriter(file_path)
             result = writer.insert_columns(sheet_name, column_index, count)
             return format_operation_result(result)
@@ -766,7 +767,6 @@ class ExcelOperations:
             logger.info(f"{cls._LOG_PREFIX} 开始导出为CSV: {output_path}")
 
         try:
-            from ..core.excel_converter import ExcelConverter
             converter = ExcelConverter(file_path)
             result = converter.export_to_csv(output_path, sheet_name, encoding)
             return format_operation_result(result)
@@ -802,7 +802,6 @@ class ExcelOperations:
             logger.info(f"{cls._LOG_PREFIX} 开始从CSV导入: {csv_path}")
 
         try:
-            from ..core.excel_converter import ExcelConverter
             result = ExcelConverter.import_from_csv(csv_path, output_path, sheet_name, encoding, has_header)
             return format_operation_result(result)
 
@@ -833,7 +832,6 @@ class ExcelOperations:
             logger.info(f"{cls._LOG_PREFIX} 开始格式转换: {input_path} -> {output_path}")
 
         try:
-            from ..core.excel_converter import ExcelConverter
             result = ExcelConverter.convert_format(input_path, output_path, target_format)
             return format_operation_result(result)
 
@@ -864,7 +862,6 @@ class ExcelOperations:
             logger.info(f"{cls._LOG_PREFIX} 开始合并文件: {len(input_files)}个文件")
 
         try:
-            from ..core.excel_converter import ExcelConverter
             result = ExcelConverter.merge_files(input_files, output_path, merge_mode)
             return format_operation_result(result)
 
@@ -888,7 +885,6 @@ class ExcelOperations:
             logger.info(f"{cls._LOG_PREFIX} 开始获取文件信息: {file_path}")
 
         try:
-            from ..core.excel_manager import ExcelManager
             result = ExcelManager.get_file_info(file_path)
             return format_operation_result(result)
 
@@ -919,7 +915,6 @@ class ExcelOperations:
             logger.info(f"{cls._LOG_PREFIX} 开始创建工作表: {sheet_name}")
 
         try:
-            from ..core.excel_manager import ExcelManager
             manager = ExcelManager(file_path)
             result = manager.create_sheet(sheet_name, index)
             return format_operation_result(result)
@@ -945,7 +940,6 @@ class ExcelOperations:
             logger.info(f"{cls._LOG_PREFIX} 开始删除工作表: {sheet_name}")
 
         try:
-            from ..core.excel_manager import ExcelManager
             manager = ExcelManager(file_path)
             result = manager.delete_sheet(sheet_name)
             return format_operation_result(result)
@@ -977,7 +971,6 @@ class ExcelOperations:
             logger.info(f"{cls._LOG_PREFIX} 开始重命名工作表: {old_name} -> {new_name}")
 
         try:
-            from ..core.excel_manager import ExcelManager
             manager = ExcelManager(file_path)
             result = manager.rename_sheet(old_name, new_name)
             return format_operation_result(result)
@@ -1011,7 +1004,6 @@ class ExcelOperations:
             logger.info(f"{cls._LOG_PREFIX} 开始删除行: {sheet_name} 第{row_index}行")
 
         try:
-            from ..core.excel_writer import ExcelWriter
             writer = ExcelWriter(file_path)
             result = writer.delete_rows(sheet_name, row_index, count)
             return format_operation_result(result)
@@ -1045,7 +1037,6 @@ class ExcelOperations:
             logger.info(f"{cls._LOG_PREFIX} 开始删除列: {sheet_name} 第{column_index}列")
 
         try:
-            from ..core.excel_writer import ExcelWriter
             writer = ExcelWriter(file_path)
             result = writer.delete_columns(sheet_name, column_index, count)
             return format_operation_result(result)
@@ -1081,7 +1072,6 @@ class ExcelOperations:
             logger.info(f"{cls._LOG_PREFIX} 开始格式化单元格: {range}")
 
         try:
-            from ..core.excel_writer import ExcelWriter
             writer = ExcelWriter(file_path)
             # 处理预设格式
             if preset:
@@ -1128,7 +1118,6 @@ class ExcelOperations:
             logger.info(f"{cls._LOG_PREFIX} 开始合并单元格: {range}")
 
         try:
-            from ..core.excel_writer import ExcelWriter
             writer = ExcelWriter(file_path)
             result = writer.merge_cells(range, sheet_name)
             return format_operation_result(result)
@@ -1147,7 +1136,6 @@ class ExcelOperations:
             logger.info(f"{cls._LOG_PREFIX} 开始取消合并单元格: {range}")
 
         try:
-            from ..core.excel_writer import ExcelWriter
             writer = ExcelWriter(file_path)
             result = writer.unmerge_cells(range, sheet_name)
             return format_operation_result(result)
@@ -1167,7 +1155,6 @@ class ExcelOperations:
             logger.info(f"{cls._LOG_PREFIX} 开始设置边框: {range}, 样式: {border_style}")
 
         try:
-            from ..core.excel_writer import ExcelWriter
             writer = ExcelWriter(file_path)
             result = writer.set_borders(range, border_style, sheet_name)
             return format_operation_result(result)
@@ -1187,7 +1174,6 @@ class ExcelOperations:
             logger.info(f"{cls._LOG_PREFIX} 开始调整行高: 行{row_index}, 高度{height}, 数量{count}")
 
         try:
-            from ..core.excel_writer import ExcelWriter
             writer = ExcelWriter(file_path)
 
             # ExcelWriter.set_row_height(row_number, height, sheet_name)
@@ -1214,7 +1200,6 @@ class ExcelOperations:
             logger.info(f"{cls._LOG_PREFIX} 开始调整列宽: 列{column_index}, 宽度{width}, 数量{count}")
 
         try:
-            from ..core.excel_writer import ExcelWriter
 
             writer = ExcelWriter(file_path)
 
@@ -1244,8 +1229,6 @@ class ExcelOperations:
             logger.info(f"{cls._LOG_PREFIX} 开始比较工作表: {file1_path}:{sheet1_name} vs {file2_path}:{sheet2_name}")
 
         try:
-            from ..core.excel_compare import ExcelComparer
-            from ..models.types import ComparisonOptions
 
             # 创建比较选项
             options = ComparisonOptions()
@@ -1273,7 +1256,6 @@ class ExcelOperations:
             logger.info(f"{cls._LOG_PREFIX} 开始设置公式: {cell_range} = {formula}")
 
         try:
-            from ..core.excel_writer import ExcelWriter
             writer = ExcelWriter(file_path)
             result = writer.set_formula(cell_range, formula, sheet_name)
             return format_operation_result(result)
@@ -1292,7 +1274,6 @@ class ExcelOperations:
             logger.info(f"{cls._LOG_PREFIX} 开始计算公式: {formula}")
 
         try:
-            from ..core.excel_writer import ExcelWriter
             writer = ExcelWriter("")  # 临时实例，不需要文件
             result = writer.evaluate_formula(formula, context_sheet)
             return format_operation_result(result)
@@ -1311,8 +1292,6 @@ class ExcelOperations:
             logger.info(f"{cls._LOG_PREFIX} 开始比较文件: {file1_path} vs {file2_path}")
 
         try:
-            from ..models.types import ComparisonOptions
-            from ..core.excel_compare import ExcelComparer
 
             # 标准文件比较配置
             options = ComparisonOptions(
@@ -1366,7 +1345,6 @@ class ExcelOperations:
             logger.info(f"{cls._LOG_PREFIX} 开始查找最后一行: {sheet_name}")
 
         try:
-            from ..core.excel_reader import ExcelReader
             reader = ExcelReader(file_path)
 
             # 获取工作簿和工作表
@@ -1394,9 +1372,6 @@ class ExcelOperations:
                     last_row = 0  # 整个工作表都没有数据
                 search_info = "整个工作表"
             else:
-                # 查找指定列的最后一行
-                from openpyxl.utils import column_index_from_string, get_column_letter
-
                 # 转换列参数为列索引
                 if isinstance(column, str):
                     try:
@@ -1466,9 +1441,6 @@ class ExcelOperations:
             logger.info(f"{cls._LOG_PREFIX} 开始检查ID重复: {sheet_name}")
 
         try:
-            from collections import Counter
-            from openpyxl import load_workbook
-
             # 参数验证
             if not file_path or not sheet_name:
                 return {
@@ -1521,7 +1493,6 @@ class ExcelOperations:
 
             # 处理列索引
             if isinstance(id_column, str):
-                from openpyxl.utils import column_index_from_string
                 try:
                     col_idx = column_index_from_string(id_column)
                 except Exception:
