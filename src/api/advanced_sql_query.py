@@ -1796,6 +1796,307 @@ class AdvancedSQLQueryEngine:
 
         return data_types
 
+    def execute_update_query(
+        self,
+        file_path: str,
+        sql: str,
+        sheet_name: Optional[str] = None,
+        dry_run: bool = False
+    ) -> Dict[str, Any]:
+        """
+        执行UPDATE语句，基于WHERE条件批量修改Excel数据
+
+        支持语法: UPDATE 表名 SET 列1=值1, 列2=值2 [WHERE 条件]
+        SET表达式支持: 列=常量, 列=列, 列=算术表达式(如 伤害*1.1)
+        WHERE条件复用查询引擎的所有条件语法
+
+        Args:
+            file_path: Excel文件路径
+            sql: UPDATE SQL语句
+            sheet_name: 工作表名称（可选）
+            dry_run: 预览模式，只返回影响行数不实际修改
+
+        Returns:
+            Dict: 更新结果
+        """
+        import time as _time
+        start_time = _time.time()
+
+        # 验证文件
+        if not os.path.exists(file_path):
+            return {'success': False, 'message': f'文件不存在: {file_path}',
+                    'affected_rows': 0, 'changes': []}
+
+        if not SQLGLOT_AVAILABLE:
+            return {'success': False, 'message': 'SQLGlot未安装，无法使用UPDATE功能',
+                    'affected_rows': 0, 'changes': []}
+
+        # 加载数据（使用缓存）
+        mtime = os.path.getmtime(file_path)
+        cache_key = file_path
+        if cache_key in self._df_cache:
+            cached_mtime, cached_data, cached_desc = self._df_cache[cache_key]
+            if cached_mtime == mtime:
+                worksheets_data = cached_data
+                self._header_descriptions = cached_desc
+            else:
+                worksheets_data = self._load_excel_data(file_path, sheet_name)
+                self._df_cache[cache_key] = (mtime, worksheets_data, self._header_descriptions)
+        else:
+            worksheets_data = self._load_excel_data(file_path, sheet_name)
+            self._df_cache[cache_key] = (mtime, worksheets_data, self._header_descriptions)
+            while len(self._df_cache) > self._max_cache_size:
+                self._df_cache.pop(next(iter(self._df_cache)))
+
+        if not worksheets_data:
+            return {'success': False, 'message': '无法加载Excel数据',
+                    'affected_rows': 0, 'changes': []}
+
+        # 解析UPDATE语句
+        try:
+            parsed = sqlglot.parse_one(sql, read='mysql')
+        except ParseError as e:
+            return {'success': False, 'message': f'SQL语法错误: {e}',
+                    'affected_rows': 0, 'changes': []}
+
+        # 验证是UPDATE语句
+        if not isinstance(parsed, exp.Update):
+            return {'success': False,
+                    'message': '只支持UPDATE语句。💡 写入操作只支持UPDATE，查询请用 excel_query',
+                    'affected_rows': 0, 'changes': []}
+
+        # 提取表名（sqlglot中table在this属性）
+        table_node = parsed.this if isinstance(parsed.this, exp.Table) else None
+        if not table_node:
+            return {'success': False, 'message': 'UPDATE语句缺少表名',
+                    'affected_rows': 0, 'changes': []}
+        target_table = table_node.name
+
+        # 匹配工作表（支持中英文表名）
+        matched_sheet = None
+        for sheet in worksheets_data:
+            if sheet == target_table:
+                matched_sheet = sheet
+                break
+            # 模糊匹配
+            if target_table.lower() == sheet.lower():
+                matched_sheet = sheet
+                break
+
+        if not matched_sheet:
+            available = list(worksheets_data.keys())
+            suggestion = self._suggest_column_name(target_table, available)
+            return {'success': False,
+                    'message': f"工作表 '{target_table}' 不存在。可用工作表: {available}。{suggestion}",
+                    'affected_rows': 0, 'changes': []}
+
+        df = worksheets_data[matched_sheet].copy()
+        original_df = df.copy()
+
+        # 中文列名替换
+        cn_map = {}
+        desc_map = self._header_descriptions.get(matched_sheet, {})
+        for en_col, cn_desc in desc_map.items():
+            if en_col in df.columns:
+                cn_map[cn_desc] = en_col
+
+        # 解析SET子句（sqlglot中在expressions属性）
+        set_exprs = parsed.args.get('expressions', [])
+        if not set_exprs:
+            return {'success': False, 'message': 'UPDATE语句缺少SET子句',
+                    'affected_rows': 0, 'changes': []}
+
+        set_operations = []  # [(col_name, expression_node)]
+        for set_item in set_exprs:
+            # sqlglot Update SET items: EQ expression (col = value)
+            if isinstance(set_item, exp.EQ):
+                col_name = set_item.left.name
+                # 中文列名替换
+                if col_name in cn_map:
+                    col_name = cn_map[col_name]
+                if col_name not in df.columns:
+                    suggestion = self._suggest_column_name(col_name, list(df.columns))
+                    return {'success': False,
+                            'message': f"列 '{col_name}' 不存在。可用列: {list(df.columns)}。{suggestion}",
+                            'affected_rows': 0, 'changes': []}
+                set_operations.append((col_name, set_item.right))
+            else:
+                return {'success': False, 'message': f'不支持的SET表达式: {set_item}',
+                        'affected_rows': 0, 'changes': []}
+
+        # 应用WHERE条件筛选
+        where_clause = parsed.args.get('where')
+        if where_clause:
+            condition_str = self._sql_condition_to_pandas(where_clause.this, df)
+            if condition_str:
+                try:
+                    filtered_df = df.query(condition_str)
+                except Exception:
+                    filtered_df = self._apply_row_filter(where_clause.this, df)
+            else:
+                filtered_df = df
+        else:
+            filtered_df = df
+
+        if filtered_df.empty:
+            return {'success': True, 'message': '没有匹配WHERE条件的行，无需更新',
+                    'affected_rows': 0, 'changes': [], 'execution_time_ms': 0}
+
+        affected_indices = filtered_df.index.tolist()
+        changes = []
+
+        # 应用SET操作
+        for col_name, value_expr in set_operations:
+            for idx in affected_indices:
+                old_val = df.at[idx, col_name]
+                new_val = self._evaluate_update_expression(value_expr, df, idx)
+
+                # 类型兼容性检查
+                if old_val != '' and new_val != '':
+                    try:
+                        old_type = type(old_val)
+                        new_type = type(new_val)
+                        # 数值之间可以互转
+                        if isinstance(old_val, (int, float)) and isinstance(new_val, (int, float)):
+                            pass
+                        elif old_type != new_type:
+                            # 尝试转换
+                            try:
+                                if isinstance(old_val, (int, float)):
+                                    new_val = type(old_val)(new_val)
+                                else:
+                                    new_val = old_type(new_val)
+                            except (ValueError, TypeError):
+                                pass
+                    except Exception:
+                        pass
+
+                if old_val != new_val:
+                    changes.append({
+                        'row': idx + 2,  # +2 for header offset (0-indexed + header row)
+                        'column': col_name,
+                        'old_value': old_val,
+                        'new_value': new_val
+                    })
+                df.at[idx, col_name] = new_val
+
+        if not changes:
+            elapsed = (_time.time() - start_time) * 1000
+            return {'success': True,
+                    'message': f'匹配 {len(affected_indices)} 行，但值无变化',
+                    'affected_rows': len(affected_indices),
+                    'changes': [], 'execution_time_ms': round(elapsed, 1)}
+
+        if dry_run:
+            elapsed = (_time.time() - start_time) * 1000
+            return {'success': True,
+                    'message': f'[预览] 将修改 {len(changes)} 个单元格（{len(affected_indices)} 行）',
+                    'affected_rows': len(affected_indices),
+                    'changes': changes, 'dry_run': True,
+                    'execution_time_ms': round(elapsed, 1)}
+
+        # 写回Excel
+        try:
+            # 检测双行表头偏移
+            header_row_offset = 0
+            desc_map = self._header_descriptions.get(matched_sheet, {})
+            if desc_map:
+                header_row_offset = 1  # 双行表头，数据从第3行开始
+
+            wb = openpyxl.load_workbook(file_path)
+            ws = wb[matched_sheet]
+
+            for change in changes:
+                excel_row = change['row'] + header_row_offset
+                col_idx = list(df.columns).index(change['column']) + 1
+                ws.cell(row=excel_row, column=col_idx, value=change['new_value'])
+
+            wb.save(file_path)
+            wb.close()
+
+            # 清除缓存（文件已修改）
+            self._df_cache.pop(cache_key, None)
+
+            elapsed = (_time.time() - start_time) * 1000
+            return {'success': True,
+                    'message': f'成功更新 {len(changes)} 个单元格（{len(affected_indices)} 行）',
+                    'affected_rows': len(affected_indices),
+                    'changes': changes,
+                    'execution_time_ms': round(elapsed, 1)}
+
+        except Exception as e:
+            return {'success': False,
+                    'message': f'写入Excel失败: {e}',
+                    'affected_rows': 0, 'changes': changes,
+                    'execution_time_ms': round((_time.time() - start_time) * 1000, 1)}
+
+    def _evaluate_update_expression(
+        self, expr: exp.Expression, df: pd.DataFrame, row_idx: int
+    ) -> Any:
+        """
+        评估UPDATE SET表达式，支持常量、列引用和算术运算
+
+        Args:
+            expr: SQL表达式
+            df: DataFrame
+            row_idx: 行索引
+
+        Returns:
+            计算后的值
+        """
+        if isinstance(expr, exp.Literal):
+            val = expr.this
+            if expr.is_string:
+                return str(val)
+            if isinstance(val, str):
+                try:
+                    if '.' in val:
+                        return float(val)
+                    return int(val)
+                except ValueError:
+                    return val
+            return val
+
+        elif isinstance(expr, exp.Column):
+            col_name = expr.name
+            if col_name in df.columns:
+                return df.at[row_idx, col_name]
+            return ''
+
+        elif isinstance(expr, exp.Neg):
+            inner = self._evaluate_update_expression(expr.this, df, row_idx)
+            try:
+                return -float(inner)
+            except (ValueError, TypeError):
+                return inner
+
+        elif isinstance(expr, (exp.Add, exp.Sub, exp.Mul, exp.Div)):
+            left = self._evaluate_update_expression(expr.left, df, row_idx)
+            right = self._evaluate_update_expression(expr.right, df, row_idx)
+            try:
+                left_n = float(left) if not isinstance(left, (int, float)) else left
+                right_n = float(right) if not isinstance(right, (int, float)) else right
+                if isinstance(expr, exp.Add):
+                    result = left_n + right_n
+                elif isinstance(expr, exp.Sub):
+                    result = left_n - right_n
+                elif isinstance(expr, exp.Mul):
+                    result = left_n * right_n
+                elif isinstance(expr, exp.Div):
+                    result = left_n / right_n if right_n != 0 else 0
+                # 如果原值都是整数且结果也是整数，返回整数
+                if isinstance(left, int) and isinstance(right, int) and isinstance(expr, (exp.Add, exp.Sub, exp.Mul)):
+                    return int(result)
+                return result
+            except (ValueError, TypeError):
+                return ''
+
+        else:
+            # 未知表达式类型，尝试递归
+            if hasattr(expr, 'this'):
+                return self._evaluate_update_expression(expr.this, df, row_idx)
+            return ''
+
 
 def execute_advanced_sql_query(
     file_path: str,
@@ -1844,3 +2145,37 @@ def execute_advanced_sql_query(
             'data': [],
             'query_info': {'error_type': 'engine_error', 'details': str(e)}
         }
+
+
+def execute_advanced_update_query(
+    file_path: str,
+    sql: str,
+    sheet_name: Optional[str] = None,
+    dry_run: bool = False
+) -> Dict[str, Any]:
+    """
+    便捷函数：执行UPDATE SQL语句
+
+    Args:
+        file_path: Excel文件路径
+        sql: UPDATE SQL语句
+        sheet_name: 工作表名称（可选）
+        dry_run: 预览模式
+
+    Returns:
+        Dict: 更新结果
+    """
+    try:
+        engine = AdvancedSQLQueryEngine()
+        return engine.execute_update_query(
+            file_path=file_path,
+            sql=sql,
+            sheet_name=sheet_name,
+            dry_run=dry_run
+        )
+    except ImportError as e:
+        return {'success': False, 'message': f'SQLGlot未安装: {str(e)}',
+                'affected_rows': 0, 'changes': []}
+    except Exception as e:
+        return {'success': False, 'message': f'UPDATE执行失败: {str(e)}',
+                'affected_rows': 0, 'changes': []}
