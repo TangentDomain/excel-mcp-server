@@ -101,6 +101,8 @@
   - ✅ 第34轮：eval()替换为_safe_eval_expr() AST白名单验证（拒绝__import__等危险调用）
   - ✅ 第47轮：智能追加优化+excel_writer.py/advanced_sql_query.py/excel_operations.py内联import提升
   - ✅ 第48轮：excel_operations.py 32处冗余内联import全面清理（-29行），excel_writer.py 5处（-5行）
+  - ✅ 第64轮：DRY消除+分发表统一+ORDER BY重构（净-31行）
+  - ✅ 第65轮：COALESCE向量化（combine_first替代5处逐行循环）+CASE WHEN DRY（25行→4行）+_get_row_value数字字面量bugfix
 - **验收**：每轮评价中包含工程治理评估，发现问题立即修复或建需求
 - **状态**：OPEN（持续迭代，不关闭）
 
