@@ -380,3 +380,176 @@ class TestExcelCore:
         manager = ExcelManager(sample_excel_file)
         result = manager.create_sheet("中文工作表名称")
         assert result.success is True
+
+
+class TestFormulaDispatch:
+    """公式分发表重构测试 — 验证_range_formulals分发表+条件统计修复"""
+
+    @pytest.fixture
+    def writer_with_data(self, sample_excel_file):
+        """创建带数据的writer，A1:A10 = [10,20,30,40,50,60,70,80,90,100]"""
+        writer = ExcelWriter(sample_excel_file)
+        data = [[i * 10] for i in range(1, 11)]
+        writer.update_range("Sheet1!A1:A10", data)
+        return writer
+
+    def test_dispatch_table_integrity(self):
+        """分发表包含所有18个公式函数"""
+        table = ExcelWriter._RANGE_FORMULAS
+        assert len(table) == 18
+        names = ['SUM', 'AVERAGE', 'COUNT', 'MIN', 'MAX', 'MEDIAN',
+                 'STDEV', 'VAR', 'PERCENTILE', 'QUARTILE',
+                 'MODE', 'SKEW', 'KURT', 'GEOMEAN', 'HARMEAN',
+                 'COUNTIF', 'SUMIF', 'AVERAGEIF']
+        for i, expected in enumerate(names):
+            import re
+            assert re.search(expected, table[i][0]), f"第{i}项缺少{expected}"
+
+    def test_formula_sum_range(self, writer_with_data):
+        writer = writer_with_data
+        from openpyxl import load_workbook
+        wb = load_workbook(writer.file_path)
+        sheet = wb.active
+        result = writer._basic_formula_parse("SUM(A1:A10)", sheet)
+        assert result == 550.0
+        wb.close()
+
+    def test_formula_average_range(self, writer_with_data):
+        writer = writer_with_data
+        from openpyxl import load_workbook
+        wb = load_workbook(writer.file_path)
+        sheet = wb.active
+        result = writer._basic_formula_parse("AVERAGE(A1:A10)", sheet)
+        assert result == 55.0
+        wb.close()
+
+    def test_formula_count_range(self, writer_with_data):
+        writer = writer_with_data
+        from openpyxl import load_workbook
+        wb = load_workbook(writer.file_path)
+        sheet = wb.active
+        result = writer._basic_formula_parse("COUNT(A1:A10)", sheet)
+        assert result == 10
+        wb.close()
+
+    def test_formula_min_max(self, writer_with_data):
+        writer = writer_with_data
+        from openpyxl import load_workbook
+        wb = load_workbook(writer.file_path)
+        sheet = wb.active
+        assert writer._basic_formula_parse("MIN(A1:A10)", sheet) == 10.0
+        assert writer._basic_formula_parse("MAX(A1:A10)", sheet) == 100.0
+        wb.close()
+
+    def test_formula_median_stdev(self, writer_with_data):
+        writer = writer_with_data
+        from openpyxl import load_workbook
+        wb = load_workbook(writer.file_path)
+        sheet = wb.active
+        median = writer._basic_formula_parse("MEDIAN(A1:A10)", sheet)
+        assert median == 55.0  # (50+60)/2
+        stdev = writer._basic_formula_parse("STDEV(A1:A10)", sheet)
+        assert stdev > 0
+        wb.close()
+
+    def test_formula_countif_all_operators(self, writer_with_data):
+        """COUNTIF全部条件运算符（修复前fallback仅支持>）"""
+        from openpyxl import load_workbook
+        wb = load_workbook(writer_with_data.file_path)
+        sheet = wb.active
+        # >50: 60,70,80,90,100 = 5
+        assert writer_with_data._basic_formula_parse("COUNTIF(A1:A10,\">50\")", sheet) == 5
+        # <50: 10,20,30,40 = 4
+        assert writer_with_data._basic_formula_parse("COUNTIF(A1:A10,\"<50\")", sheet) == 4
+        # >=50: 50,60,70,80,90,100 = 6
+        assert writer_with_data._basic_formula_parse("COUNTIF(A1:A10,\">=50\")", sheet) == 6
+        # <=50: 10,20,30,40,50 = 5
+        assert writer_with_data._basic_formula_parse("COUNTIF(A1:A10,\"<=50\")", sheet) == 5
+        # =50: 1
+        assert writer_with_data._basic_formula_parse("COUNTIF(A1:A10,\"=50\")", sheet) == 1
+        # 隐式等于
+        assert writer_with_data._basic_formula_parse("COUNTIF(A1:A10,\"50\")", sheet) == 1
+        wb.close()
+
+    def test_formula_sumif_all_operators(self, writer_with_data):
+        """SUMIF全部条件运算符（修复前fallback仅支持>）"""
+        from openpyxl import load_workbook
+        wb = load_workbook(writer_with_data.file_path)
+        sheet = wb.active
+        # >50: 60+70+80+90+100 = 400
+        assert writer_with_data._basic_formula_parse("SUMIF(A1:A10,\">50\")", sheet) == 400.0
+        # <50: 10+20+30+40 = 100
+        assert writer_with_data._basic_formula_parse("SUMIF(A1:A10,\"<50\")", sheet) == 100.0
+        # >=50: 50+60+70+80+90+100 = 450
+        assert writer_with_data._basic_formula_parse("SUMIF(A1:A10,\">=50\")", sheet) == 450.0
+        # <=50: 10+20+30+40+50 = 150
+        assert writer_with_data._basic_formula_parse("SUMIF(A1:A10,\"<=50\")", sheet) == 150.0
+        wb.close()
+
+    def test_formula_averageif_all_operators(self, writer_with_data):
+        """AVERAGEIF全部条件运算符（修复前fallback仅支持>）"""
+        from openpyxl import load_workbook
+        wb = load_workbook(writer_with_data.file_path)
+        sheet = wb.active
+        # >50: avg(60,70,80,90,100) = 80
+        assert writer_with_data._basic_formula_parse("AVERAGEIF(A1:A10,\">50\")", sheet) == 80.0
+        # <50: avg(10,20,30,40) = 25
+        assert writer_with_data._basic_formula_parse("AVERAGEIF(A1:A10,\"<50\")", sheet) == 25.0
+        # 无匹配: 返回0
+        assert writer_with_data._basic_formula_parse("AVERAGEIF(A1:A10,\">999\")", sheet) == 0
+        wb.close()
+
+    def test_formula_concatenate(self, sample_excel_file):
+        """CONCATENATE函数"""
+        from openpyxl import load_workbook
+        writer = ExcelWriter(sample_excel_file)
+        wb = load_workbook(sample_excel_file)
+        sheet = wb.active
+        result = writer._basic_formula_parse(
+            'CONCATENATE("Hello", " ", "World")', sheet)
+        assert result == "Hello World"
+        wb.close()
+
+    def test_formula_if(self, sample_excel_file):
+        """IF函数>和<比较"""
+        from openpyxl import load_workbook
+        writer = ExcelWriter(sample_excel_file)
+        wb = load_workbook(sample_excel_file)
+        sheet = wb.active
+        assert writer._basic_formula_parse("IF(10>5,Y,N)", sheet) == "Y"
+        assert writer._basic_formula_parse("IF(5>10,Y,N)", sheet) == "N"
+        assert writer._basic_formula_parse("IF(3<7,A,B)", sheet) == "A"
+        wb.close()
+
+    def test_formula_simple_math(self, sample_excel_file):
+        """简单数学表达式"""
+        from openpyxl import load_workbook
+        writer = ExcelWriter(sample_excel_file)
+        wb = load_workbook(sample_excel_file)
+        sheet = wb.active
+        assert writer._basic_formula_parse("1+2+3", sheet) == 6
+        assert writer._basic_formula_parse("(2+3)*4", sheet) == 20
+        assert writer._basic_formula_parse("10/3", sheet) == pytest.approx(10/3, rel=1e-9)
+        wb.close()
+
+    def test_formula_list_sum_average(self, sample_excel_file):
+        """数字列表SUM/AVERAGE"""
+        from openpyxl import load_workbook
+        writer = ExcelWriter(sample_excel_file)
+        wb = load_workbook(sample_excel_file)
+        sheet = wb.active
+        assert writer._basic_formula_parse("SUM(1,2,3,4,5)", sheet) == 15
+        assert writer._basic_formula_parse("AVERAGE(10,20,30)", sheet) == 20
+        wb.close()
+
+    def test_apply_condition_static(self):
+        """_apply_condition纯Python实现不依赖numpy"""
+        values = [10, 20, 30, 40, 50, 60, 70, 80, 90, 100]
+        assert ExcelWriter._apply_condition(values, ">50", "count") == 5
+        assert ExcelWriter._apply_condition(values, "<50", "count") == 4
+        assert ExcelWriter._apply_condition(values, ">=50", "count") == 6
+        assert ExcelWriter._apply_condition(values, "<=50", "count") == 5
+        assert ExcelWriter._apply_condition(values, "=50", "count") == 1
+        assert ExcelWriter._apply_condition(values, ">50", "sum") == 400.0
+        assert ExcelWriter._apply_condition(values, "<50", "average") == 25.0
+        assert ExcelWriter._apply_condition(values, ">999", "average") == 0
