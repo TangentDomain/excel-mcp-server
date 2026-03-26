@@ -19,7 +19,7 @@ from openpyxl import Workbook
 
 from src.excel_mcp_server_fastmcp.core.excel_search import ExcelSearcher
 from src.excel_mcp_server_fastmcp.models.types import OperationResult
-from src.server import excel_search
+from src.excel_mcp_server_fastmcp.server import excel_search
 
 
 @pytest.fixture

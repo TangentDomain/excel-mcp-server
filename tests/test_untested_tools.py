@@ -11,7 +11,7 @@ Tests for previously untested tools:
 
 import pytest
 import os
-from src.server import (
+from src.excel_mcp_server_fastmcp.server import (
     excel_compare_files,
     excel_compare_sheets,
     excel_convert_format,
