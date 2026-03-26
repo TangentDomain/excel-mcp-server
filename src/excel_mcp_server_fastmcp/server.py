@@ -993,9 +993,6 @@ def excel_restore_backup(
     """
 从备份恢复Excel文件。可恢复到原位置或指定位置。
     """
-    """
-从备份恢复Excel文件。可恢复到原位置或指定位置。
-    """
     _path_err = _validate_path(backup_path)
     if _path_err:
         return _path_err
@@ -1196,9 +1193,6 @@ def excel_import_from_csv(
     """
 从CSV文件导入数据创建Excel文件。
     """
-    """
-从CSV文件导入数据创建Excel文件。
-    """
     for _p in [csv_path, output_path]:
         _err = _validate_path(_p)
         if _err:
@@ -1230,9 +1224,6 @@ def excel_merge_files(
     output_path: str,
     merge_mode: str = "sheets"
 ) -> Dict[str, Any]:
-    """
-合并多个Excel文件。支持三种模式: sheets(各文件独立工作表)/append(追加行)/horizontal(按列拼接)。
-    """
     """
 合并多个Excel文件。支持三种模式: sheets(各文件独立工作表)/append(追加行)/horizontal(按列拼接)。
     """
