@@ -1109,98 +1109,98 @@ class ExcelWriter:
 
     # ==================== Numpy统计函数实现 ====================
 
-    def _numpy_average(self, values: list) -> float:
-        """计算平均值"""
+    def _numpy_op(self, values: list, np_func_name, fallback_func,
+                  min_values: int = 0, numpy_kwargs: dict = None) -> float:
+        """统一的numpy计算+Python降级模式，消除15个numpy方法的重复try/except
+
+        Args:
+            values: 数值列表
+            np_func_name: numpy函数名（如'min', 'max', 'median'）或callable
+            fallback_func: numpy不可用时的Python降级函数
+            min_values: 最小值数量（不足直接返回0）
+            numpy_kwargs: 传递给numpy函数的额外参数
+
+        Returns:
+            float: 计算结果
+        """
         try:
             import numpy as np
-            if not values:
+            if len(values) < min_values:
                 return 0
-            return float(np.mean(values))
+            kwargs = numpy_kwargs or {}
+            if callable(np_func_name):
+                np_func = np_func_name
+            else:
+                np_func = getattr(np, np_func_name)
+            return float(np_func(values, **kwargs))
         except Exception:
-            return sum(values) / len(values) if values else 0
+            return fallback_func(values) if values else 0
+
+    @staticmethod
+    def _python_median(values: list) -> float:
+        """Python原生中位数计算"""
+        sorted_values = sorted(values)
+        n = len(sorted_values)
+        if n % 2 == 1:
+            return sorted_values[n // 2]
+        return (sorted_values[n // 2 - 1] + sorted_values[n // 2]) / 2
+
+    @staticmethod
+    def _python_stdev(values: list) -> float:
+        """Python原生样本标准差"""
+        mean = sum(values) / len(values)
+        variance = sum((x - mean) ** 2 for x in values) / (len(values) - 1)
+        return variance ** 0.5
+
+    @staticmethod
+    def _python_var(values: list) -> float:
+        """Python原生样本方差"""
+        mean = sum(values) / len(values)
+        return sum((x - mean) ** 2 for x in values) / (len(values) - 1)
+
+    @staticmethod
+    def _python_percentile(values: list, p: float) -> float:
+        """Python原生百分位数"""
+        sorted_values = sorted(values)
+        k = p * (len(sorted_values) - 1)
+        f = int(k)
+        c = k - f
+        if f + 1 < len(sorted_values):
+            return sorted_values[f] * (1 - c) + sorted_values[f + 1] * c
+        return sorted_values[f]
+
+    def _numpy_average(self, values: list) -> float:
+        """计算平均值"""
+        return self._numpy_op(values, 'mean',
+                              lambda v: sum(v) / len(v) if v else 0)
 
     def _numpy_min(self, values: list) -> float:
         """计算最小值"""
-        try:
-            import numpy as np
-            if not values:
-                return 0
-            return float(np.min(values))
-        except Exception:
-            return min(values) if values else 0
+        return self._numpy_op(values, 'min', min)
 
     def _numpy_max(self, values: list) -> float:
         """计算最大值"""
-        try:
-            import numpy as np
-            if not values:
-                return 0
-            return float(np.max(values))
-        except Exception:
-            return max(values) if values else 0
+        return self._numpy_op(values, 'max', max)
 
     def _numpy_median(self, values: list) -> float:
         """计算中位数"""
-        try:
-            import numpy as np
-            if not values:
-                return 0
-            return float(np.median(values))
-        except Exception:
-            sorted_values = sorted(values)
-            n = len(sorted_values)
-            if n == 0:
-                return 0
-            elif n % 2 == 1:
-                return sorted_values[n // 2]
-            else:
-                return (sorted_values[n // 2 - 1] + sorted_values[n // 2]) / 2
+        return self._numpy_op(values, 'median', self._python_median)
 
     def _numpy_stdev(self, values: list) -> float:
         """计算样本标准差"""
-        try:
-            import numpy as np
-            if len(values) < 2:
-                return 0
-            return float(np.std(values, ddof=1))
-        except Exception:
-            if len(values) < 2:
-                return 0
-            mean = sum(values) / len(values)
-            variance = sum((x - mean) ** 2 for x in values) / (len(values) - 1)
-            return variance ** 0.5
+        return self._numpy_op(values, 'std', self._python_stdev, min_values=2,
+                              numpy_kwargs={'ddof': 1})
 
     def _numpy_var(self, values: list) -> float:
         """计算样本方差"""
-        try:
-            import numpy as np
-            if len(values) < 2:
-                return 0
-            return float(np.var(values, ddof=1))
-        except Exception:
-            if len(values) < 2:
-                return 0
-            mean = sum(values) / len(values)
-            return sum((x - mean) ** 2 for x in values) / (len(values) - 1)
+        return self._numpy_op(values, 'var', self._python_var, min_values=2,
+                              numpy_kwargs={'ddof': 1})
 
     def _numpy_percentile(self, values: list, percentile: float) -> float:
         """计算百分位数"""
-        try:
-            import numpy as np
-            if not values:
-                return 0
-            return float(np.percentile(values, percentile * 100))
-        except Exception:
-            if not values:
-                return 0
-            sorted_values = sorted(values)
-            k = percentile * (len(sorted_values) - 1)
-            f = int(k)
-            c = k - f
-            if f + 1 < len(sorted_values):
-                return sorted_values[f] * (1 - c) + sorted_values[f + 1] * c
-            else:
-                return sorted_values[f]
+        return self._numpy_op(values, 'percentile',
+                              lambda v: self._python_percentile(v, percentile),
+                              numpy_kwargs={'q': percentile * 100})
 
     def _numpy_quartile(self, values: list, quartile: int) -> float:
         """计算四分位数"""
@@ -1301,6 +1301,54 @@ class ExcelWriter:
                 vertical=align_config.get('vertical', cell.alignment.vertical)
             )
 
+    def _parse_and_resolve_sheet(self, workbook, range_expression: str,
+                                  sheet_name: Optional[str] = None):
+        """解析范围表达式并获取工作表，消除merge/unmerge/borders的重复逻辑
+
+        Args:
+            workbook: openpyxl Workbook实例
+            range_expression: 范围表达式
+            sheet_name: 工作表名称（可选）
+
+        Returns:
+            tuple: (range_info, worksheet)
+
+        Raises:
+            SheetNotFoundError: 工作表不存在
+        """
+        if sheet_name and '!' not in range_expression:
+            full_range = f"{sheet_name}!{range_expression}"
+        else:
+            full_range = range_expression
+
+        range_info = RangeParser.parse_range_expression(full_range)
+
+        if range_info.sheet_name not in workbook.sheetnames:
+            raise SheetNotFoundError(f"工作表 '{range_info.sheet_name}' 不存在")
+
+        return range_info, workbook[range_info.sheet_name]
+
+    def _get_worksheet_or_raise(self, workbook, sheet_name: Optional[str] = None):
+        """获取工作表（支持可选sheet_name，不存在则用活动表）
+
+        Args:
+            workbook: openpyxl Workbook实例
+            sheet_name: 工作表名称（可选）
+
+        Returns:
+            tuple: (worksheet, resolved_sheet_name)
+
+        Raises:
+            SheetNotFoundError: 指定的工作表不存在
+        """
+        if sheet_name:
+            if sheet_name not in workbook.sheetnames:
+                raise SheetNotFoundError(f"工作表 '{sheet_name}' 不存在")
+            return workbook[sheet_name], sheet_name
+        else:
+            worksheet = workbook.active
+            return worksheet, worksheet.title
+
     def merge_cells(
         self,
         range_expression: str,
@@ -1318,25 +1366,11 @@ class ExcelWriter:
         """
         try:
             workbook = load_workbook(self.file_path)
+            range_info, worksheet = self._parse_and_resolve_sheet(
+                workbook, range_expression, sheet_name)
 
-            # 解析范围表达式，构造完整的范围表达式
-            if sheet_name and '!' not in range_expression:
-                full_range = f"{sheet_name}!{range_expression}"
-            else:
-                full_range = range_expression
-
-            range_info = RangeParser.parse_range_expression(full_range)
-
-            # 获取工作表
-            if range_info.sheet_name not in workbook.sheetnames:
-                raise SheetNotFoundError(f"工作表 '{range_info.sheet_name}' 不存在")
-
-            worksheet = workbook[range_info.sheet_name]
-
-            # 执行合并操作
             worksheet.merge_cells(range_info.cell_range)
 
-            # 保存文件
             workbook.save(self.file_path)
             workbook.close()
 
@@ -1377,25 +1411,11 @@ class ExcelWriter:
         """
         try:
             workbook = load_workbook(self.file_path)
+            range_info, worksheet = self._parse_and_resolve_sheet(
+                workbook, range_expression, sheet_name)
 
-            # 解析范围表达式，构造完整的范围表达式
-            if sheet_name and '!' not in range_expression:
-                full_range = f"{sheet_name}!{range_expression}"
-            else:
-                full_range = range_expression
-
-            range_info = RangeParser.parse_range_expression(full_range)
-
-            # 获取工作表
-            if range_info.sheet_name not in workbook.sheetnames:
-                raise SheetNotFoundError(f"工作表 '{range_info.sheet_name}' 不存在")
-
-            worksheet = workbook[range_info.sheet_name]
-
-            # 执行取消合并操作
             worksheet.unmerge_cells(range_info.cell_range)
 
-            # 保存文件
             workbook.save(self.file_path)
             workbook.close()
 
@@ -1437,22 +1457,9 @@ class ExcelWriter:
             OperationResult: 操作结果
         """
         try:
-
             workbook = load_workbook(self.file_path)
-
-            # 解析范围表达式，构造完整的范围表达式
-            if sheet_name and '!' not in range_expression:
-                full_range = f"{sheet_name}!{range_expression}"
-            else:
-                full_range = range_expression
-
-            range_info = RangeParser.parse_range_expression(full_range)
-
-            # 获取工作表
-            if range_info.sheet_name not in workbook.sheetnames:
-                raise SheetNotFoundError(f"工作表 '{range_info.sheet_name}' 不存在")
-
-            worksheet = workbook[range_info.sheet_name]
+            range_info, worksheet = self._parse_and_resolve_sheet(
+                workbook, range_expression, sheet_name)
 
             # 创建边框样式
             side = Side(style=border_style)
@@ -1524,15 +1531,7 @@ class ExcelWriter:
         """
         try:
             workbook = load_workbook(self.file_path)
-
-            # 获取工作表
-            if sheet_name:
-                if sheet_name not in workbook.sheetnames:
-                    raise SheetNotFoundError(f"工作表 '{sheet_name}' 不存在")
-                worksheet = workbook[sheet_name]
-            else:
-                worksheet = workbook.active
-                sheet_name = worksheet.title
+            worksheet, sheet_name = self._get_worksheet_or_raise(workbook, sheet_name)
 
             # 设置行高
             worksheet.row_dimensions[row_number].height = height
@@ -1581,15 +1580,7 @@ class ExcelWriter:
         """
         try:
             workbook = load_workbook(self.file_path)
-
-            # 获取工作表
-            if sheet_name:
-                if sheet_name not in workbook.sheetnames:
-                    raise SheetNotFoundError(f"工作表 '{sheet_name}' 不存在")
-                worksheet = workbook[sheet_name]
-            else:
-                worksheet = workbook.active
-                sheet_name = worksheet.title
+            worksheet, sheet_name = self._get_worksheet_or_raise(workbook, sheet_name)
 
             # 设置列宽
             worksheet.column_dimensions[column.upper()].width = width
