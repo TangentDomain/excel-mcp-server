@@ -4,13 +4,18 @@ Excel MCP Server - Excel写入模块
 提供Excel文件写入和修改功能
 """
 
+import ast
 import logging
-import tempfile
+import math
 import os
+import re
+import tempfile
 import time
+from collections import Counter
 from typing import List, Any, Optional
 from openpyxl import load_workbook, Workbook
 from openpyxl.utils import range_boundaries
+from openpyxl.styles import Font, PatternFill, Border, Alignment, Side
 
 from ..models.types import RangeInfo, ModifiedCell, OperationResult, RangeType
 from ..utils.validators import ExcelValidator
@@ -584,8 +589,6 @@ class ExcelWriter:
             OperationResult: 格式应用结果
         """
         try:
-            from openpyxl.styles import Font, PatternFill, Border, Alignment
-
             # 解析范围表达式
             range_info = RangeParser.parse_range_expression(range_expression)
 
@@ -887,7 +890,6 @@ class ExcelWriter:
 
     def _safe_eval_expr(self, expr: str):
         """安全求值简单数学表达式（仅支持数字和+-*/运算符）"""
-        import ast
         try:
             tree = ast.parse(expr, mode='eval')
             # 只允许数字常量和算术运算符
@@ -929,8 +931,6 @@ class ExcelWriter:
 
     def _basic_formula_parse(self, formula: str, sheet) -> any:
         """增强的基础公式解析器 - 支持numpy统计函数"""
-        import re
-
         formula = formula.strip()
 
         # 简单数学表达式（优先处理，不依赖工作表）
@@ -976,13 +976,13 @@ class ExcelWriter:
     # ---- 范围统计函数分发处理方法 ----
 
     def _formula_range_sum(self, sheet, start, end):
-        return self._calculate_range_sum(sheet, start, end)
+        return sum(self._get_range_values(sheet, start, end))
 
     def _formula_range_average(self, sheet, start, end):
         return self._numpy_average(self._get_range_values(sheet, start, end))
 
     def _formula_range_count(self, sheet, start, end):
-        return self._calculate_range_count(sheet, start, end)
+        return len(self._get_range_values(sheet, start, end))
 
     def _formula_range_min(self, sheet, start, end):
         return self._numpy_min(self._get_range_values(sheet, start, end))
@@ -1088,7 +1088,6 @@ class ExcelWriter:
 
     def _get_range_values(self, sheet, start_cell: str, end_cell: str) -> list:
         """获取范围内的数值列表"""
-        from openpyxl.utils import range_boundaries
 
         min_col, min_row, max_col, max_row = range_boundaries(f"{start_cell}:{end_cell}")
         values = []
@@ -1215,7 +1214,6 @@ class ExcelWriter:
             # 简单实现：返回最频繁出现的值
             if not values:
                 return 0
-            from collections import Counter
             counts = Counter(values)
             return float(counts.most_common(1)[0][0])
 
@@ -1249,7 +1247,6 @@ class ExcelWriter:
         except Exception:
             if not values or any(v <= 0 for v in values):
                 return 0
-            import math
             product = 1
             for v in values:
                 product *= v
@@ -1267,40 +1264,8 @@ class ExcelWriter:
                 return 0
             return len(values) / sum(1.0 / v for v in values)
 
-    def _calculate_range_sum(self, sheet, start_cell: str, end_cell: str) -> float:
-        """计算范围求和"""
-        from openpyxl.utils import range_boundaries
-
-        min_col, min_row, max_col, max_row = range_boundaries(f"{start_cell}:{end_cell}")
-        total = 0
-
-        for row in range(min_row, max_row + 1):
-            for col in range(min_col, max_col + 1):
-                cell = sheet.cell(row=row, column=col)
-                if cell.value is not None and isinstance(cell.value, (int, float)):
-                    total += cell.value
-
-        return total
-
-    def _calculate_range_count(self, sheet, start_cell: str, end_cell: str) -> int:
-        """计算范围内数值个数"""
-        from openpyxl.utils import range_boundaries
-
-        min_col, min_row, max_col, max_row = range_boundaries(f"{start_cell}:{end_cell}")
-        count = 0
-
-        for row in range(min_row, max_row + 1):
-            for col in range(min_col, max_col + 1):
-                cell = sheet.cell(row=row, column=col)
-                if cell.value is not None and isinstance(cell.value, (int, float)):
-                    count += 1
-
-        return count
-
     def _apply_cell_format(self, cell, formatting: dict):
         """应用单元格格式"""
-        from openpyxl.styles import Font, PatternFill, Border, Alignment
-
         # 字体格式
         if 'font' in formatting:
             font_config = formatting['font']
@@ -1465,7 +1430,6 @@ class ExcelWriter:
             OperationResult: 操作结果
         """
         try:
-            from openpyxl.styles import Border, Side
 
             workbook = load_workbook(self.file_path)
 
@@ -1501,7 +1465,6 @@ class ExcelWriter:
                         cell_count += 1
             except TypeError:
                 # 如果cell_range不是预期的格式，尝试其他方法
-                from openpyxl.utils import range_boundaries
                 min_col, min_row, max_col, max_row = range_boundaries(range_info.cell_range)
                 for row in range(min_row, max_row + 1):
                     for col in range(min_col, max_col + 1):
