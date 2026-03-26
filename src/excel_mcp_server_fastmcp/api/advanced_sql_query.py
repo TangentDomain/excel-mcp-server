@@ -164,6 +164,20 @@ class AdvancedSQLQueryEngine:
             # 中文列名替换：将SQL中的中文列名替换为英文列名（在解析前）
             sql = self._replace_cn_columns_in_sql(sql, worksheets_data)
 
+            # DESCRIBE命令友好提示
+            sql_stripped = sql.strip().upper()
+            if sql_stripped.startswith('DESCRIBE ') or sql_stripped.startswith('DESC '):
+                table_hint = sql.strip().split(None, 1)[-1].strip(';').strip('"\'`') if len(sql.strip().split()) > 1 else ''
+                hint = f'请使用 excel_describe_table 工具查看表结构'
+                if table_hint:
+                    hint += f'（工作表: {table_hint}）'
+                return {
+                    'success': False,
+                    'message': f'DESCRIBE不是SQL查询语法。{hint}',
+                    'data': [],
+                    'query_info': {'error_type': 'describe_not_sql', 'hint': 'use_excel_describe_table'}
+                }
+
             # 解析和执行SQL
             import time as _time
             _query_start = _time.time()
