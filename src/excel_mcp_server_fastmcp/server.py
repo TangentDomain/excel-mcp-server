@@ -1216,9 +1216,6 @@ def excel_convert_format(
     """
 转换Excel文件格式。支持xlsx/xlsm/csv/json互转。
     """
-    """
-转换Excel文件格式。支持xlsx/xlsm/csv/json互转。
-    """
     for _p in [input_path, output_path]:
         _err = _validate_path(_p)
         if _err:
