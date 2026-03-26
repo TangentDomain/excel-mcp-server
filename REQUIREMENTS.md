@@ -256,7 +256,7 @@
   3. **返回值结构统一**：所有工具返回统一的JSON结构（success/error/data/meta），降低AI解析成本
   4. **错误信息结构化**：SQL报错返回`{error, suggestion, available_columns, original_sql}`，AI能直接用suggestion重试
   5. **大结果自动截断**：查询结果超过阈值（如200行）时自动截断+提示"建议加WHERE/LIMIT"，保护AI上下文
-  6. **合并重复工具**：`get_headers`和`get_sheet_headers`合并、`preview_operation`和`assess_data_impact`合并，减少AI选择困难
+  6. **合并重复工具**：~~preview_operation→assess_data_impact（第79轮合并，detailed参数）~~，get_headers/get_sheet_headers保持独立（不同用途）
 - **已完成**：
   - ✅ 第51轮：MCP instructions全面更新（6项过时信息修正，SQL功能29→35项）
   - ✅ 第51轮：大结果自动截断（>500行截断为前500行，returned_rows/truncated字段）
