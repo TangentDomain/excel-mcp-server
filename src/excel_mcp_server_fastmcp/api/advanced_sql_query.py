@@ -567,14 +567,21 @@ class AdvancedSQLQueryEngine:
                 else:
                     hints.append(f'• 列"{col}"有{len(unique_vals)}个不同值，"{val}"不在其中')
 
-        # 范围条件：提示列的实际范围
-        for col, op, val in range_conditions:
+        # 范围条件 + BETWEEN条件：提示列的实际范围（两者提示文本相同）
+        range_and_between = [(col, op, val) for col, op, val in range_conditions] + \
+                            [(col, f'{low}~{high}', None) for col, low, high in between_conditions]
+        range_cols_seen = set()
+        for item in range_and_between:
+            col = item[0]
+            if col in range_cols_seen:
+                continue
+            range_cols_seen.add(col)
             if col in df_before_where.columns:
                 numeric = pd.to_numeric(df_before_where[col], errors='coerce').dropna()
                 if len(numeric) > 0:
                     hints.append(f'• 列"{col}"的实际范围: {numeric.min():.2f} ~ {numeric.max():.2f}')
                 else:
-                    hints.append(f'• 列"{col}"不是数值列，无法用{op}比较')
+                    hints.append(f'• 列"{col}"不是数值列，无法用范围条件比较')
 
         # LIKE条件：提示匹配情况
         for col, pattern in like_conditions:
@@ -589,13 +596,6 @@ class AdvancedSQLQueryEngine:
                 matched = unique_vals & set(vals)
                 if not matched:
                     hints.append(f'• 列"{col}"中不包含指定的任何值')
-
-        # BETWEEN条件：提示列的实际范围
-        for col, low, high in between_conditions:
-            if col in df_before_where.columns:
-                numeric = pd.to_numeric(df_before_where[col], errors='coerce').dropna()
-                if len(numeric) > 0:
-                    hints.append(f'• 列"{col}"的实际范围: {numeric.min():.2f} ~ {numeric.max():.2f}')
 
         # IS NULL条件
         for col, is_null in null_conditions:
@@ -739,18 +739,12 @@ class AdvancedSQLQueryEngine:
             hints.append('• 可先去掉HAVING查看全部分组结果，再调整过滤条件')
             return '\n'.join(hints)
 
-        if isinstance(condition, exp.GT):
-            col_max = numeric.max()
-            hints.append(f'• 列"{col}"的最大值为{col_max}，HAVING要求 >{val}，无满足条件的组')
-        elif isinstance(condition, exp.GTE):
-            col_max = numeric.max()
-            hints.append(f'• 列"{col}"的最大值为{col_max}，HAVING要求 >={val}，无满足条件的组')
-        elif isinstance(condition, exp.LT):
-            col_min = numeric.min()
-            hints.append(f'• 列"{col}"的最小值为{col_min}，HAVING要求 <{val}，无满足条件的组')
-        elif isinstance(condition, exp.LTE):
-            col_min = numeric.min()
-            hints.append(f'• 列"{col}"的最小值为{col_min}，HAVING要求 <={val}，无满足条件的组')
+        # 比较运算符（GT/GTE/LT/LTE）使用分发表
+        op_type = type(condition)
+        if op_type in self._HAVING_OPS:
+            stat_func, op_str, label = self._HAVING_OPS[op_type]
+            stat_val = getattr(numeric, stat_func)()
+            hints.append(f'• 列"{col}"的{label}值为{stat_val}，HAVING要求 {op_str}{val}，无满足条件的组')
         elif isinstance(condition, exp.EQ):
             unique_vals = df_before_having[col].dropna().unique()
             if len(unique_vals) <= 10:
@@ -1437,6 +1431,27 @@ class AdvancedSQLQueryEngine:
         exp.Concat, exp.Replace, exp.Substring, exp.Left, exp.Right,
     })
 
+    # HAVING空结果建议分发表：(stat_func, op_str, label)
+    _HAVING_OPS = {
+        exp.GT:  ('max', '>',  '最大'),
+        exp.GTE: ('max', '>=', '最大'),
+        exp.LT:  ('min', '<',  '最小'),
+        exp.LTE: ('min', '<=', '最小'),
+    }
+
+    # JOIN类型分发表：(side, kind) → how
+    _JOIN_KIND_MAP = {
+        ('LEFT', None): 'left',
+        (None, 'LEFT'): 'left',
+        ('RIGHT', None): 'right',
+        (None, 'RIGHT'): 'right',
+        ('FULL', None): 'outer',
+        (None, 'FULL'): 'outer',
+        ('INNER', None): 'inner',
+        (None, 'INNER'): 'inner',
+        (None, 'CROSS'): 'cross',
+    }
+
     # Pandas条件运算符分发表：SQL条件→pandas query字符串
     _PANDAS_OPS = {
         exp.EQ: '==',
@@ -1633,19 +1648,9 @@ class AdvancedSQLQueryEngine:
 
         for join in joins:
             # 解析JOIN类型
-            join_kind = 'inner'
-            join_side = join.side  # LEFT, RIGHT, etc.
-            join_kind_name = join.kind  # INNER, CROSS, etc.
-
-            if join_side and str(join_side).upper() == 'LEFT':
-                join_kind = 'left'
-            elif join_side and str(join_side).upper() == 'RIGHT':
-                join_kind = 'right'
-            elif (join_side and str(join_side).upper() == 'FULL') or \
-                 (join_kind_name and str(join_kind_name).upper() == 'FULL'):
-                join_kind = 'outer'
-            elif join_kind_name and str(join_kind_name).upper() == 'CROSS':
-                join_kind = 'cross'
+            join_side = str(join.side).upper() if join.side else None
+            join_kind_name = str(join.kind).upper() if join.kind else None
+            join_kind = self._JOIN_KIND_MAP.get((join_side, join_kind_name), 'inner')
 
             # 解析右表
             right_table_expr = join.this
@@ -1978,22 +1983,11 @@ class AdvancedSQLQueryEngine:
     def _expression_to_value(self, expr: exp.Expression, df: pd.DataFrame) -> Union[str, int, float]:
         """将表达式转换为值"""
         if isinstance(expr, exp.Literal):
-            value = expr.this
-            if isinstance(value, str):
-                # 尝试将字符串转换为数字
-                try:
-                    # 检查是否为整数
-                    if value.isdigit():
-                        return int(value)
-                    # 检查是否为浮点数
-                    elif '.' in value and value.replace('.', '').isdigit():
-                        return float(value)
-                    # 如果不是数字，保持字符串格式
-                    else:
-                        return f"'{value}'"
-                except (ValueError, AttributeError):
-                    return f"'{value}'"
-            return value
+            # 委托_parse_literal_value统一处理Literal→Python值转换
+            parsed = self._parse_literal_value(expr)
+            if isinstance(parsed, str):
+                return f"'{parsed}'"
+            return parsed
 
         elif isinstance(expr, exp.Column):
             col_name = expr.name

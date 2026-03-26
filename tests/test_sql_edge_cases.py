@@ -372,3 +372,70 @@ class TestSQLQueryKnownLimitations:
         records = json.loads(result['formatted_output'])
         types = [r['skill_type'] for r in records]
         assert 'TOTAL' in types
+
+    def test_having_dispatch_table_completeness(self):
+        """HAVING dispatch table covers all 4 comparison operators"""
+        from src.excel_mcp_server_fastmcp.api.advanced_sql_query import AdvancedSQLQueryEngine
+        try:
+            from sqlglot import expressions as exp
+        except ImportError:
+            return
+        engine = AdvancedSQLQueryEngine.__new__(AdvancedSQLQueryEngine)
+        assert exp.GT in engine._HAVING_OPS
+        assert exp.GTE in engine._HAVING_OPS
+        assert exp.LT in engine._HAVING_OPS
+        assert exp.LTE in engine._HAVING_OPS
+        # Verify dispatch returns correct (stat, op, label)
+        assert engine._HAVING_OPS[exp.GT] == ('max', '>', '最大')
+        assert engine._HAVING_OPS[exp.LT] == ('min', '<', '最小')
+
+    def test_range_and_between_merged_hint(self, game_config_file):
+        """Range and BETWEEN conditions produce identical hint text (merged)"""
+        # Range condition
+        result_range = excel_query(game_config_file, "SELECT * FROM 技能配置 WHERE 伤害 > 99999")
+        assert result_range['success'] is True
+        hint_range = result_range['query_info'].get('suggestion', '')
+        assert '实际范围' in hint_range
+
+        # BETWEEN condition (same hint pattern)
+        result_between = excel_query(game_config_file, "SELECT * FROM 技能配置 WHERE 伤害 BETWEEN 99998 AND 99999")
+        assert result_between['success'] is True
+        hint_between = result_between['query_info'].get('suggestion', '')
+        assert '实际范围' in hint_between
+
+    def test_join_kind_dispatch(self, game_config_file):
+        """JOIN kind dispatch table covers all 5 join types"""
+        from src.excel_mcp_server_fastmcp.api.advanced_sql_query import AdvancedSQLQueryEngine
+        engine = AdvancedSQLQueryEngine.__new__(AdvancedSQLQueryEngine)
+        # Verify dispatch table has all expected join types
+        assert engine._JOIN_KIND_MAP[('LEFT', None)] == 'left'
+        assert engine._JOIN_KIND_MAP[('RIGHT', None)] == 'right'
+        assert engine._JOIN_KIND_MAP[('FULL', None)] == 'outer'
+        assert engine._JOIN_KIND_MAP[(None, 'CROSS')] == 'cross'
+        assert engine._JOIN_KIND_MAP[('INNER', None)] == 'inner'
+        # Default fallback
+        assert engine._JOIN_KIND_MAP.get(('UNKNOWN', None), 'inner') == 'inner'
+
+    def test_expression_to_value_literal_delegation(self, game_config_file):
+        """_expression_to_value delegates Literal parsing to _parse_literal_value"""
+        from src.excel_mcp_server_fastmcp.api.advanced_sql_query import AdvancedSQLQueryEngine
+        try:
+            import sqlglot
+            from sqlglot import expressions as exp
+        except ImportError:
+            return
+        engine = AdvancedSQLQueryEngine.__new__(AdvancedSQLQueryEngine)
+        import pandas as pd
+        df = pd.DataFrame({'col': [1, 2, 3]})
+
+        # Integer literal
+        int_expr = exp.Literal.number(42)
+        assert engine._expression_to_value(int_expr, df) == 42
+
+        # Float literal
+        float_expr = exp.Literal.number(3.14)
+        assert engine._expression_to_value(float_expr, df) == 3.14
+
+        # String literal (quoted)
+        str_expr = exp.Literal.string('hello')
+        assert engine._expression_to_value(str_expr, df) == "'hello'"
