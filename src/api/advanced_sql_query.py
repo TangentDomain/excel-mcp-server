@@ -674,49 +674,54 @@ class AdvancedSQLQueryEngine:
         hints = ['\nHAVING分析：']
         hints.append(f'• GROUP BY聚合后有{len(df_before_having)}组数据')
 
-        # 分析HAVING条件类型
+        col = self._extract_column_name(condition.left)
+        val = self._extract_literal_value(condition.right)
+
+        # HAVING条件中聚合函数的列名可能不直接匹配，尝试从列名或表达式推导
+        if not col:
+            # 可能是 AVG(damage) 这样的聚合表达式，尝试匹配别名或聚合列
+            left_str = str(condition.left).lower()
+            for c in df_before_having.columns:
+                if c.lower() in left_str or left_str in c.lower():
+                    col = c
+                    break
+
+        if not col or col not in df_before_having.columns:
+            hints.append('• HAVING条件较复杂，建议去掉HAVING先查看聚合结果')
+            hints.append('• 可先去掉HAVING查看全部分组结果，再调整过滤条件')
+            return '\n'.join(hints)
+
+        numeric = pd.to_numeric(df_before_having[col], errors='coerce').dropna()
+        if len(numeric) == 0:
+            hints.append(f'• 列"{col}"没有数值数据')
+            hints.append('• 可先去掉HAVING查看全部分组结果，再调整过滤条件')
+            return '\n'.join(hints)
+
         if isinstance(condition, exp.GT):
-            col = self._extract_column_name(condition.left)
-            val = self._extract_literal_value(condition.right)
-            if col and col in df_before_having.columns:
-                col_max = pd.to_numeric(df_before_having[col], errors='coerce').max()
-                hints.append(f'• 列"{col}"的最大值为{col_max}，HAVING要求 >{val}，无满足条件的组')
-                if col_max <= val:
-                    hints.append(f'• 建议：降低阈值（如改为 >{max(0, val * 0.8):.0f}）或移除HAVING查看全部分组')
+            col_max = numeric.max()
+            hints.append(f'• 列"{col}"的最大值为{col_max}，HAVING要求 >{val}，无满足条件的组')
+            if col_max <= val:
+                hints.append(f'• 建议：降低阈值或移除HAVING查看全部分组')
         elif isinstance(condition, exp.GTE):
-            col = self._extract_column_name(condition.left)
-            val = self._extract_literal_value(condition.right)
-            if col and col in df_before_having.columns:
-                col_max = pd.to_numeric(df_before_having[col], errors='coerce').max()
-                hints.append(f'• 列"{col}"的最大值为{col_max}，HAVING要求 >={val}，无满足条件的组')
+            col_max = numeric.max()
+            hints.append(f'• 列"{col}"的最大值为{col_max}，HAVING要求 >={val}，无满足条件的组')
         elif isinstance(condition, exp.LT):
-            col = self._extract_column_name(condition.left)
-            val = self._extract_literal_value(condition.right)
-            if col and col in df_before_having.columns:
-                col_min = pd.to_numeric(df_before_having[col], errors='coerce').min()
-                hints.append(f'• 列"{col}"的最小值为{col_min}，HAVING要求 <{val}，无满足条件的组')
+            col_min = numeric.min()
+            hints.append(f'• 列"{col}"的最小值为{col_min}，HAVING要求 <{val}，无满足条件的组')
         elif isinstance(condition, exp.LTE):
-            col = self._extract_column_name(condition.left)
-            val = self._extract_literal_value(condition.right)
-            if col and col in df_before_having.columns:
-                col_min = pd.to_numeric(df_before_having[col], errors='coerce').min()
-                hints.append(f'• 列"{col}"的最小值为{col_min}，HAVING要求 <={val}，无满足条件的组')
+            col_min = numeric.min()
+            hints.append(f'• 列"{col}"的最小值为{col_min}，HAVING要求 <={val}，无满足条件的组')
         elif isinstance(condition, exp.EQ):
-            col = self._extract_column_name(condition.left)
-            val = self._extract_literal_value(condition.right)
-            if col and col in df_before_having.columns:
-                unique_vals = df_before_having[col].dropna().unique()
-                if len(unique_vals) <= 10:
-                    vals_str = ', '.join(str(v) for v in unique_vals)
-                    hints.append(f'• 列"{col}"的值为: {vals_str}，不等于{val}')
-                else:
-                    hints.append(f'• 列"{col}"有{len(unique_vals)}个不同值，不等于{val}')
+            unique_vals = df_before_having[col].dropna().unique()
+            if len(unique_vals) <= 10:
+                vals_str = ', '.join(str(v) for v in unique_vals)
+                hints.append(f'• 列"{col}"的值为: {vals_str}，不等于{val}')
+            else:
+                hints.append(f'• 列"{col}"有{len(unique_vals)}个不同值，不等于{val}')
         else:
             hints.append(f'• HAVING条件较复杂，建议去掉HAVING先查看聚合结果')
 
-        # 通用建议
         hints.append('• 可先去掉HAVING查看全部分组结果，再调整过滤条件')
-
         return '\n'.join(hints)
 
     def _suggest_column_name(self, col_name: str, available_cols: List[str], max_suggestions: int = 3) -> str:
@@ -1581,16 +1586,17 @@ class AdvancedSQLQueryEngine:
             """智能序列化值：数值保持数值类型，None转空字符串"""
             if val is None:
                 return ''
-            if isinstance(val, float) and val == int(val):
-                return int(val)  # 170.0 → 170
             if isinstance(val, (np.integer,)):
                 return int(val)
             if isinstance(val, (np.floating,)):
                 f = float(val)
                 if f == int(f):
                     return int(f)
-                # 非整数浮点数保留2位小数，避免166.66666666666666
                 return round(f, 2)
+            if isinstance(val, float):
+                if val == int(val):
+                    return int(val)
+                return round(val, 2)
             return val
 
         data = []
