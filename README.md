@@ -10,8 +10,8 @@
 [![Python 版本](https://img.shields.io/badge/python-3.10+-blue.svg)](https://www.python.org/downloads/)
 [![技术支持: FastMCP](https://img.shields.io/badge/Powered%20by-FastMCP-orange)](https://github.com/jlowin/fastmcp)
 ![状态](https://img.shields.io/badge/status-stable-green.svg)
-![测试覆盖](https://img.shields.io/badge/tests-800%20tests-brightgreen.svg)
-![工具数量](https://img.shields.io/badge/tools-44%20verified%20tools-green.svg)
+![测试覆盖](https://img.shields.io/badge/tests-819%20tests-brightgreen.svg)
+![工具数量](https://img.shields.io/badge/tools-46%20verified%20tools-green.svg)
 [![CI](https://github.com/TangentDomain/excel-mcp-server/actions/workflows/ci.yml/badge.svg)](https://github.com/TangentDomain/excel-mcp-server/actions/workflows/ci.yml)
 
 **ExcelMCP** 是专为游戏开发设计的Excel配置表管理MCP服务器。通过AI自然语言指令，实现技能配置表、装备数据、怪物属性等游戏配置的智能化操作。基于**FastMCP**构建，读取使用**python-calamine**（Rust引擎，2300x提速），写入使用**openpyxl**，拥有**42个专业工具**和**785个测试用例**，确保企业级可靠性。
@@ -308,7 +308,7 @@ SELECT a.skill_name, b.equip_name FROM SkillConfig a INNER JOIN EquipConfig b ON
 
 ---
 
-## 🛠️ 完整工具列表（44个专业工具）
+## 🛠️ 完整工具列表（46个专业工具）
 
 ### 📁 文件与工作表管理
 - `excel_create_file` - 创建新Excel文件，支持自定义工作表
@@ -331,6 +331,8 @@ SELECT a.skill_name, b.equip_name FROM SkillConfig a INNER JOIN EquipConfig b ON
 - `excel_delete_columns` - 删除列范围
 - `excel_find_last_row` - 查找最后一行有数据位置
 - `excel_rename_column` - 重命名列（修改表头单元格值，支持双行表头）
+- `excel_upsert_row` - Upsert行（按键列查找，存在则更新，不存在则插入，策划合并配置高频操作）
+- `excel_batch_insert_rows` - 批量插入多行数据到工作表末尾（策划批量导入配置）
 - `excel_set_formula` - 设置单元格公式（自动计算）
 - `excel_evaluate_formula` - 临时执行公式返回结果，不修改文件
 
@@ -551,7 +553,7 @@ ExcelMCP 内置多层安全防护，保护用户数据和系统安全：
 ```
 src/excel_mcp_server_fastmcp/    # 主包（pip install 后可直接 import）
 ├── __init__.py                   # 包入口，暴露 main()
-├── server.py                     # MCP接口层（44个工具定义）
+├── server.py                     # MCP接口层（46个工具定义）
 ├── api/                          # API业务逻辑层
 │   ├── excel_operations.py       # Excel操作统一入口
 │   └── advanced_sql_query.py     # SQL查询引擎
@@ -606,7 +608,7 @@ API业务逻辑层 (集中式处理)
 - **测试用例**: 783个（行为验证，无覆盖率填充）
 - **测试文件**: 34个测试文件
 - **测试代码**: 13,574行
-- **工具数量**: 44个 (@mcp.tool装饰器验证)
+- **工具数量: 46个 (@mcp.tool装饰器验证)
 - **架构层次**: 4层分层设计 (MCP→API→Core→Utils)
 
 ### 验证命令
@@ -615,7 +617,7 @@ API业务逻辑层 (集中式处理)
 python -m pytest tests/ -q --tb=short -n auto --timeout=30
 
 # 验证工具完整性
-grep -c "def excel_" src/excel_mcp_server_fastmcp/server.py  # 应输出: 44
+grep -c "def excel_" src/excel_mcp_server_fastmcp/server.py  # 应输出: 46
 
 # 生成覆盖率报告
 python -m pytest tests/ --cov=src --cov-report=html
