@@ -292,3 +292,35 @@ class TestSQLQueryKnownLimitations:
         assert result['success'] is False
         assert "Ag" in result['message']
         assert "Age" in result['message']
+
+    def test_empty_result_eq_suggestion(self, game_config_file):
+        """Empty result from equality condition shows available values"""
+        result = excel_query(game_config_file, "SELECT * FROM 技能配置 WHERE 技能类型 = \"不存在的类型\"")
+        assert result['success'] is True
+        assert result['query_info']['filtered_rows'] == 0
+        suggestion = result['query_info'].get('suggestion', '')
+        assert '法师' in suggestion or '战士' in suggestion or '刺客' in suggestion
+        assert '源表共10行' in suggestion
+
+    def test_empty_result_range_suggestion(self, game_config_file):
+        """Empty result from range condition shows actual data range"""
+        result = excel_query(game_config_file, "SELECT * FROM 技能配置 WHERE 伤害 > 99999")
+        assert result['success'] is True
+        assert result['query_info']['filtered_rows'] == 0
+        suggestion = result['query_info'].get('suggestion', '')
+        assert '实际范围' in suggestion
+
+    def test_empty_result_like_suggestion(self, game_config_file):
+        """Empty result from LIKE condition shows sample data"""
+        result = excel_query(game_config_file, "SELECT * FROM 技能配置 WHERE 技能名称 LIKE \"%不存在%\"")
+        assert result['success'] is True
+        assert result['query_info']['filtered_rows'] == 0
+        suggestion = result['query_info'].get('suggestion', '')
+        assert '样本数据' in suggestion
+
+    def test_empty_result_multi_and_suggestion(self, game_config_file):
+        """Empty result from multiple AND conditions hints to reduce conditions"""
+        result = excel_query(game_config_file, "SELECT * FROM 技能配置 WHERE 伤害 > 99999 AND 技能类型 = \"法师\"")
+        assert result['success'] is True
+        suggestion = result['query_info'].get('suggestion', '')
+        assert '多个AND条件' in suggestion or '减少条件' in suggestion

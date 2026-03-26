@@ -180,7 +180,7 @@ class AdvancedSQLQueryEngine:
                 result_data = self._execute_query(parsed_sql, worksheets_data, limit)
                 _query_elapsed = (_time.time() - _query_start) * 1000
 
-                # 格式化结果（传入parsed_sql判断是否需要总计行）
+                # 格式化结果（传入parsed_sql和WHERE前数据用于空结果智能建议）
                 has_group_by = parsed_sql.args.get('group') is not None
                 result = self._format_query_result(
                     result_data,
@@ -188,7 +188,9 @@ class AdvancedSQLQueryEngine:
                     sql,
                     worksheets_data,
                     include_headers,
-                    has_group_by=has_group_by
+                    has_group_by=has_group_by,
+                    parsed_sql=parsed_sql,
+                    df_before_where=self._df_before_where
                 )
                 # 注入执行时间
                 result['query_info']['execution_time_ms'] = round(_query_elapsed, 1)
@@ -502,6 +504,166 @@ class AdvancedSQLQueryEngine:
 
         return protected_sql
 
+    def _generate_empty_result_suggestion(self, parsed_sql, df_before_where, worksheets_data):
+        """分析WHERE条件类型，生成智能空结果建议"""
+        where_clause = parsed_sql.args.get('where')
+        if not where_clause:
+            return '查询返回0行数据。表可能为空，请检查数据是否已录入。'
+
+        total_rows = len(df_before_where)
+        if total_rows == 0:
+            return '查询返回0行数据。工作表本身没有数据行。'
+
+        hints = []
+        condition = where_clause.this
+
+        # 分析条件树，收集条件类型和涉及的列
+        eq_conditions = []  # 等值条件
+        range_conditions = []  # 范围条件
+        like_conditions = []  # LIKE条件
+        in_conditions = []  # IN条件
+        between_conditions = []  # BETWEEN条件
+        null_conditions = []  # IS NULL条件
+
+        self._collect_condition_types(condition, eq_conditions, range_conditions,
+                                       like_conditions, in_conditions, between_conditions, null_conditions)
+
+        # 等值条件：提示列的唯一值
+        for col, val in eq_conditions:
+            if col in df_before_where.columns:
+                unique_vals = df_before_where[col].dropna().unique()
+                if len(unique_vals) <= 20:
+                    vals_str = ', '.join(str(v) for v in unique_vals[:10])
+                    if len(unique_vals) > 10:
+                        vals_str += f' ... 共{len(unique_vals)}个'
+                    hints.append(f'• 列"{col}"的值为: {vals_str}')
+                else:
+                    hints.append(f'• 列"{col}"有{len(unique_vals)}个不同值，"{val}"不在其中')
+
+        # 范围条件：提示列的实际范围
+        for col, op, val in range_conditions:
+            if col in df_before_where.columns:
+                numeric = pd.to_numeric(df_before_where[col], errors='coerce').dropna()
+                if len(numeric) > 0:
+                    hints.append(f'• 列"{col}"的实际范围: {numeric.min():.2f} ~ {numeric.max():.2f}')
+                else:
+                    hints.append(f'• 列"{col}"不是数值列，无法用{op}比较')
+
+        # LIKE条件：提示匹配情况
+        for col, pattern in like_conditions:
+            if col in df_before_where.columns:
+                sample = df_before_where[col].dropna().astype(str).head(5).tolist()
+                hints.append(f'• 列"{col}"的样本数据: {", ".join(sample)}')
+
+        # IN条件：提示实际存在的值
+        for col, vals in in_conditions:
+            if col in df_before_where.columns:
+                unique_vals = set(df_before_where[col].dropna().unique())
+                matched = unique_vals & set(vals)
+                if not matched:
+                    hints.append(f'• 列"{col}"中不包含指定的任何值')
+
+        # BETWEEN条件：提示列的实际范围
+        for col, low, high in between_conditions:
+            if col in df_before_where.columns:
+                numeric = pd.to_numeric(df_before_where[col], errors='coerce').dropna()
+                if len(numeric) > 0:
+                    hints.append(f'• 列"{col}"的实际范围: {numeric.min():.2f} ~ {numeric.max():.2f}')
+
+        # IS NULL条件
+        for col, is_null in null_conditions:
+            if col in df_before_where.columns:
+                null_count = df_before_where[col].isna().sum()
+                if is_null and null_count == 0:
+                    hints.append(f'• 列"{col}"没有空值')
+                elif not is_null and null_count == total_rows:
+                    hints.append(f'• 列"{col}"全部为空值')
+
+        # 多条件提示
+        total_conditions = len(eq_conditions) + len(range_conditions) + len(like_conditions) + len(in_conditions) + len(between_conditions) + len(null_conditions)
+        if total_conditions > 1:
+            hints.append('• 多个AND条件同时满足的行可能不存在，尝试减少条件或改用OR')
+
+        # 通用提示
+        hints.append(f'• 源表共{total_rows}行，WHERE过滤后为0行')
+        hints.append('• 可用 DESCRIBE 查看表结构，或去掉WHERE先查看全部数据')
+
+        return '查询返回0行数据。分析：\n' + '\n'.join(hints)
+
+    def _collect_condition_types(self, condition, eq, rng, like, in_list, between, null_list):
+        """递归收集WHERE条件树中的各类条件"""
+        if isinstance(condition, exp.EQ):
+            col = self._extract_column_name(condition.left)
+            val = self._extract_literal_value(condition.right)
+            if col:
+                eq.append((col, val))
+        elif isinstance(condition, (exp.GT, exp.GTE, exp.LT, exp.LTE)):
+            col = self._extract_column_name(condition.left)
+            val = self._extract_literal_value(condition.right)
+            op_map = {exp.GT: '>', exp.GTE: '>=', exp.LT: '<', exp.LTE: '<='}
+            if col:
+                rng.append((col, op_map.get(type(condition), '?'), val))
+        elif isinstance(condition, exp.Like):
+            col = self._extract_column_name(condition.left)
+            val = self._extract_literal_value(condition.right)
+            if col:
+                like.append((col, val))
+        elif isinstance(condition, exp.In):
+            col = self._extract_column_name(condition.this)
+            vals = []
+            if hasattr(condition, 'expressions'):
+                for e in condition.expressions:
+                    v = self._extract_literal_value(e)
+                    if v is not None:
+                        vals.append(v)
+            if col and vals:
+                in_list.append((col, vals))
+        elif isinstance(condition, exp.Between):
+            col = self._extract_column_name(condition.this)
+            low = self._extract_literal_value(condition.args.get('low'))
+            high = self._extract_literal_value(condition.args.get('high'))
+            if col:
+                between.append((col, low, high))
+        elif isinstance(condition, exp.Is):
+            col = self._extract_column_name(condition.this)
+            if col:
+                null_list.append((col, True))
+        elif isinstance(condition, exp.Not):
+            inner = condition.this
+            if isinstance(inner, exp.Is):
+                col = self._extract_column_name(inner.this)
+                if col:
+                    null_list.append((col, False))
+            else:
+                self._collect_condition_types(inner, eq, rng, like, in_list, between, null_list)
+        elif isinstance(condition, exp.And):
+            for child in condition.flatten():
+                if child is not condition:
+                    self._collect_condition_types(child, eq, rng, like, in_list, between, null_list)
+        elif isinstance(condition, exp.Or):
+            for child in condition.flatten():
+                if child is not condition:
+                    self._collect_condition_types(child, eq, rng, like, in_list, between, null_list)
+
+    def _extract_column_name(self, expr):
+        """从表达式中提取列名"""
+        if isinstance(expr, exp.Column):
+            return expr.name
+        return None
+
+    def _extract_literal_value(self, expr):
+        """从表达式中提取字面值"""
+        if isinstance(expr, exp.Literal):
+            val = expr.this
+            try:
+                return int(val)
+            except (ValueError, TypeError):
+                try:
+                    return float(val)
+                except (ValueError, TypeError):
+                    return val
+        return None
+
     def _suggest_column_name(self, col_name: str, available_cols: List[str], max_suggestions: int = 3) -> str:
         """
         当列名不存在时，用编辑距离找出最相似的列名作为建议。
@@ -570,6 +732,9 @@ class AdvancedSQLQueryEngine:
         base_df = worksheets_data[from_table].copy()
 
         # 应用WHERE条件
+        # 保存WHERE前的DataFrame，用于空结果智能建议
+        base_df_before_where = base_df.copy()
+        self._df_before_where = base_df_before_where
         base_df = self._apply_where_clause(parsed_sql, base_df)
 
         # 检查是否有聚合函数
@@ -1339,12 +1504,16 @@ class AdvancedSQLQueryEngine:
         sql: str,
         worksheets_data: Dict[str, pd.DataFrame],
         include_headers: bool,
-        has_group_by: bool = False
+        has_group_by: bool = False,
+        parsed_sql: exp.Expression = None,
+        df_before_where: pd.DataFrame = None
     ) -> Dict[str, Any]:
         """格式化查询结果
 
         Args:
             has_group_by: 如果为True且有数值聚合列，自动追加TOTAL行
+            parsed_sql: 解析后的SQL表达式，用于空结果智能建议
+            df_before_where: WHERE过滤前的DataFrame，用于空结果智能建议
         """
 
         # 计算原始数据统计
@@ -1429,9 +1598,11 @@ class AdvancedSQLQueryEngine:
             }
         }
 
-        # 空结果友好提示
+        # 空结果智能建议：分析WHERE条件类型，给出针对性提示
         if result_df.empty:
-            result['query_info']['suggestion'] = '查询返回0行数据。可能原因：WHERE条件过严、列名拼写错误（可用DESCRIBE查看列名）、或数据尚未录入。'
+            result['query_info']['suggestion'] = self._generate_empty_result_suggestion(
+                parsed_sql, df_before_where, worksheets_data
+            )
 
         # 生成Markdown表格（方便AI和人类阅读）
         if data and len(data) > 0:
