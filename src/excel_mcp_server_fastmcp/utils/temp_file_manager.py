@@ -85,9 +85,11 @@ class TempFileManager:
         try:
             if os.path.exists(file_path):
                 os.unlink(file_path)
+                logger.debug(f"临时文件已清理: {file_path}")
                 return True
             return False
-        except Exception:
+        except Exception as e:
+            logger.warning(f"清理临时文件失败: {file_path}: {e}")
             return False
 
     @staticmethod
@@ -113,32 +115,3 @@ class TempFileManager:
         """
         temp_dir = tempfile.mkdtemp(prefix=prefix)
         return temp_dir
-
-
-if __name__ == "__main__":
-    # 测试代码
-    print("测试临时文件管理器...")
-
-    # 测试Excel文件创建
-    temp_excel = TempFileManager.create_temp_excel_file()
-    print(f"Excel临时文件: {temp_excel}")
-
-    # 测试CSV文件创建
-    temp_csv = TempFileManager.create_temp_csv_file()
-    print(f"CSV临时文件: {temp_csv}")
-
-    # 测试JSON文件创建
-    temp_json = TempFileManager.create_temp_json_file()
-    print(f"JSON临时文件: {temp_json}")
-
-    # 验证在系统临时目录中
-    system_temp = tempfile.gettempdir()
-    print(f"系统临时目录: {system_temp}")
-    print(f"Excel文件在系统临时目录: {temp_excel.startswith(system_temp)}")
-
-    # 清理测试文件
-    TempFileManager.cleanup_temp_file(temp_excel)
-    TempFileManager.cleanup_temp_file(temp_csv)
-    TempFileManager.cleanup_temp_file(temp_json)
-    print("测试文件已清理")
-    print("测试完成！")
