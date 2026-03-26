@@ -7,11 +7,13 @@
 - 聚合统计: COUNT, SUM, AVG, MAX, MIN, GROUP BY, HAVING
 - 排序限制: ORDER BY, LIMIT, OFFSET
 - 算术运算: 加减乘除
+- 表关联: INNER JOIN, LEFT JOIN（同文件内工作表关联）
 
 不支持功能：
-- 子查询、CTE (WITH)、JOIN、UNION
+- 子查询、CTE (WITH)、UNION
 - 窗口函数 (ROW_NUMBER等)
 - CASE WHEN、EXISTS
+- RIGHT JOIN, FULL JOIN, CROSS JOIN
 - INSERT/UPDATE/DELETE
 """
 
@@ -424,16 +426,8 @@ class AdvancedSQLQueryEngine:
                     'error': '不支持窗口函数（OVER子句）'
                 }
 
-            # 检查不支持的JOIN
-            if parsed_sql.args.get('joins') or parsed_sql.find(exp.Join):
-                available_tables = list(self._pending_tables) if hasattr(self, '_pending_tables') else []
-                return {
-                    'valid': False,
-                    'error': '不支持JOIN查询。💡 游戏配置表关联查询替代方案：\n'
-                             '1. 先用 excel_get_range 读取两个表的数据\n'
-                             '2. 在AI层面做关联匹配\n'
-                             '3. 或将需要关联的字段合并到同一个工作表中'
-                }
+            # 检查不支持的JOIN（现在已支持）
+            # JOIN支持已实现，不再拒绝
 
             # 检查不支持的CASE WHEN
             if parsed_sql.find(exp.Case):
@@ -812,6 +806,22 @@ class AdvancedSQLQueryEngine:
 
         base_df = worksheets_data[from_table].copy()
 
+        # 构建表别名映射
+        self._table_aliases = {}
+        self._table_aliases[from_table] = from_table
+        # 检查FROM子句是否有别名 (FROM 技能表 a)
+        from_clause = parsed_sql.args.get('from')
+        if from_clause:
+            for alias in from_clause.find_all(exp.Alias):
+                parent_table = from_clause.this.name if hasattr(from_clause.this, 'name') else str(from_clause.this)
+                self._table_aliases[alias.alias] = parent_table
+                self._table_aliases[parent_table] = parent_table
+
+        # 应用JOIN子句
+        joins = parsed_sql.args.get('joins')
+        if joins:
+            base_df = self._apply_join_clause(joins, base_df, worksheets_data, from_table)
+
         # 应用WHERE条件
         # 保存WHERE前的DataFrame，用于空结果智能建议
         base_df_before_where = base_df.copy()
@@ -917,13 +927,18 @@ class AdvancedSQLQueryEngine:
             # 计算表达式值
             try:
                 if isinstance(original_expr, exp.Column):
-                    # 普通列引用
+                    # 普通列引用（支持表限定符 a.column）
                     column_name = original_expr.name
-                    if column_name in df.columns:
+                    table_part = original_expr.table if hasattr(original_expr, 'table') and original_expr.table else None
+                    qualified = f"{table_part}.{column_name}" if table_part else None
+
+                    if qualified and qualified in df.columns:
+                        result_data[alias_name] = df[qualified]
+                    elif column_name in df.columns:
                         result_data[alias_name] = df[column_name]
                     else:
                         suggestion = self._suggest_column_name(column_name, list(df.columns))
-                        raise ValueError(f"列 '{column_name}' 不存在。可用列: {list(df.columns)}。{suggestion}")
+                        raise ValueError(f"列 '{qualified or column_name}' 不存在。可用列: {list(df.columns)}。{suggestion}")
 
                 elif self._is_mathematical_expression(original_expr):
                     # 数学表达式
@@ -1003,6 +1018,164 @@ class AdvancedSQLQueryEngine:
 
         # 如果没有明确的FROM子句，返回第一个表名
         raise ValueError("无法确定FROM子句中的表名")
+
+    def _apply_join_clause(self, joins, left_df: pd.DataFrame, worksheets_data: Dict[str, pd.DataFrame], left_table: str) -> pd.DataFrame:
+        """
+        应用JOIN子句，支持INNER JOIN和LEFT JOIN
+
+        Args:
+            joins: sqlglot joins列表
+            left_df: 左表DataFrame
+            worksheets_data: 所有工作表数据
+            left_table: 左表名
+
+        Returns:
+            pd.DataFrame: JOIN后的DataFrame
+        """
+        if isinstance(joins, exp.Join):
+            joins = [joins]
+
+        result_df = left_df
+
+        for join in joins:
+            # 解析JOIN类型
+            join_kind = 'inner'
+            join_side = join.side  # LEFT, RIGHT, etc.
+            join_kind_name = join.kind  # INNER, CROSS, etc.
+
+            if join_side and str(join_side).upper() == 'LEFT':
+                join_kind = 'left'
+            elif join_side and str(join_side).upper() == 'RIGHT':
+                return pd.DataFrame()  # 不支持RIGHT JOIN，返回空
+            elif join_kind_name and str(join_kind_name).upper() == 'CROSS':
+                return pd.DataFrame()  # 不支持CROSS JOIN，返回空
+
+            # 解析右表
+            right_table_expr = join.this
+            if hasattr(right_table_expr, 'this'):
+                right_table = right_table_expr.this if isinstance(right_table_expr.this, str) else (
+                    right_table_expr.this.name if hasattr(right_table_expr.this, 'name') else str(right_table_expr.this)
+                )
+            else:
+                right_table = right_table_expr.name if hasattr(right_table_expr, 'name') else str(right_table_expr)
+
+            # 检查右表是否有别名
+            right_alias = right_table
+            for alias in join.find_all(exp.Alias):
+                parent = alias.this
+                parent_name = parent.name if hasattr(parent, 'name') else str(parent)
+                if parent_name == right_table or str(parent) == right_table:
+                    right_alias = alias.alias
+                    break
+
+            # 记录别名映射
+            self._table_aliases[right_alias] = right_table
+            self._table_aliases[right_table] = right_table
+
+            if right_table not in worksheets_data:
+                available = list(worksheets_data.keys())
+                raise ValueError(f"JOIN表 '{right_table}' 不存在。可用表: {available}")
+
+            right_df = worksheets_data[right_table].copy()
+
+            # 解析ON条件
+            on_clause = join.args.get('on')
+            if not on_clause:
+                raise ValueError("JOIN缺少ON条件")
+
+            left_on_col, right_on_col = self._parse_join_on_condition(on_clause, left_table, right_table, right_alias)
+
+            # 验证列存在
+            if left_on_col not in result_df.columns:
+                raise ValueError(f"JOIN ON条件: 左表 '{left_table}' 没有列 '{left_on_col}'。可用列: {list(result_df.columns)}")
+            if right_on_col not in right_df.columns:
+                raise ValueError(f"JOIN ON条件: 右表 '{right_table}' 没有列 '{right_on_col}'。可用列: {list(right_df.columns)}")
+
+            # 执行JOIN
+            # 为右表列添加别名前缀避免冲突
+            right_df_renamed = right_df.copy()
+            col_mapping = {}
+            for col in right_df_renamed.columns:
+                if col in result_df.columns and col != left_on_col:
+                    new_col = f"{right_alias}.{col}"
+                    col_mapping[col] = new_col
+                elif col == left_on_col and left_on_col == right_on_col:
+                    # ON列同名：右表列重命名避免合并后重复
+                    new_col = f"{right_alias}.{col}"
+                    col_mapping[col] = new_col
+            right_df_renamed = right_df_renamed.rename(columns=col_mapping)
+
+            # 调整右表ON列名（如果被重命名了）
+            actual_right_on = col_mapping.get(right_on_col, right_on_col)
+
+            # 合并双行表头描述
+            if right_table in self._header_descriptions:
+                for orig_col, new_col in col_mapping.items():
+                    if orig_col in self._header_descriptions[right_table]:
+                        self._header_descriptions[right_table][new_col] = self._header_descriptions[right_table][orig_col]
+
+            result_df = result_df.merge(
+                right_df_renamed,
+                left_on=left_on_col,
+                right_on=actual_right_on,
+                how=join_kind
+            )
+
+            # 合并后删除重复的ON列（右表侧）
+            if actual_right_on in result_df.columns and actual_right_on != left_on_col:
+                result_df = result_df.drop(columns=[actual_right_on])
+
+        return result_df
+
+    def _parse_join_on_condition(self, on_clause, left_table: str, right_table: str, right_alias: str) -> Tuple[str, str]:
+        """
+        解析JOIN ON条件，返回(左列, 右列)
+
+        支持格式：
+        - ON a.id = b.id（带表别名）
+        - ON id = id（不带别名，自动匹配）
+        - ON a.id = id（混合）
+        """
+        if isinstance(on_clause, exp.EQ):
+            left_expr = on_clause.left
+            right_expr = on_clause.right
+        elif isinstance(on_clause, exp.And):
+            # 多条件JOIN暂不支持，取第一个等值条件
+            for child in on_clause.find_all(exp.EQ):
+                left_expr = child.left
+                right_expr = child.right
+                break
+            else:
+                raise ValueError("JOIN ON多条件暂不支持，请使用单个等值连接条件")
+        else:
+            raise ValueError(f"JOIN ON条件格式不支持，请使用等值连接: ON a.id = b.id")
+
+        def resolve_column(col_expr) -> str:
+            if isinstance(col_expr, exp.Column):
+                col_name = col_expr.name
+                # 检查是否有表限定符
+                table_part = col_expr.table if hasattr(col_expr, 'table') and col_expr.table else None
+                return col_name, table_part
+            return str(col_expr), None
+
+        left_col, left_tbl = resolve_column(left_expr)
+        right_col, right_tbl = resolve_column(right_expr)
+
+        # 判断哪个属于左表，哪个属于右表
+        if left_tbl:
+            resolved_left_tbl = self._table_aliases.get(left_tbl, left_tbl)
+            if resolved_left_tbl == right_table or left_tbl == right_alias:
+                # 左表达式实际指向右表，交换
+                return right_col, left_col
+        if right_tbl:
+            resolved_right_tbl = self._table_aliases.get(right_tbl, right_tbl)
+            if resolved_right_tbl == left_table:
+                # 右表达式实际指向左表，交换
+                return right_col, left_col
+
+        # 无表限定符：根据列是否存在于左右表来判断
+        # 默认左=左表, 右=右表
+        return left_col, right_col
 
     def _apply_where_clause(self, parsed_sql: exp.Expression, df: pd.DataFrame) -> pd.DataFrame:
         """应用WHERE条件"""
@@ -1122,13 +1295,24 @@ class AdvancedSQLQueryEngine:
             raise ValueError(f"不支持的条件类型: {type(condition)}")
 
     def _expression_to_column_reference(self, expr: exp.Expression, df: pd.DataFrame) -> str:
-        """将表达式转换为列引用"""
+        """将表达式转换为列引用（支持表限定符 a.column）"""
         if isinstance(expr, exp.Column):
             col_name = expr.name
-            if col_name not in df.columns:
-                suggestion = self._suggest_column_name(col_name, list(df.columns))
-                raise ValueError(f"列 '{col_name}' 不存在。可用列: {list(df.columns)}。{suggestion}")
-            return f"`{col_name}`"
+            # 处理表限定符 (a.column_name → 查找 "a.column_name" 或 "column_name")
+            table_part = expr.table if hasattr(expr, 'table') and expr.table else None
+            qualified = f"{table_part}.{col_name}" if table_part else None
+
+            if qualified and qualified in df.columns:
+                return f"`{qualified}`"
+            if col_name in df.columns:
+                return f"`{col_name}`"
+            # 兜底：尝试搜索别名前缀匹配
+            if table_part and hasattr(self, '_table_aliases'):
+                for col in df.columns:
+                    if col == f"{table_part}.{col_name}":
+                        return f"`{col}`"
+            suggestion = self._suggest_column_name(col_name, list(df.columns))
+            raise ValueError(f"列 '{qualified or col_name}' 不存在。可用列: {list(df.columns)}。{suggestion}")
 
         elif isinstance(expr, exp.Literal):
             return str(expr.this)
@@ -1553,12 +1737,20 @@ class AdvancedSQLQueryEngine:
 
         for order_expr in order_clause.expressions:
             if isinstance(order_expr, exp.Ordered):
-                col_name = order_expr.this.name
-                # 先查SELECT别名，再查原始列
-                resolved_name = self._resolve_order_column(col_name, df, select_aliases)
+                col_expr = order_expr.this
+                col_name = col_expr.name
+                table_part = col_expr.table if hasattr(col_expr, 'table') and col_expr.table else None
+                qualified = f"{table_part}.{col_name}" if table_part else None
+
+                # 先查限定名，再查简单名，再查SELECT别名
+                resolved_name = qualified if qualified and qualified in df.columns else None
+                if resolved_name is None:
+                    resolved_name = self._resolve_order_column(col_name, df, select_aliases)
+                if resolved_name is None and qualified and qualified in df.columns:
+                    resolved_name = qualified
                 if resolved_name is None:
                     suggestion = self._suggest_column_name(col_name, list(df.columns))
-                    raise ValueError(f"排序列 '{col_name}' 不存在。可用列: {list(df.columns)}。{suggestion}")
+                    raise ValueError(f"排序列 '{qualified or col_name}' 不存在。可用列: {list(df.columns)}。{suggestion}")
 
                 sort_columns.append(resolved_name)
                 is_desc = order_expr.args.get('desc', False)
@@ -1567,10 +1759,17 @@ class AdvancedSQLQueryEngine:
                 # 简单列引用，默认升序
                 if isinstance(order_expr, exp.Column):
                     col_name = order_expr.name
-                    resolved_name = self._resolve_order_column(col_name, df, select_aliases)
+                    table_part = order_expr.table if hasattr(order_expr, 'table') and order_expr.table else None
+                    qualified = f"{table_part}.{col_name}" if table_part else None
+
+                    resolved_name = qualified if qualified and qualified in df.columns else None
+                    if resolved_name is None:
+                        resolved_name = self._resolve_order_column(col_name, df, select_aliases)
+                    if resolved_name is None and qualified and qualified in df.columns:
+                        resolved_name = qualified
                     if resolved_name is None:
                         suggestion = self._suggest_column_name(col_name, list(df.columns))
-                        raise ValueError(f"排序列 '{col_name}' 不存在。可用列: {list(df.columns)}。{suggestion}")
+                        raise ValueError(f"排序列 '{qualified or col_name}' 不存在。可用列: {list(df.columns)}。{suggestion}")
 
                     sort_columns.append(resolved_name)
                     ascending.append(True)

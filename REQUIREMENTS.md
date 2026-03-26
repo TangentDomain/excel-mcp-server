@@ -36,7 +36,14 @@
 - **来源**：策划视角评价 — 技能表关联装备表做不了
 - **描述**：支持多表JOIN查询，先支持同文件内的工作表关联
 - **验收**：`SELECT a.技能名, b.装备名 FROM 技能表 a JOIN 装备表 b ON a.装备ID = b.ID`
-- **状态**：OPEN
+- **状态**：IN_PROGRESS（第16轮）
+- **子需求进度**：
+  - [x] 解析JOIN子句（INNER/LEFT JOIN）
+  - [x] 表别名支持（a, b）
+  - [x] ON条件解析（等值连接）
+  - [x] 列名消歧义（a.col vs b.col）
+  - [ ] 测试覆盖
+  - [ ] MCP验证
 
 ### REQ-004 [P2] 查询结果导出（JSON/CSV）
 - **来源**：策划视角评价 — 结果只有markdown，缺JSON/CSV

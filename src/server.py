@@ -1243,9 +1243,10 @@ def excel_query(
     """
 SQL查询Excel数据。优先使用此工具而非excel_get_range进行数据查询和分析。
 支持中文列名、双行表头自动识别、数学表达式。
-支持: SELECT/WHERE/GROUP BY/HAVING/ORDER BY/LIMIT/OFFSET/DISTINCT/IN/BETWEEN/IS NULL/NOT LIKE/NOT IN
+支持: SELECT/WHERE/GROUP BY/HAVING/ORDER BY/LIMIT/OFFSET/DISTINCT/IN/BETWEEN/IS NULL/NOT LIKE/NOT IN/JOIN
 聚合: COUNT/SUM/AVG/MAX/MIN/COUNT(DISTINCT)
-不支持: JOIN/子查询/CASE WHEN/UNION（会给出替代方案）
+表关联: INNER JOIN / LEFT JOIN（同文件内工作表关联，ON等值连接）
+不支持: 子查询/CASE WHEN/UNION/RIGHT JOIN/CROSS JOIN（会给出替代方案）
 输出格式: table(默认Markdown)/json/csv
 示例: excel_query("技能表.xlsx", "SELECT 类型, AVG(伤害) FROM 技能配置 GROUP BY 类型 HAVING COUNT(*)>2 ORDER BY AVG(伤害) DESC")
     """
