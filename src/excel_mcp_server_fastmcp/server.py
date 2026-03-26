@@ -343,13 +343,15 @@ mcp = FastMCP(
 ## 🔥 核心原则：SQL优先
 
 **优先使用 `excel_query`** - 所有数据查询分析任务
-- 复杂条件筛选 ✅ WHERE, LIKE, IN, BETWEEN
+- 复杂条件筛选 ✅ WHERE, LIKE, IN, BETWEEN, 子查询
 - 聚合统计分析 ✅ COUNT, SUM, AVG, MAX, MIN, GROUP BY, HAVING
+- 高级查询 ✅ CASE WHEN, CTE(WITH), EXISTS, JOIN
 - 排序限制 ✅ ORDER BY, LIMIT, OFFSET
+- 字符串函数 ✅ UPPER, LOWER, TRIM, LENGTH, CONCAT, REPLACE, SUBSTRING
 
 ## 📊 工具选择决策树
 ```
-需要数据分析/查询？   → excel_query (SQL引擎，支持WHERE/GROUP BY/JOIN)
+需要数据分析/查询？   → excel_query (SQL引擎，支持WHERE/GROUP BY/JOIN/子查询/CTE)
 需要快速了解表结构？ → excel_describe_table (列名+类型+样本)
 需要定位单元格？     → excel_search (返回row/column)
 需要批量修改数据？   → excel_update_query (SQL UPDATE语法)
@@ -357,24 +359,30 @@ mcp = FastMCP(
 需要格式调整？       → excel_format_cells
 ```
 
-## ✅ SQL已支持功能 (29项)
-基础查询: SELECT, DISTINCT, 别名(AS)
-条件筛选: WHERE, =/>/</<, LIKE, IN, BETWEEN, AND/OR, IS NULL, NOT
-聚合统计: COUNT(*), COUNT(col), SUM, AVG, MAX, MIN, GROUP BY, HAVING
-排序限制: ORDER BY, LIMIT, OFFSET
+## ✅ SQL已支持功能 (35项)
+基础查询: SELECT, DISTINCT, 别名(AS), 数学表达式(+-*/%)
+条件筛选: WHERE, =/>/</<=/>=/!=, LIKE, IN, NOT IN, BETWEEN, AND/OR, IS NULL, NOT
+高级查询: 子查询(WHERE col IN (SELECT...)), CASE WHEN, COALESCE, EXISTS, CTE(WITH)
+聚合统计: COUNT(*), COUNT(col), SUM, AVG, MAX, MIN, GROUP BY, HAVING, TOTAL行
+排序限制: ORDER BY DESC/ASC, LIMIT, OFFSET
 表关联: INNER JOIN, LEFT JOIN（同文件内工作表）
+字符串函数: UPPER, LOWER, TRIM, LENGTH, CONCAT, REPLACE, SUBSTRING, LEFT, RIGHT
 
 ## ❌ SQL不支持功能
-子查询, CTE(WITH), UNION, 窗口函数, CASE WHEN, INSERT/DELETE, RIGHT JOIN, CROSS JOIN
+UNION, 窗口函数(ROW_NUMBER/RANK), INSERT/DELETE, RIGHT JOIN, CROSS JOIN
+替代方案: 子查询用 WHERE col IN (SELECT...)，不支持FROM子查询
 
 ## ⚠️ 重要原则
+- 双行表头自动识别: 第1行中文描述+第2行英文字段名，可用中英文列名查询
 - 1-based索引: 第1行=1, 第1列=1
 - 范围格式: 必须包含工作表名 "技能表!A1:Z100"
 - 默认覆盖: update_range默认覆盖，需保留数据用insert_mode=True
 
 ## 🎮 游戏配置表示例
-技能: SELECT 技能类型, AVG(伤害), COUNT(*) FROM 技能表 GROUP BY 技能类型
-装备: SELECT 品质, AVG(价格) FROM 装备表 GROUP BY 品质 ORDER BY AVG(价格) DESC
+技能统计: SELECT 技能类型, AVG(伤害), COUNT(*) FROM 技能表 GROUP BY 技能类型
+高级筛选: SELECT * FROM 技能表 WHERE 伤害 > (SELECT AVG(伤害) FROM 技能表)
+条件表达式: SELECT 技能名, CASE WHEN 伤害>100 THEN '高' ELSE '低' END AS 等级 FROM 技能表
+CTE: WITH 高伤 AS (SELECT * FROM 技能表 WHERE 伤害>100) SELECT COUNT(*) FROM 高伤
 
 ## ⚡ 常用流程
 1. excel_list_sheets - 列出工作表
