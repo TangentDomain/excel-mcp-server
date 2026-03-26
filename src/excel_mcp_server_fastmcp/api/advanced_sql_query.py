@@ -19,9 +19,12 @@
 
 import os
 import re
+import logging
 from typing import Dict, List, Any, Optional, Union, Tuple
 import pandas as pd
 import numpy as np
+
+logger = logging.getLogger(__name__)
 
 # SQLGlot导入 - 核心SQL解析引擎
 try:
@@ -31,7 +34,7 @@ try:
     SQLGLOT_AVAILABLE = True
 except ImportError:
     SQLGLOT_AVAILABLE = False
-    print("警告: SQLGlot未安装，将使用基础pandas查询功能")
+    logger.warning("SQLGlot未安装，将使用基础pandas查询功能")
     # 创建虚拟类型注解以避免NameError
     class exp:
         class Expression: pass
@@ -349,7 +352,7 @@ class AdvancedSQLQueryEngine:
                 worksheets_data[sheet] = df
 
         except Exception as e:
-            print(f"加载Excel数据失败: {e}")
+            logger.error(f"加载Excel数据失败: {e}")
             return {}
 
         return worksheets_data
