@@ -44,6 +44,8 @@ MCP client configuration:
 }
 ```
 
+> 💡 **Debug mode**: Set environment variable `EXCEL_MCP_DEBUG=1` to enable verbose logging (default: WARNING level).
+
 ### Option 2: Install from Source
 
 1. **Clone the project**

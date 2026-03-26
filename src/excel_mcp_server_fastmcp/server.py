@@ -203,9 +203,10 @@ def _validate_path(file_path: str) -> Optional[Dict[str, Any]]:
 operation_logger = OperationLogger()
 
 # ==================== 配置和初始化 ====================
-# 开启详细日志用于调试
+# 日志级别: 默认WARNING，设置EXCEL_MCP_DEBUG=1开启DEBUG
+_log_level = logging.DEBUG if os.environ.get('EXCEL_MCP_DEBUG') else logging.WARNING
 logging.basicConfig(
-    level=logging.DEBUG,  # 改为DEBUG级别获取更多信息
+    level=_log_level,
     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
     handlers=[
         logging.StreamHandler(),
@@ -232,10 +233,12 @@ mcp = FastMCP(
 
 ## 📊 工具选择决策树
 ```
-需要数据分析/查询？ → excel_query (SQL引擎)
-需要定位单元格？   → excel_search (返回row/column)
-需要数据修改？     → excel_update_range
-需要格式调整？     → excel_format_cells
+需要数据分析/查询？   → excel_query (SQL引擎，支持WHERE/GROUP BY/JOIN)
+需要快速了解表结构？ → excel_describe_table (列名+类型+样本)
+需要定位单元格？     → excel_search (返回row/column)
+需要批量修改数据？   → excel_update_query (SQL UPDATE语法)
+需要修改指定单元格？ → excel_update_range (范围写入)
+需要格式调整？       → excel_format_cells
 ```
 
 ## ✅ SQL已支持功能 (29项)
@@ -259,13 +262,13 @@ mcp = FastMCP(
 
 ## ⚡ 常用流程
 1. excel_list_sheets - 列出工作表
-2. excel_get_headers - 查看表头
-3. excel_query - SQL查询
-4. excel_update_range - 数据更新
-5. excel_format_cells - 格式美化
+2. excel_describe_table - 快速了解表结构（列名+类型+样本）
+3. excel_query - SQL查询分析
+4. excel_update_query / excel_update_range - 数据更新
+5. excel_compare_sheets - 版本对比
 """,
-    debug=True,
-    log_level="DEBUG"
+    debug=bool(os.environ.get('EXCEL_MCP_DEBUG')),
+    log_level="DEBUG" if os.environ.get('EXCEL_MCP_DEBUG') else "WARNING"
 )
 
 
