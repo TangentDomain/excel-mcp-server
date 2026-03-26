@@ -1642,3 +1642,36 @@ class ExcelOperations:
             logger.error(f"{cls._LOG_PREFIX} {error_msg}")
             return cls._format_error_result(error_msg)
 
+    @classmethod
+    def upsert_row(
+        cls,
+        file_path: str,
+        sheet_name: str,
+        key_column: str,
+        key_value,
+        updates: dict,
+        header_row: int = 1
+    ) -> Dict[str, Any]:
+        """
+        @intention Upsert行：按键列查找，存在则更新，不存在则插入新行
+
+        Args:
+            file_path: Excel文件路径
+            sheet_name: 工作表名称
+            key_column: 用于匹配的列名
+            key_value: 用于匹配的值
+            updates: 要写入的列值字典
+            header_row: 表头所在行号（默认1）
+
+        Returns:
+            Dict: 标准化的操作结果
+        """
+        try:
+            manager = ExcelManager(file_path)
+            result = manager.upsert_row(sheet_name, key_column, key_value, updates, header_row)
+            return format_operation_result(result)
+        except Exception as e:
+            error_msg = f"Upsert行失败: {str(e)}"
+            logger.error(f"{cls._LOG_PREFIX} {error_msg}")
+            return cls._format_error_result(error_msg)
+

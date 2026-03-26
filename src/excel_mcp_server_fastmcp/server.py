@@ -1508,6 +1508,25 @@ def excel_rename_column(
 
 @mcp.tool()
 @_track_call
+def excel_upsert_row(
+    file_path: str,
+    sheet_name: str,
+    key_column: str,
+    key_value: Any,
+    updates: Dict[str, Any],
+    header_row: int = 1
+) -> Dict[str, Any]:
+    """
+按键列查找行，存在则更新，不存在则插入新行。策划合并配置高频操作（如导入新技能/更新已有技能属性）。
+    """
+    _path_err = _validate_path(file_path)
+    if _path_err:
+        return _path_err
+    return ExcelOperations.upsert_row(file_path, sheet_name, key_column, key_value, updates, header_row)
+
+
+@mcp.tool()
+@_track_call
 def excel_delete_rows(
     file_path: str,
     sheet_name: str,
