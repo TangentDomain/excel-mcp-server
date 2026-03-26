@@ -2614,6 +2614,28 @@ class AdvancedSQLQueryEngine:
         # 3. 列名不存在
         return None
 
+    def _resolve_order_expression(self, expr, df: pd.DataFrame) -> Optional[str]:
+        """解析ORDER BY中的函数表达式，临时计算并添加为排序列
+
+        支持: UPPER, LOWER, TRIM, LENGTH, CONCAT, REPLACE, SUBSTRING, LEFT, RIGHT,
+              CASE WHEN, COALESCE, 数学表达式
+        """
+        temp_col = f"__order_expr_{id(expr)}"
+        try:
+            if self._is_string_function(expr):
+                df[temp_col] = self._evaluate_string_function(expr, df)
+            elif isinstance(expr, exp.Case):
+                df[temp_col] = self._evaluate_case_expression(expr, df)
+            elif isinstance(expr, exp.Coalesce):
+                df[temp_col] = self._evaluate_coalesce_vectorized(expr, df)
+            elif self._is_mathematical_expression(expr):
+                df[temp_col] = self._evaluate_math_expression(expr, df)
+            else:
+                return None
+            return temp_col
+        except Exception:
+            return None
+
     def _apply_order_by(self, parsed_sql: exp.Expression, df: pd.DataFrame, select_aliases: Optional[Dict] = None) -> pd.DataFrame:
         """应用ORDER BY排序
 
@@ -2638,7 +2660,9 @@ class AdvancedSQLQueryEngine:
                 col_expr = order_expr
                 is_desc = False
             else:
-                continue
+                # 函数表达式: ORDER BY UPPER(name), ORDER BY LENGTH(name) 等
+                col_expr = order_expr
+                is_desc = False
 
             col_name = col_expr.name
             table_part = col_expr.table if hasattr(col_expr, 'table') and col_expr.table else None
@@ -2650,6 +2674,11 @@ class AdvancedSQLQueryEngine:
                 resolved_name = self._resolve_order_column(col_name, df, select_aliases)
             if resolved_name is None and qualified and qualified in df.columns:
                 resolved_name = qualified
+
+            # 函数表达式: ORDER BY UPPER(col), LENGTH(col), COALESCE(col, 0) 等
+            if resolved_name is None and not isinstance(col_expr, exp.Column):
+                resolved_name = self._resolve_order_expression(col_expr, df)
+
             if resolved_name is None:
                 suggestion = self._suggest_column_name(col_name, list(df.columns))
                 raise ValueError(f"排序列 '{qualified or col_name}' 不存在。可用列: {list(df.columns)}。{suggestion}")
