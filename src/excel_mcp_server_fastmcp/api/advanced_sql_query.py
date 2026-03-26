@@ -1803,6 +1803,16 @@ class AdvancedSQLQueryEngine:
         pattern = str(value_str).strip("'\"")
         return pattern.replace('%', '.*').replace('_', '.')
 
+    @staticmethod
+    def _parse_literal_value(expr: exp.Literal) -> Any:
+        """将SQL Literal解析为Python值（字符串→str，数字→int/float）"""
+        if expr.is_string:
+            return expr.this
+        try:
+            return float(expr.this) if '.' in str(expr.this) else int(expr.this)
+        except (ValueError, TypeError):
+            return expr.this
+
     def _in_to_pandas(self, in_expr: exp.In, df: pd.DataFrame, negate: bool = False) -> str:
         """将IN/NOT IN条件转换为pandas表达式（支持子查询和值列表）
 
@@ -2155,13 +2165,7 @@ class AdvancedSQLQueryEngine:
             return row.get(col_name)
 
         elif isinstance(expr, exp.Literal):
-            if expr.is_string:
-                return expr.this
-            else:
-                try:
-                    return float(expr.this) if '.' in str(expr.this) else int(expr.this)
-                except (ValueError, TypeError):
-                    return expr.this
+            return self._parse_literal_value(expr)
 
         elif isinstance(expr, exp.Coalesce):
             return self._evaluate_coalesce_for_row(expr, row)
@@ -2369,13 +2373,7 @@ class AdvancedSQLQueryEngine:
                     return self._get_expression_value(if_clause.args.get('true'), row)
             # 没有匹配的WHEN，返回ELSE默认值
             if default_value is not None:
-                if isinstance(default_value, exp.Literal):
-                    return default_value.this if default_value.is_string else (
-                        float(default_value.this) if '.' in str(default_value.this) else int(default_value.this)
-                    )
-                elif isinstance(default_value, exp.Column):
-                    return row.get(default_value.name)
-                return None
+                return self._get_expression_value(default_value, row)
             return None
         else:
             # 向量化模式 - 复用逐行评估
@@ -2385,18 +2383,8 @@ class AdvancedSQLQueryEngine:
             )
 
     def _get_expression_value(self, expr: exp.Expression, row: pd.Series) -> Any:
-        """获取表达式在指定行的值（支持列引用、字面量、算术表达式）"""
-        if isinstance(expr, exp.Literal):
-            return expr.this if expr.is_string else (
-                float(expr.this) if '.' in str(expr.this) else int(expr.this)
-            )
-        elif isinstance(expr, exp.Column):
-            return row.get(expr.name)
-        elif isinstance(expr, (exp.Add, exp.Sub, exp.Mul, exp.Div)):
-            return self._evaluate_math_for_row(expr, row)
-        elif isinstance(expr, exp.Coalesce):
-            return self._evaluate_coalesce_for_row(expr, row)
-        return None
+        """获取表达式在指定行的值（委托给_get_row_value，两者功能完全重叠）"""
+        return self._get_row_value(expr, row)
 
     def _evaluate_math_for_row(self, expr: exp.Expression, row: pd.Series) -> Any:
         """逐行评估数学表达式，复用类级别分发表"""
@@ -2554,20 +2542,18 @@ class AdvancedSQLQueryEngine:
                 self._having_agg_alias_map[agg_sql] = select_expr.alias
 
         # HAVING子句处理类似于WHERE，但作用于聚合后的数据
-        condition_str = self._sql_condition_to_pandas(having_clause.this, df)
+        try:
+            condition_str = self._sql_condition_to_pandas(having_clause.this, df)
+        except (ValueError, TypeError):
+            # 不支持的条件类型（如COALESCE/CASE），回退到逐行过滤
+            return self._apply_row_filter(having_clause.this, df)
 
         if condition_str:
             try:
                 return df.query(condition_str)
-            except Exception as e:
+            except Exception:
                 # 备用方案：逐行过滤
-                mask = []
-                for _, row in df.iterrows():
-                    if self._evaluate_condition_for_row(having_clause.this, row):
-                        mask.append(True)
-                    else:
-                        mask.append(False)
-                return df[mask]
+                return self._apply_row_filter(having_clause.this, df)
 
         return df
 
@@ -2611,27 +2597,19 @@ class AdvancedSQLQueryEngine:
             expr = select_aliases[col_name]
             if isinstance(expr, exp.Column) and expr.name in df.columns:
                 return expr.name
-            # 别名对应的是计算表达式，无法在SELECT之前排序
-            # 这种情况需要特殊处理：先计算表达式列，排序后删除
+            # 别名对应的是计算表达式，临时计算后用于排序
+            # CASE WHEN / COALESCE / 数学表达式 统一处理
+            temp_col = f"__order_temp_{col_name}"
             if self._is_mathematical_expression(expr):
-                # 临时计算该表达式
-                temp_col = f"__order_temp_{col_name}"
                 df[temp_col] = self._evaluate_math_expression(expr, df)
-                # 重命名到目标列名（SELECT后会被处理）
-                df.rename(columns={temp_col: col_name}, inplace=True)
-                return col_name
-            # CASE WHEN表达式：临时计算
-            if isinstance(expr, exp.Case):
-                temp_col = f"__order_temp_{col_name}"
+            elif isinstance(expr, exp.Case):
                 df[temp_col] = self._evaluate_case_expression(expr, df)
-                df.rename(columns={temp_col: col_name}, inplace=True)
-                return col_name
-            # COALESCE表达式：临时计算（向量化）
-            if isinstance(expr, exp.Coalesce):
-                temp_col = f"__order_temp_{col_name}"
+            elif isinstance(expr, exp.Coalesce):
                 df[temp_col] = self._evaluate_coalesce_vectorized(expr, df)
-                df.rename(columns={temp_col: col_name}, inplace=True)
-                return col_name
+            else:
+                return None
+            df.rename(columns={temp_col: col_name}, inplace=True)
+            return col_name
 
         # 3. 列名不存在
         return None
