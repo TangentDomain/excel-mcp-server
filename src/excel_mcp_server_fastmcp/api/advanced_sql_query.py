@@ -675,16 +675,9 @@ class AdvancedSQLQueryEngine:
         return None
 
     def _extract_literal_value(self, expr):
-        """从表达式中提取字面值"""
+        """从表达式中提取字面值（委托_parse_literal_value统一处理）"""
         if isinstance(expr, exp.Literal):
-            val = expr.this
-            try:
-                return int(val)
-            except (ValueError, TypeError):
-                try:
-                    return float(val)
-                except (ValueError, TypeError):
-                    return val
+            return self._parse_literal_value(expr)
         return None
 
     def _generate_having_empty_suggestion(self, having_expr, df_before_having) -> str:
@@ -1342,15 +1335,8 @@ class AdvancedSQLQueryEngine:
 
                 elif isinstance(original_expr, exp.Literal):
                     # SELECT中的字面量值（如 SELECT 1, SELECT 'hello'）
-                    val = original_expr.this
-                    if original_expr.is_string:
-                        result_data[alias_name] = pd.Series([val] * len(df), index=df.index)
-                    else:
-                        try:
-                            num_val = int(val) if '.' not in str(val) else float(val)
-                            result_data[alias_name] = pd.Series([num_val] * len(df), index=df.index)
-                        except (ValueError, TypeError):
-                            result_data[alias_name] = pd.Series([val] * len(df), index=df.index)
+                    val = self._parse_literal_value(original_expr)
+                    result_data[alias_name] = pd.Series([val] * len(df), index=df.index)
 
                 else:
                     # 其他表达式，尝试作为列处理
@@ -2421,14 +2407,8 @@ class AdvancedSQLQueryEngine:
             if isinstance(val_expr, exp.Column) and val_expr.name in df.columns:
                 series = df[val_expr.name].astype(object)
             elif isinstance(val_expr, exp.Literal):
-                if val_expr.is_string:
-                    series = pd.Series([val_expr.this] * len(df), index=df.index, dtype=object)
-                else:
-                    try:
-                        v = float(val_expr.this) if '.' in str(val_expr.this) else int(val_expr.this)
-                        series = pd.Series([v] * len(df), index=df.index, dtype=object)
-                    except (ValueError, TypeError):
-                        series = pd.Series([None] * len(df), index=df.index, dtype=object)
+                v = self._parse_literal_value(val_expr)
+                series = pd.Series([v] * len(df), index=df.index, dtype=object)
             else:
                 fallback = True
                 break
@@ -2549,23 +2529,17 @@ class AdvancedSQLQueryEngine:
         return df
 
     def _extract_select_aliases(self, parsed_sql: exp.Expression) -> Dict[str, Any]:
-        """提取SELECT子句中的别名映射
+        """提取SELECT子句中的别名映射（委托_extract_select_alias统一逻辑）
 
         Returns:
-            Dict: {alias_name: original_expression} 或 {column_name: column_name}
+            Dict: {alias_name: original_expression}
         """
         aliases = {}
         for i, select_expr in enumerate(parsed_sql.expressions):
-            if isinstance(select_expr, exp.Alias):
-                aliases[select_expr.alias] = select_expr.this
-            elif isinstance(select_expr, exp.Column) and hasattr(select_expr, 'name'):
-                aliases[select_expr.name] = select_expr
-            elif self._is_aggregate_function(select_expr):
-                # 无别名的聚合函数，生成列名
-                aliases[self._generate_aggregate_alias(select_expr)] = select_expr
-            elif isinstance(select_expr, exp.Case):
-                # CASE WHEN无别名的处理
-                pass
+            if isinstance(select_expr, exp.Star):
+                continue
+            alias_name, original_expr = self._extract_select_alias(select_expr, i)
+            aliases[alias_name] = original_expr
         return aliases
 
     def _resolve_order_column(self, col_name: str, df: pd.DataFrame, select_aliases: Optional[Dict] = None) -> Optional[str]:
