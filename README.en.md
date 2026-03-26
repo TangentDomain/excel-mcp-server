@@ -85,6 +85,11 @@ excel-mcp-server-fastmcp --version
 
 # Run tests
 python -m pytest tests/ --tb=short -q
+
+# Run performance benchmarks
+python scripts/benchmark.py --quick        # Quick mode (~30s)
+python scripts/benchmark.py                # Full mode (includes large table tests)
+python scripts/benchmark.py --compare      # Compare with previous results
 ```
 
 ---

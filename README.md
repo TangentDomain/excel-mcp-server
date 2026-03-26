@@ -85,6 +85,11 @@ excel-mcp-server-fastmcp --version
 
 # 运行测试
 python -m pytest tests/ --tb=short -q
+
+# 运行性能基准测试
+python scripts/benchmark.py --quick        # 快速模式（约30秒）
+python scripts/benchmark.py                # 完整模式（含大表测试）
+python scripts/benchmark.py --compare      # 与上次结果对比
 ```
 
 ---
