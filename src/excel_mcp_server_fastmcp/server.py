@@ -238,14 +238,15 @@ mcp = FastMCP(
 需要格式调整？     → excel_format_cells
 ```
 
-## ✅ SQL已支持功能 (27项)
+## ✅ SQL已支持功能 (29项)
 基础查询: SELECT, DISTINCT, 别名(AS)
-条件筛选: WHERE, =/>/</<, LIKE, IN, BETWEEN, AND/OR
+条件筛选: WHERE, =/>/</<, LIKE, IN, BETWEEN, AND/OR, IS NULL, NOT
 聚合统计: COUNT(*), COUNT(col), SUM, AVG, MAX, MIN, GROUP BY, HAVING
 排序限制: ORDER BY, LIMIT, OFFSET
+表关联: INNER JOIN, LEFT JOIN（同文件内工作表）
 
 ## ❌ SQL不支持功能
-子查询, CTE(WITH), JOIN, UNION, 窗口函数, CASE WHEN, INSERT/UPDATE/DELETE
+子查询, CTE(WITH), UNION, 窗口函数, CASE WHEN, INSERT/DELETE, RIGHT JOIN, CROSS JOIN
 
 ## ⚠️ 重要原则
 - 1-based索引: 第1行=1, 第1列=1
@@ -273,7 +274,7 @@ mcp = FastMCP(
 @mcp.tool()
 def excel_list_sheets(file_path: str) -> Dict[str, Any]:
     """
-列出Excel文件中所有工作表名称。
+列出Excel文件中所有工作表名称。查询前先用此工具确认有哪些工作表。
     """
     _path_err = _validate_path(file_path)
     if _path_err:
@@ -306,7 +307,8 @@ def excel_search(
     range: Optional[str] = None
 ) -> Dict[str, Any]:
     """
-在单个Excel文件中搜索文本。返回匹配的单元格位置和值。支持正则。
+在单个Excel文件中搜索文本。返回匹配的单元格位置(row/column)和值。支持正则。
+搜索整个目录的多个文件请用excel_search_directory。
     """
     _path_err = _validate_path(file_path)
     if _path_err:
@@ -329,8 +331,12 @@ def excel_search_directory(
     max_files: int = 100
 ) -> Dict[str, Any]:
     """
-在目录下所有Excel文件中批量搜索。支持正则、大小写、全词匹配、文件名过滤。
+在目录下所有Excel文件中批量搜索。返回文件名+单元格位置+值。支持正则、大小写、全词匹配、文件名过滤。
+搜索单个文件请用excel_search。
     """
+    _path_err = _validate_path(directory_path)
+    if _path_err:
+        return _path_err
     return ExcelOperations.search_directory(directory_path, pattern, case_sensitive, whole_word, use_regex, include_values, include_formulas, recursive, file_extensions, file_pattern, max_files)
 
 
@@ -393,7 +399,8 @@ def excel_get_headers(
     max_columns: Optional[int] = None
 ) -> Dict[str, Any]:
     """
-获取指定工作表的表头信息。支持指定表头行号。
+获取单个工作表的表头行。返回指定行的列名列表。
+查看所有工作表的双行表头（中英映射）请用excel_get_sheet_headers。
     """
     _path_err = _validate_path(file_path)
     if _path_err:
@@ -492,7 +499,8 @@ def excel_preview_operation(
     data: Optional[List[List[Any]]] = None
 ) -> Dict[str, Any]:
     """
-预览操作影响范围和当前数据，不实际执行。操作前确认用。
+预览操作影响范围和当前数据，不实际执行。修改前确认用。
+全面评估请用excel_assess_data_impact。
     """
     _path_err = _validate_path(file_path)
     if _path_err:
@@ -584,7 +592,8 @@ def excel_assess_data_impact(
     data: Optional[List[List[Any]]] = None
 ) -> Dict[str, Any]:
     """
-全面评估操作对数据的潜在影响。比preview_operation更详细。
+全面评估操作对数据的潜在影响（风险等级、数据类型分析、结果预测）。
+简单预览请用excel_preview_operation。
     """
     _path_err = _validate_path(file_path)
     if _path_err:
@@ -859,11 +868,12 @@ def excel_get_operation_history(
     limit: int = 20
 ) -> Dict[str, Any]:
     """
-获取操作历史记录。可按文件过滤。
+获取操作历史记录。可按文件过滤。file_path为空时返回所有记录。
     """
-    _path_err = _validate_path(file_path)
-    if _path_err:
-        return _path_err
+    if file_path is not None:
+        _path_err = _validate_path(file_path)
+        if _path_err:
+            return _path_err
     try:
         recent_operations = operation_logger.get_recent_operations(limit)
 
@@ -1134,7 +1144,7 @@ def excel_find_last_row(
     column: Optional[Union[str, int]] = None
 ) -> Dict[str, Any]:
     """
-查找工作表最后一行（有数据的最大行号）。
+查找工作表最后一行（有数据的最大行号）。追加数据前用此工具确定插入位置。
     """
     _path_err = _validate_path(file_path)
     if _path_err:
@@ -1148,7 +1158,7 @@ def excel_create_file(
     sheet_names: Optional[List[str]] = None
 ) -> Dict[str, Any]:
     """
-创建新的Excel文件（默认含1个空工作表）。
+创建新的空Excel文件（默认含1个空工作表）。创建后用excel_update_range写入数据。
     """
     _path_err = _validate_path(file_path)
     if _path_err:
@@ -1846,8 +1856,8 @@ def excel_compare_files(
     file2_path: str
 ) -> Dict[str, Any]:
     """
-对比两个Excel文件的所有工作表差异（结构差异+单元格值变化）。
-如需按ID做对象级对比（新增/删除/修改），使用excel_compare_sheets。
+对比两个Excel文件的所有工作表差异（结构差异+单元格值变化）。输出逐单元格对比。
+按ID列做对象级对比（新增/删除/修改记录）请用excel_compare_sheets。
     """
     for _p in [file1_path, file2_path]:
         _err = _validate_path(_p)
@@ -1864,8 +1874,8 @@ def excel_check_duplicate_ids(
     header_row: int = 1
 ) -> Dict[str, Any]:
     """
-检查配置表ID列是否有重复值。返回重复ID及其所在行。
-也可用excel_query实现: SELECT ID, COUNT(*) as c FROM 表 GROUP BY ID HAVING c>1
+检查配置表ID列是否有重复值。返回重复ID及其所在行号。
+也可用excel_query: SELECT ID, COUNT(*) as c FROM 表 GROUP BY ID HAVING c>1
     """
     _path_err = _validate_path(file_path)
     if _path_err:
@@ -1883,7 +1893,8 @@ def excel_compare_sheets(
     header_row: int = 1
 ) -> Dict[str, Any]:
     """
-按ID列精确对比两个工作表，输出新增/删除/修改的记录。
+按ID列精确对比两个工作表，输出新增/删除/修改的记录（对象级差异）。
+逐单元格对比请用excel_compare_files。
     """
     for _p in [file1_path, file2_path]:
         _err = _validate_path(_p)

@@ -60,6 +60,11 @@
   - **依赖健康** — 依赖版本是否最新？有没有已知漏洞？
   - **性能回归** — 每轮改进是否引入性能退化？大表查询时间是否稳定？
   - **架构清晰度** — server.py是否越来越胖？API层和核心层是否职责清晰？
+- **已完成**：
+  - ✅ 第22轮：清理重构残留旧包+3个死依赖+8个测试import修复（-1921行）
+  - ✅ 第23轮：excel_get_operation_history bug修复（Optional参数条件验证）
+  - ✅ 第23轮：excel_search_directory安全补漏（添加_validate_path）
+  - ✅ 第23轮：MCP说明与代码同步（JOIN功能遗漏2轮）
 - **验收**：每轮评价中包含工程治理评估，发现问题立即修复或建需求
 - **状态**：OPEN（持续迭代，不关闭）
 
@@ -77,6 +82,8 @@
   - ✅ 去掉Args/Returns/Example开发者文档（-583行）
   - ✅ 高频工具加场景引导和优先级提示
   - ✅ 统一格式，平均48字/工具
+  - ✅ 第23轮：10个易混淆工具加交叉引用（search↔search_directory, get_headers↔get_sheet_headers, preview↔assess, compare_files↔compare_sheets）
+  - ✅ 第23轮：5个工具加场景引导（list_sheets/create_file/find_last_row等）
 - **后续方向**：
   - MCP调用准确性监控：每轮验证时记录AI是否第一次就选对工具
   - 常见选错场景：该用query却用get_range、该用update_query却用update_range、该用describe_table却用get_headers
