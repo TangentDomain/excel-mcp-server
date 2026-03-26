@@ -116,7 +116,7 @@ class TestServerInterfaces:
         result = excel_list_sheets("nonexistent_file.xlsx")
 
         assert result['success'] is False
-        assert 'error' in result
+        assert 'message' in result
 
     # ==================== Excel Get Headers Tests ====================
 
@@ -185,9 +185,9 @@ class TestServerInterfaces:
         result = excel_get_headers(sample_excel_file, "NonExistentSheet")
 
         assert result['success'] is False
-        assert 'error' in result
+        assert 'message' in result
         # Check for various possible error messages
-        error_msg = result['error'].lower()
+        error_msg = result['message'].lower()
         assert ("不存在" in error_msg or "无法读取" in error_msg or
                 "工作表" in error_msg or "sheet" in error_msg)
 
@@ -196,7 +196,7 @@ class TestServerInterfaces:
         result = excel_get_headers("nonexistent_file.xlsx", "Sheet1")
 
         assert result['success'] is False
-        assert 'error' in result
+        assert 'message' in result
 
     def test_excel_get_headers_empty_sheet(self, empty_excel_file):
         """Test excel_get_headers with empty sheet"""
@@ -271,7 +271,7 @@ class TestServerInterfaces:
         result = excel_get_range(sample_excel_file, "NonExistentSheet!A1")
 
         assert result['success'] is False
-        assert 'error' in result
+        assert 'message' in result
 
     def test_excel_update_range(self, sample_excel_file):
         """Test excel_update_range interface"""
@@ -288,7 +288,7 @@ class TestServerInterfaces:
         result = excel_update_range(sample_excel_file, "NonExistentSheet!A1", data)
 
         assert result['success'] is False
-        assert 'error' in result
+        assert 'message' in result
 
     def test_excel_update_range_row_format(self, sample_excel_file):
         """Test excel_update_range with row range format - should return error for missing sheet name"""
@@ -296,7 +296,7 @@ class TestServerInterfaces:
         data1 = [["测试1", "测试2", "测试3"]]
         result1 = excel_update_range(sample_excel_file, "1:1", data1)
         assert result1['success'] is False
-        error_message = result1.get('error', '')
+        error_message = result1.get('message', '')
         # 更灵活的错误消息检查，支持多种可能的错误格式
         assert any(msg in error_message for msg in [
             "range必须包含工作表名",
@@ -311,7 +311,7 @@ class TestServerInterfaces:
         data2 = [[930006, "", "[TRBuff收益类型]无", "【女武神】退场易伤", 1, 0]]
         result2 = excel_update_range(sample_excel_file, "3:5", data2)
         assert result2['success'] is False
-        error_message2 = result2.get('error', '')
+        error_message2 = result2.get('message', '')
         assert any(msg in error_message2 for msg in [
             "range必须包含工作表名",
             "VALIDATION_FAILED",
@@ -346,8 +346,8 @@ class TestServerInterfaces:
 
         # Should fail with clear error message
         assert result['success'] is False
-        assert 'error' in result
-        assert '不支持纯行范围格式' in result['error'] or '范围表达式解析失败' in result['error']
+        assert 'message' in result
+        assert '不支持纯行范围格式' in result['message'] or '范围表达式解析失败' in result['message']
 
         # Test with proper format should work
         result_proper = excel_update_range(str(file_path), "TrBuff!A1250:AB1250", user_data)
@@ -379,7 +379,7 @@ class TestServerInterfaces:
         result = excel_create_sheet(sample_excel_file, "Sheet1")
 
         assert result['success'] is False
-        assert 'error' in result
+        assert 'message' in result
 
     def test_excel_delete_sheet(self, sample_excel_file):
         """Test excel_delete_sheet interface"""
@@ -394,7 +394,7 @@ class TestServerInterfaces:
         result = excel_delete_sheet(sample_excel_file, "NonExistentSheet")
 
         assert result['success'] is False
-        assert 'error' in result
+        assert 'message' in result
 
     def test_excel_rename_sheet(self, sample_excel_file):
         """Test excel_rename_sheet interface"""
@@ -409,7 +409,7 @@ class TestServerInterfaces:
         result = excel_rename_sheet(sample_excel_file, "NonExistentSheet", "新名称")
 
         assert result['success'] is False
-        assert 'error' in result
+        assert 'message' in result
 
     def test_excel_insert_rows(self, sample_excel_file):
         """Test excel_insert_rows interface"""
@@ -460,7 +460,7 @@ class TestServerInterfaces:
         result = excel_format_cells(sample_excel_file, "NonExistentSheet", "A1", formatting=formatting)
 
         assert result['success'] is False
-        assert 'error' in result
+        assert 'message' in result
 
     def test_excel_format_cells_preset(self, sample_excel_file):
         """Test excel_format_cells with preset"""
@@ -483,7 +483,7 @@ class TestServerInterfaces:
         result = excel_search("nonexistent_file.xlsx", r"test")
 
         assert result['success'] is False
-        assert 'error' in result
+        assert 'message' in result
 
     def test_all_interfaces_return_consistent_structure(self, sample_excel_file):
         """Test that all interfaces return consistent response structure"""
@@ -515,8 +515,8 @@ class TestServerInterfaces:
 
                 assert has_expected_key, f"Expected data keys in result or metadata, got keys: {list(result.keys())}"
             else:
-                assert 'error' in result
-                assert isinstance(result['error'], str)
+                assert 'message' in result
+                assert isinstance(result['message'], str)
 
 
     def test_excel_find_last_row(self, sample_excel_file):
@@ -584,8 +584,8 @@ class TestServerInterfaces:
         result = excel_find_last_row(sample_excel_file, "NonExistentSheet")
 
         assert result['success'] is False
-        assert 'error' in result
-        assert "工作表不存在" in result['error']
+        assert 'message' in result
+        assert "工作表不存在" in result['message']
 
     def test_excel_evaluate_formula_basic_math(self):
         """Test excel_evaluate_formula with basic mathematical expressions"""
