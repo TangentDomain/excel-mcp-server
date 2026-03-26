@@ -11,10 +11,10 @@
 [![Powered by: FastMCP](https://img.shields.io/badge/Powered%20by-FastMCP-orange)](https://github.com/jlowin/fastmcp)
 ![Status](https://img.shields.io/badge/status-stable-green.svg)
 ![Tests](https://img.shields.io/badge/tests-985%20tests-brightgreen.svg)
-![Tools](https://img.shields.io/badge/tools-46%20verified%20tools-green.svg)
+![Tools](https://img.shields.io/badge/tools-45%20verified%20tools-green.svg)
 [![CI](https://github.com/TangentDomain/excel-mcp-server/actions/workflows/ci.yml/badge.svg)](https://github.com/TangentDomain/excel-mcp-server/actions/workflows/ci.yml)
 
-**ExcelMCP** is an Excel configuration table management MCP server designed for game development. Through AI natural language commands, it enables intelligent operations on game configurations such as skill tables, equipment data, and monster attributes. Built with **FastMCP**, reads use **python-calamine** (Rust engine, 2300x speedup), writes use **openpyxl**. Features **46 professional tools** and **985 test cases**, ensuring enterprise-grade reliability.
+**ExcelMCP** is an Excel configuration table management MCP server designed for game development. Through AI natural language commands, it enables intelligent operations on game configurations such as skill tables, equipment data, and monster attributes. Built with **FastMCP**, reads use **python-calamine** (Rust engine, 2300x speedup), writes use **openpyxl**. Features **45 professional tools** and **985 test cases**, ensuring enterprise-grade reliability.
 
 🎯 **Core Features**: Skill systems, equipment management, monster configuration, numerical balancing, version comparison, designer toolchain
 
@@ -131,7 +131,7 @@ Attribute adjustment: "Increase attributes of legendary equipment by 25%"
 | Version comparison | `excel_compare_sheets` + `excel_compare_files` | "Compare differences between old and new version config tables" |
 | Data statistics query | `excel_query` | "Query average attack power by class in skill table" |
 | Conditional batch update | `excel_update_query` | "Increase fire skill damage by 20%" |
-| Pre-modification preview | `excel_preview_operation` + `excel_assess_data_impact` | "Preview impact of deleting rows 5-10" |
+| Pre-modification preview | `excel_assess_data_impact` (detailed=False for quick preview, detailed=True for full assessment) | "Preview impact of deleting rows 5-10" |
 | Pre-modification backup | `excel_create_backup` | "Backup skill table before modifying" |
 | Formula evaluation | `excel_evaluate_formula` | "Temporarily calculate SUM(A2:A100) to see result" |
 
@@ -300,7 +300,7 @@ SELECT a.skill_name, b.equip_name FROM SkillConfig a INNER JOIN EquipConfig b ON
 
 ---
 
-## 🛠️ Complete Tool List (46 Professional Tools)
+## 🛠️ Complete Tool List (45 Professional Tools)
 
 ### 📁 File & Worksheet Management
 - `excel_create_file` - Create new Excel files with custom worksheets
@@ -343,8 +343,7 @@ SELECT a.skill_name, b.equip_name FROM SkillConfig a INNER JOIN EquipConfig b ON
 - `excel_create_backup` - Create file auto-backup
 - `excel_restore_backup` - Restore from backup files
 - `excel_list_backups` - List all backup records
-- `excel_preview_operation` - Preview operation scope and current data
-- `excel_assess_data_impact` - Comprehensively assess potential operation impact
+- `excel_assess_data_impact` - Assess potential operation impact (detailed=False for quick preview / detailed=True for full assessment)
 
 ### 📜 Operation History
 - `excel_get_operation_history` - Get operation history and statistics
@@ -541,7 +540,7 @@ ExcelMCP includes multi-layer security protections:
 ```
 src/excel_mcp_server_fastmcp/    # Main package (directly importable after pip install)
 ├── __init__.py                   # Package entry point, exposes main()
-├── server.py                     # MCP interface layer (46 tool definitions)
+├── server.py                     # MCP interface layer (45 tool definitions)
 ├── api/                          # API business logic layer
 │   ├── excel_operations.py       # Excel operations unified entry
 │   └── advanced_sql_query.py     # SQL query engine
@@ -596,7 +595,7 @@ Tool Layer (Common Functions)
 - **Test Cases**: 985 (behavior validation, no coverage padding)
 - **Test Files**: 49 test files
 - **Test Code**: 16,496 lines
-- **Tool Count: 46 (@mcp.tool decorator verified)
+- **Tool Count: 45 (@mcp.tool decorator verified)
 - **Architecture Layers**: 4-layer design (MCP→API→Core→Utils)
 
 ### Verification Commands
@@ -605,7 +604,7 @@ Tool Layer (Common Functions)
 python -m pytest tests/ -q --tb=short -n auto --timeout=30
 
 # Verify tool completeness
-grep -c "def excel_" src/excel_mcp_server_fastmcp/server.py  # Should output: 46
+grep -c "def excel_" src/excel_mcp_server_fastmcp/server.py  # Should output: 45
 
 # Generate coverage report
 python -m pytest tests/ --cov=src --cov-report=html
