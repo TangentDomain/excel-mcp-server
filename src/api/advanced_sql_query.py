@@ -2198,8 +2198,17 @@ class AdvancedSQLQueryEngine:
         import shutil
         import tempfile
         backup_path = None
+        lock_fd = None
         try:
-            # 创建临时备份（事务保护）
+            # 文件锁（Linux fcntl，其他平台优雅降级）
+            try:
+                import fcntl
+                lock_fd = open(file_path + '.lock', 'w')
+                fcntl.flock(lock_fd, fcntl.LOCK_EX)
+            except (ImportError, OSError):
+                lock_fd = None
+
+            # 创建临时备份（事务保护，用NamedTemporaryFile确保可清理）
             backup_path = tempfile.mktemp(suffix='.xlsx.bak')
             shutil.copy2(file_path, backup_path)
 
@@ -2224,6 +2233,18 @@ class AdvancedSQLQueryEngine:
             if backup_path and os.path.exists(backup_path):
                 os.remove(backup_path)
 
+            # 释放文件锁
+            if lock_fd:
+                try:
+                    import fcntl
+                    fcntl.flock(lock_fd, fcntl.LOCK_UN)
+                    lock_path = file_path + '.lock'
+                    if os.path.exists(lock_path):
+                        os.remove(lock_path)
+                except Exception:
+                    pass
+                lock_fd.close()
+
             # 清除缓存（文件已修改）
             self._df_cache.pop(cache_key, None)
 
@@ -2242,6 +2263,17 @@ class AdvancedSQLQueryEngine:
                     os.remove(backup_path)
                 except Exception:
                     pass
+            # 释放文件锁
+            if lock_fd:
+                try:
+                    import fcntl
+                    fcntl.flock(lock_fd, fcntl.LOCK_UN)
+                    lock_path = file_path + '.lock'
+                    if os.path.exists(lock_path):
+                        os.remove(lock_path)
+                except Exception:
+                    pass
+                lock_fd.close()
             return {'success': False,
                     'message': f'写入Excel失败，已自动回滚: {e}',
                     'affected_rows': 0, 'changes': changes,

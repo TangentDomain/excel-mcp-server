@@ -202,3 +202,43 @@ class TestSymlink:
             except OSError:
                 pass
             os.unlink(real_path)
+
+
+class TestTempFileCleanup:
+    """临时文件清理"""
+
+    def test_cleanup_orphan_temp_files(self):
+        """清理超过1小时的孤儿临时文件"""
+        import tempfile
+        with tempfile.TemporaryDirectory() as tmpdir:
+            # 创建一个"旧"临时文件
+            old_file = os.path.join(tmpdir, 'old_backup.xlsx.bak')
+            with open(old_file, 'wb') as f:
+                f.write(b'PK' * 10)
+            # 修改时间设为2小时前
+            import time
+            two_hours_ago = time.time() - 7200
+            os.utime(old_file, (two_hours_ago, two_hours_ago))
+
+            cleaned = SecurityValidator.cleanup_orphan_temp_files(tmpdir)
+            assert cleaned == 1
+            assert not os.path.exists(old_file)
+
+    def test_cleanup_preserves_recent_files(self):
+        """保留最近的临时文件（不到1小时）"""
+        import tempfile
+        with tempfile.TemporaryDirectory() as tmpdir:
+            recent_file = os.path.join(tmpdir, 'recent_backup.xlsx.bak')
+            with open(recent_file, 'wb') as f:
+                f.write(b'PK' * 10)
+
+            cleaned = SecurityValidator.cleanup_orphan_temp_files(tmpdir)
+            assert cleaned == 0
+            assert os.path.exists(recent_file)
+
+    def test_cleanup_empty_dir(self):
+        """空目录不报错"""
+        import tempfile
+        with tempfile.TemporaryDirectory() as tmpdir:
+            cleaned = SecurityValidator.cleanup_orphan_temp_files(tmpdir)
+            assert cleaned == 0
