@@ -64,6 +64,8 @@
   - ✅ 第24轮：包元数据完善（license/authors/keywords/classifiers/urls）
   - ✅ 第26轮：发现错误响应格式不一致（_validate_path用message，ExcelOperations用error），记录待修复
   - ✅ 第27轮：错误响应格式标准化（formatter.py归一化error→message，_format_error_result改用message）
+  - ✅ 第30轮：SQL引擎缓存跨调用共享（模块级单例_get_engine()，修复缓存从未跨调用复用的隐性bug）
+  - ✅ 第30轮：清理4个重复docstring（convert/restore/import/merge，server.py -12行）
 - **验收**：每轮评价中包含工程治理评估，发现问题立即修复或建需求
 - **状态**：OPEN（持续迭代，不关闭）
 
