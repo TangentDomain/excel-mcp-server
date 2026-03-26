@@ -8,6 +8,7 @@ Excel MCP Server - Excel操作API模块
 
 import logging
 from typing import Dict, Any, List, Optional, Union
+from openpyxl.utils import get_column_letter
 
 from ..core.excel_reader import ExcelReader
 from ..core.excel_writer import ExcelWriter
@@ -306,7 +307,6 @@ class ExcelOperations:
         """构建表头范围表达式，支持单行或双行模式"""
         if max_columns:
             # 如果指定了最大列数，使用具体范围
-            from openpyxl.utils import get_column_letter
             end_column = get_column_letter(max_columns)
             if dual_row:
                 # 双行模式：获取连续两行
@@ -381,9 +381,6 @@ class ExcelOperations:
         max_cols = max(len(first_row), len(second_row))  # 改为取最大值，不遗漏任何列
         if max_columns:
             max_cols = min(max_cols, max_columns)
-
-        # 导入列名转换工具
-        from openpyxl.utils import get_column_letter
 
         for i in range(max_cols):
             # 处理字段描述（第1行）
@@ -1218,7 +1215,6 @@ class ExcelOperations:
 
         try:
             from ..core.excel_writer import ExcelWriter
-            from openpyxl.utils import get_column_letter
 
             writer = ExcelWriter(file_path)
 
