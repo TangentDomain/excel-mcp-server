@@ -33,7 +33,7 @@ except ImportError as e:
     exit(1)
 
 # 导入API模块
-from .api.excel_operations import ExcelOperations
+from excel_mcp_server_fastmcp.api.excel_operations import ExcelOperations
 
 # ==================== 操作日志系统 ====================
 class OperationLogger:
@@ -348,7 +348,7 @@ def excel_get_range(
     if _path_err:
         return _path_err
     # 增强参数验证
-    from .utils.validators import ExcelValidator, DataValidationError
+    from excel_mcp_server_fastmcp.utils.validators import ExcelValidator, DataValidationError
 
     try:
         # 验证范围表达式格式
@@ -417,7 +417,7 @@ def excel_update_range(
     if _path_err:
         return _path_err
     # 增强参数验证
-    from .utils.validators import ExcelValidator, DataValidationError
+    from excel_mcp_server_fastmcp.utils.validators import ExcelValidator, DataValidationError
 
     try:
         # 验证范围表达式格式
@@ -589,7 +589,7 @@ def excel_assess_data_impact(
     _path_err = _validate_path(file_path)
     if _path_err:
         return _path_err
-    from .utils.validators import ExcelValidator, DataValidationError
+    from excel_mcp_server_fastmcp.utils.validators import ExcelValidator, DataValidationError
 
     try:
         # 验证范围表达式
@@ -1499,7 +1499,7 @@ SQL查询Excel数据。优先使用此工具而非excel_get_range进行数据查
 
     # 使用高级SQL查询引擎
     try:
-        from .api.advanced_sql_query import execute_advanced_sql_query
+        from excel_mcp_server_fastmcp.api.advanced_sql_query import execute_advanced_sql_query
         return execute_advanced_sql_query(
             file_path=file_path,
             sql=query_expression,
@@ -1602,7 +1602,7 @@ dry_run=True 可预览影响范围不实际修改。
                 'affected_rows': 0, 'changes': []}
 
     try:
-        from .api.advanced_sql_query import execute_advanced_update_query
+        from excel_mcp_server_fastmcp.api.advanced_sql_query import execute_advanced_update_query
         return execute_advanced_update_query(
             file_path=file_path,
             sql=query_expression,

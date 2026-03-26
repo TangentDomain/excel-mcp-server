@@ -11,7 +11,7 @@ import os
 import time
 from pathlib import Path
 
-from src.utils.temp_file_manager import TempFileManager
+from src.excel_mcp_server_fastmcp.utils.temp_file_manager import TempFileManager
 
 
 class TestTempFileManager:

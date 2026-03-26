@@ -10,9 +10,9 @@ import os
 from pathlib import Path
 from unittest.mock import Mock, patch, mock_open
 
-from src.core.excel_converter import ExcelConverter
-from src.models.types import OperationResult
-from src.utils.exceptions import ExcelFileNotFoundError
+from src.excel_mcp_server_fastmcp.core.excel_converter import ExcelConverter
+from src.excel_mcp_server_fastmcp.models.types import OperationResult
+from src.excel_mcp_server_fastmcp.utils.exceptions import ExcelFileNotFoundError
 
 
 class TestExcelConverter:
@@ -20,12 +20,12 @@ class TestExcelConverter:
 
     def test_converter_init(self):
         """测试转换器初始化"""
-        with patch('src.utils.validators.ExcelValidator.validate_file_path', return_value="test.xlsx"):
+        with patch('src.excel_mcp_server_fastmcp.utils.validators.ExcelValidator.validate_file_path', return_value="test.xlsx"):
             converter = ExcelConverter("test.xlsx")
             assert converter is not None
             assert converter.file_path == "test.xlsx"
 
-    @patch('src.core.excel_converter.load_workbook')
+    @patch('src.excel_mcp_server_fastmcp.core.excel_converter.load_workbook')
     @patch('os.path.exists')
     def test_convert_to_csv_success(self, mock_exists, mock_load_workbook):
         """测试成功转换Excel到CSV"""
@@ -45,7 +45,7 @@ class TestExcelConverter:
         mock_workbook.active = mock_worksheet
         mock_load_workbook.return_value = mock_workbook
 
-        with patch('src.utils.validators.ExcelValidator.validate_file_path', return_value="test.xlsx"):
+        with patch('src.excel_mcp_server_fastmcp.utils.validators.ExcelValidator.validate_file_path', return_value="test.xlsx"):
             converter = ExcelConverter("test.xlsx")
 
         with patch('builtins.open', mock_open()) as mock_file:
@@ -59,14 +59,14 @@ class TestExcelConverter:
         """测试转换不存在的文件"""
         mock_exists.return_value = False
 
-        with patch('src.utils.validators.ExcelValidator.validate_file_path', return_value="nonexistent.xlsx"):
+        with patch('src.excel_mcp_server_fastmcp.utils.validators.ExcelValidator.validate_file_path', return_value="nonexistent.xlsx"):
             converter = ExcelConverter("nonexistent.xlsx")
         result = converter.export_to_csv("output.csv")
 
         assert isinstance(result, OperationResult)
         assert result.success is False
 
-    @patch('src.core.excel_converter.load_workbook')
+    @patch('src.excel_mcp_server_fastmcp.core.excel_converter.load_workbook')
     @patch('os.path.exists')
     def test_convert_to_json_success(self, mock_exists, mock_load_workbook):
         """测试成功转换Excel到JSON"""
@@ -85,7 +85,7 @@ class TestExcelConverter:
         mock_workbook.__getitem__ = Mock(return_value=mock_worksheet)
         mock_load_workbook.return_value = mock_workbook
 
-        with patch('src.utils.validators.ExcelValidator.validate_file_path', return_value="test.xlsx"):
+        with patch('src.excel_mcp_server_fastmcp.utils.validators.ExcelValidator.validate_file_path', return_value="test.xlsx"):
             converter = ExcelConverter("test.xlsx")
 
         with patch('builtins.open', mock_open()) as mock_file:
@@ -98,7 +98,7 @@ class TestExcelConverter:
         assert isinstance(result, OperationResult)
         assert result.success is True
 
-    @patch('src.core.excel_converter.load_workbook')
+    @patch('src.excel_mcp_server_fastmcp.core.excel_converter.load_workbook')
     @patch('os.path.exists')
     def test_convert_with_specific_sheet(self, mock_exists, mock_load_workbook):
         """测试转换指定工作表"""
@@ -114,7 +114,7 @@ class TestExcelConverter:
         mock_workbook.__getitem__ = Mock(return_value=mock_worksheet)
         mock_load_workbook.return_value = mock_workbook
 
-        with patch('src.utils.validators.ExcelValidator.validate_file_path', return_value="test.xlsx"):
+        with patch('src.excel_mcp_server_fastmcp.utils.validators.ExcelValidator.validate_file_path', return_value="test.xlsx"):
             converter = ExcelConverter("test.xlsx")
 
         with patch('builtins.open', mock_open()):
@@ -125,7 +125,7 @@ class TestExcelConverter:
 
     def test_supported_formats(self):
         """测试支持的格式"""
-        with patch('src.utils.validators.ExcelValidator.validate_file_path', return_value="test.xlsx"):
+        with patch('src.excel_mcp_server_fastmcp.utils.validators.ExcelValidator.validate_file_path', return_value="test.xlsx"):
             converter = ExcelConverter("test.xlsx")
 
         # 测试方法是否存在
@@ -142,14 +142,14 @@ class TestExcelConverter:
             method_exists = hasattr(converter, method)
             assert isinstance(method_exists, bool)
 
-    @patch('src.core.excel_converter.load_workbook')
+    @patch('src.excel_mcp_server_fastmcp.core.excel_converter.load_workbook')
     @patch('os.path.exists')
     def test_convert_exception_handling(self, mock_exists, mock_load_workbook):
         """测试转换过程中的异常处理"""
         mock_exists.return_value = True
         mock_load_workbook.side_effect = Exception("读取工作簿失败")
 
-        with patch('src.utils.validators.ExcelValidator.validate_file_path', return_value="test.xlsx"):
+        with patch('src.excel_mcp_server_fastmcp.utils.validators.ExcelValidator.validate_file_path', return_value="test.xlsx"):
             converter = ExcelConverter("test.xlsx")
         result = converter.export_to_csv("output.csv")
 
@@ -164,7 +164,7 @@ class TestExcelConverter:
     ])
     def test_format_combinations(self, input_format, output_format):
         """测试不同格式组合的转换"""
-        with patch('src.utils.validators.ExcelValidator.validate_file_path', return_value=f"test.{input_format}"):
+        with patch('src.excel_mcp_server_fastmcp.utils.validators.ExcelValidator.validate_file_path', return_value=f"test.{input_format}"):
             converter = ExcelConverter(f"test.{input_format}")
 
         # 这里只测试方法调用不会出错
@@ -180,7 +180,7 @@ class TestExcelConverter:
 
     def test_converter_error_messages(self):
         """测试转换器的错误消息"""
-        with patch('src.utils.validators.ExcelValidator.validate_file_path', return_value="nonexistent.xlsx"):
+        with patch('src.excel_mcp_server_fastmcp.utils.validators.ExcelValidator.validate_file_path', return_value="nonexistent.xlsx"):
             converter = ExcelConverter("nonexistent.xlsx")
 
         # 测试文件不存在的错误消息

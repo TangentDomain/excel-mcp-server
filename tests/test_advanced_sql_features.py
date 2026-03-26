@@ -60,7 +60,7 @@ class TestAdvancedSQLFeatures:
 
     def test_distinct_query(self, test_excel_file):
         """测试DISTINCT查询"""
-        from src.api.advanced_sql_query import execute_advanced_sql_query
+        from src.excel_mcp_server_fastmcp.api.advanced_sql_query import execute_advanced_sql_query
         
         result = execute_advanced_sql_query(
             file_path=test_excel_file,
@@ -72,7 +72,7 @@ class TestAdvancedSQLFeatures:
 
     def test_count_with_group_by(self, test_excel_file):
         """测试COUNT和GROUP BY"""
-        from src.api.advanced_sql_query import execute_advanced_sql_query
+        from src.excel_mcp_server_fastmcp.api.advanced_sql_query import execute_advanced_sql_query
         
         result = execute_advanced_sql_query(
             file_path=test_excel_file,
@@ -83,7 +83,7 @@ class TestAdvancedSQLFeatures:
 
     def test_sum_with_group_by(self, test_excel_file):
         """测试SUM和GROUP BY"""
-        from src.api.advanced_sql_query import execute_advanced_sql_query
+        from src.excel_mcp_server_fastmcp.api.advanced_sql_query import execute_advanced_sql_query
         
         result = execute_advanced_sql_query(
             file_path=test_excel_file,
@@ -94,7 +94,7 @@ class TestAdvancedSQLFeatures:
 
     def test_avg_with_group_by(self, test_excel_file):
         """测试AVG和GROUP BY"""
-        from src.api.advanced_sql_query import execute_advanced_sql_query
+        from src.excel_mcp_server_fastmcp.api.advanced_sql_query import execute_advanced_sql_query
         
         result = execute_advanced_sql_query(
             file_path=test_excel_file,
@@ -105,7 +105,7 @@ class TestAdvancedSQLFeatures:
 
     def test_min_max_with_group_by(self, test_excel_file):
         """测试MIN/MAX和GROUP BY"""
-        from src.api.advanced_sql_query import execute_advanced_sql_query
+        from src.excel_mcp_server_fastmcp.api.advanced_sql_query import execute_advanced_sql_query
         
         result = execute_advanced_sql_query(
             file_path=test_excel_file,
@@ -116,7 +116,7 @@ class TestAdvancedSQLFeatures:
 
     def test_order_by_desc(self, test_excel_file):
         """测试ORDER BY DESC"""
-        from src.api.advanced_sql_query import execute_advanced_sql_query
+        from src.excel_mcp_server_fastmcp.api.advanced_sql_query import execute_advanced_sql_query
         
         result = execute_advanced_sql_query(
             file_path=test_excel_file,
@@ -127,7 +127,7 @@ class TestAdvancedSQLFeatures:
 
     def test_order_by_asc(self, test_excel_file):
         """测试ORDER BY ASC"""
-        from src.api.advanced_sql_query import execute_advanced_sql_query
+        from src.excel_mcp_server_fastmcp.api.advanced_sql_query import execute_advanced_sql_query
         
         result = execute_advanced_sql_query(
             file_path=test_excel_file,
@@ -138,7 +138,7 @@ class TestAdvancedSQLFeatures:
 
     def test_limit_clause(self, test_excel_file):
         """测试LIMIT子句"""
-        from src.api.advanced_sql_query import execute_advanced_sql_query
+        from src.excel_mcp_server_fastmcp.api.advanced_sql_query import execute_advanced_sql_query
         
         result = execute_advanced_sql_query(
             file_path=test_excel_file,
@@ -149,7 +149,7 @@ class TestAdvancedSQLFeatures:
 
     def test_where_between(self, test_excel_file):
         """测试WHERE BETWEEN"""
-        from src.api.advanced_sql_query import execute_advanced_sql_query
+        from src.excel_mcp_server_fastmcp.api.advanced_sql_query import execute_advanced_sql_query
         
         result = execute_advanced_sql_query(
             file_path=test_excel_file,
@@ -160,7 +160,7 @@ class TestAdvancedSQLFeatures:
 
     def test_where_in(self, test_excel_file):
         """测试WHERE IN"""
-        from src.api.advanced_sql_query import execute_advanced_sql_query
+        from src.excel_mcp_server_fastmcp.api.advanced_sql_query import execute_advanced_sql_query
         
         result = execute_advanced_sql_query(
             file_path=test_excel_file,
@@ -171,7 +171,7 @@ class TestAdvancedSQLFeatures:
 
     def test_where_like(self, test_excel_file):
         """测试WHERE LIKE"""
-        from src.api.advanced_sql_query import execute_advanced_sql_query
+        from src.excel_mcp_server_fastmcp.api.advanced_sql_query import execute_advanced_sql_query
         
         result = execute_advanced_sql_query(
             file_path=test_excel_file,
@@ -182,7 +182,7 @@ class TestAdvancedSQLFeatures:
 
     def test_where_not_equal(self, test_excel_file):
         """测试WHERE <>"""
-        from src.api.advanced_sql_query import execute_advanced_sql_query
+        from src.excel_mcp_server_fastmcp.api.advanced_sql_query import execute_advanced_sql_query
         
         result = execute_advanced_sql_query(
             file_path=test_excel_file,
@@ -193,7 +193,7 @@ class TestAdvancedSQLFeatures:
 
     def test_multiple_conditions(self, test_excel_file):
         """测试多条件查询"""
-        from src.api.advanced_sql_query import execute_advanced_sql_query
+        from src.excel_mcp_server_fastmcp.api.advanced_sql_query import execute_advanced_sql_query
         
         result = execute_advanced_sql_query(
             file_path=test_excel_file,
@@ -204,7 +204,7 @@ class TestAdvancedSQLFeatures:
 
     def test_or_conditions(self, test_excel_file):
         """测试OR条件"""
-        from src.api.advanced_sql_query import execute_advanced_sql_query
+        from src.excel_mcp_server_fastmcp.api.advanced_sql_query import execute_advanced_sql_query
         
         result = execute_advanced_sql_query(
             file_path=test_excel_file,
@@ -217,7 +217,7 @@ class TestAdvancedSQLFeatures:
 
     def test_is_null(self, test_excel_with_nulls):
         """测试空值处理"""
-        from src.api.advanced_sql_query import execute_advanced_sql_query
+        from src.excel_mcp_server_fastmcp.api.advanced_sql_query import execute_advanced_sql_query
         
         # 由于 IS NULL 可能不被支持，使用等效的查询
         result = execute_advanced_sql_query(
@@ -229,7 +229,7 @@ class TestAdvancedSQLFeatures:
 
     def test_is_not_null(self, test_excel_with_nulls):
         """测试非空值处理"""
-        from src.api.advanced_sql_query import execute_advanced_sql_query
+        from src.excel_mcp_server_fastmcp.api.advanced_sql_query import execute_advanced_sql_query
         
         # 由于 IS NOT NULL 可能不被支持，使用等效的查询
         result = execute_advanced_sql_query(
@@ -243,7 +243,7 @@ class TestAdvancedSQLFeatures:
 
     def test_arithmetic_division(self, test_excel_file):
         """测试算术运算 - 除法"""
-        from src.api.advanced_sql_query import execute_advanced_sql_query
+        from src.excel_mcp_server_fastmcp.api.advanced_sql_query import execute_advanced_sql_query
         
         result = execute_advanced_sql_query(
             file_path=test_excel_file,
@@ -254,7 +254,7 @@ class TestAdvancedSQLFeatures:
 
     def test_arithmetic_addition(self, test_excel_file):
         """测试算术运算 - 加法"""
-        from src.api.advanced_sql_query import execute_advanced_sql_query
+        from src.excel_mcp_server_fastmcp.api.advanced_sql_query import execute_advanced_sql_query
         
         result = execute_advanced_sql_query(
             file_path=test_excel_file,
@@ -265,7 +265,7 @@ class TestAdvancedSQLFeatures:
 
     def test_arithmetic_multiplication(self, test_excel_file):
         """测试算术运算 - 乘法"""
-        from src.api.advanced_sql_query import execute_advanced_sql_query
+        from src.excel_mcp_server_fastmcp.api.advanced_sql_query import execute_advanced_sql_query
         
         result = execute_advanced_sql_query(
             file_path=test_excel_file,
@@ -278,7 +278,7 @@ class TestAdvancedSQLFeatures:
 
     def test_column_alias(self, test_excel_file):
         """测试列别名"""
-        from src.api.advanced_sql_query import execute_advanced_sql_query
+        from src.excel_mcp_server_fastmcp.api.advanced_sql_query import execute_advanced_sql_query
         
         result = execute_advanced_sql_query(
             file_path=test_excel_file,
@@ -291,7 +291,7 @@ class TestAdvancedSQLFeatures:
 
     def test_invalid_table_name(self, test_excel_file):
         """测试无效表名"""
-        from src.api.advanced_sql_query import execute_advanced_sql_query
+        from src.excel_mcp_server_fastmcp.api.advanced_sql_query import execute_advanced_sql_query
         
         result = execute_advanced_sql_query(
             file_path=test_excel_file,
@@ -302,7 +302,7 @@ class TestAdvancedSQLFeatures:
 
     def test_invalid_column(self, test_excel_file):
         """测试无效列名"""
-        from src.api.advanced_sql_query import execute_advanced_sql_query
+        from src.excel_mcp_server_fastmcp.api.advanced_sql_query import execute_advanced_sql_query
         
         result = execute_advanced_sql_query(
             file_path=test_excel_file,
@@ -314,7 +314,7 @@ class TestAdvancedSQLFeatures:
 
     def test_syntax_error(self, test_excel_file):
         """测试SQL语法错误"""
-        from src.api.advanced_sql_query import execute_advanced_sql_query
+        from src.excel_mcp_server_fastmcp.api.advanced_sql_query import execute_advanced_sql_query
         
         # 简化语法错误测试
         result = execute_advanced_sql_query(
@@ -329,7 +329,7 @@ class TestAdvancedSQLFeatures:
 
     def test_offset_only(self, test_excel_file):
         """测试OFFSET跳过前N行"""
-        from src.api.advanced_sql_query import execute_advanced_sql_query
+        from src.excel_mcp_server_fastmcp.api.advanced_sql_query import execute_advanced_sql_query
         
         result_all = execute_advanced_sql_query(
             file_path=test_excel_file,
@@ -354,7 +354,7 @@ class TestAdvancedSQLFeatures:
 
     def test_offset_with_limit(self, test_excel_file):
         """测试OFFSET+LIMIT组合分页 - 验证分页不重叠"""
-        from src.api.advanced_sql_query import execute_advanced_sql_query
+        from src.excel_mcp_server_fastmcp.api.advanced_sql_query import execute_advanced_sql_query
         
         # 全量
         result_all = execute_advanced_sql_query(
@@ -388,7 +388,7 @@ class TestAdvancedSQLFeatures:
 
     def test_not_like(self, test_excel_file):
         """测试NOT LIKE排除匹配"""
-        from src.api.advanced_sql_query import execute_advanced_sql_query
+        from src.excel_mcp_server_fastmcp.api.advanced_sql_query import execute_advanced_sql_query
         
         # LIKE匹配含'l'的（Alice, Charlie）
         result_like = execute_advanced_sql_query(
@@ -413,7 +413,7 @@ class TestAdvancedSQLFeatures:
 
     def test_like_case_insensitive(self, test_excel_file):
         """测试LIKE大小写不敏感（游戏配置表场景：搜Fire和fire应匹配同一行）"""
-        from src.api.advanced_sql_query import execute_advanced_sql_query
+        from src.excel_mcp_server_fastmcp.api.advanced_sql_query import execute_advanced_sql_query
         
         result_lower = execute_advanced_sql_query(
             file_path=test_excel_file,
@@ -444,7 +444,7 @@ class TestAdvancedSQLFeatures:
 
     def test_count_distinct_no_group_by(self, test_excel_file):
         """测试COUNT(DISTINCT)不带GROUP BY"""
-        from src.api.advanced_sql_query import execute_advanced_sql_query
+        from src.excel_mcp_server_fastmcp.api.advanced_sql_query import execute_advanced_sql_query
         
         result = execute_advanced_sql_query(
             file_path=test_excel_file,
@@ -460,7 +460,7 @@ class TestAdvancedSQLFeatures:
 
     def test_count_distinct_with_group_by(self, test_excel_file):
         """测试COUNT(DISTINCT)带GROUP BY"""
-        from src.api.advanced_sql_query import execute_advanced_sql_query
+        from src.excel_mcp_server_fastmcp.api.advanced_sql_query import execute_advanced_sql_query
         
         result = execute_advanced_sql_query(
             file_path=test_excel_file,
@@ -475,7 +475,7 @@ class TestAdvancedSQLFeatures:
 
     def test_not_in(self, test_excel_file):
         """测试NOT IN排除列表值"""
-        from src.api.advanced_sql_query import execute_advanced_sql_query
+        from src.excel_mcp_server_fastmcp.api.advanced_sql_query import execute_advanced_sql_query
         
         # IN匹配指定部门
         result_in = execute_advanced_sql_query(
@@ -501,7 +501,7 @@ class TestAdvancedSQLFeatures:
 
     def test_count_distinct_with_alias(self, test_excel_file):
         """测试COUNT(DISTINCT)带别名"""
-        from src.api.advanced_sql_query import execute_advanced_sql_query
+        from src.excel_mcp_server_fastmcp.api.advanced_sql_query import execute_advanced_sql_query
         
         result = execute_advanced_sql_query(
             file_path=test_excel_file,

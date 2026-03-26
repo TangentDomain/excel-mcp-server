@@ -19,7 +19,7 @@ class TestUpdateQueryBasic:
 
     def test_update_single_column_arithmetic(self, game_config_copy):
         """单列算术更新：法师伤害*1.1"""
-        from src.api.advanced_sql_query import execute_advanced_update_query
+        from src.excel_mcp_server_fastmcp.api.advanced_sql_query import execute_advanced_update_query
 
         result = execute_advanced_update_query(
             game_config_copy,
@@ -36,7 +36,7 @@ class TestUpdateQueryBasic:
 
     def test_update_multi_column(self, game_config_copy):
         """多列SET同时更新"""
-        from src.api.advanced_sql_query import execute_advanced_update_query
+        from src.excel_mcp_server_fastmcp.api.advanced_sql_query import execute_advanced_update_query
 
         result = execute_advanced_update_query(
             game_config_copy,
@@ -54,7 +54,7 @@ class TestUpdateQueryBasic:
 
     def test_update_column_reference(self, game_config_copy):
         """SET使用列引用：damage = cooldown * 20"""
-        from src.api.advanced_sql_query import execute_advanced_update_query
+        from src.excel_mcp_server_fastmcp.api.advanced_sql_query import execute_advanced_update_query
 
         result = execute_advanced_update_query(
             game_config_copy,
@@ -69,7 +69,7 @@ class TestUpdateQueryBasic:
 
     def test_update_constant_value(self, game_config_copy):
         """SET使用常量值"""
-        from src.api.advanced_sql_query import execute_advanced_update_query
+        from src.excel_mcp_server_fastmcp.api.advanced_sql_query import execute_advanced_update_query
 
         result = execute_advanced_update_query(
             game_config_copy,
@@ -83,7 +83,7 @@ class TestUpdateQueryBasic:
 
     def test_dry_run_no_modify(self, game_config_copy):
         """预览模式不修改文件"""
-        from src.api.advanced_sql_query import execute_advanced_update_query
+        from src.excel_mcp_server_fastmcp.api.advanced_sql_query import execute_advanced_update_query
 
         result = execute_advanced_update_query(
             game_config_copy,
@@ -100,7 +100,7 @@ class TestUpdateQueryBasic:
 
     def test_update_no_where(self, game_config_copy):
         """无WHERE条件更新所有行"""
-        from src.api.advanced_sql_query import execute_advanced_update_query
+        from src.excel_mcp_server_fastmcp.api.advanced_sql_query import execute_advanced_update_query
 
         result = execute_advanced_update_query(
             game_config_copy,
@@ -111,7 +111,7 @@ class TestUpdateQueryBasic:
 
     def test_update_no_match(self, game_config_copy):
         """WHERE不匹配任何行"""
-        from src.api.advanced_sql_query import execute_advanced_update_query
+        from src.excel_mcp_server_fastmcp.api.advanced_sql_query import execute_advanced_update_query
 
         result = execute_advanced_update_query(
             game_config_copy,
@@ -123,7 +123,7 @@ class TestUpdateQueryBasic:
 
     def test_update_value_unchanged(self, game_config_copy):
         """值未变化时不写入"""
-        from src.api.advanced_sql_query import execute_advanced_update_query
+        from src.excel_mcp_server_fastmcp.api.advanced_sql_query import execute_advanced_update_query
 
         result = execute_advanced_update_query(
             game_config_copy,
@@ -135,7 +135,7 @@ class TestUpdateQueryBasic:
 
     def test_select_rejected(self, game_config_copy):
         """SELECT语句被拒绝"""
-        from src.api.advanced_sql_query import execute_advanced_update_query
+        from src.excel_mcp_server_fastmcp.api.advanced_sql_query import execute_advanced_update_query
 
         result = execute_advanced_update_query(
             game_config_copy,
@@ -146,7 +146,7 @@ class TestUpdateQueryBasic:
 
     def test_wrong_table_name(self, game_config_copy):
         """错误的表名给出建议"""
-        from src.api.advanced_sql_query import execute_advanced_update_query
+        from src.excel_mcp_server_fastmcp.api.advanced_sql_query import execute_advanced_update_query
 
         result = execute_advanced_update_query(
             game_config_copy,
@@ -157,7 +157,7 @@ class TestUpdateQueryBasic:
 
     def test_wrong_column_name(self, game_config_copy):
         """错误的列名给出建议"""
-        from src.api.advanced_sql_query import execute_advanced_update_query
+        from src.excel_mcp_server_fastmcp.api.advanced_sql_query import execute_advanced_update_query
 
         result = execute_advanced_update_query(
             game_config_copy,
@@ -168,21 +168,21 @@ class TestUpdateQueryBasic:
 
     def test_empty_file_path(self):
         """空文件路径"""
-        from src.api.advanced_sql_query import execute_advanced_update_query
+        from src.excel_mcp_server_fastmcp.api.advanced_sql_query import execute_advanced_update_query
 
         result = execute_advanced_update_query('', "UPDATE t SET a=1")
         assert result['success'] is False
 
     def test_empty_sql(self, game_config_copy):
         """空SQL"""
-        from src.api.advanced_sql_query import execute_advanced_update_query
+        from src.excel_mcp_server_fastmcp.api.advanced_sql_query import execute_advanced_update_query
 
         result = execute_advanced_update_query(game_config_copy, '')
         assert result['success'] is False
 
     def test_nonexistent_file(self):
         """不存在的文件"""
-        from src.api.advanced_sql_query import execute_advanced_update_query
+        from src.excel_mcp_server_fastmcp.api.advanced_sql_query import execute_advanced_update_query
 
         result = execute_advanced_update_query(
             '/tmp/nonexistent_file.xlsx',
@@ -194,7 +194,7 @@ class TestUpdateQueryBasic:
     def test_transaction_rollback_on_write_failure(self, game_config_copy):
         """写入失败时自动回滚，文件不损坏"""
         import shutil
-        from src.api.advanced_sql_query import execute_advanced_update_query
+        from src.excel_mcp_server_fastmcp.api.advanced_sql_query import execute_advanced_update_query
 
         # 先读取原始文件内容做校验
         import hashlib
@@ -220,7 +220,7 @@ class TestFileLockProtection:
 
     def test_single_write_with_lock(self, game_config_copy):
         """单次写入文件锁正常工作不报错"""
-        from src.api.advanced_sql_query import execute_advanced_update_query
+        from src.excel_mcp_server_fastmcp.api.advanced_sql_query import execute_advanced_update_query
         result = execute_advanced_update_query(
             file_path=game_config_copy,
             sql="UPDATE 技能配置 SET damage = damage + 10 WHERE 1=1",
@@ -236,7 +236,7 @@ class TestNumpySerialization:
     def test_dry_run_changes_json_serializable(self, game_config_copy):
         """dry_run返回的changes列表必须可JSON序列化（numpy→Python原生）"""
         import json
-        from src.api.advanced_sql_query import execute_advanced_update_query
+        from src.excel_mcp_server_fastmcp.api.advanced_sql_query import execute_advanced_update_query
 
         result = execute_advanced_update_query(
             game_config_copy,
@@ -257,7 +257,7 @@ class TestNumpySerialization:
     def test_actual_write_changes_json_serializable(self, game_config_copy):
         """实际写入返回的changes列表必须可JSON序列化"""
         import json
-        from src.api.advanced_sql_query import execute_advanced_update_query
+        from src.excel_mcp_server_fastmcp.api.advanced_sql_query import execute_advanced_update_query
 
         result = execute_advanced_update_query(
             game_config_copy,
@@ -270,7 +270,7 @@ class TestNumpySerialization:
 
     def test_update_with_chinese_column_names(self, game_config_copy):
         """中文列名UPDATE：SET和WHERE都使用中文列名"""
-        from src.api.advanced_sql_query import execute_advanced_update_query
+        from src.excel_mcp_server_fastmcp.api.advanced_sql_query import execute_advanced_update_query
 
         result = execute_advanced_update_query(
             game_config_copy,
@@ -282,7 +282,7 @@ class TestNumpySerialization:
 
     def test_update_chinese_set_english_where(self, game_config_copy):
         """混合列名UPDATE：SET中文、WHERE英文"""
-        from src.api.advanced_sql_query import execute_advanced_update_query
+        from src.excel_mcp_server_fastmcp.api.advanced_sql_query import execute_advanced_update_query
 
         result = execute_advanced_update_query(
             game_config_copy,

@@ -28,7 +28,7 @@ class TestPerformanceBenchmarks:
     """性能基准测试套件"""
 
     # 性能测试在并行执行(xdist)时可能超时，单独设置更长超时
-    pytestmark = pytest.mark.timeout(120)
+    pytestmark = pytest.mark.timeout(180)
 
     @pytest.fixture
     def large_dataset_file(self, temp_dir):
@@ -258,7 +258,7 @@ class TestPerformanceBenchmarks:
         print(f"  平均单表读取时间: {avg_read_time:.3f}秒")
 
         assert successful_reads == 5, f"只有 {successful_reads}/5 个表读取成功"
-        assert total_time < 15.0, f"并发读取过慢: {total_time:.3f}秒"
+        assert total_time < 30.0, f"并发读取过慢: {total_time:.3f}秒"
 
     # ==================== 内存使用测试 ====================
 

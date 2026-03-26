@@ -23,8 +23,8 @@ from src.server import (
     _generate_safety_recommendations,
     _predict_operation_result
 )
-from src.utils.validators import ExcelValidator, DataValidationError
-from src.api.excel_operations import ExcelOperations
+from src.excel_mcp_server_fastmcp.utils.validators import ExcelValidator, DataValidationError
+from src.excel_mcp_server_fastmcp.api.excel_operations import ExcelOperations
 
 
 class TestOperationLogger:
