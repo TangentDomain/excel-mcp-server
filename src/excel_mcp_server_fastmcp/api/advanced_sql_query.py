@@ -2453,6 +2453,16 @@ def execute_advanced_update_query(
             dry_run=dry_run
         )
     except ImportError as e:
-        return self._update_error(f'SQLGLOT未安装: {str(e)}')
+        return {
+            'success': False,
+            'message': f'SQLGLOT未安装，无法使用UPDATE功能: {str(e)}',
+            'affected_rows': 0, 'changes': [],
+            'query_info': {'error_type': 'missing_dependency', 'dependency': 'sqlglot'}
+        }
     except Exception as e:
-        return self._update_error(f'UPDATE执行失败: {str(e)}')
+        return {
+            'success': False,
+            'message': f'UPDATE执行失败: {str(e)}',
+            'affected_rows': 0, 'changes': [],
+            'query_info': {'error_type': 'engine_error', 'details': str(e)}
+        }
