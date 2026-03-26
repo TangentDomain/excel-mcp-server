@@ -34,6 +34,9 @@
   - ✅ 第6轮：DataFrame LRU缓存(max=10)，重复查询30-100倍提速
   - ✅ 第29轮：独立benchmark脚本，15项指标+历史对比
   - ✅ 第30轮：缓存跨调用共享（单例引擎，修复缓存从未复用的bug）
+  - ✅ 第32轮：_load_worksheets批量双行表头检测（2N+1→N+1次文件打开）
+  - ✅ 第32轮：excel_describe_table单次遍历所有列（N×M→M行I/O）
+  - ✅ 第32轮：DESCRIBE内存优化（类型推断限制前100个值）
 - **后续方向**：
   - 调研只读场景是否可用openpyxl read_only模式加速首次加载
   - 写入场景：openpyxl的write_only模式或批量写入优化
