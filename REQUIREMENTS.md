@@ -65,6 +65,9 @@
   - ✅ 第28轮：CI优化 — test extra替代dev（减少~20个不必要的包）+ pip缓存
   - ✅ 第28轮：CI全矩阵通过（含Windows 3.13），之前main失败为临时性问题
   - ✅ 第28轮：mypy overrides清理fastmcp残留
+  - ✅ 第34轮：excel_writer.py 10个方法添加workbook.close()（修复文件句柄泄漏）
+  - ✅ 第34轮：_create_temp_workbook移除重复代码块（公式计算不再加载文件2次）
+  - ✅ 第34轮：eval()替换为_safe_eval_expr() AST白名单验证
 - **验收**：至少在2个不同MCP客户端中验证通过，CI跑3.10和3.13
 - **状态**：OPEN（CI矩阵已就绪且通过，多客户端验证待实际测试）
 
@@ -106,6 +109,9 @@
   - ✅ 第27轮：错误响应格式标准化（formatter.py归一化error→message，_format_error_result改用message）
   - ✅ 第30轮：SQL引擎缓存跨调用共享（模块级单例_get_engine()，修复缓存从未跨调用复用的隐性bug）
   - ✅ 第30轮：清理4个重复docstring（convert/restore/import/merge，server.py -12行）
+  - ✅ 第34轮：excel_writer.py 10个方法添加workbook.close()（修复文件句柄泄漏）
+  - ✅ 第34轮：_create_temp_workbook移除重复代码块（公式计算不再加载文件2次）
+  - ✅ 第34轮：eval()替换为_safe_eval_expr() AST白名单验证（拒绝__import__等危险调用）
 - **验收**：每轮评价中包含工程治理评估，发现问题立即修复或建需求
 - **状态**：OPEN（持续迭代，不关闭）
 

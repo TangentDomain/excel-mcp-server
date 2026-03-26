@@ -16,10 +16,14 @@ Excel MCP Server - 基于 FastMCP 和 openpyxl 实现
 - openpyxl: 用于Excel文件操作
 """
 
+import functools
 import logging
 import os
 import re
 import shutil
+import threading
+import time
+from collections import defaultdict
 from datetime import datetime
 from enum import Enum
 from pathlib import Path
@@ -94,6 +98,85 @@ class OperationLogger:
 
         operations = self.current_session[0]['operations']
         return operations[-limit:] if len(operations) > limit else operations
+
+# ==================== 工具调用追踪器 ====================
+class ToolCallTracker:
+    """工具调用追踪器，记录每个工具的调用次数、耗时和错误率"""
+
+    def __init__(self):
+        self._stats: Dict[str, Dict[str, Any]] = defaultdict(lambda: {
+            'call_count': 0,
+            'total_time_ms': 0.0,
+            'error_count': 0,
+            'last_called': None,
+            'min_time_ms': float('inf'),
+            'max_time_ms': 0.0,
+        })
+        self._lock = threading.Lock()
+        self._start_time = datetime.now()
+
+    def record(self, tool_name: str, duration_ms: float, success: bool = True):
+        """记录一次工具调用"""
+        with self._lock:
+            s = self._stats[tool_name]
+            s['call_count'] += 1
+            s['total_time_ms'] += duration_ms
+            s['last_called'] = datetime.now().isoformat()
+            if duration_ms < s['min_time_ms']:
+                s['min_time_ms'] = duration_ms
+            if duration_ms > s['max_time_ms']:
+                s['max_time_ms'] = duration_ms
+            if not success:
+                s['error_count'] += 1
+
+    def get_stats(self) -> Dict[str, Any]:
+        """获取所有工具的调用统计，按调用次数降序排列"""
+        with self._lock:
+            tools = {}
+            for name, s in sorted(self._stats.items(), key=lambda x: -x[1]['call_count']):
+                tools[name] = {
+                    'call_count': s['call_count'],
+                    'avg_time_ms': round(s['total_time_ms'] / s['call_count'], 1) if s['call_count'] else 0,
+                    'min_time_ms': round(s['min_time_ms'], 1) if s['min_time_ms'] != float('inf') else 0,
+                    'max_time_ms': round(s['max_time_ms'], 1),
+                    'error_count': s['error_count'],
+                    'last_called': s['last_called'],
+                }
+            return {
+                'uptime_seconds': round((datetime.now() - self._start_time).total_seconds(), 0),
+                'total_calls': sum(s['call_count'] for s in self._stats.values()),
+                'total_errors': sum(s['error_count'] for s in self._stats.values()),
+                'tools': tools,
+            }
+
+    def reset(self):
+        """重置所有统计"""
+        with self._lock:
+            self._stats.clear()
+            self._start_time = datetime.now()
+
+
+_tracker = ToolCallTracker()
+
+
+def _track_call(func):
+    """工具调用追踪装饰器，记录每次调用的耗时和结果"""
+    @functools.wraps(func)
+    def wrapper(*args, **kwargs):
+        start = time.perf_counter()
+        try:
+            result = func(*args, **kwargs)
+            duration_ms = (time.perf_counter() - start) * 1000
+            _tracker.record(func.__name__, duration_ms, success=True)
+            logger.debug(f"[TOOL] {func.__name__}: {duration_ms:.1f}ms")
+            return result
+        except Exception as e:
+            duration_ms = (time.perf_counter() - start) * 1000
+            _tracker.record(func.__name__, duration_ms, success=False)
+            logger.debug(f"[TOOL] {func.__name__}: {duration_ms:.1f}ms ERROR: {e}")
+            raise
+    return wrapper
+
 
 # ==================== 安全验证模块 ====================
 class SecurityValidator:
@@ -275,6 +358,7 @@ mcp = FastMCP(
 # ==================== MCP 工具定义 ====================
 
 @mcp.tool()
+@_track_call
 def excel_list_sheets(file_path: str) -> Dict[str, Any]:
     """
 列出Excel文件中所有工作表名称。查询前先用此工具确认有哪些工作表。
@@ -286,6 +370,7 @@ def excel_list_sheets(file_path: str) -> Dict[str, Any]:
 
 
 @mcp.tool()
+@_track_call
 def excel_get_sheet_headers(file_path: str) -> Dict[str, Any]:
     """
 批量获取所有工作表的双行表头（游戏开发专用）。
@@ -298,6 +383,7 @@ def excel_get_sheet_headers(file_path: str) -> Dict[str, Any]:
 
 
 @mcp.tool()
+@_track_call
 def excel_search(
     file_path: str,
     pattern: str,
@@ -320,6 +406,7 @@ def excel_search(
 
 
 @mcp.tool()
+@_track_call
 def excel_search_directory(
     directory_path: str,
     pattern: str,
@@ -344,6 +431,7 @@ def excel_search_directory(
 
 
 @mcp.tool()
+@_track_call
 def excel_get_range(
     file_path: str,
     range: str,
@@ -395,6 +483,7 @@ def excel_get_range(
 
 
 @mcp.tool()
+@_track_call
 def excel_get_headers(
     file_path: str,
     sheet_name: str,
@@ -412,6 +501,7 @@ def excel_get_headers(
 
 
 @mcp.tool()
+@_track_call
 def excel_update_range(
     file_path: str,
     range: str,
@@ -495,6 +585,7 @@ def excel_update_range(
 
 
 @mcp.tool()
+@_track_call
 def excel_preview_operation(
     file_path: str,
     range: str,
@@ -588,6 +679,7 @@ def _generate_safety_warning(operation_type: str, has_data: bool, risk_level: st
 
 
 @mcp.tool()
+@_track_call
 def excel_assess_data_impact(
     file_path: str,
     range: str,
@@ -866,6 +958,7 @@ def _predict_operation_result(
 
 
 @mcp.tool()
+@_track_call
 def excel_get_operation_history(
     file_path: Optional[str] = None,
     limit: int = 20
@@ -925,6 +1018,7 @@ def excel_get_operation_history(
 
 
 @mcp.tool()
+@_track_call
 def excel_create_backup(
     file_path: str,
     backup_dir: Optional[str] = None
@@ -986,6 +1080,7 @@ def excel_create_backup(
 
 
 @mcp.tool()
+@_track_call
 def excel_restore_backup(
     backup_path: str,
     target_path: Optional[str] = None
@@ -1044,6 +1139,7 @@ def excel_restore_backup(
 
 
 @mcp.tool()
+@_track_call
 def excel_list_backups(
     file_path: str,
     backup_dir: Optional[str] = None
@@ -1106,6 +1202,7 @@ def excel_list_backups(
 
 
 @mcp.tool()
+@_track_call
 def excel_insert_rows(
     file_path: str,
     sheet_name: str,
@@ -1122,6 +1219,7 @@ def excel_insert_rows(
 
 
 @mcp.tool()
+@_track_call
 def excel_insert_columns(
     file_path: str,
     sheet_name: str,
@@ -1138,6 +1236,7 @@ def excel_insert_columns(
 
 
 @mcp.tool()
+@_track_call
 def excel_find_last_row(
     file_path: str,
     sheet_name: str,
@@ -1153,6 +1252,7 @@ def excel_find_last_row(
 
 
 @mcp.tool()
+@_track_call
 def excel_create_file(
     file_path: str,
     sheet_names: Optional[List[str]] = None
@@ -1167,6 +1267,7 @@ def excel_create_file(
 
 
 @mcp.tool()
+@_track_call
 def excel_export_to_csv(
     file_path: str,
     output_path: str,
@@ -1183,6 +1284,7 @@ def excel_export_to_csv(
 
 
 @mcp.tool()
+@_track_call
 def excel_import_from_csv(
     csv_path: str,
     output_path: str,
@@ -1202,6 +1304,7 @@ def excel_import_from_csv(
 
 
 @mcp.tool()
+@_track_call
 def excel_convert_format(
     input_path: str,
     output_path: str,
@@ -1219,6 +1322,7 @@ def excel_convert_format(
 
 
 @mcp.tool()
+@_track_call
 def excel_merge_files(
     input_files: List[str],
     output_path: str,
@@ -1236,6 +1340,7 @@ def excel_merge_files(
 
 
 @mcp.tool()
+@_track_call
 def excel_get_file_info(file_path: str) -> Dict[str, Any]:
     """
 获取Excel文件信息：大小、工作表数量、格式、创建/修改时间。
@@ -1247,6 +1352,7 @@ def excel_get_file_info(file_path: str) -> Dict[str, Any]:
 
 
 @mcp.tool()
+@_track_call
 def excel_create_sheet(
     file_path: str,
     sheet_name: str,
@@ -1262,6 +1368,7 @@ def excel_create_sheet(
 
 
 @mcp.tool()
+@_track_call
 def excel_delete_sheet(
     file_path: str,
     sheet_name: str
@@ -1308,6 +1415,7 @@ def excel_delete_sheet(
 
 
 @mcp.tool()
+@_track_call
 def excel_rename_sheet(
     file_path: str,
     old_name: str,
@@ -1323,6 +1431,7 @@ def excel_rename_sheet(
 
 
 @mcp.tool()
+@_track_call
 def excel_delete_rows(
     file_path: str,
     sheet_name: str,
@@ -1372,6 +1481,7 @@ def excel_delete_rows(
 
 
 @mcp.tool()
+@_track_call
 def excel_delete_columns(
     file_path: str,
     sheet_name: str,
@@ -1420,6 +1530,7 @@ def excel_delete_columns(
         }
 
 @mcp.tool()
+@_track_call
 def excel_set_formula(
     file_path: str,
     sheet_name: str,
@@ -1438,6 +1549,7 @@ def excel_set_formula(
     return ExcelOperations.set_formula(file_path, sheet_name, cell_address, formula)
 
 @mcp.tool()
+@_track_call
 def excel_evaluate_formula(
     formula: str,
     context_sheet: Optional[str] = None
@@ -1452,6 +1564,7 @@ def excel_evaluate_formula(
 
 
 @mcp.tool()
+@_track_call
 def excel_query(
     file_path: str,
     query_expression: str,
@@ -1572,6 +1685,7 @@ SQL查询Excel数据（只读）。优先使用此工具而非excel_get_range进
 
 
 @mcp.tool()
+@_track_call
 def excel_update_query(
     file_path: str,
     update_expression: str,
@@ -1620,6 +1734,7 @@ dry_run=True 可预览影响范围不实际修改。
 
 
 @mcp.tool()
+@_track_call
 def excel_describe_table(
     file_path: str,
     sheet_name: str = None
@@ -1752,6 +1867,7 @@ def excel_describe_table(
 
 
 @mcp.tool()
+@_track_call
 def excel_format_cells(
     file_path: str,
     sheet_name: str,
@@ -1769,6 +1885,7 @@ def excel_format_cells(
 
 
 @mcp.tool()
+@_track_call
 def excel_merge_cells(
     file_path: str,
     sheet_name: str,
@@ -1784,6 +1901,7 @@ def excel_merge_cells(
 
 
 @mcp.tool()
+@_track_call
 def excel_unmerge_cells(
     file_path: str,
     sheet_name: str,
@@ -1799,6 +1917,7 @@ def excel_unmerge_cells(
 
 
 @mcp.tool()
+@_track_call
 def excel_set_borders(
     file_path: str,
     sheet_name: str,
@@ -1815,6 +1934,7 @@ def excel_set_borders(
 
 
 @mcp.tool()
+@_track_call
 def excel_set_row_height(
     file_path: str,
     sheet_name: str,
@@ -1832,6 +1952,7 @@ def excel_set_row_height(
 
 
 @mcp.tool()
+@_track_call
 def excel_set_column_width(
     file_path: str,
     sheet_name: str,
@@ -1851,6 +1972,7 @@ def excel_set_column_width(
 # ==================== Excel比较功能 ====================
 
 @mcp.tool()
+@_track_call
 def excel_compare_files(
     file1_path: str,
     file2_path: str
@@ -1867,6 +1989,7 @@ def excel_compare_files(
 
 
 @mcp.tool()
+@_track_call
 def excel_check_duplicate_ids(
     file_path: str,
     sheet_name: str,
@@ -1884,6 +2007,7 @@ def excel_check_duplicate_ids(
 
 
 @mcp.tool()
+@_track_call
 def excel_compare_sheets(
     file1_path: str,
     sheet1_name: str,
@@ -1901,6 +2025,17 @@ def excel_compare_sheets(
         if _err:
             return _err
     return ExcelOperations.compare_sheets(file1_path, sheet1_name, file2_path, sheet2_name, id_column, header_row)
+
+
+@mcp.tool()
+@_track_call
+def excel_server_stats() -> Dict[str, Any]:
+    """
+获取MCP服务器运行统计：每个工具的调用次数、平均耗时、错误率。用于监控和调试。
+    """
+    return _tracker.get_stats()
+
+
 # ==================== 主程序 ====================
 def main():
     """Entry point for excel-mcp-server-fastmcp."""
