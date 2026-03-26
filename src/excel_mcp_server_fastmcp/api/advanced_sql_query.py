@@ -2184,25 +2184,15 @@ class AdvancedSQLQueryEngine:
                 old_val = df.at[idx, col_name]
                 new_val = self._evaluate_update_expression(value_expr, df, idx)
 
-                # 类型兼容性检查
-                if old_val != '' and new_val != '':
-                    try:
-                        old_type = type(old_val)
-                        new_type = type(new_val)
-                        # 数值之间可以互转
-                        if isinstance(old_val, (int, float)) and isinstance(new_val, (int, float)):
+                # 类型兼容性：数值类型可互通，其他类型尝试转为旧值类型
+                if old_val != '' and new_val != '' and type(old_val) != type(new_val):
+                    if isinstance(old_val, (int, float)) and isinstance(new_val, (int, float)):
+                        pass  # 数值互通：不转换
+                    else:
+                        try:
+                            new_val = type(old_val)(new_val)
+                        except (ValueError, TypeError):
                             pass
-                        elif old_type != new_type:
-                            # 尝试转换
-                            try:
-                                if isinstance(old_val, (int, float)):
-                                    new_val = type(old_val)(new_val)
-                                else:
-                                    new_val = old_type(new_val)
-                            except (ValueError, TypeError):
-                                pass
-                    except Exception:
-                        pass
 
                 if old_val != new_val:
                     changes.append({

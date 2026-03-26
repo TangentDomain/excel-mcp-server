@@ -1668,51 +1668,12 @@ SQL查询Excel数据（只读）。优先使用此工具而非excel_get_range进
             }
         }
     except Exception as e:
-        # 分析错误类型，提供针对性的降级建议
-        error_msg = str(e).lower()
-
-        if 'sql' in error_msg or 'parse' in error_msg:
-            # SQL语法错误
-            suggestion = '''💡 SQL语法错误降级建议：
-• 简化查询：尝试更简单的SQL语句
-• 基础查询：使用 excel_get_range 读取数据后手动筛选
-• 文本搜索：使用 excel_search 进行关键词搜索'''
-            alternatives = ['excel_get_range', 'excel_search']
-
-        elif 'file' in error_msg or 'not found' in error_msg:
-            # 文件相关问题
-            suggestion = '''💡 文件问题降级建议：
-• 检查文件路径：确保Excel文件存在且可访问
-• 尝试基础操作：使用 excel_get_file_info 检查文件状态
-• 格式检查：确保文件为.xlsx或.xlsm格式'''
-            alternatives = ['excel_get_file_info', 'excel_list_sheets']
-
-        elif 'sheet' in error_msg or 'table' in error_msg:
-            # 工作表问题
-            suggestion = '''💡 工作表问题降级建议：
-• 列出工作表：使用 excel_list_sheets 查看可用工作表
-• 基础读取：使用 excel_get_range 直接指定工作表范围
-• 检查表名：确认工作表名称拼写正确'''
-            alternatives = ['excel_list_sheets', 'excel_get_range']
-
-        else:
-            # 其他错误
-            suggestion = '''💡 通用降级建议：
-• 基础读取：使用 excel_get_range 读取数据范围
-• 分步处理：将复杂查询拆分为多个简单操作
-• 逐步调试：从最简单的查询开始尝试'''
-            alternatives = ['excel_get_range', 'excel_search', 'excel_get_headers']
-
+        # SQL引擎已处理大部分错误并返回结构化响应，此处仅捕获未预期的异常
         return {
             'success': False,
-            'message': f'SQL查询失败: {str(e)}\n\n{suggestion}',
+            'message': f'SQL查询失败: {str(e)}',
             'data': [],
-            'query_info': {
-                'error_type': 'execution_error',
-                'details': str(e),
-                'alternatives': alternatives,
-                'suggestion': 'LLM请根据错误类型选择合适的替代API继续执行任务'
-            }
+            'query_info': {'error_type': 'unexpected_error', 'details': str(e)}
         }
 
 
