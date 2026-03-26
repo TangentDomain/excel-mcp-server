@@ -5,19 +5,7 @@
 
 ## OPEN（待实现）
 
-### REQ-014 [P0→DONE] 测试用例精简
-- **来源**：CEO要求 — 1307个测试太多，35%是凑覆盖率的
-- **描述**：清理低价值测试，提高测试套件质量和运行速度
-- **完成**：
-  - 删除22个覆盖率填充文件（enhanced/coverage/supplement/deep/more/final）
-  - 57→34文件，1307→773测试，23481→13574行测试代码（-42%）
-  - 保留的34个文件全部验证行为（SQL/安全/格式/搜索/比较/集成）
-- **验收**：773测试全通过，覆盖核心功能+边界场景，无重复测试 ✅
-- **状态**：DONE ✅（第21轮）
-
-### REQ-007 [P0→DONE] README文档同步（第二轮）
-- **来源**：CEO要求 — 文档必须和代码保持一致
-- **描述**：每次功能变更后README必须同步更新，不能过时
+### REQ-012 [P1] 兼容性验证
 - **本轮完成**：
   - Badge: 1271→1307测试数
   - 项目信息: 57测试文件/23481行测试代码/80%覆盖率
@@ -35,8 +23,15 @@
   - **跨平台路径** — Windows反斜杠、Mac空格路径、Linux符号链接
   - **Python版本** — 3.10/3.11/3.12/3.13都能跑
   - **依赖最小化** — 只依赖必要的包，不引入重量级依赖
+- **已完成**：
+  - ✅ 第24轮：包元数据完善（license/authors/keywords/classifiers/urls）
+  - ✅ 第24轮：移除死依赖fastmcp（代码从未import，只使用mcp.server.fastmcp）
+  - ✅ 第24轮：修复误导性错误提示（pip install fastmcp → pip install mcp）
+  - ✅ 第24轮：清理mypy配置中formulas/xlwings引用
+  - ✅ 第24轮：验证18个模块全部正常import
+  - ✅ 第24轮：验证入口函数main()正常工作
 - **验收**：至少在2个不同MCP客户端中验证通过，CI跑3.10和3.13
-- **状态**：OPEN
+- **状态**：OPEN（部分完成，多客户端/跨平台/多版本CI待验证）
 
 ### REQ-013 [P2] 可观测性
 - **来源**：运维需要 — 发布后需要监控工具运行状态
@@ -65,6 +60,8 @@
   - ✅ 第23轮：excel_get_operation_history bug修复（Optional参数条件验证）
   - ✅ 第23轮：excel_search_directory安全补漏（添加_validate_path）
   - ✅ 第23轮：MCP说明与代码同步（JOIN功能遗漏2轮）
+  - ✅ 第24轮：移除死依赖fastmcp + 修复误导错误提示 + 清理mypy残留引用
+  - ✅ 第24轮：包元数据完善（license/authors/keywords/classifiers/urls）
 - **验收**：每轮评价中包含工程治理评估，发现问题立即修复或建需求
 - **状态**：OPEN（持续迭代，不关闭）
 
@@ -90,6 +87,10 @@
   - 发现选错 → 针对性加描述提示或互斥说明
   - 低频但易混淆的工具加优先级排序提示
   - 工具描述A/B测试：对比优化前后AI选工具准确率
+- **已知问题（第24轮发现）**：
+  - excel_search 没有 search_type 参数，搜索模式通过 use_regex 布尔值控制
+  - excel_compare_sheets 用 file1_path/file2_path 而非 file_path（与多数工具不一致）
+  - excel_query 和 excel_update_query 都用 query_expression 参数名（AI可能混淆SELECT和UPDATE）
 - **验收**：AI选工具错误率降低，高频场景不再选错
 - **状态**：OPEN（持续迭代，不关闭）
 

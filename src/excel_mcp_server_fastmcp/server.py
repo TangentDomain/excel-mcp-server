@@ -29,7 +29,7 @@ try:
     from mcp.server.fastmcp import FastMCP
 except ImportError as e:
     print(f"Error: 缺少必要的依赖包: {e}")
-    print("请运行: pip install fastmcp openpyxl")
+    print("请运行: pip install mcp openpyxl")
     exit(1)
 
 # 导入API模块
