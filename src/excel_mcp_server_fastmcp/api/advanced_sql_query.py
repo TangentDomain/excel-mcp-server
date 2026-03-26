@@ -1824,6 +1824,56 @@ class AdvancedSQLQueryEngine:
 
         return df
 
+    def _build_total_row(self, result_df: pd.DataFrame) -> Optional[List]:
+        """构建GROUP BY聚合结果的TOTAL汇总行"""
+        if result_df.empty or len(result_df) <= 1:
+            return None
+        total_row = [''] * len(result_df.columns)
+        total_row[0] = 'TOTAL'
+        has_numeric = False
+        for i, col in enumerate(result_df.columns):
+            series = pd.to_numeric(result_df[col], errors='coerce')
+            if series.notna().sum() > len(result_df) * 0.5:
+                total_row[i] = self._serialize_value(series.sum())
+                has_numeric = True
+        return total_row if has_numeric else None
+
+    def _generate_markdown_table(self, data: List, max_rows: int = 50) -> str:
+        """将查询结果数据转为Markdown表格"""
+        if not data:
+            return ''
+        md_lines = ['| ' + ' | '.join(str(c) for c in data[0]) + ' |']
+        md_lines.append('| ' + ' | '.join(['---'] * len(data[0])) + ' |')
+        display_rows = min(len(data) - 1, max_rows)
+        for row in data[1:1 + display_rows]:
+            md_lines.append('| ' + ' | '.join(str(c) for c in row) + ' |')
+        if len(data) - 1 > max_rows:
+            md_lines.append(f'| ... 共{len(data) - 1}行，仅显示前{max_rows}行 |')
+        return '\n'.join(md_lines)
+
+    def _format_export_output(self, data: List, output_format: str,
+                               include_headers: bool) -> Dict[str, Any]:
+        """生成JSON/CSV格式输出"""
+        if not data or output_format == 'table':
+            return {}
+        headers_row = data[0]
+        data_rows = data[1:]
+        records = [dict(zip([str(h) for h in headers_row], row)) for row in data_rows]
+        result = {'query_info': {'record_count': len(records)}}
+        if output_format == 'json':
+            result['formatted_output'] = json.dumps(records, ensure_ascii=False, indent=2)
+            result['query_info']['output_format'] = 'json'
+        elif output_format == 'csv':
+            output = io.StringIO()
+            writer = csv.writer(output)
+            if include_headers:
+                writer.writerow([str(h) for h in headers_row])
+            for row in data_rows:
+                writer.writerow([str(v) if v is not None else '' for v in row])
+            result['formatted_output'] = output.getvalue()
+            result['query_info']['output_format'] = 'csv'
+        return result
+
     def _format_query_result(
         self,
         result_df: pd.DataFrame,
@@ -1865,18 +1915,11 @@ class AdvancedSQLQueryEngine:
                 for _, row in result_df.iterrows():
                     data.append([self._serialize_value(val) for val in row])
 
-        # GROUP BY 聚合结果自动追加 TOTAL 行（从原始DataFrame计算，非序列化后数据）
+        # GROUP BY 聚合结果自动追加 TOTAL 行
         has_total_row = False
-        if has_group_by and not result_df.empty and len(result_df) > 1 and include_headers:
-            total_row = [''] * len(result_df.columns)
-            total_row[0] = 'TOTAL'
-            has_numeric = False
-            for i, col in enumerate(result_df.columns):
-                series = pd.to_numeric(result_df[col], errors='coerce')
-                if series.notna().sum() > len(result_df) * 0.5:
-                    total_row[i] = self._serialize_value(series.sum())
-                    has_numeric = True
-            if has_numeric:
+        if has_group_by and include_headers:
+            total_row = self._build_total_row(result_df)
+            if total_row:
                 data.append(total_row)
                 has_total_row = True
 
@@ -1927,44 +1970,17 @@ class AdvancedSQLQueryEngine:
             result['query_info']['suggestion'] = suggestion
 
         # 生成Markdown表格（方便AI和人类阅读）
-        if data and len(data) > 0:
-            md_lines = []
-            # 表头
-            md_lines.append('| ' + ' | '.join(str(c) for c in data[0]) + ' |')
-            md_lines.append('| ' + ' | '.join(['---'] * len(data[0])) + ' |')
-            # 数据行（最多50行，避免超大输出）
-            max_md_rows = min(len(data) - 1, 50)
-            for row in data[1:1 + max_md_rows]:
-                md_lines.append('| ' + ' | '.join(str(c) for c in row) + ' |')
-            if len(data) - 1 > 50:
-                md_lines.append(f'| ... 共{len(data) - 1}行，仅显示前50行 |')
-            result['query_info']['markdown_table'] = '\n'.join(md_lines)
+        if data:
+            result['query_info']['markdown_table'] = self._generate_markdown_table(data)
 
         # 生成JSON/CSV格式输出
-        if data and len(data) > 0 and output_format != 'table':
-            headers_row = data[0]
-            data_rows = data[1:]
-            records = []
-            for row in data_rows:
-                records.append(dict(zip(
-                    [str(h) for h in headers_row],
-                    row
-                )))
-
-            if output_format == 'json':
-                result['formatted_output'] = json.dumps(records, ensure_ascii=False, indent=2)
-                result['query_info']['output_format'] = 'json'
-                result['query_info']['record_count'] = len(records)
-            elif output_format == 'csv':
-                output = io.StringIO()
-                writer = csv.writer(output)
-                if include_headers:
-                    writer.writerow([str(h) for h in headers_row])
-                for row in data_rows:
-                    writer.writerow([str(v) if v is not None else '' for v in row])
-                result['formatted_output'] = output.getvalue()
-                result['query_info']['output_format'] = 'csv'
-                result['query_info']['record_count'] = len(records)
+        if data:
+            export = self._format_export_output(data, output_format, include_headers)
+            for key, value in export.items():
+                if key == 'query_info':
+                    result['query_info'].update(value)
+                else:
+                    result[key] = value
 
         # 双行表头时附加描述信息
         if column_descriptions:
@@ -2012,6 +2028,14 @@ class AdvancedSQLQueryEngine:
 
         return data_types
 
+    def _update_error(self, message: str, elapsed_ms: float = 0) -> Dict[str, Any]:
+        """构造UPDATE操作的统一错误响应"""
+        result = {'success': False, 'message': message,
+                  'affected_rows': 0, 'changes': []}
+        if elapsed_ms:
+            result['execution_time_ms'] = round(elapsed_ms, 1)
+        return result
+
     def execute_update_query(
         self,
         file_path: str,
@@ -2039,19 +2063,16 @@ class AdvancedSQLQueryEngine:
 
         # 验证文件
         if not os.path.exists(file_path):
-            return {'success': False, 'message': f'文件不存在: {file_path}',
-                    'affected_rows': 0, 'changes': []}
+            return self._update_error(f'文件不存在: {file_path}')
 
         if not SQLGLOT_AVAILABLE:
-            return {'success': False, 'message': 'SQLGlot未安装，无法使用UPDATE功能',
-                    'affected_rows': 0, 'changes': []}
+            return self._update_error('SQLGLOT未安装，无法使用UPDATE功能')
 
         # 加载数据（使用缓存）
         worksheets_data = self._load_data_with_cache(file_path, sheet_name)
 
         if not worksheets_data:
-            return {'success': False, 'message': '无法加载Excel数据',
-                    'affected_rows': 0, 'changes': []}
+            return self._update_error('无法加载Excel数据')
 
         # 解析UPDATE语句
         # 中文列名替换（与SELECT查询保持一致）
@@ -2063,20 +2084,16 @@ class AdvancedSQLQueryEngine:
         try:
             parsed = sqlglot.parse_one(sql, read='mysql')
         except ParseError as e:
-            return {'success': False, 'message': f'SQL语法错误: {e}',
-                    'affected_rows': 0, 'changes': []}
+            return self._update_error(f'SQL语法错误: {e}')
 
         # 验证是UPDATE语句
         if not isinstance(parsed, exp.Update):
-            return {'success': False,
-                    'message': '只支持UPDATE语句。💡 写入操作只支持UPDATE，查询请用 excel_query',
-                    'affected_rows': 0, 'changes': []}
+            return self._update_error('只支持UPDATE语句。💡 写入操作只支持UPDATE，查询请用 excel_query')
 
         # 提取表名（sqlglot中table在this属性）
         table_node = parsed.this if isinstance(parsed.this, exp.Table) else None
         if not table_node:
-            return {'success': False, 'message': 'UPDATE语句缺少表名',
-                    'affected_rows': 0, 'changes': []}
+            return self._update_error('UPDATE语句缺少表名')
         target_table = table_node.name
 
         # 匹配工作表（支持中英文表名）
@@ -2093,9 +2110,8 @@ class AdvancedSQLQueryEngine:
         if not matched_sheet:
             available = list(worksheets_data.keys())
             suggestion = self._suggest_column_name(target_table, available)
-            return {'success': False,
-                    'message': f"工作表 '{target_table}' 不存在。可用工作表: {available}。{suggestion}",
-                    'affected_rows': 0, 'changes': []}
+            return self._update_error(
+                f"工作表 '{target_table}' 不存在。可用工作表: {available}。{suggestion}")
 
         df = worksheets_data[matched_sheet].copy()
         original_df = df.copy()
@@ -2110,8 +2126,7 @@ class AdvancedSQLQueryEngine:
         # 解析SET子句（sqlglot中在expressions属性）
         set_exprs = parsed.args.get('expressions', [])
         if not set_exprs:
-            return {'success': False, 'message': 'UPDATE语句缺少SET子句',
-                    'affected_rows': 0, 'changes': []}
+            return self._update_error('UPDATE语句缺少SET子句')
 
         set_operations = []  # [(col_name, expression_node)]
         for set_item in set_exprs:
@@ -2123,13 +2138,11 @@ class AdvancedSQLQueryEngine:
                     col_name = cn_map[col_name]
                 if col_name not in df.columns:
                     suggestion = self._suggest_column_name(col_name, list(df.columns))
-                    return {'success': False,
-                            'message': f"列 '{col_name}' 不存在。可用列: {list(df.columns)}。{suggestion}",
-                            'affected_rows': 0, 'changes': []}
+                    return self._update_error(
+                        f"列 '{col_name}' 不存在。可用列: {list(df.columns)}。{suggestion}")
                 set_operations.append((col_name, set_item.right))
             else:
-                return {'success': False, 'message': f'不支持的SET表达式: {set_item}',
-                        'affected_rows': 0, 'changes': []}
+                return self._update_error(f'不支持的SET表达式: {set_item}')
 
         # 应用WHERE条件筛选
         where_clause = parsed.args.get('where')
@@ -2440,8 +2453,6 @@ def execute_advanced_update_query(
             dry_run=dry_run
         )
     except ImportError as e:
-        return {'success': False, 'message': f'SQLGlot未安装: {str(e)}',
-                'affected_rows': 0, 'changes': []}
+        return self._update_error(f'SQLGLOT未安装: {str(e)}')
     except Exception as e:
-        return {'success': False, 'message': f'UPDATE执行失败: {str(e)}',
-                'affected_rows': 0, 'changes': []}
+        return self._update_error(f'UPDATE执行失败: {str(e)}')
