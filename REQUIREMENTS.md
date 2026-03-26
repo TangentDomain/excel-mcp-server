@@ -231,18 +231,19 @@
 - **验收标准**：命令行参数选择传输模式，不影响现有stdio功能
 - **状态**：DONE ✅（main()新增--stdio/--sse/--streamable-http/--mount-path参数）
 
-### REQ-018 [P1] Upsert（INSERT ON DUPLICATE KEY UPDATE）
+### REQ-018 [P1→DONE] Upsert（INSERT ON DUPLICATE KEY UPDATE）
 - **来源**：数据库能力发散 — 类比MySQL的UPSERT
 - **描述**：写入时自动判断ID是否存在，存在则更新，不存在则插入。策划合并配置高频操作。
-- **语法参考**：`UPSERT INTO 技能表 VALUES (1001, '火球术', ...) ON DUPLICATE KEY UPDATE 伤害=VALUES(伤害)`
-- **验收标准**：单条upsert + 批量upsert，至少3个测试
-- **状态**：OPEN
+- **验收标准**：单条upsert + 批量upsert，至少3个测试 ✅（13个测试）
+- **实现**：ExcelManager.upsert_row核心层，按键列查找→update/insert双路径，支持双行表头
+- **状态**：DONE ✅（第54轮，excel_upsert_row第45个工具，13个测试通过）
 
-### REQ-019 [P1] 批量INSERT
+### REQ-019 [P1→DONE] 批量INSERT
 - **来源**：数据库能力发散 — 类比 `INSERT INTO ... VALUES (...), (...), (...)`
 - **描述**：一次插入多行数据，当前只能逐行写入。策划批量导入几十条配置时效率提升显著。
-- **验收标准**：批量INSERT + 与现有逐行写入兼容，至少3个测试
-- **状态**：OPEN
+- **验收标准**：批量INSERT + 与现有逐行写入兼容，至少3个测试 ✅（6个测试）
+- **实现**：ExcelManager.batch_insert_rows核心层，按列名映射批量写入，未知列自动忽略
+- **状态**：DONE ✅（第54轮，excel_batch_insert_rows第46个工具，6个测试通过）
 
 ### REQ-020 [P2→CANCELLED] View（命名查询）
 - **状态**：CANCELLED — SQL查询本身就能保存为文本，不需要额外封装

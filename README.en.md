@@ -10,11 +10,11 @@
 [![Python Version](https://img.shields.io/badge/python-3.10+-blue.svg)](https://www.python.org/downloads/)
 [![Powered by: FastMCP](https://img.shields.io/badge/Powered%20by-FastMCP-orange)](https://github.com/jlowin/fastmcp)
 ![Status](https://img.shields.io/badge/status-stable-green.svg)
-![Tests](https://img.shields.io/badge/tests-800%20tests-brightgreen.svg)
-![Tools](https://img.shields.io/badge/tools-44%20verified%20tools-green.svg)
+![Tests](https://img.shields.io/badge/tests-832%20tests-brightgreen.svg)
+![Tools](https://img.shields.io/badge/tools-46%20verified%20tools-green.svg)
 [![CI](https://github.com/TangentDomain/excel-mcp-server/actions/workflows/ci.yml/badge.svg)](https://github.com/TangentDomain/excel-mcp-server/actions/workflows/ci.yml)
 
-**ExcelMCP** is an Excel configuration table management MCP server designed for game development. Through AI natural language commands, it enables intelligent operations on game configurations such as skill tables, equipment data, and monster attributes. Built with **FastMCP**, reads use **python-calamine** (Rust engine, 2300x speedup), writes use **openpyxl**. Features **44 professional tools** and **800 test cases**, ensuring enterprise-grade reliability.
+**ExcelMCP** is an Excel configuration table management MCP server designed for game development. Through AI natural language commands, it enables intelligent operations on game configurations such as skill tables, equipment data, and monster attributes. Built with **FastMCP**, reads use **python-calamine** (Rust engine, 2300x speedup), writes use **openpyxl**. Features **46 professional tools** and **832 test cases**, ensuring enterprise-grade reliability.
 
 🎯 **Core Features**: Skill systems, equipment management, monster configuration, numerical balancing, version comparison, designer toolchain
 
@@ -300,7 +300,7 @@ SELECT a.skill_name, b.equip_name FROM SkillConfig a INNER JOIN EquipConfig b ON
 
 ---
 
-## 🛠️ Complete Tool List (44 Professional Tools)
+## 🛠️ Complete Tool List (46 Professional Tools)
 
 ### 📁 File & Worksheet Management
 - `excel_create_file` - Create new Excel files with custom worksheets
@@ -323,13 +323,15 @@ SELECT a.skill_name, b.equip_name FROM SkillConfig a INNER JOIN EquipConfig b ON
 - `excel_delete_columns` - Delete column ranges
 - `excel_find_last_row` - Find last row with data
 - `excel_rename_column` - Rename columns (modify header cell values, supports dual-header tables)
+- `excel_upsert_row` - Upsert row (find by key column, update if exists, insert if not)
+- `excel_batch_insert_rows` - Batch insert multiple rows at end of sheet
 - `excel_set_formula` - Set cell formulas (auto-calculate)
 - `excel_evaluate_formula` - Evaluate formulas without writing to files
 
 ### 🔍 Search & Analysis
 - `excel_search` - Regex expression search
 - `excel_search_directory` - Directory batch search
-- `excel_query` - SQL query (supports dual-row headers, WHERE/GROUP BY/HAVING/ORDER BY/LIMIT/OFFSET/DISTINCT/JOIN/subqueries/CTE/CASE WHEN/COALESCE/string functions/math expressions)
+- `excel_query` - SQL query (supports dual-row headers, WHERE/GROUP BY/HAVING/ORDER BY/LIMIT/OFFSET/DISTINCT/JOIN/UNION/subqueries/CTE/CASE WHEN/COALESCE/string functions/math expressions)
 - `excel_update_query` - SQL UPDATE batch modification (SET constant/column ref/arithmetic, WHERE condition, dry_run preview)
 - `excel_describe_table` - View table structure (column names, types, descriptions, sample values, auto-detect dual-row headers)
 - `excel_compare_sheets` - Worksheet comparison (game config optimized)
@@ -447,6 +449,9 @@ SELECT skill_name, CASE WHEN damage > 200 THEN 'High' WHEN damage > 100 THEN 'Mi
 -- CTE (WITH ... AS ...)
 WITH high_dmg AS (SELECT * FROM SkillTable WHERE damage > 150) SELECT * FROM high_dmg ORDER BY damage DESC
 
+-- UNION / UNION ALL combine query results
+SELECT name, damage FROM SkillTable WHERE skill_type='Mage' UNION ALL SELECT name, damage FROM SkillTable WHERE skill_type='Warrior' ORDER BY damage DESC LIMIT 10
+
 -- COALESCE / IFNULL null replacement
 SELECT skill_name, COALESCE(description, 'N/A') as desc FROM SkillTable
 
@@ -473,7 +478,7 @@ UPDATE SkillTable SET damage = damage * 1.1 WHERE element = 'Fire'  -- dry_run=T
 
 **Unsupported Syntax (with clear alternative suggestions):**
 - FROM subqueries `FROM (SELECT ...)` (suggest: use WHERE subqueries or CTEs)
-- UNION / Window functions (suggest: separate queries or subqueries + GROUP BY)
+- Window functions ROW_NUMBER/RANK/DENSE_RANK (suggest: use subqueries + GROUP BY)
 - RIGHT JOIN / CROSS JOIN / FULL JOIN (rarely used in game scenarios)
 
 **Query Performance:**
@@ -526,7 +531,7 @@ ExcelMCP includes multi-layer security protections:
 ```
 src/excel_mcp_server_fastmcp/    # Main package (directly importable after pip install)
 ├── __init__.py                   # Package entry point, exposes main()
-├── server.py                     # MCP interface layer (44 tool definitions)
+├── server.py                     # MCP interface layer (46 tool definitions)
 ├── api/                          # API business logic layer
 │   ├── excel_operations.py       # Excel operations unified entry
 │   └── advanced_sql_query.py     # SQL query engine
@@ -581,7 +586,7 @@ Tool Layer (Common Functions)
 - **Test Cases**: 783 (behavior validation, no coverage padding)
 - **Test Files**: 34 test files
 - **Test Code**: 13,574 lines
-- **Tool Count**: 44 (@mcp.tool decorator verified)
+- **Tool Count: 46 (@mcp.tool decorator verified)
 - **Architecture Layers**: 4-layer design (MCP→API→Core→Utils)
 
 ### Verification Commands
@@ -590,7 +595,7 @@ Tool Layer (Common Functions)
 python -m pytest tests/ -q --tb=short -n auto --timeout=30
 
 # Verify tool completeness
-grep -c "def excel_" src/excel_mcp_server_fastmcp/server.py  # Should output: 44
+grep -c "def excel_" src/excel_mcp_server_fastmcp/server.py  # Should output: 46
 
 # Generate coverage report
 python -m pytest tests/ --cov=src --cov-report=html

@@ -192,12 +192,15 @@ class AdvancedSQLQueryEngine:
                         'query_info': {'error_type': 'unsupported_sql', 'details': validation_result}
                     }
 
-                # 执行查询
-                result_data = self._execute_query(parsed_sql, worksheets_data, limit)
+                # 执行查询（UNION/UNION ALL 或普通 SELECT）
+                if isinstance(parsed_sql, exp.Union):
+                    result_data = self._execute_union(parsed_sql, worksheets_data, limit)
+                else:
+                    result_data = self._execute_query(parsed_sql, worksheets_data, limit)
                 _query_elapsed = (time.time() - _query_start) * 1000
 
                 # 格式化结果（传入parsed_sql和WHERE前数据用于空结果智能建议）
-                has_group_by = parsed_sql.args.get('group') is not None
+                has_group_by = not isinstance(parsed_sql, exp.Union) and parsed_sql.args.get('group') is not None
                 result = self._format_query_result(
                     result_data,
                     file_path,
@@ -450,8 +453,8 @@ class AdvancedSQLQueryEngine:
             Dict[str, Any]: 验证结果
         """
         try:
-            # 检查是否为SELECT语句
-            if not isinstance(parsed_sql, exp.Select):
+            # 检查是否为SELECT语句或UNION（UNION内部由多个SELECT组成）
+            if not isinstance(parsed_sql, (exp.Select, exp.Union)):
                 return {
                     'valid': False,
                     'error': '只支持SELECT查询语句，不支持INSERT、UPDATE、DELETE等操作'
@@ -464,11 +467,7 @@ class AdvancedSQLQueryEngine:
             with_clause = parsed_sql.args.get('with_')
             if with_clause:
                 return {'valid': True}  # CTE在_execute_query中处理
-            if parsed_sql.find(exp.Union):
-                return {
-                    'valid': False,
-                    'error': '不支持UNION语法。💡 替代方案：分别执行两个查询'
-                }
+            # UNION/UNION ALL 支持已实现
             # 检查不支持的窗口函数
             if parsed_sql.find(exp.Window):
                 return {
@@ -815,6 +814,142 @@ class AdvancedSQLQueryEngine:
                     return f" 中文名称匹配: {', '.join(mapped)}"
 
         return ""
+
+    def _apply_union_order_by(self, df: pd.DataFrame, order_clause: exp.Expression) -> pd.DataFrame:
+        """
+        对 UNION 合并后的 DataFrame 应用 ORDER BY 排序
+
+        Args:
+            df: 合并后的 DataFrame
+            order_clause: sqlglot Order expression
+
+        Returns:
+            pd.DataFrame: 排序后的 DataFrame
+        """
+        if not order_clause or df.empty:
+            return df
+
+        sort_columns = []
+        sort_ascending = []
+
+        for ordered in order_clause.find_all(exp.Ordered):
+            col_expr = ordered.this
+            # 获取列名
+            if isinstance(col_expr, exp.Column):
+                col_name = col_expr.name
+            elif isinstance(col_expr, exp.Identifier):
+                col_name = col_expr.this
+            else:
+                col_name = str(col_expr)
+
+            # 检查是否使用表别名限定符
+            if '.' in col_name:
+                col_name = col_name.split('.')[-1]
+
+            # 尝试列名匹配（包括中文列名映射）
+            if col_name not in df.columns:
+                # 搜索中文列名映射
+                for cn_name, en_name in self._cn_to_en_map.items():
+                    if col_name == cn_name:
+                        col_name = en_name
+                        break
+
+            if col_name in df.columns:
+                sort_columns.append(col_name)
+                sort_ascending.append(not ordered.args.get('desc', False))
+
+        if sort_columns:
+            df = df.sort_values(sort_columns, ascending=sort_ascending).reset_index(drop=True)
+
+        return df
+
+    def _execute_union(
+        self,
+        parsed_sql: exp.Expression,
+        worksheets_data: Dict[str, pd.DataFrame],
+        limit: Optional[int] = None
+    ) -> pd.DataFrame:
+        """
+        执行 UNION / UNION ALL 查询
+
+        从 Union 表达式中提取所有 SELECT 语句，分别执行后合并结果。
+        UNION 去重，UNION ALL 保留所有行。
+        支持 ORDER BY 和 LIMIT 应用于合并后的结果。
+
+        Args:
+            parsed_sql: 解析后的 Union 表达式
+            worksheets_data: 工作表数据
+            limit: 结果限制
+
+        Returns:
+            pd.DataFrame: 合并后的查询结果
+        """
+        # 递归提取所有 SELECT 语句
+        def _extract_selects(node):
+            if isinstance(node, exp.Select):
+                return [node]
+            elif isinstance(node, exp.Union):
+                selects = []
+                # this 可能是 Union（链式）或 Select
+                selects.extend(_extract_selects(node.this))
+                # expression 是右侧的 Select 或 Union
+                selects.extend(_extract_selects(node.expression))
+                return selects
+            return []
+
+        selects = _extract_selects(parsed_sql)
+        if not selects:
+            raise ValueError("UNION 查询中未找到有效的 SELECT 语句")
+
+        # 执行每个 SELECT 并收集结果
+        result_dfs = []
+        for i, select_sql in enumerate(selects):
+            # 确保每个 SELECT 有自己的表别名上下文
+            df = self._execute_query(select_sql, worksheets_data, limit=None)
+            result_dfs.append(df)
+
+        # 合并所有结果（列名对齐）
+        if not result_dfs:
+            return pd.DataFrame()
+
+        # 以第一个 SELECT 的列名为基准，统一列名
+        base_columns = list(result_dfs[0].columns)
+        aligned_dfs = []
+        for df in result_dfs:
+            aligned = df.reindex(columns=base_columns)
+            aligned_dfs.append(aligned)
+
+        combined = pd.concat(aligned_dfs, ignore_index=True)
+
+        # UNION（去重） vs UNION ALL（保留重复）
+        is_union_all = not parsed_sql.args.get('distinct', True)
+        if not is_union_all:
+            combined = combined.drop_duplicates().reset_index(drop=True)
+
+        # 应用 ORDER BY（如果有，sqlglot 将其放在外层 Union 上）
+        order_clause = parsed_sql.args.get('order')
+        if order_clause:
+            # 构造一个最小化的 Select 用于 _apply_order_by 的签名
+            # _apply_order_by(self, parsed_sql, df, select_aliases) 期望完整的 parsed_sql
+            # 但 UNION 的 ORDER BY 是独立的，直接解析排序列
+            combined = self._apply_union_order_by(combined, order_clause)
+
+        # 应用 LIMIT（如果有）
+        union_limit = parsed_sql.args.get('limit')
+        if union_limit:
+            try:
+                limit_expr = union_limit.expression or union_limit.this
+                if limit_expr is not None:
+                    limit_val = int(limit_expr.this if hasattr(limit_expr, 'this') else limit_expr)
+                    combined = combined.head(limit_val)
+            except (ValueError, AttributeError, TypeError):
+                pass
+
+        # 应用外部传入的 limit
+        if limit is not None:
+            combined = combined.head(limit)
+
+        return combined
 
     def _execute_query(
         self,
