@@ -256,9 +256,11 @@
 ### REQ-025 [P1] AI体验优化线（持续迭代，不关闭）
 - **来源**：产品定位复盘 — MCP工具的用户是AI不是人类，需要优化AI使用体验
 - **关注点**：
-  1. **返回值结构统一**：所有工具返回统一的JSON结构（success/error/data/meta），降低AI解析成本
-  2. **错误信息结构化**：SQL报错返回`{error, suggestion, available_columns, original_sql}`，AI能直接用suggestion重试
-  3. **大结果自动截断**：查询结果超过阈值（如200行）时自动截断+提示"建议加WHERE/LIMIT"，保护AI上下文
-  4. **合并重复工具**：`get_headers`和`get_sheet_headers`合并、`preview_operation`和`assess_data_impact`合并，减少AI选择困难
+  1. **MCP instructions优化**：FastMCP实例的instructions字段，AI首次连接时看到的"自我介绍"，决定AI对MCP整体能力的理解
+  2. **工具docstring优化**：每个工具的描述是AI选择工具的唯一依据，直接影响选工具准确率（REQ-006的执行层）
+  3. **返回值结构统一**：所有工具返回统一的JSON结构（success/error/data/meta），降低AI解析成本
+  4. **错误信息结构化**：SQL报错返回`{error, suggestion, available_columns, original_sql}`，AI能直接用suggestion重试
+  5. **大结果自动截断**：查询结果超过阈值（如200行）时自动截断+提示"建议加WHERE/LIMIT"，保护AI上下文
+  6. **合并重复工具**：`get_headers`和`get_sheet_headers`合并、`preview_operation`和`assess_data_impact`合并，减少AI选择困难
 - **验收标准**：每个子项独立验收，MCP验证中AI选工具准确率作为核心指标
 - **状态**：OPEN（持续迭代，不关闭）
