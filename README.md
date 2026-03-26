@@ -10,10 +10,10 @@
 [![Python 版本](https://img.shields.io/badge/python-3.10+-blue.svg)](https://www.python.org/downloads/)
 [![技术支持: FastMCP](https://img.shields.io/badge/Powered%20by-FastMCP-orange)](https://github.com/jlowin/fastmcp)
 ![状态](https://img.shields.io/badge/status-stable-green.svg)
-![测试覆盖](https://img.shields.io/badge/tests-1271%20tests-brightgreen.svg)
+![测试覆盖](https://img.shields.io/badge/tests-1307%20tests-brightgreen.svg)
 ![工具数量](https://img.shields.io/badge/tools-41%20verified%20tools-green.svg)
 
-**ExcelMCP** 是专为游戏开发设计的Excel配置表管理MCP服务器。通过AI自然语言指令，实现技能配置表、装备数据、怪物属性等游戏配置的智能化操作。基于**FastMCP**和**openpyxl**构建，拥有**41个专业工具**和**1271个测试用例**，确保企业级可靠性。
+**ExcelMCP** 是专为游戏开发设计的Excel配置表管理MCP服务器。通过AI自然语言指令，实现技能配置表、装备数据、怪物属性等游戏配置的智能化操作。基于**FastMCP**和**openpyxl**构建，拥有**41个专业工具**和**1307个测试用例**，确保企业级可靠性。
 
 🎯 **核心功能**: 技能系统、装备管理、怪物配置、数值平衡、版本对比、策划工具链
 
@@ -454,6 +454,35 @@ UPDATE 技能表 SET 伤害 = 伤害 * 1.1 WHERE 元素 = '火'  -- dry_run=True
 
 ---
 
+## 🔒 安全机制
+
+ExcelMCP 内置多层安全防护，保护用户数据和系统安全：
+
+### 路径安全（SecurityValidator）
+- **路径穿越防护**: 拒绝 `../` 等目录遍历攻击
+- **符号链接拒绝**: 不跟随符号链接，防止指向敏感文件
+- **隐藏文件拒绝**: 不处理以 `.` 开头的隐藏文件
+- **扩展名白名单**: 仅允许 `.xlsx`/`.xlsm`/`.xls`/`.csv`/`.json`/`.bak`
+- **文件大小限制**: 单文件最大 50MB
+
+### 公式注入防护
+- **DDE检测**: 拒绝 `=DDE()` 等动态数据交换公式
+- **CMD检测**: 拒绝 `=CMD()` 等系统命令执行
+- **SHELL检测**: 拒绝 `=SHELL()` 等Shell命令公式
+- **REGISTER检测**: 拒绝 `=REGISTER()` 等DLL注册公式
+- **管道检测**: 拒绝包含管道符的危险公式
+
+### 数据安全
+- **文件锁**: `excel_update_query` 写入时使用文件锁（fcntl LOCK_EX），防止并发写入冲突
+- **事务保护**: UPDATE操作前自动创建备份，失败自动回滚，确保文件不损坏
+- **临时文件清理**: 启动时自动清理超过1小时的孤儿 `.bak` 临时文件
+
+### 错误信息
+- 安全错误以 🔒 前缀标识，包含具体被拒绝的原因
+- 示例: `🔒 安全验证失败: 路径包含非法字符 '..'`
+
+---
+
 ## 🏗️ 技术架构
 
 ### 分层设计模式
@@ -484,18 +513,19 @@ API业务逻辑层 (集中式处理)
 ## 📊 项目信息
 
 ### 质量验证指标
-- **测试用例**: 1271个
-- **测试代码**: 13,515行 (全面验证)
+- **测试用例**: 1307个
+- **测试文件**: 57个测试文件
+- **测试代码**: 23,481行 (全面验证)
 - **工具数量**: 41个 (@mcp.tool装饰器验证)
 - **架构层次**: 4层分层设计 (MCP→API→Core→Utils)
 
 ### 验证命令
 ```bash
-# 运行完整测试套件
-python -m pytest tests/ -v
+# 运行完整测试套件（并行加速）
+python -m pytest tests/ -q --tb=short -n auto --timeout=30
 
 # 验证工具完整性
-grep -r "@mcp.tool" src/ | wc -l  # 应输出: 41
+grep -c "def excel_" src/server.py  # 应输出: 41
 
 # 生成覆盖率报告
 python -m pytest tests/ --cov=src --cov-report=html
@@ -505,7 +535,7 @@ python -m pytest tests/ --cov=src --cov-report=html
 - **纯委托模式**: server.py严格委托给ExcelOperations
 - **集中式业务逻辑**: 统一验证、错误处理、结果格式化
 - **分支命名**: 所有功能分支必须以`feature/`开头
-- **测试覆盖**: 保持78%以上的测试覆盖率
+- **测试覆盖**: 保持80%以上的测试覆盖率
 
 ---
 
@@ -551,7 +581,7 @@ A: 使用专门的配置表对比工具，支持ID对象跟踪
 
 | 🎯 **快速开始** | 🛠️ **工具参考** | 📚 **学习指南** |
 |----------------|----------------|----------------|
-| [🚀 安装配置](#-快速入门-3分钟设置) | [📋 完整工具列表](#️-完整工具列表40个专业工具) | [📖 使用指南](#-使用指南) |
+| [🚀 安装配置](#-快速入门-3分钟设置) | [📋 完整工具列表](#️-完整工具列表41个专业工具) | [📖 使用指南](#-使用指南) |
 | [⚡ 命令速查](#-快速参考) | [🏗️ 技术架构](#️-技术架构) | [🚨 故障排除](#-故障排除) |
 | [🎮 游戏配置管理](#-使用指南) | [📊 项目信息](#-项目信息) | [❓ 常见问题](#-常见问题) |
 

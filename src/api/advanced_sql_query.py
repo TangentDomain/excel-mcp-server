@@ -2052,6 +2052,12 @@ class AdvancedSQLQueryEngine:
                     'affected_rows': 0, 'changes': []}
 
         # 解析UPDATE语句
+        # 中文列名替换（与SELECT查询保持一致）
+        try:
+            sql = self._replace_cn_columns_in_sql(sql, worksheets_data)
+        except Exception:
+            pass  # 替换失败时继续用原始SQL
+
         try:
             parsed = sqlglot.parse_one(sql, read='mysql')
         except ParseError as e:
@@ -2172,10 +2178,10 @@ class AdvancedSQLQueryEngine:
 
                 if old_val != new_val:
                     changes.append({
-                        'row': idx + 2,  # +2 for header offset (0-indexed + header row)
+                        'row': int(idx) + 2,  # +2 for header offset (0-indexed + header row)
                         'column': col_name,
-                        'old_value': old_val,
-                        'new_value': new_val
+                        'old_value': self._serialize_update_value(old_val),
+                        'new_value': self._serialize_update_value(new_val)
                     })
                 df.at[idx, col_name] = new_val
 
@@ -2278,6 +2284,19 @@ class AdvancedSQLQueryEngine:
                     'message': f'写入Excel失败，已自动回滚: {e}',
                     'affected_rows': 0, 'changes': changes,
                     'execution_time_ms': round((_time.time() - start_time) * 1000, 1)}
+
+    def _serialize_update_value(self, val: Any) -> Any:
+        """将值序列化为JSON安全类型（numpy→Python原生）"""
+        if val is None:
+            return ''
+        if isinstance(val, (np.integer,)):
+            return int(val)
+        if isinstance(val, (np.floating,)):
+            f = float(val)
+            return int(f) if f == int(f) else round(f, 2)
+        if isinstance(val, float):
+            return int(val) if val == int(val) else round(val, 2)
+        return val
 
     def _evaluate_update_expression(
         self, expr: exp.Expression, df: pd.DataFrame, row_idx: int
