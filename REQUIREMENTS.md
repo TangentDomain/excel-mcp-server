@@ -217,12 +217,14 @@
 ### REQ-027 [P2] SQL引擎增强（剩余项）
 - **来源**：REQ-016未完成项拆分
 - **描述**：
-  1. UNION/UNION ALL：合并查询结果（需要跨DataFrame concat逻辑）
+  1. ~~UNION/UNION ALL：合并查询结果~~ ✅（第55轮实现）
   2. 窗口函数：ROW_NUMBER、RANK、DENSE_RANK（复杂度高，游戏场景少见）
   3. RIGHT/FULL/CROSS JOIN（游戏场景极少使用）
   4. 跨文件JOIN：`SELECT * FROM 技能表@file1.xlsx s JOIN 掉落表@file2.xlsx d ON s.技能ID = d.技能ID`
 - **验收标准**：每项至少2个测试，更新文件头支持列表
 - **状态**：OPEN
+- **已完成**：
+  - ✅ 第55轮：UNION/UNION ALL（递归提取SELECT+concat+去重+ORDER BY+LIMIT，13个测试）
 - **v1.0.19修复**：EXISTS关联子查询无表限定符列引用re.sub参数顺序bug
 
 ### REQ-017 [P1→DONE] Streamable HTTP + SSE传输模式
