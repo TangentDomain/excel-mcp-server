@@ -694,24 +694,45 @@ class AdvancedSQLQueryEngine:
         col = self._extract_column_name(condition.left)
         val = self._extract_literal_value(condition.right)
 
+        # 策略0：通过_having_agg_alias_map直接查找聚合表达式对应的SELECT别名
+        # 这是最可靠的方式，能正确处理中文列名（如AVG(伤害)→avg_dmg）
+        if not col and hasattr(self, '_having_agg_alias_map') and self._having_agg_alias_map:
+            left_sql = str(condition.left).strip()
+            # 精确匹配：HAVING表达式SQL与map key完全一致
+            for map_sql, alias in self._having_agg_alias_map.items():
+                if map_sql == left_sql and alias in df_before_having.columns:
+                    col = alias
+                    break
+            # 模糊匹配：去除多余空格后比较（sqlglot有时生成不一致的空格）
+            if not col:
+                left_normalized = ' '.join(left_sql.split())
+                for map_sql, alias in self._having_agg_alias_map.items():
+                    map_normalized = ' '.join(map_sql.split())
+                    if (left_normalized == map_normalized or left_sql in map_sql or map_sql in left_sql) \
+                            and alias in df_before_having.columns:
+                        col = alias
+                        break
+
         # HAVING中聚合函数表达式的列名可能是别名，尝试从DataFrame列匹配
         if not col:
             left_str = str(condition.left).lower()
-            # 策略1：子串匹配
+            # 策略1：子串匹配（含中文支持）
             for c in df_before_having.columns:
-                if c.lower() in left_str or left_str in c.lower():
+                c_lower = c.lower()
+                if c_lower in left_str or left_str in c_lower:
                     col = c
                     break
-            # 策略2：拆分表达式中的标识符（如AVG(damage) → 检查含avg和damage的列）
+            # 策略2：拆分表达式中的标识符（含中文token提取）
             if not col:
                 tokens = set(re.findall(r'[a-zA-Z_]+', left_str))
-                if tokens:
+                cn_tokens = set(re.findall(r'[\u4e00-\u9fff]+', left_str))
+                if tokens or cn_tokens:
                     for c in df_before_having.columns:
                         c_tokens = set(re.findall(r'[a-zA-Z_]+', c.lower()))
-                        # 至少有一个token匹配（排除通用token如avg, sum, count, min, max）
+                        c_cn_tokens = set(re.findall(r'[\u4e00-\u9fff]+', c))
                         generic = {'avg', 'sum', 'count', 'min', 'max'}
                         specific = tokens - generic
-                        if specific and specific & c_tokens:
+                        if (specific and specific & c_tokens) or (cn_tokens and cn_tokens & c_cn_tokens):
                             col = c
                             break
 
@@ -2495,8 +2516,14 @@ class AdvancedSQLQueryEngine:
         self._having_agg_alias_map = {}
         for select_expr in parsed_sql.expressions:
             if isinstance(select_expr, exp.Alias) and isinstance(select_expr.this, exp.AggFunc):
+                # 显式别名：AVG(伤害) as avg_dmg
                 agg_sql = select_expr.this.sql()
                 self._having_agg_alias_map[agg_sql] = select_expr.alias
+            elif isinstance(select_expr, exp.AggFunc) and not isinstance(select_expr, exp.Alias):
+                # 无别名：AVG(伤害) → 自动生成 avg_damage
+                agg_sql = select_expr.sql()
+                auto_alias = self._generate_aggregate_alias(select_expr)
+                self._having_agg_alias_map[agg_sql] = auto_alias
 
         # HAVING子句处理类似于WHERE，但作用于聚合后的数据
         try:
