@@ -2201,7 +2201,9 @@ def excel_server_stats() -> Dict[str, Any]:
 获取MCP服务器运行统计：每个工具的调用次数、平均耗时、错误率和错误分类。
 返回全局error_types统计（按错误类型分类的计数），用于监控和调试。
     """
-    return _tracker.get_stats()
+    stats = _tracker.get_stats()
+    stats['success'] = True
+    return stats
 
 
 # ==================== 主程序 ====================
