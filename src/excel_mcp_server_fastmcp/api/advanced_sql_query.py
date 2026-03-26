@@ -2209,6 +2209,14 @@ class AdvancedSQLQueryEngine:
             else:
                 return df
 
+        # 预计算CASE WHEN/COALESCE表达式，添加到df副本，使grouped可访问
+        df = df.copy()
+        for alias_name, expr in select_exprs.items():
+            if isinstance(expr, exp.Case) and alias_name not in df.columns:
+                df[alias_name] = self._evaluate_case_expression(expr, df)
+            elif isinstance(expr, exp.Coalesce) and alias_name not in df.columns:
+                df[alias_name] = self._evaluate_coalesce_vectorized(expr, df)
+
         # 应用聚合
         if group_by_columns:
             grouped = df.groupby(group_by_columns)
@@ -2227,42 +2235,21 @@ class AdvancedSQLQueryEngine:
             ordered_columns.append(alias_name)
 
             # 处理聚合函数
-            # 检查当前表达式（或其内部表达式）是否是聚合函数
             is_agg = self._is_aggregate_function(select_expr if not isinstance(select_expr, exp.Alias) else select_expr.this)
             
             if is_agg:
-                # 找到对应的聚合表达式
                 agg_expr = original_expr if isinstance(select_expr, exp.Alias) else select_expr
                 agg_result = self._apply_aggregation_function(agg_expr, grouped)
-                # 如果结果是标量，转换为Series
                 if isinstance(agg_result, (int, float, np.integer, np.floating)):
                     result_data[alias_name] = pd.Series([agg_result])
                 else:
                     result_data[alias_name] = agg_result
-            # 处理CASE WHEN表达式（在GROUP BY中作为列使用）
+            # 处理CASE WHEN表达式（已预计算到df，直接从grouped取first）
             elif isinstance(original_expr, exp.Case):
-                # CASE WHEN在GROUP BY中需要先计算再分组
-                case_series = self._evaluate_case_expression(original_expr, df)
-                if alias_name not in group_by_columns:
-                    group_by_columns.append(alias_name)
-                # 重新分组包含CASE WHEN列
-                if len(group_by_columns) > 1:
-                    existing_cols = [c for c in group_by_columns if c != alias_name and c in df.columns]
-                    if existing_cols:
-                        temp_df = df.copy()
-                        temp_df[alias_name] = case_series
-                        regrouped = temp_df.groupby(group_by_columns)
-                        result_data[alias_name] = regrouped[alias_name].first()
-                    else:
-                        result_data[alias_name] = case_series.groupby(case_series).first()
-                else:
-                    result_data[alias_name] = case_series.groupby(case_series).first()
-            # 处理COALESCE表达式（向量化）
+                result_data[alias_name] = grouped[alias_name].first()
+            # 处理COALESCE表达式（已预计算到df，直接从grouped取first）
             elif isinstance(original_expr, exp.Coalesce):
-                coalesce_series = self._evaluate_coalesce_vectorized(original_expr, df)
-                if alias_name not in group_by_columns:
-                    group_by_columns.append(alias_name)
-                result_data[alias_name] = coalesce_series.groupby(coalesce_series).first()
+                result_data[alias_name] = grouped[alias_name].first()
             # 处理普通列（GROUP BY列）
             elif hasattr(original_expr, 'name'):
                 col_name = original_expr.name
@@ -2270,7 +2257,6 @@ class AdvancedSQLQueryEngine:
                     result_data[alias_name] = grouped[col_name].first()
             # 处理SELECT * 的情况
             elif alias_name == '*':
-                # SELECT * 情况，返回所有GROUP BY列
                 for col in group_by_columns:
                     if col not in result_data:
                         result_data[col] = grouped[col].first()
