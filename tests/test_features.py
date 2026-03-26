@@ -210,14 +210,14 @@ class TestExcelFeatures:
         exception = Exception("Mock exception")
         result = _fallback_format_result(type('MockResult', (), {
             'success': False,
-            'error': 'Test error',
+            'message': 'Test error',
             'data': None,
             'metadata': None,
-            'message': None
+            'error': None
         })(), exception)
 
         assert isinstance(result, dict)
-        assert "error" in result or "success" in result    # ==================== 错误处理优化测试 ====================
+        assert "message" in result or "success" in result    # ==================== 错误处理优化测试 ====================
 
     def test_unified_error_handling(self, sample_excel_file):
         """测试统一错误处理机制"""

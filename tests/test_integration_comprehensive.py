@@ -368,7 +368,7 @@ class TestIntegrationComprehensive:
         # 测试无效范围查询的恢复
         invalid_result = ExcelOperations.get_range(complex_game_config, "NonExistentSheet!A1:B2")
         assert invalid_result['success'] is False
-        assert 'error' in invalid_result
+        assert 'message' in invalid_result
 
         # 测试错误后正常操作仍能工作
         valid_result = ExcelOperations.get_range(complex_game_config, "TrSkill!A1:C1")
@@ -378,7 +378,7 @@ class TestIntegrationComprehensive:
         nonexistent_file = "nonexistent_file.xlsx"
         sheets_result = ExcelOperations.list_sheets(nonexistent_file)
         assert sheets_result['success'] is False
-        assert 'error' in sheets_result
+        assert 'message' in sheets_result
 
         # 测试搜索错误处理
         search_result = ExcelOperations.search(complex_game_config, "nonexistent_pattern", "TrSkill")

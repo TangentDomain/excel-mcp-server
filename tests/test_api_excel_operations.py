@@ -135,7 +135,7 @@ class TestExcelOperations:
         # 实际的文件路径验证在get_range方法内部处理
         result = ExcelOperations.get_range("", "TestSheet!A1:B2")
         assert result['success'] is False
-        assert 'error' in result
+        assert 'message' in result
 
     def test_validate_range_parameters_empty_range(self):
         """测试空范围表达式的参数验证"""
@@ -202,8 +202,8 @@ class TestExcelOperations:
         result = ExcelOperations.get_range("test.xlsx", "Sheet1!A1:B2")
 
         assert result['success'] is False
-        assert '获取范围数据失败' in result['error']
-        assert '读取错误' in result['error']
+        assert '获取范围数据失败' in result['message']
+        assert '读取错误' in result['message']
 
     # ==================== 结果格式化测试 ====================
 
@@ -236,7 +236,7 @@ class TestExcelOperations:
         result = ExcelOperations._format_error_result(error_msg)  # 使用正确的方法名
 
         assert result['success'] is False
-        assert result['error'] == error_msg
+        assert result['message'] == error_msg
         assert result['data'] is None
 
     def test_get_range_error_handling_invalid_params(self):
@@ -244,12 +244,12 @@ class TestExcelOperations:
         # 测试无效的范围格式
         result = ExcelOperations.get_range("test.xlsx", "A1:B2")  # 缺少工作表名
         assert result['success'] is False
-        assert 'range必须包含工作表名' in result['error']
+        assert 'range必须包含工作表名' in result['message']
 
         # 测试无效的范围表达式
         result = ExcelOperations.get_range("test.xlsx", "A1:B2")
         assert result['success'] is False
-        assert 'range必须包含工作表名' in result['error']
+        assert 'range必须包含工作表名' in result['message']
 
     @unittest.mock.patch('src.excel_mcp_server_fastmcp.api.excel_operations.ExcelReader')
     def test_get_range_error_handling_execution_failure(self, mock_reader_class):
@@ -260,7 +260,7 @@ class TestExcelOperations:
         result = ExcelOperations.get_range("nonexistent.xlsx", "Sheet1!A1:B2")
 
         assert result['success'] is False
-        assert '文件未找到' in result['error']
+        assert '文件未找到' in result['message']
 
     # ==================== 日志功能测试 ====================
 
@@ -317,7 +317,7 @@ class TestExcelOperations:
             # 所以这里不验证error日志，而是验证返回结果
             result = ExcelOperations.get_range("test.xlsx", "A1:B2")
             assert result['success'] is False
-            assert 'range必须包含工作表名' in result['error']
+            assert 'range必须包含工作表名' in result['message']
 
         finally:
             # 恢复原始设置
@@ -329,7 +329,7 @@ class TestExcelOperations:
         """测试不存在的文件"""
         result = ExcelOperations.get_range("/nonexistent/path.xlsx", "Sheet1!A1:B2")
         assert result['success'] is False
-        assert 'error' in result
+        assert 'message' in result
 
     def test_get_range_invalid_range_format(self, test_excel_file):
         """测试无效的范围格式"""
@@ -482,35 +482,35 @@ class TestExcelOperations:
         result = ExcelOperations.find_last_row(str(test_excel_file), "NonExistentSheet")
 
         assert not result['success']
-        assert "工作表不存在" in result['error']
+        assert "工作表不存在" in result['message']
 
     def test_find_last_row_invalid_file(self):
         """测试无效的文件路径"""
         result = ExcelOperations.find_last_row("nonexistent_file.xlsx", "Sheet1")
 
         assert not result['success']
-        assert "查找最后一行失败" in result['error']
+        assert "查找最后一行失败" in result['message']
 
     def test_find_last_row_invalid_column_name(self, test_excel_file):
         """测试无效的列名"""
         result = ExcelOperations.find_last_row(str(test_excel_file), "TestSheet", "INVALID")
 
         assert not result['success']
-        assert "无效的列名" in result['error']
+        assert "无效的列名" in result['message']
 
     def test_find_last_row_invalid_column_index(self, test_excel_file):
         """测试无效的列索引"""
         result = ExcelOperations.find_last_row(str(test_excel_file), "TestSheet", 0)
 
         assert not result['success']
-        assert "列索引必须大于等于1" in result['error']
+        assert "列索引必须大于等于1" in result['message']
 
     def test_find_last_row_invalid_column_type(self, test_excel_file):
         """测试无效的列参数类型"""
         result = ExcelOperations.find_last_row(str(test_excel_file), "TestSheet", 3.14)
 
         assert not result['success']
-        assert "列参数必须是字符串或整数" in result['error']
+        assert "列参数必须是字符串或整数" in result['message']
 
     @unittest.mock.patch('src.excel_mcp_server_fastmcp.api.excel_operations.logger')
     def test_find_last_row_logging(self, mock_logger, test_excel_file):

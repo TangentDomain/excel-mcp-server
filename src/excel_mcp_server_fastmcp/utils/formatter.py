@@ -22,6 +22,21 @@ from typing import Any, Dict, List, Optional, Union
 
 # ==================== 主干 ====================
 
+def _normalize_error_key(result_dict: Dict[str, Any]) -> None:
+    """
+    统一错误信息键名：将error字段映射到message，确保MCP客户端只需检查message键。
+
+    核心层OperationResult使用error字段，server层和advanced_sql_query使用message字段。
+    此函数在输出边界统一，避免MCP客户端需要检查两个不同的键。
+    仅处理字符串类型的error值（结构化错误对象如error_handler的error dict不处理）。
+    """
+    if not isinstance(result_dict, dict):
+        return
+    error_val = result_dict.get('error')
+    if isinstance(error_val, str) and not result_dict.get('message'):
+        result_dict['message'] = result_dict.pop('error')
+
+
 def format_operation_result(result) -> Dict[str, Any]:
     """
     格式化操作结果为MCP响应格式
@@ -50,11 +65,16 @@ def format_operation_result(result) -> Dict[str, Any]:
 
         # 步骤3：应用深度null清理
         cleaned_dict = _deep_clean_nulls(serialized_dict)
+
+        # 步骤4：统一错误键 — 将error映射到message，确保MCP客户端只需检查message
+        _normalize_error_key(cleaned_dict)
         return cleaned_dict
 
     except Exception as e:
-        # 步骤4：JSON方案失败，使用回退方案
-        return _fallback_format_result(result, e)
+        # 步骤5：JSON方案失败，使用回退方案
+        fallback = _fallback_format_result(result, e)
+        _normalize_error_key(fallback)
+        return fallback
 
 
 # ==================== 分支 ====================

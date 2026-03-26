@@ -114,7 +114,7 @@ class TestNewAPIs:
             # 如果返回结果而不是抛出异常，检查错误信息
             if 'success' in result:
                 assert result['success'] is False
-                assert "未知的预设样式" in result.get('error', '')
+                assert "未知的预设样式" in result.get('message', '')
         except Exception:
             # 如果抛出异常也是可接受的
             pass

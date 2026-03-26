@@ -1117,7 +1117,7 @@ class ExcelOperations:
         """创建标准化的错误响应"""
         return {
             'success': False,
-            'error': error_message,
+            'message': error_message,
             'data': None
         }
 

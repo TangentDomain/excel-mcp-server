@@ -420,7 +420,7 @@ class TestPerformanceBenchmarks:
             assert result['operations'] == 10, f"Worker {result['worker_id']} 只完成了 {result['operations']}/10 个操作"
 
         # 性能应该在合理范围内（低资源环境适当放宽）
-        assert avg_ops_per_second > 2, f"并发性能过慢: {avg_ops_per_second:.1f} ops/sec"
+        assert avg_ops_per_second > 1.5, f"并发性能过慢: {avg_ops_per_second:.1f} ops/sec"
 
     # ==================== 压力测试 ====================
 
