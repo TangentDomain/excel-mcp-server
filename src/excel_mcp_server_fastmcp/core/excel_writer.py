@@ -892,13 +892,11 @@ class ExcelWriter:
             tree = ast.parse(expr, mode='eval')
             # 只允许数字常量和算术运算符
             for node in ast.walk(tree):
-                if isinstance(node, (ast.Expression, ast.BinOp, ast.UnaryOp, ast.Constant)):
-                    if isinstance(node, ast.Constant) and not isinstance(node.value, (int, float)):
+                if isinstance(node, (ast.Expression, ast.BinOp, ast.UnaryOp, ast.operator)):
+                    pass
+                elif isinstance(node, ast.Constant):
+                    if not isinstance(node.value, (int, float)):
                         return None
-                elif isinstance(node, ast.Num):  # Python <3.8 compat
-                    pass
-                elif isinstance(node, ast.operator):
-                    pass
                 else:
                     return None
             return eval(compile(tree, '<expr>', 'eval'))
