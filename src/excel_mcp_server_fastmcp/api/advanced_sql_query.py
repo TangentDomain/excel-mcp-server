@@ -1767,22 +1767,15 @@ class AdvancedSQLQueryEngine:
         if not where_clause:
             return df
 
-        # 如果WHERE包含COALESCE/CASE WHEN/EXISTS/字符串函数等复杂表达式，直接使用逐行过滤
+        # 如果WHERE包含复杂表达式（pandas query不支持的类型），直接使用逐行过滤
         where_expr = where_clause.this
-        has_complex = (
-            where_expr.find(exp.Coalesce) is not None or
-            where_expr.find(exp.Case) is not None or
-            where_expr.find(exp.Exists) is not None or
-            where_expr.find(exp.Upper) is not None or
-            where_expr.find(exp.Lower) is not None or
-            where_expr.find(exp.Trim) is not None or
-            where_expr.find(exp.Length) is not None or
-            where_expr.find(exp.Concat) is not None or
-            where_expr.find(exp.Replace) is not None or
-            where_expr.find(exp.Substring) is not None or
-            where_expr.find(exp.Left) is not None or
-            where_expr.find(exp.Right) is not None
-        )
+        # 集合检查：新增复杂表达式只需在集合中添加一行
+        _COMPLEX_EXPR_TYPES = {
+            exp.Coalesce, exp.Case, exp.Exists,
+            exp.Upper, exp.Lower, exp.Trim, exp.Length,
+            exp.Concat, exp.Replace, exp.Substring, exp.Left, exp.Right,
+        }
+        has_complex = any(where_expr.find(t) is not None for t in _COMPLEX_EXPR_TYPES)
 
         if has_complex:
             return self._apply_row_filter(where_expr, df)
@@ -2836,19 +2829,10 @@ class AdvancedSQLQueryEngine:
         # 准备返回数据
         data = []
         if include_headers:
-            # 包含表头（无论是否有数据）
-            headers = list(result_df.columns)
-            data.append(headers)
-
-            # 添加数据行（如果有的话）
-            if not result_df.empty:
-                for _, row in result_df.iterrows():
-                    data.append([self._serialize_value(val) for val in row])
-        else:
-            # 不包含表头，只返回数据
-            if not result_df.empty:
-                for _, row in result_df.iterrows():
-                    data.append([self._serialize_value(val) for val in row])
+            data.append(list(result_df.columns))
+        if not result_df.empty:
+            for _, row in result_df.iterrows():
+                data.append([self._serialize_value(val) for val in row])
 
         # 大结果自动截断：保护AI上下文窗口（MAX_RESULT_ROWS=500）
         MAX_RESULT_ROWS = 500
@@ -3297,16 +3281,12 @@ class AdvancedSQLQueryEngine:
             try:
                 left_n = float(left) if not isinstance(left, (int, float)) else left
                 right_n = float(right) if not isinstance(right, (int, float)) else right
-                if isinstance(expr, exp.Add):
-                    result = left_n + right_n
-                elif isinstance(expr, exp.Sub):
-                    result = left_n - right_n
-                elif isinstance(expr, exp.Mul):
-                    result = left_n * right_n
-                elif isinstance(expr, exp.Div):
-                    result = left_n / right_n if right_n != 0 else 0
-                # 如果原值都是整数且结果也是整数，返回整数
-                if isinstance(left, int) and isinstance(right, int) and isinstance(expr, (exp.Add, exp.Sub, exp.Mul)):
+                # 分发表：与 _MATH_BINARY_OPS 风格统一，新增运算符只需一行
+                _OPS = {exp.Add: operator.add, exp.Sub: operator.sub,
+                        exp.Mul: operator.mul, exp.Div: operator.truediv}
+                result = _OPS[type(expr)](left_n, right_n if type(expr) != exp.Div or right_n != 0 else 0)
+                # 如果原值都是整数且非除法，返回整数
+                if isinstance(left, int) and isinstance(right, int) and type(expr) != exp.Div:
                     return int(result)
                 return result
             except (ValueError, TypeError):
