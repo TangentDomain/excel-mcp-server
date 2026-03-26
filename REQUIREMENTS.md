@@ -5,6 +5,21 @@
 
 ## OPEN（待实现）
 
+### REQ-014 [P0] 测试用例精简
+- **来源**：CEO要求 — 1307个测试太多，35%是凑覆盖率的
+- **描述**：清理低价值测试，提高测试套件质量和运行速度
+- **现状**：
+  - 57个测试文件，1307个测试
+  - 其中35%（~460个）是 coverage/supplement/enhanced 文件，明显为凑覆盖率
+  - 同模块测试散落在多个文件（如 writer 有3个文件：writer_enhanced/writer_advanced/writer_coverage_supplement）
+  - security 有2个文件（test_security + test_security_features），可能有重复
+- **目标**：
+  - 文件数 57→~25（合并同模块测试）
+  - 测试数 1307→~800（删凑覆盖率的，保留行为验证和边界测试）
+  - 运行时间 <30秒（pytest-xdist并行）
+- **验收**：全量测试通过，覆盖核心功能+边界场景，无重复测试
+- **状态**：OPEN
+
 ### REQ-007 [P0→DONE] README文档同步（第二轮）
 - **来源**：CEO要求 — 文档必须和代码保持一致
 - **描述**：每次功能变更后README必须同步更新，不能过时
