@@ -29,8 +29,8 @@
   - **benchmark持续** — 每轮跑benchmark对比，检测性能退化
 - **性能基线（第29轮benchmark）**：
   - SQL SELECT 50行: ~30ms | SQL GROUP BY 100行: ~80ms
-  - openpyxl读取50行: ~1610ms | 读取100行: ~5742ms
-  - 搜索精确/模糊/正则: 14-19ms
+  - 读取(50行): ~0.7ms (calamine) | 读取(100行): ~1ms (calamine)
+  - 搜索精确/模糊/正则: ~1ms (calamine)
   - 写入20行×10列: ~23ms
 - **已完成**：
   - ✅ 第6轮：DataFrame LRU缓存(max=10)，重复查询30-100倍提速

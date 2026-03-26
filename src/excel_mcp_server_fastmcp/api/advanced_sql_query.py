@@ -929,15 +929,9 @@ class AdvancedSQLQueryEngine:
             combined = self._apply_union_order_by(combined, order_clause)
 
         # 应用 LIMIT（如果有）
-        union_limit = parsed_sql.args.get('limit')
-        if union_limit:
-            try:
-                limit_expr = union_limit.expression or union_limit.this
-                if limit_expr is not None:
-                    limit_val = int(limit_expr.this if hasattr(limit_expr, 'this') else limit_expr)
-                    combined = combined.head(limit_val)
-            except (ValueError, AttributeError, TypeError):
-                pass
+        union_limit = self._extract_int_value(parsed_sql.args.get('limit'))
+        if union_limit is not None:
+            combined = combined.head(union_limit)
 
         # 应用外部传入的 limit
         if limit is not None:
@@ -1256,21 +1250,13 @@ class AdvancedSQLQueryEngine:
             base_df = self._apply_select_expressions(parsed_sql, base_df)
 
         # 应用OFFSET（在LIMIT之前）
-        offset_clause = parsed_sql.args.get('offset')
-        if offset_clause:
-            if hasattr(offset_clause, 'expression'):
-                offset_value = int(offset_clause.expression.this)
-            else:
-                offset_value = int(offset_clause.this)
+        offset_value = self._extract_int_value(parsed_sql.args.get('offset'))
+        if offset_value is not None:
             base_df = base_df.iloc[offset_value:]
 
         # 应用LIMIT
-        limit_clause = parsed_sql.args.get('limit')
-        if limit_clause:
-            if hasattr(limit_clause, 'expression'):
-                limit_value = int(limit_clause.expression.this)
-            else:
-                limit_value = int(limit_clause.this)
+        limit_value = self._extract_int_value(parsed_sql.args.get('limit'))
+        if limit_value is not None:
             base_df = base_df.head(limit_value)
         elif limit:
             base_df = base_df.head(limit)
@@ -1280,6 +1266,15 @@ class AdvancedSQLQueryEngine:
             base_df = base_df.drop_duplicates()
 
         return base_df
+
+    @staticmethod
+    def _extract_int_value(clause) -> Optional[int]:
+        """从SQL子句中提取整数值（LIMIT/OFFSET等）"""
+        if clause is None:
+            return None
+        if hasattr(clause, 'expression'):
+            return int(clause.expression.this)
+        return int(clause.this)
 
     def _check_has_aggregate_function(self, parsed_sql: exp.Expression) -> bool:
         """检查SQL查询是否包含聚合函数"""
@@ -2465,37 +2460,23 @@ class AdvancedSQLQueryEngine:
         return None
 
     def _evaluate_math_for_row(self, expr: exp.Expression, row: pd.Series) -> Any:
-        """逐行评估数学表达式"""
-        if isinstance(expr, exp.Add):
-            left = self._get_expression_value(expr.left, row)
-            right = self._get_expression_value(expr.right, row)
-            try:
-                return float(left) + float(right)
-            except (TypeError, ValueError):
+        """逐行评估数学表达式，复用类级别分发表"""
+        op_type = type(expr)
+        if op_type not in self._MATH_BINARY_OPS:
+            return None
+        left = self._get_expression_value(expr.left, row)
+        right = self._get_expression_value(expr.right, row)
+        try:
+            left_n = float(left) if left is not None else None
+            right_n = float(right) if right is not None else None
+            if left_n is None or right_n is None:
                 return None
-        elif isinstance(expr, exp.Sub):
-            left = self._get_expression_value(expr.left, row)
-            right = self._get_expression_value(expr.right, row)
-            try:
-                return float(left) - float(right)
-            except (TypeError, ValueError):
+            # 除零保护
+            if op_type == exp.Div and right_n == 0:
                 return None
-        elif isinstance(expr, exp.Mul):
-            left = self._get_expression_value(expr.left, row)
-            right = self._get_expression_value(expr.right, row)
-            try:
-                return float(left) * float(right)
-            except (TypeError, ValueError):
-                return None
-        elif isinstance(expr, exp.Div):
-            left = self._get_expression_value(expr.left, row)
-            right = self._get_expression_value(expr.right, row)
-            try:
-                r = float(right)
-                return float(left) / r if r != 0 else None
-            except (TypeError, ValueError):
-                return None
-        return None
+            return self._MATH_BINARY_OPS[op_type](left_n, right_n)
+        except (TypeError, ValueError):
+            return None
 
     def _evaluate_coalesce_for_row(self, coalesce_expr: exp.Coalesce, row: pd.Series) -> Any:
         """逐行评估COALESCE/IFNULL表达式"""
@@ -2698,43 +2679,32 @@ class AdvancedSQLQueryEngine:
         ascending = []
 
         for order_expr in order_clause.expressions:
+            # 统一处理Ordered和简单列引用
             if isinstance(order_expr, exp.Ordered):
                 col_expr = order_expr.this
-                col_name = col_expr.name
-                table_part = col_expr.table if hasattr(col_expr, 'table') and col_expr.table else None
-                qualified = f"{table_part}.{col_name}" if table_part else None
-
-                # 先查限定名，再查简单名，再查SELECT别名
-                resolved_name = qualified if qualified and qualified in df.columns else None
-                if resolved_name is None:
-                    resolved_name = self._resolve_order_column(col_name, df, select_aliases)
-                if resolved_name is None and qualified and qualified in df.columns:
-                    resolved_name = qualified
-                if resolved_name is None:
-                    suggestion = self._suggest_column_name(col_name, list(df.columns))
-                    raise ValueError(f"排序列 '{qualified or col_name}' 不存在。可用列: {list(df.columns)}。{suggestion}")
-
-                sort_columns.append(resolved_name)
                 is_desc = order_expr.args.get('desc', False)
-                ascending.append(not is_desc if is_desc is not None else True)
+            elif isinstance(order_expr, exp.Column):
+                col_expr = order_expr
+                is_desc = False
             else:
-                # 简单列引用，默认升序
-                if isinstance(order_expr, exp.Column):
-                    col_name = order_expr.name
-                    table_part = order_expr.table if hasattr(order_expr, 'table') and order_expr.table else None
-                    qualified = f"{table_part}.{col_name}" if table_part else None
+                continue
 
-                    resolved_name = qualified if qualified and qualified in df.columns else None
-                    if resolved_name is None:
-                        resolved_name = self._resolve_order_column(col_name, df, select_aliases)
-                    if resolved_name is None and qualified and qualified in df.columns:
-                        resolved_name = qualified
-                    if resolved_name is None:
-                        suggestion = self._suggest_column_name(col_name, list(df.columns))
-                        raise ValueError(f"排序列 '{qualified or col_name}' 不存在。可用列: {list(df.columns)}。{suggestion}")
+            col_name = col_expr.name
+            table_part = col_expr.table if hasattr(col_expr, 'table') and col_expr.table else None
+            qualified = f"{table_part}.{col_name}" if table_part else None
 
-                    sort_columns.append(resolved_name)
-                    ascending.append(True)
+            # 先查限定名，再查简单名，再查SELECT别名
+            resolved_name = qualified if qualified and qualified in df.columns else None
+            if resolved_name is None:
+                resolved_name = self._resolve_order_column(col_name, df, select_aliases)
+            if resolved_name is None and qualified and qualified in df.columns:
+                resolved_name = qualified
+            if resolved_name is None:
+                suggestion = self._suggest_column_name(col_name, list(df.columns))
+                raise ValueError(f"排序列 '{qualified or col_name}' 不存在。可用列: {list(df.columns)}。{suggestion}")
+
+            sort_columns.append(resolved_name)
+            ascending.append(not is_desc if is_desc is not None else True)
 
         if sort_columns:
             return df.sort_values(by=sort_columns, ascending=ascending)
@@ -3275,10 +3245,9 @@ class AdvancedSQLQueryEngine:
             try:
                 left_n = float(left) if not isinstance(left, (int, float)) else left
                 right_n = float(right) if not isinstance(right, (int, float)) else right
-                # 分发表：与 _MATH_BINARY_OPS 风格统一，新增运算符只需一行
-                _OPS = {exp.Add: operator.add, exp.Sub: operator.sub,
-                        exp.Mul: operator.mul, exp.Div: operator.truediv}
-                result = _OPS[type(expr)](left_n, right_n if type(expr) != exp.Div or right_n != 0 else 0)
+                # 复用类级别分发表，支持所有算术运算符
+                op = self._MATH_BINARY_OPS[type(expr)]
+                result = op(left_n, right_n if type(expr) != exp.Div or right_n != 0 else 0)
                 # 如果原值都是整数且非除法，返回整数
                 if isinstance(left, int) and isinstance(right, int) and type(expr) != exp.Div:
                     return int(result)
