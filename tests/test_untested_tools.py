@@ -111,8 +111,8 @@ class TestExcelConvertFormat:
         assert os.path.exists(output_path)
 
         import json
-        with open(output_path, 'r') as f:
-            data = json.load(f, encoding='utf-8')
+        with open(output_path, 'r', encoding='utf-8') as f:
+            data = json.load(f)
         assert isinstance(data, dict)
 
     def test_convert_invalid_format(self, sample_excel_file, temp_dir):
