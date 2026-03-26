@@ -261,31 +261,31 @@ class Benchmarks:
         print("\n📖 数据读取性能测试")
         print("-" * 40)
 
-        # 小表读取（openpyxl每次都要打开文件，较慢，单次测量）
+        # 小表读取（calamine引擎，多轮测量取平均）
         r = measure("read_50x10", "read",
                      lambda: ExcelOperations.get_range(self.small_file, "技能配置!A1:J50"),
-                     runs=1, warmup=0)
+                     runs=5, warmup=2)
         self.results.append(r)
         print(f"  读取 50行×10列 (小表):         {r.avg_ms:.1f}ms")
 
-        # 中表读取（单次测量）
-        r = measure("read_500x10", "read",
+        # 中表读取（calamine引擎，多轮测量取平均）
+        r = measure("read_100x10", "read",
                      lambda: ExcelOperations.get_range(self.medium_file, "技能配置!A1:J100"),
-                     runs=1, warmup=0)
+                     runs=5, warmup=2)
         self.results.append(r)
         print(f"  读取 100行×10列 (中表):        {r.avg_ms:.1f}ms")
 
         # list_sheets
         r = measure("list_sheets", "read",
                      lambda: ExcelOperations.list_sheets(self.small_file),
-                     runs=1, warmup=0)
+                     runs=5, warmup=2)
         self.results.append(r)
         print(f"  列出工作表 (小表):             {r.avg_ms:.1f}ms")
 
         # get_headers
         r = measure("get_headers", "read",
                      lambda: ExcelOperations.get_headers(self.small_file, "技能配置"),
-                     runs=1, warmup=0)
+                     runs=5, warmup=2)
         self.results.append(r)
         print(f"  获取表头 (小表):               {r.avg_ms:.1f}ms")
 
@@ -294,10 +294,10 @@ class Benchmarks:
         print("\n🔍 搜索性能测试")
         print("-" * 40)
 
-        # 精确搜索（openpyxl需打开文件，单次测量）
+        # 精确搜索（calamine引擎，多轮测量）
         r = measure("search_exact", "search",
                      lambda: ExcelOperations.search(self.medium_file, "技能_42", "技能配置"),
-                     runs=1, warmup=0)
+                     runs=5, warmup=2)
         self.results.append(r)
         print(f"  精确搜索 (中表):               {r.avg_ms:.1f}ms")
 
