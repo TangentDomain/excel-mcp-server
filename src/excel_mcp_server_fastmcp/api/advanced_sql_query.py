@@ -2598,15 +2598,8 @@ class AdvancedSQLQueryEngine:
             if isinstance(expr, exp.Column) and expr.name in df.columns:
                 return expr.name
             # 别名对应的是计算表达式，临时计算后用于排序
-            # CASE WHEN / COALESCE / 数学表达式 统一处理
-            temp_col = f"__order_temp_{col_name}"
-            if self._is_mathematical_expression(expr):
-                df[temp_col] = self._evaluate_math_expression(expr, df)
-            elif isinstance(expr, exp.Case):
-                df[temp_col] = self._evaluate_case_expression(expr, df)
-            elif isinstance(expr, exp.Coalesce):
-                df[temp_col] = self._evaluate_coalesce_vectorized(expr, df)
-            else:
+            temp_col = self._compute_temp_column(expr, df, f"__order_temp_{col_name}")
+            if temp_col is None:
                 return None
             df.rename(columns={temp_col: col_name}, inplace=True)
             return col_name
@@ -2614,13 +2607,18 @@ class AdvancedSQLQueryEngine:
         # 3. 列名不存在
         return None
 
-    def _resolve_order_expression(self, expr, df: pd.DataFrame) -> Optional[str]:
-        """解析ORDER BY中的函数表达式，临时计算并添加为排序列
+    def _compute_temp_column(self, expr, df: pd.DataFrame, prefix: str = "__order_expr") -> Optional[str]:
+        """将表达式计算结果写入临时列，支持数学/字符串/CASE/COALESCE
 
-        支持: UPPER, LOWER, TRIM, LENGTH, CONCAT, REPLACE, SUBSTRING, LEFT, RIGHT,
-              CASE WHEN, COALESCE, 数学表达式
+        Args:
+            expr: SQL表达式
+            df: DataFrame
+            prefix: 临时列名前缀
+
+        Returns:
+            临时列名，不支持的表达式返回None
         """
-        temp_col = f"__order_expr_{id(expr)}"
+        temp_col = f"{prefix}_{id(expr)}"
         try:
             if self._is_string_function(expr):
                 df[temp_col] = self._evaluate_string_function(expr, df)
@@ -2635,6 +2633,14 @@ class AdvancedSQLQueryEngine:
             return temp_col
         except Exception:
             return None
+
+    def _resolve_order_expression(self, expr, df: pd.DataFrame) -> Optional[str]:
+        """解析ORDER BY中的函数表达式，临时计算并添加为排序列
+
+        支持: UPPER, LOWER, TRIM, LENGTH, CONCAT, REPLACE, SUBSTRING, LEFT, RIGHT,
+              CASE WHEN, COALESCE, 数学表达式
+        """
+        return self._compute_temp_column(expr, df, "__order_expr")
 
     def _apply_order_by(self, parsed_sql: exp.Expression, df: pd.DataFrame, select_aliases: Optional[Dict] = None) -> pd.DataFrame:
         """应用ORDER BY排序
@@ -3194,17 +3200,7 @@ class AdvancedSQLQueryEngine:
             计算后的值
         """
         if isinstance(expr, exp.Literal):
-            val = expr.this
-            if expr.is_string:
-                return str(val)
-            if isinstance(val, str):
-                try:
-                    if '.' in val:
-                        return float(val)
-                    return int(val)
-                except ValueError:
-                    return val
-            return val
+            return self._parse_literal_value(expr)
 
         elif isinstance(expr, exp.Column):
             col_name = expr.name
@@ -3228,8 +3224,8 @@ class AdvancedSQLQueryEngine:
                 # 复用类级别分发表，支持所有算术运算符
                 op = self._MATH_BINARY_OPS[type(expr)]
                 result = op(left_n, right_n if type(expr) != exp.Div or right_n != 0 else 0)
-                # 如果原值都是整数且非除法，返回整数
-                if isinstance(left, int) and isinstance(right, int) and type(expr) != exp.Div:
+                # 如果原值都是整数（含numpy整数）且非除法，返回整数
+                if isinstance(left, (int, np.integer)) and isinstance(right, (int, np.integer)) and type(expr) != exp.Div:
                     return int(result)
                 return result
             except (ValueError, TypeError):

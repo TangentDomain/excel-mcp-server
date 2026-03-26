@@ -3,6 +3,7 @@ import os
 import shutil
 import pytest
 import pandas as pd
+from openpyxl import Workbook, load_workbook
 
 
 @pytest.fixture
@@ -291,3 +292,45 @@ class TestNumpySerialization:
         )
         assert result['success'] is True
         assert result['affected_rows'] == 4
+
+    def test_update_int_preservation_numpy_types(self, tmp_path):
+        """UPDATE算术运算保留整数类型（numpy.int64不会变成float）"""
+        from src.excel_mcp_server_fastmcp.api.advanced_sql_query import execute_advanced_update_query
+
+        # 创建测试文件
+        wb = Workbook()
+        ws = wb.active
+        ws.title = "test"
+        ws.append(["id", "val", "mult"])
+        ws.append([1, 10, 3])
+        ws.append([2, 20, 5])
+        f = tmp_path / "test_int.xlsx"
+        wb.save(str(f))
+
+        # int + int = int
+        result = execute_advanced_update_query(str(f), "UPDATE test SET val = val + mult")
+        assert result['success'] is True
+        wb2 = load_workbook(str(f))
+        ws2 = wb2.active
+        # val(10) + mult(3) = 13, should be int not 13.0
+        assert ws2.cell(2, 2).value == 13
+        assert isinstance(ws2.cell(2, 2).value, int)
+        # val(20) + mult(5) = 25
+        assert ws2.cell(3, 2).value == 25
+        assert isinstance(ws2.cell(3, 2).value, int)
+
+        # int * int = int
+        result = execute_advanced_update_query(str(f), "UPDATE test SET val = val * 2")
+        assert result['success'] is True
+        wb3 = load_workbook(str(f))
+        ws3 = wb3.active
+        assert ws3.cell(2, 2).value == 26
+        assert isinstance(ws3.cell(2, 2).value, int)
+
+        # int / int = float (division always returns float)
+        result = execute_advanced_update_query(str(f), "UPDATE test SET val = val / 2")
+        assert result['success'] is True
+        wb4 = load_workbook(str(f))
+        ws4 = wb4.active
+        # 26 / 2 = 13 (openpyxl converts 13.0 to int when saving)
+        assert ws4.cell(2, 2).value == 13
