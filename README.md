@@ -18,7 +18,7 @@
 
 🎯 **核心功能**: 技能系统、装备管理、怪物配置、数值平衡、版本对比、策划工具链
 
-📦 **一键安装**: `uvx excel-mcp-server-fastmcp` — 从PyPI直接运行，零配置
+📦 **一键安装**: `uvx --force excel-mcp-server-fastmcp` — 从PyPI直接运行，自动更新，零配置
 
 ---
 
@@ -38,11 +38,13 @@ MCP客户端配置：
   "mcpServers": {
     "excelmcp": {
       "command": "uvx",
-      "args": ["excel-mcp-server-fastmcp"]
+      "args": ["--force", "excel-mcp-server-fastmcp"]
     }
   }
 }
 ```
+
+> ⚡ **推荐加 `--force`**：跳过本地缓存，每次自动拉取PyPI最新版本。无新版本时不会重复下载（仅多1-2秒检查），有新版本则自动更新，无需手动操作。
 
 > 💡 **调试模式**: 设置环境变量 `EXCEL_MCP_DEBUG=1` 开启详细日志（默认WARNING级别）。设置 `EXCEL_MCP_JSON_LOG=1` 输出结构化JSON日志（每行一个JSON对象，含ts/level/tool/duration_ms等字段）。
 
