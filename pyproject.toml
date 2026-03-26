@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "excel-mcp-server-fastmcp"
-version = "1.0.0"
+version = "1.0.1"
 description = "Excel MCP Server based on FastMCP and openpyxl"
 readme = "README.md"
 requires-python = ">=3.10"
@@ -20,7 +20,7 @@ dependencies = [
 ]
 
 [project.scripts]
-excel-mcp-server-fastmcp = "server:main"
+excel-mcp-server-fastmcp = "excel_mcp_server_fastmcp:main"
 
 [project.optional-dependencies]
 dev = [
@@ -62,9 +62,6 @@ quality = [
 
 [tool.setuptools.packages.find]
 where = ["src"]
-
-[tool.setuptools.package-dir]
-"" = "src"
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
