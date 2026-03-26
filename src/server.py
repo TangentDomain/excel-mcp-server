@@ -1746,6 +1746,60 @@ Returns:
 
 
 @mcp.tool()
+def excel_update_query(
+    file_path: str,
+    query_expression: str,
+    dry_run: bool = False
+) -> Dict[str, Any]:
+    """SQL UPDATE - 基于WHERE条件批量修改Excel数据
+    
+支持: UPDATE ... SET ... WHERE 语法
+SET表达式: 列=常量, 列=列引用, 列=算术表达式(如 伤害*1.1, 攻击力+10)
+WHERE条件: 复用excel_query的全部条件语法(AND/OR/LIKE/IN/BETWEEN/IS NULL等)
+中文列名: 自动替换，策划可直接用中文字段名
+dry_run: 预览模式，只返回影响范围不实际修改
+
+Args:
+    file_path: Excel文件路径
+    query_expression: UPDATE SQL语句
+    dry_run: 预览模式，默认false
+
+Returns:
+    {success, affected_rows, changes: [{row, column, old_value, new_value}], message}
+
+示例: excel_update_query("data.xlsx", "UPDATE 技能表 SET 伤害 = 伤害 * 1.1 WHERE 元素 = '火'")
+    """
+    if not file_path or not file_path.strip():
+        return {'success': False, 'message': '文件路径不能为空',
+                'affected_rows': 0, 'changes': []}
+
+    if not query_expression or not query_expression.strip():
+        return {'success': False, 'message': 'UPDATE语句不能为空',
+                'affected_rows': 0, 'changes': []}
+
+    # 安全检查：只允许UPDATE语句
+    stripped = query_expression.strip().upper()
+    if not stripped.startswith('UPDATE'):
+        return {'success': False,
+                'message': '只支持UPDATE语句。查询请使用 excel_query',
+                'affected_rows': 0, 'changes': []}
+
+    try:
+        from .api.advanced_sql_query import execute_advanced_update_query
+        return execute_advanced_update_query(
+            file_path=file_path,
+            sql=query_expression,
+            dry_run=dry_run
+        )
+    except ImportError:
+        return {'success': False, 'message': 'SQLGlot未安装，无法使用UPDATE功能',
+                'affected_rows': 0, 'changes': []}
+    except Exception as e:
+        return {'success': False, 'message': f'UPDATE执行失败: {str(e)}',
+                'affected_rows': 0, 'changes': []}
+
+
+@mcp.tool()
 def excel_describe_table(
     file_path: str,
     sheet_name: str = None
