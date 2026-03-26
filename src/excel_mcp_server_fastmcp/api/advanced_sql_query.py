@@ -1419,6 +1419,33 @@ class AdvancedSQLQueryEngine:
         exp.Mod: operator.mod,
     }
 
+    # 比较运算符分发表：逐行条件评估统一处理
+    _COMPARISON_OPS = {
+        exp.EQ: lambda l, r: l == r,
+        exp.NEQ: lambda l, r: l != r,
+        exp.GT: lambda l, r: float(l) > float(r),
+        exp.GTE: lambda l, r: float(l) >= float(r),
+        exp.LT: lambda l, r: float(l) < float(r),
+        exp.LTE: lambda l, r: float(l) <= float(r),
+    }
+
+    # 复杂表达式类型集合：WHERE子句逐行过滤触发条件
+    _COMPLEX_EXPR_TYPES = frozenset({
+        exp.Coalesce, exp.Case, exp.Exists,
+        exp.Upper, exp.Lower, exp.Trim, exp.Length,
+        exp.Concat, exp.Replace, exp.Substring, exp.Left, exp.Right,
+    })
+
+    # Pandas条件运算符分发表：SQL条件→pandas query字符串
+    _PANDAS_OPS = {
+        exp.EQ: '==',
+        exp.NEQ: '!=',
+        exp.GT: '>',
+        exp.GTE: '>=',
+        exp.LT: '<',
+        exp.LTE: '<=',
+    }
+
     def _evaluate_math_expression(self, expr, df: pd.DataFrame):
         """计算数学表达式"""
         op_type = type(expr)
@@ -1771,13 +1798,7 @@ class AdvancedSQLQueryEngine:
 
         # 如果WHERE包含复杂表达式（pandas query不支持的类型），直接使用逐行过滤
         where_expr = where_clause.this
-        # 集合检查：新增复杂表达式只需在集合中添加一行
-        _COMPLEX_EXPR_TYPES = {
-            exp.Coalesce, exp.Case, exp.Exists,
-            exp.Upper, exp.Lower, exp.Trim, exp.Length,
-            exp.Concat, exp.Replace, exp.Substring, exp.Left, exp.Right,
-        }
-        has_complex = any(where_expr.find(t) is not None for t in _COMPLEX_EXPR_TYPES)
+        has_complex = any(where_expr.find(t) is not None for t in self._COMPLEX_EXPR_TYPES)
 
         if has_complex:
             return self._apply_row_filter(where_expr, df)
@@ -1796,17 +1817,11 @@ class AdvancedSQLQueryEngine:
 
     def _sql_condition_to_pandas(self, condition: exp.Expression, df: pd.DataFrame) -> str:
         """将SQL条件转换为pandas查询字符串"""
-        # 比较运算符分发表 → pandas查询字符串
-        _PANDAS_OPS = {
-            exp.EQ: '==', exp.NEQ: '!=',
-            exp.GT: '>', exp.GTE: '>=',
-            exp.LT: '<', exp.LTE: '<=',
-        }
         op_type = type(condition)
-        if op_type in _PANDAS_OPS:
+        if op_type in self._PANDAS_OPS:
             left = self._expression_to_column_reference(condition.left, df)
             right = self._expression_to_value(condition.right, df)
-            return f"{left} {_PANDAS_OPS[op_type]} {right}"
+            return f"{left} {self._PANDAS_OPS[op_type]} {right}"
 
         elif isinstance(condition, exp.And):
             left = self._sql_condition_to_pandas(condition.left, df)
@@ -2043,21 +2058,12 @@ class AdvancedSQLQueryEngine:
     def _evaluate_condition_for_row(self, condition: exp.Expression, row: pd.Series) -> bool:
         """为单行评估条件"""
         try:
-            # 比较运算符分发表（EQ/NEQ直接比较，GT/GTE/LT/LTE数值比较）
-            _COMPARISON_OPS = {
-                exp.EQ: lambda l, r: l == r,
-                exp.NEQ: lambda l, r: l != r,
-                exp.GT: lambda l, r: float(l) > float(r),
-                exp.GTE: lambda l, r: float(l) >= float(r),
-                exp.LT: lambda l, r: float(l) < float(r),
-                exp.LTE: lambda l, r: float(l) <= float(r),
-            }
             op_type = type(condition)
-            if op_type in _COMPARISON_OPS:
+            if op_type in self._COMPARISON_OPS:
                 left_val = self._get_row_value(condition.left, row)
                 right_val = self._get_row_value(condition.right, row)
                 try:
-                    return _COMPARISON_OPS[op_type](left_val, right_val)
+                    return self._COMPARISON_OPS[op_type](left_val, right_val)
                 except (TypeError, ValueError):
                     return False
 
@@ -2101,87 +2107,88 @@ class AdvancedSQLQueryEngine:
                     return False
 
             elif isinstance(condition, exp.Exists):
-                # EXISTS子查询（支持关联子查询）
-                inner_expr = condition.this  # 可能是Select或Subquery
-                if isinstance(inner_expr, exp.Subquery):
-                    inner_select = inner_expr.this
-                elif isinstance(inner_expr, exp.Select):
-                    inner_select = inner_expr
-                else:
-                    return False
-
-                if hasattr(self, '_current_worksheets') and self._current_worksheets:
-                    # 检查是否有关联引用（引用外部表列）
-                    inner_from = self._get_from_table(inner_select)
-                    has_correlation = False
-                    for col in inner_select.find_all(exp.Column):
-                        col_name = col.name
-                        table_part = col.table if hasattr(col, 'table') and col.table else None
-                        
-                        if table_part:
-                            resolved = self._table_aliases.get(table_part, table_part)
-                            if resolved != inner_from:
-                                has_correlation = True
-                                break
-                        else:
-                            # 无表限定符：检查列名是否存在于外部表但不在子查询表
-                            if inner_from in self._current_worksheets:
-                                inner_cols = set(self._current_worksheets[inner_from].columns)
-                                # 检查是否是外部表独有的列（不在子查询FROM表中）
-                                for tbl_name, tbl_df in self._current_worksheets.items():
-                                    if tbl_name != inner_from and col_name in tbl_df.columns:
-                                        has_correlation = True
-                                        break
-                    
-                    if has_correlation:
-                        # 关联子查询：替换外部引用为当前行值，然后执行
-                        inner_sql = str(inner_select)
-                        inner_from_cols = set()
-                        if inner_from in self._current_worksheets:
-                            inner_from_cols = set(self._current_worksheets[inner_from].columns)
-
-                        for col in inner_select.find_all(exp.Column):
-                            col_name = col.name
-                            table_part = col.table if hasattr(col, 'table') and col.table else None
-                            should_substitute = False
-
-                            if table_part:
-                                resolved = self._table_aliases.get(table_part, table_part)
-                                for tbl_name in self._current_worksheets:
-                                    if tbl_name != inner_from and (resolved == tbl_name or table_part == tbl_name):
-                                        should_substitute = True
-                                        break
-                            else:
-                                # 无表限定符：检查列是否只存在于外部表
-                                for tbl_name, tbl_df in self._current_worksheets.items():
-                                    if tbl_name != inner_from and col_name in tbl_df.columns and col_name not in inner_from_cols:
-                                        should_substitute = True
-                                        break
-
-                            if should_substitute:
-                                val = row.get(col_name)
-                                if val is not None:
-                                    if table_part:
-                                        inner_sql = inner_sql.replace(f"{table_part}.{col_name}", repr(val), 1)
-                                    else:
-                                        # 无表限定符：精确替换（避免误替换子查询表的列）
-                                        pattern = r'\b' + re.escape(col_name) + r'\b'
-                                        inner_sql = re.sub(pattern, repr(val), inner_sql, count=1)
-                        try:
-                            parsed_inner = sqlglot.parse_one(inner_sql)
-                            sub_result = self._execute_query(parsed_inner, self._current_worksheets)
-                            return len(sub_result) > 0
-                        except Exception:
-                            return False
-                    else:
-                        sub_result = self._execute_subquery(inner_expr, self._current_worksheets)
-                        return len(sub_result) > 0
-                return False
+                return self._evaluate_exists_for_row(condition, row)
 
             # 其他条件类型...
 
             return True
 
+        except Exception:
+            return False
+
+    def _evaluate_exists_for_row(self, condition: exp.Exists, row: pd.Series) -> bool:
+        """评估EXISTS子查询（支持关联子查询）"""
+        inner_expr = condition.this
+        if isinstance(inner_expr, exp.Subquery):
+            inner_select = inner_expr.this
+        elif isinstance(inner_expr, exp.Select):
+            inner_select = inner_expr
+        else:
+            return False
+
+        if not (hasattr(self, '_current_worksheets') and self._current_worksheets):
+            return False
+
+        inner_from = self._get_from_table(inner_select)
+        has_correlation = False
+        for col in inner_select.find_all(exp.Column):
+            col_name = col.name
+            table_part = col.table if hasattr(col, 'table') and col.table else None
+            if table_part:
+                resolved = self._table_aliases.get(table_part, table_part)
+                if resolved != inner_from:
+                    has_correlation = True
+                    break
+            else:
+                if inner_from in self._current_worksheets:
+                    for tbl_name, tbl_df in self._current_worksheets.items():
+                        if tbl_name != inner_from and col_name in tbl_df.columns:
+                            has_correlation = True
+                            break
+
+        if has_correlation:
+            return self._evaluate_correlated_exists(inner_select, inner_from, row)
+        else:
+            sub_result = self._execute_subquery(inner_expr, self._current_worksheets)
+            return len(sub_result) > 0
+
+    def _evaluate_correlated_exists(self, inner_select, inner_from: str, row: pd.Series) -> bool:
+        """评估关联EXISTS子查询：替换外部引用为当前行值后执行"""
+        inner_sql = str(inner_select)
+        inner_from_cols = set()
+        if inner_from in self._current_worksheets:
+            inner_from_cols = set(self._current_worksheets[inner_from].columns)
+
+        for col in inner_select.find_all(exp.Column):
+            col_name = col.name
+            table_part = col.table if hasattr(col, 'table') and col.table else None
+            should_substitute = False
+
+            if table_part:
+                resolved = self._table_aliases.get(table_part, table_part)
+                for tbl_name in self._current_worksheets:
+                    if tbl_name != inner_from and (resolved == tbl_name or table_part == tbl_name):
+                        should_substitute = True
+                        break
+            else:
+                for tbl_name, tbl_df in self._current_worksheets.items():
+                    if tbl_name != inner_from and col_name in tbl_df.columns and col_name not in inner_from_cols:
+                        should_substitute = True
+                        break
+
+            if should_substitute:
+                val = row.get(col_name)
+                if val is not None:
+                    if table_part:
+                        inner_sql = inner_sql.replace(f"{table_part}.{col_name}", repr(val), 1)
+                    else:
+                        pattern = r'\b' + re.escape(col_name) + r'\b'
+                        inner_sql = re.sub(pattern, repr(val), inner_sql, count=1)
+
+        try:
+            parsed_inner = sqlglot.parse_one(inner_sql)
+            sub_result = self._execute_query(parsed_inner, self._current_worksheets)
+            return len(sub_result) > 0
         except Exception:
             return False
 
@@ -3121,21 +3128,33 @@ class AdvancedSQLQueryEngine:
                     'execution_time_ms': round(elapsed, 1)}
 
         # 写回Excel（事务保护：失败自动回滚）
+        try:
+            return self._write_changes_to_excel(
+                file_path, matched_sheet, changes, df,
+                len(affected_indices), start_time)
+        except Exception as e:
+            elapsed = (time.time() - start_time) * 1000
+            return {'success': False,
+                    'message': f'写入Excel失败，已自动回滚: {e}',
+                    'affected_rows': 0, 'changes': changes,
+                    'execution_time_ms': round(elapsed, 1)}
+
+    def _write_changes_to_excel(self, file_path: str, sheet_name: str,
+                                changes: list, df: pd.DataFrame,
+                                affected_rows: int, start_time: float) -> Dict[str, Any]:
+        """事务保护写入变更到Excel（失败自动回滚）"""
         backup_path = None
         try:
             with self._file_lock(file_path):
-                # 创建临时备份（事务保护）
                 backup_path = tempfile.mktemp(suffix='.xlsx.bak')
                 shutil.copy2(file_path, backup_path)
 
-                # 检测双行表头偏移
                 header_row_offset = 0
-                desc_map = self._header_descriptions.get(matched_sheet, {})
-                if desc_map:
-                    header_row_offset = 1  # 双行表头，数据从第3行开始
+                if self._header_descriptions.get(sheet_name, {}):
+                    header_row_offset = 1
 
                 wb = openpyxl.load_workbook(file_path)
-                ws = wb[matched_sheet]
+                ws = wb[sheet_name]
 
                 for change in changes:
                     excel_row = change['row'] + header_row_offset
@@ -3145,32 +3164,25 @@ class AdvancedSQLQueryEngine:
                 wb.save(file_path)
                 wb.close()
 
-                # 写入成功，删除备份
                 if backup_path and os.path.exists(backup_path):
                     os.remove(backup_path)
 
-                # 清除缓存（文件已修改）
                 self._df_cache.pop(file_path, None)
 
                 elapsed = (time.time() - start_time) * 1000
                 return {'success': True,
-                        'message': f'成功更新 {len(changes)} 个单元格（{len(affected_indices)} 行）',
-                        'affected_rows': len(affected_indices),
+                        'message': f'成功更新 {len(changes)} 个单元格（{affected_rows} 行）',
+                        'affected_rows': affected_rows,
                         'changes': changes,
                         'execution_time_ms': round(elapsed, 1)}
-
-        except Exception as e:
-            # 事务回滚：从备份恢复
+        except Exception:
             if backup_path and os.path.exists(backup_path):
                 try:
                     shutil.copy2(backup_path, file_path)
                     os.remove(backup_path)
                 except Exception:
                     pass
-            return {'success': False,
-                    'message': f'写入Excel失败，已自动回滚: {e}',
-                    'affected_rows': 0, 'changes': changes,
-                    'execution_time_ms': round((time.time() - start_time) * 1000, 1)}
+            raise  # 重新抛出让调用方处理
 
     @contextmanager
     def _file_lock(self, file_path: str) -> Generator[None, None, None]:
