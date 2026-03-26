@@ -17,11 +17,13 @@ Excel MCP Server - 基于 FastMCP 和 openpyxl 实现
 """
 
 import functools
+import glob
 import json
 import logging
 import os
 import re
 import shutil
+import tempfile
 import threading
 import time
 from collections import defaultdict
@@ -39,6 +41,7 @@ except ImportError as e:
 
 # 导入API模块
 from .api.excel_operations import ExcelOperations
+from .utils.validators import ExcelValidator, DataValidationError
 
 # ==================== 操作日志系统 ====================
 class OperationLogger:
@@ -86,7 +89,6 @@ class OperationLogger:
             return
 
         try:
-            import json
             with open(self.log_file, 'w', encoding='utf-8') as f:
                 json.dump(self.current_session, f, indent=2, ensure_ascii=False)
         except Exception as e:
@@ -256,7 +258,6 @@ class SecurityValidator:
     @classmethod
     def cleanup_orphan_temp_files(cls, temp_dir: str = None) -> int:
         """清理孤儿临时文件（.xlsx.bak），返回清理数量"""
-        import tempfile, glob, time
         target = temp_dir or tempfile.gettempdir()
         pattern = os.path.join(target, '*.xlsx.bak')
         cleaned = 0
@@ -477,7 +478,6 @@ def excel_get_range(
     if _path_err:
         return _path_err
     # 增强参数验证
-    from .utils.validators import ExcelValidator, DataValidationError
 
     try:
         # 验证范围表达式格式
@@ -548,8 +548,6 @@ def excel_update_range(
     _path_err = _validate_path(file_path)
     if _path_err:
         return _path_err
-    # 增强参数验证
-    from .utils.validators import ExcelValidator, DataValidationError
 
     try:
         # 验证范围表达式格式
@@ -725,7 +723,6 @@ def excel_assess_data_impact(
     _path_err = _validate_path(file_path)
     if _path_err:
         return _path_err
-    from .utils.validators import ExcelValidator, DataValidationError
 
     try:
         # 验证范围表达式
