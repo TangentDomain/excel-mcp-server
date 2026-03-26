@@ -10,11 +10,11 @@
 [![Python Version](https://img.shields.io/badge/python-3.10+-blue.svg)](https://www.python.org/downloads/)
 [![Powered by: FastMCP](https://img.shields.io/badge/Powered%20by-FastMCP-orange)](https://github.com/jlowin/fastmcp)
 ![Status](https://img.shields.io/badge/status-stable-green.svg)
-![Tests](https://img.shields.io/badge/tests-832%20tests-brightgreen.svg)
+![Tests](https://img.shields.io/badge/tests-847%20tests-brightgreen.svg)
 ![Tools](https://img.shields.io/badge/tools-46%20verified%20tools-green.svg)
 [![CI](https://github.com/TangentDomain/excel-mcp-server/actions/workflows/ci.yml/badge.svg)](https://github.com/TangentDomain/excel-mcp-server/actions/workflows/ci.yml)
 
-**ExcelMCP** is an Excel configuration table management MCP server designed for game development. Through AI natural language commands, it enables intelligent operations on game configurations such as skill tables, equipment data, and monster attributes. Built with **FastMCP**, reads use **python-calamine** (Rust engine, 2300x speedup), writes use **openpyxl**. Features **46 professional tools** and **832 test cases**, ensuring enterprise-grade reliability.
+**ExcelMCP** is an Excel configuration table management MCP server designed for game development. Through AI natural language commands, it enables intelligent operations on game configurations such as skill tables, equipment data, and monster attributes. Built with **FastMCP**, reads use **python-calamine** (Rust engine, 2300x speedup), writes use **openpyxl**. Features **46 professional tools** and **847 test cases**, ensuring enterprise-grade reliability.
 
 🎯 **Core Features**: Skill systems, equipment management, monster configuration, numerical balancing, version comparison, designer toolchain
 
@@ -331,7 +331,7 @@ SELECT a.skill_name, b.equip_name FROM SkillConfig a INNER JOIN EquipConfig b ON
 ### 🔍 Search & Analysis
 - `excel_search` - Regex expression search
 - `excel_search_directory` - Directory batch search
-- `excel_query` - SQL query (supports dual-row headers, WHERE/GROUP BY/HAVING/ORDER BY/LIMIT/OFFSET/DISTINCT/JOIN/UNION/subqueries/CTE/CASE WHEN/COALESCE/string functions/math expressions)
+- `excel_query` - SQL query (supports dual-row headers, WHERE/GROUP BY/HAVING/ORDER BY/LIMIT/OFFSET/DISTINCT/JOIN/UNION/subqueries/CTE/CASE WHEN/COALESCE/string functions/math expressions/window functions)
 - `excel_update_query` - SQL UPDATE batch modification (SET constant/column ref/arithmetic, WHERE condition, dry_run preview)
 - `excel_describe_table` - View table structure (column names, types, descriptions, sample values, auto-detect dual-row headers)
 - `excel_compare_sheets` - Worksheet comparison (game config optimized)
@@ -478,8 +478,19 @@ UPDATE SkillTable SET damage = damage * 1.1 WHERE element = 'Fire'  -- dry_run=T
 
 **Unsupported Syntax (with clear alternative suggestions):**
 - FROM subqueries `FROM (SELECT ...)` (suggest: use WHERE subqueries or CTEs)
-- Window functions ROW_NUMBER/RANK/DENSE_RANK (suggest: use subqueries + GROUP BY)
 - RIGHT JOIN / CROSS JOIN / FULL JOIN (rarely used in game scenarios)
+
+**Window Functions (ROW_NUMBER/RANK/DENSE_RANK):**
+```sql
+-- Rank by damage descending
+SELECT skill_name, damage, ROW_NUMBER() OVER (ORDER BY damage DESC) as rn FROM SkillConfig
+
+-- Rank within each class
+SELECT skill_name, skill_type, ROW_NUMBER() OVER (PARTITION BY skill_type ORDER BY damage DESC) as rn FROM SkillConfig
+
+-- RANK vs DENSE_RANK: tied values get same rank
+SELECT skill_name, damage, RANK() OVER (ORDER BY damage DESC) as r, DENSE_RANK() OVER (ORDER BY damage DESC) as dr FROM SkillConfig
+```
 
 **Query Performance:**
 - Same-file repeated queries auto-cache, 30-100x speedup

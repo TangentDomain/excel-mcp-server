@@ -367,9 +367,10 @@ mcp = FastMCP(
 排序限制: ORDER BY DESC/ASC, LIMIT, OFFSET
 表关联: INNER JOIN, LEFT JOIN（同文件内工作表）
 字符串函数: UPPER, LOWER, TRIM, LENGTH, CONCAT, REPLACE, SUBSTRING, LEFT, RIGHT
+窗口函数: ROW_NUMBER, RANK, DENSE_RANK（OVER PARTITION BY ... ORDER BY ...）
 
 ## ❌ SQL不支持功能
-窗口函数(ROW_NUMBER/RANK), INSERT/DELETE, RIGHT JOIN, CROSS JOIN
+INSERT/DELETE, RIGHT JOIN, CROSS JOIN, FROM子查询
 
 ## ✅ UNION / UNION ALL
 合并多个 SELECT 查询结果。UNION 去重，UNION ALL 保留重复行。
@@ -378,6 +379,16 @@ mcp = FastMCP(
 SELECT name, damage FROM 技能配置 WHERE 技能类型='法师' UNION ALL SELECT name, damage FROM 技能配置 WHERE 技能类型='战士' ORDER BY damage DESC LIMIT 10
 ```
 替代方案: 子查询用 WHERE col IN (SELECT...)，不支持FROM子查询
+
+## ✅ 窗口函数 (ROW_NUMBER / RANK / DENSE_RANK)
+在查询结果上计算排名。支持 PARTITION BY 分区和 ORDER BY 排序。
+ROW_NUMBER: 连续编号(1,2,3)；RANK: 并列跳过(1,2,2,4)；DENSE_RANK: 并列不跳过(1,2,2,3)
+```sql
+-- 每个职业内按伤害排名
+SELECT skill_name, skill_type, ROW_NUMBER() OVER (PARTITION BY skill_type ORDER BY damage DESC) as rn FROM 技能配置
+-- 在聚合结果上排名
+SELECT skill_type, AVG(damage) as avg_dmg, RANK() OVER (ORDER BY AVG(damage) DESC) as r FROM 技能配置 GROUP BY skill_type
+```
 
 ## ⚠️ 重要原则
 - 双行表头自动识别: 第1行中文描述+第2行英文字段名，可用中英文列名查询
@@ -1696,12 +1707,12 @@ SQL查询Excel数据（只读）。优先使用此工具而非excel_get_range进
 支持中文列名、双行表头自动识别、数学表达式。
 基础: SELECT/DISTINCT/别名(AS)/数学表达式(+-*/%)
 条件: WHERE/AND/OR/LIKE/IN/NOT IN/BETWEEN/IS NULL/NOT
-高级: 子查询(WHERE col IN(SELECT...))/CASE WHEN/COALESCE/EXISTS/CTE(WITH)/UNION/UNION ALL
+高级: 子查询(WHERE col IN(SELECT...))/CASE WHEN/COALESCE/EXISTS/CTE(WITH)/UNION/UNION ALL/窗口函数(ROW_NUMBER/RANK/DENSE_RANK)
 聚合: COUNT/SUM/AVG/MAX/MIN/COUNT(DISTINCT)/GROUP BY/HAVING/TOTAL行
 排序: ORDER BY DESC/ASC/LIMIT/OFFSET
 关联: INNER JOIN/LEFT JOIN（同文件内工作表）
 字符串: UPPER/LOWER/TRIM/LENGTH/CONCAT/REPLACE/SUBSTRING/LEFT/RIGHT
-不支持: 窗口函数/INSERT/DELETE/RIGHT JOIN/CROSS JOIN/FROM子查询
+不支持: INSERT/DELETE/RIGHT JOIN/CROSS JOIN/FROM子查询
 输出格式: table(默认Markdown)/json/csv
 示例: excel_query("技能表.xlsx", "SELECT 类型, AVG(伤害) FROM 技能配置 GROUP BY 类型 HAVING COUNT(*)>2 ORDER BY AVG(伤害) DESC")
     """

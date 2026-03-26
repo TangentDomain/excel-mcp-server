@@ -10,7 +10,7 @@
 [![Python 版本](https://img.shields.io/badge/python-3.10+-blue.svg)](https://www.python.org/downloads/)
 [![技术支持: FastMCP](https://img.shields.io/badge/Powered%20by-FastMCP-orange)](https://github.com/jlowin/fastmcp)
 ![状态](https://img.shields.io/badge/status-stable-green.svg)
-![测试覆盖](https://img.shields.io/badge/tests-832%20tests-brightgreen.svg)
+![测试覆盖](https://img.shields.io/badge/tests-847%20tests-brightgreen.svg)
 ![工具数量](https://img.shields.io/badge/tools-46%20verified%20tools-green.svg)
 [![CI](https://github.com/TangentDomain/excel-mcp-server/actions/workflows/ci.yml/badge.svg)](https://github.com/TangentDomain/excel-mcp-server/actions/workflows/ci.yml)
 
@@ -339,7 +339,7 @@ SELECT a.skill_name, b.equip_name FROM SkillConfig a INNER JOIN EquipConfig b ON
 ### 🔍 搜索与分析
 - `excel_search` - 正则表达式搜索
 - `excel_search_directory` - 目录批量搜索
-- `excel_query` - SQL查询（支持双行表头、WHERE/GROUP BY/HAVING/ORDER BY/LIMIT/OFFSET/DISTINCT/JOIN/UNION/子查询/CTE/CASE WHEN/COALESCE/字符串函数/数学表达式）
+- `excel_query` - SQL查询（支持双行表头、WHERE/GROUP BY/HAVING/ORDER BY/LIMIT/OFFSET/DISTINCT/JOIN/UNION/子查询/CTE/CASE WHEN/COALESCE/字符串函数/数学表达式/窗口函数）
 - `excel_update_query` - SQL UPDATE批量修改（SET常量/列引用/算术，WHERE条件，dry_run预览）
 - `excel_describe_table` - 查看表结构（列名、类型、描述、样本值，自动识别双行表头）
 - `excel_compare_sheets` - 工作表对比（游戏配置优化）
@@ -491,9 +491,20 @@ UPDATE 技能表 SET 伤害 = 伤害 * 1.1 WHERE 元素 = '火'  -- dry_run=True
 
 **不支持的语法（有清晰替代方案提示）：**
 - FROM子查询 `FROM (SELECT ...)`（提示：改用WHERE子查询或CTE）
-- 窗口函数 ROW_NUMBER/RANK/DENSE_RANK（提示：改用子查询+GROUP BY）
 - INSERT/DELETE语句（提示：写入请用excel_upsert_row或excel_update_query）
 - RIGHT JOIN / CROSS JOIN / FULL JOIN（游戏场景极少使用）
+
+**窗口函数（ROW_NUMBER/RANK/DENSE_RANK）：**
+```sql
+-- 按伤害降序排名
+SELECT skill_name, damage, ROW_NUMBER() OVER (ORDER BY damage DESC) as rn FROM 技能配置
+
+-- 每个职业内按伤害排名
+SELECT skill_name, skill_type, ROW_NUMBER() OVER (PARTITION BY skill_type ORDER BY damage DESC) as rn FROM 技能配置
+
+-- RANK vs DENSE_RANK: 相同伤害并列排名
+SELECT skill_name, damage, RANK() OVER (ORDER BY damage DESC) as r, DENSE_RANK() OVER (ORDER BY damage DESC) as dr FROM 技能配置
+```
 
 **双行表头自动识别：**
 ```
