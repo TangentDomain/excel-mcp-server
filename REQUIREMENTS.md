@@ -12,7 +12,7 @@
 | 🔧 工程治理 | REQ-010 | P1 | 代码复杂度/重复/依赖健康/架构 | 持续迭代 |
 | 📈 可观测性 | REQ-013 | P2 | 结构化日志/工具频率/错误分类 | 部分完成 |
 | 🌍 兼容性 | REQ-012 | P1 | 多客户端/跨平台/CI矩阵 | 大部分完成 |
-| 🏗️ 基建 | REQ-008 | P2 | git worktree隔离 | OPEN |
+| 🏗️ 基建 | REQ-008 | P2 | git worktree隔离 | DONE ✅ |
 | 🤖 AI体验优化 | REQ-025 | P1 | 返回值统一/错误结构化/大结果截断/重复工具合并 | 持续迭代 |
 | 📚 文档与门面 | REQ-026 | P1 | README优化/GitHub门面/使用示例/对比文档 | 持续迭代 |
 
@@ -128,7 +128,7 @@
 - **描述**：定时任务在 worktree 中进行开发和测试，测试通过后再合并回 develop/main
 - **好处**：多个子代理可并行开发、测试不会污染主工作目录、失败可快速丢弃
 - **验收**：定时任务自动创建worktree→开发→测试→合并→清理worktree
-- **状态**：OPEN
+- **状态**：DONE ✅（cron prompt已内置worktree工作流，每轮自动创建feature branch + worktree）
 
 ### REQ-006 [P1] 工具描述持续优化
 - **来源**：AI视角评价 — 工具描述直接影响AI选工具的准确率
@@ -212,7 +212,17 @@
   13. ❌ 跨文件JOIN：类似数据库跨库查询，`SELECT * FROM 技能表@file1.xlsx s JOIN 掉落表@file2.xlsx d ON s.技能ID = d.技能ID`
 - **测试**：16个新测试（test_sql_enhanced.py），779全通过
 - **验收标准**：每项至少2个测试用例 ✅ | 更新文件头支持列表 ✅ | 不支持项目有替代提示 ✅
-- **状态**：IN_PROGRESS（核心功能已完成，UNION/窗口函数/扩展JOIN留待后续）
+- **状态**：DONE ✅（v1.0.16, 第46轮，9项核心功能全部实现，16个新测试通过）
+
+### REQ-027 [P2] SQL引擎增强（剩余项）
+- **来源**：REQ-016未完成项拆分
+- **描述**：
+  1. UNION/UNION ALL：合并查询结果（需要跨DataFrame concat逻辑）
+  2. 窗口函数：ROW_NUMBER、RANK、DENSE_RANK（复杂度高，游戏场景少见）
+  3. RIGHT/FULL/CROSS JOIN（游戏场景极少使用）
+  4. 跨文件JOIN：`SELECT * FROM 技能表@file1.xlsx s JOIN 掉落表@file2.xlsx d ON s.技能ID = d.技能ID`
+- **验收标准**：每项至少2个测试，更新文件头支持列表
+- **状态**：OPEN
 - **v1.0.19修复**：EXISTS关联子查询无表限定符列引用re.sub参数顺序bug
 
 ### REQ-017 [P1→DONE] Streamable HTTP + SSE传输模式
