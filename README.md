@@ -10,11 +10,11 @@
 [![Python 版本](https://img.shields.io/badge/python-3.10+-blue.svg)](https://www.python.org/downloads/)
 [![技术支持: FastMCP](https://img.shields.io/badge/Powered%20by-FastMCP-orange)](https://github.com/jlowin/fastmcp)
 ![状态](https://img.shields.io/badge/status-stable-green.svg)
-![测试覆盖](https://img.shields.io/badge/tests-698%20passed-brightgreen.svg)
-![覆盖率](https://img.shields.io/badge/coverage-78.58%25-blue.svg)
-![工具数量](https://img.shields.io/badge/tools-38%20verified%20tools-green.svg)
+![测试覆盖](https://img.shields.io/badge/tests-1166%20tests-brightgreen.svg)
+![覆盖率](https://img.shields.io/badge/coverage-92.03%25-blue.svg)
+![工具数量](https://img.shields.io/badge/tools-40%20verified%20tools-green.svg)
 
-**ExcelMCP** 是专为游戏开发设计的Excel配置表管理MCP服务器。通过AI自然语言指令，实现技能配置表、装备数据、怪物属性等游戏配置的智能化操作。基于**FastMCP**和**openpyxl**构建，拥有**38个专业工具**和**698个测试用例**，确保企业级可靠性。
+**ExcelMCP** 是专为游戏开发设计的Excel配置表管理MCP服务器。通过AI自然语言指令，实现技能配置表、装备数据、怪物属性等游戏配置的智能化操作。基于**FastMCP**和**openpyxl**构建，拥有**40个专业工具**和**1166个测试用例**，确保企业级可靠性。
 
 🎯 **核心功能**: 技能系统、装备管理、怪物配置、数值平衡、版本对比、策划工具链
 
@@ -94,7 +94,11 @@ python -m pytest tests/ --tb=short -q
 | 技能平衡调整 | `excel_search` + `excel_update_range` | "将所有火系技能伤害提升20%" |
 | 装备配置管理 | `excel_format_cells` + `excel_get_range` | "用金色标记所有传说装备" |
 | 怪物数据验证 | `excel_check_duplicate_ids` + `excel_search` | "确保怪物ID唯一，血量合理" |
-| 版本对比分析 | `excel_compare_sheets` | "对比新旧版本配置表差异" |
+| 版本对比分析 | `excel_compare_sheets` + `excel_compare_files` | "对比新旧版本配置表差异" |
+| 数据统计查询 | `excel_query` | "查询技能表中各职业平均攻击力" |
+| 批量修改前预览 | `excel_preview_operation` + `excel_assess_data_impact` | "预览删除第5-10行的影响" |
+| 修改前备份 | `excel_create_backup` | "备份当前技能表再修改" |
+| 公式试算 | `excel_evaluate_formula` | "临时计算SUM(A2:A100)看结果" |
 
 ### 🔧 范围表达式参考
 
@@ -107,7 +111,153 @@ python -m pytest tests/ --tb=short -q
 
 ---
 
-## 🛠️ 完整工具列表（38个专业工具）
+## 🎮 游戏策划完整工作流教程
+
+> 从零开始，手把手教你用自然语言操作Excel配置表。不需要记住任何命令格式，用中文描述你想做什么就行。
+
+### 📦 第一步：了解你的表（DESCRIBE）
+
+拿到一张配置表，先看看有什么数据：
+
+```
+"查看 skills.xlsx 的技能表结构"
+→ excel_describe_table("skills.xlsx", "SkillConfig")
+```
+
+返回结果：
+```
+列名          | 类型    | 描述     | 非空 | 样本值
+skill_id     | int     | 技能ID   | 10/10 | 1001, 1002
+skill_name   | str     | 技能名称 | 10/10 | 火球术, 治愈之光
+damage       | float   | 伤害值   | 9/10  | 150.0, 200.5
+cooldown     | int     | 冷却时间 | 10/10 | 5, 10
+```
+
+💡 **小贴士**：双行表头的配置表（第1行中文描述+第2行英文字段名）会被自动识别，列描述自动关联。
+
+### 🔍 第二步：搜索定位（SEARCH）
+
+找特定数据：
+
+```
+"在 skills.xlsx 中搜索所有火系技能"
+→ excel_search("skills.xlsx", "火")
+
+"搜索所有包含'传说'的装备名称"
+→ excel_search("equipment.xlsx", "传说", "EquipmentConfig")
+```
+
+### 📊 第三步：SQL查询分析（QUERY）
+
+这是最强大的功能。用标准SQL语法查询配置表：
+
+**基础查询 — 找数据：**
+```sql
+-- 查看所有10级以上技能
+SELECT * FROM SkillConfig WHERE level >= 10
+
+-- 只看技能名和伤害，按伤害排序
+SELECT skill_name, damage FROM SkillConfig ORDER BY damage DESC LIMIT 10
+
+-- 分页查看：每页5条，看第3页
+SELECT * FROM MonsterConfig ORDER BY level LIMIT 5 OFFSET 10
+```
+
+**中文列名查询 — 策划友好：**
+```sql
+-- 双行表头时直接用中文名查询
+SELECT 技能名称, 伤害值 FROM SkillConfig WHERE 等级 >= 10
+
+-- 中文列名 + 英文列名混用也可以
+SELECT skill_name, 伤害值 FROM SkillConfig WHERE 技能类型 = '攻击'
+```
+
+**聚合统计 — 数值分析：**
+```sql
+-- 各职业平均伤害
+SELECT skill_type, AVG(damage) as avg_dmg, COUNT(*) as cnt
+FROM SkillConfig GROUP BY skill_type
+
+-- 哪些技能类型总伤害超过1000
+SELECT skill_type, SUM(damage) as total
+FROM SkillConfig GROUP BY skill_type HAVING total > 1000
+
+-- 装备品质分布
+SELECT DISTINCT quality FROM EquipmentConfig
+```
+
+**DPM数值平衡分析：**
+```sql
+-- 每秒伤害排名（DPM = damage / cooldown）
+SELECT skill_name, damage * 1.0 / cooldown as dpm
+FROM SkillConfig ORDER BY dpm DESC LIMIT 10
+```
+
+**数据质量检查：**
+```sql
+-- 找出有缺失值的配置
+SELECT skill_name, description FROM SkillConfig WHERE description IS NULL
+
+-- 找出特定等级范围的怪物
+SELECT name, level, hp FROM MonsterConfig WHERE level BETWEEN 10 AND 20
+
+-- 排除测试数据
+SELECT * FROM SkillConfig WHERE skill_name NOT LIKE '%测试%'
+```
+
+### ✏️ 第四步：批量修改（UPDATE）
+
+找到要改的数据后，批量修改：
+
+```
+"将 skills.xlsx 第2行到第50行的伤害列数值全部乘以1.15"
+→ excel_update_range("skills.xlsx", "SkillConfig!E2:E50",
+    [[原有值*1.15 for each cell]])
+```
+
+⚠️ **修改前一定要备份：**
+```
+"备份 skills.xlsx"
+→ excel_create_backup("skills.xlsx")
+```
+
+### 🔄 第五步：版本对比（COMPARE）
+
+改完之后对比一下：
+
+```
+"对比 v1.0 和 v1.1 的技能表差异"
+→ excel_compare_sheets("skills_v1.0.xlsx", "SkillConfig",
+                        "skills_v1.1.xlsx", "SkillConfig")
+```
+
+### 📋 常用策划场景速查
+
+| 我想做 | 怎么说 |
+|--------|--------|
+| 看看表里有什么 | "查看xxx表结构" |
+| 找某个技能/装备 | "搜索xxx" |
+| 按条件筛选 | "查询等级>10的技能" |
+| 统计各类型数量 | "各职业技能有多少个" |
+| 找最强的技能 | "DPM最高的10个技能" |
+| 找有问题的数据 | "哪些技能描述是空的" |
+| 批量改数值 | "把所有火系技能伤害提升20%" |
+| 对比版本差异 | "对比v1和v2的配置表" |
+
+### ❓ 常见错误和解决
+
+**Q: 列名拼错了怎么办？**
+A: 系统会自动推荐相似列名。比如你写 `skil_name`，会提示"你是否想用: skill_name?"
+
+**Q: 表太大查询慢？**
+A: 同一张表重复查询会自动缓存，第二次查询速度提升30-100倍。2000行的大表首次~230ms，缓存后仅需2-8ms。
+
+**Q: JOIN不支持怎么办？**
+A: 分别查询两张表，让AI在结果层帮你关联。
+
+---
+
+## 🛠️ 完整工具列表（40个专业工具）
 
 ### 📁 文件与工作表管理
 - `excel_create_file` - 创建新Excel文件，支持自定义工作表
@@ -128,18 +278,33 @@ python -m pytest tests/ --tb=short -q
 - `excel_insert_columns` - 插入空列
 - `excel_delete_columns` - 删除列范围
 - `excel_find_last_row` - 查找最后一行有数据位置
+- `excel_set_formula` - 设置单元格公式（自动计算）
+- `excel_evaluate_formula` - 临时执行公式返回结果，不修改文件
 
 ### 🔍 搜索与分析
 - `excel_search` - 正则表达式搜索
 - `excel_search_directory` - 目录批量搜索
+- `excel_query` - SQL查询（支持双行表头自动识别、WHERE/GROUP BY/HAVING/ORDER BY/LIMIT、聚合函数、数学表达式、DISTINCT）
+- `excel_describe_table` - 查看表结构（列名、类型、描述、样本值，自动识别双行表头）
 - `excel_compare_sheets` - 工作表对比（游戏配置优化）
+- `excel_compare_files` - 多工作表文件对比
 - `excel_check_duplicate_ids` - ID重复检测
+
+### 🛡️ 安全与备份
+- `excel_create_backup` - 创建文件自动备份
+- `excel_restore_backup` - 从备份恢复文件
+- `excel_list_backups` - 列出所有备份记录
+- `excel_preview_operation` - 预览操作影响范围和当前数据
+- `excel_assess_data_impact` - 全面评估操作的潜在影响
+
+### 📜 操作历史
+- `excel_get_operation_history` - 获取操作历史记录和统计
 
 ### 🎨 格式化与样式
 - `excel_format_cells` - 应用字体、颜色、对齐格式
 - `excel_set_borders` - 设置单元格边框
 - `excel_merge_cells` - 合并单元格范围
-- `excel_unmerge_cells` - 取消合并单元格
+- `excel_unmerge_cells` - 取消合并单元格范围
 - `excel_set_column_width` - 调整列宽
 - `excel_set_row_height` - 调整行高
 
@@ -154,11 +319,13 @@ python -m pytest tests/ --tb=short -q
 
 ### 🎮 游戏配置表标准格式
 
-**双行表头系统** (游戏开发专用):
+**双行表头系统** (游戏开发专用，自动识别):
 ```
 第1行(描述): ['技能ID描述', '技能名称描述', '技能类型描述']
 第2行(字段): ['skill_id', 'skill_name', 'skill_type']
 ```
+
+`excel_query` 会自动检测双行表头格式（第1行中文描述 + 第2行英文字段名），无需手动指定。查询结果中会附带 `column_descriptions` 映射，方便理解字段含义。
 
 **常见配置表结构**:
 - **技能配置表**: ID|名称|类型|等级|消耗|冷却|伤害|描述
@@ -174,7 +341,73 @@ python -m pytest tests/ --tb=short -q
 5. **美化显示**: 使用 `excel_format_cells` 标记重要数据
 6. **验证结果**: 重新读取确认更新成功
 
-### 🚨 故障排除
+### 🔍 SQL查询参考
+
+`excel_query` 基于sqlglot + pandas实现，支持以下SQL语法：
+
+**支持的语法：**
+```sql
+-- 基础查询
+SELECT * FROM 技能表 WHERE level >= 10 LIMIT 20
+SELECT skill_name, damage FROM 技能表 ORDER BY damage DESC
+
+-- 聚合统计
+SELECT skill_type, AVG(damage) as avg_dmg, COUNT(*) as cnt FROM 技能表 GROUP BY skill_type
+
+-- HAVING过滤
+SELECT skill_type, SUM(damage) as total FROM 技能表 GROUP BY skill_type HAVING total > 1000
+
+-- 数学表达式
+SELECT skill_name, damage * 1.2 as boosted_dmg FROM 技能表 WHERE level >= 5
+
+-- LIKE模糊搜索
+SELECT * FROM 技能表 WHERE skill_name LIKE '%火%'
+
+-- DISTINCT去重
+SELECT DISTINCT skill_type FROM 技能表
+
+-- IN条件
+SELECT * FROM 技能表 WHERE skill_type IN ('攻击', '辅助')
+
+-- BETWEEN范围
+SELECT * FROM 怪物表 WHERE level BETWEEN 10 AND 20
+
+-- IS NULL / IS NOT NULL 空值检测
+SELECT * FROM 技能表 WHERE description IS NULL
+SELECT * FROM 技能表 WHERE description IS NOT NULL
+
+-- OFFSET分页（大表分批查看）
+SELECT * FROM 怪物表 ORDER BY level LIMIT 20 OFFSET 0
+SELECT * FROM 怪物表 ORDER BY level LIMIT 20 OFFSET 20
+
+-- NOT LIKE / NOT IN 排除匹配
+SELECT * FROM 技能表 WHERE skill_name NOT LIKE '%测试%'
+SELECT * FROM 装备表 WHERE quality NOT IN ('废弃', '内部测试')
+```
+
+**不支持的语法（有清晰替代方案提示）：**
+- JOIN（提示：读取两表在AI层关联）
+- CASE WHEN（提示：分条件查询或外部处理）
+- 子查询 / CTE / 窗口函数
+
+**双行表头自动识别：**
+```
+# 自动检测到双行表头后，查询结果包含column_descriptions映射
+# 例：查询 "技能表" 的 skill_name 列，返回时附带 "技能名称" 描述
+```
+
+**智能列名建议：**
+```
+# 拼写错误时自动推荐相似列名（基于编辑距离匹配）
+# 例：SELECT skil_name FROM 技能表
+# → 错误：列 'skil_name' 不存在。你是否想用: skill_name?
+```
+
+**查询性能：**
+- 同一文件重复查询自动缓存，提速30-100倍
+- 小表(10行)：首次30-47ms，缓存后2-5ms
+- 大表(2000行)：首次~230ms，缓存后2-8ms
+- 文件修改后缓存自动失效
 
 **常见问题解决**:
 - **文件被锁定**: 关闭Excel程序后重试
@@ -215,10 +448,9 @@ API业务逻辑层 (集中式处理)
 ## 📊 项目信息
 
 ### 质量验证指标
-- **测试用例**: 699个 (698通过, 1跳过)
+- **测试用例**: 1166个
 - **测试代码**: 13,515行 (全面验证)
-- **工具数量**: 38个 (@mcp.tool装饰器验证)
-- **测试覆盖**: 78.58%
+- **工具数量**: 40个 (@mcp.tool装饰器验证)
 - **架构层次**: 4层分层设计 (MCP→API→Core→Utils)
 
 ### 验证命令
@@ -227,7 +459,7 @@ API业务逻辑层 (集中式处理)
 python -m pytest tests/ -v
 
 # 验证工具完整性
-grep -r "@mcp.tool" src/ | wc -l  # 应输出: 38
+grep -r "@mcp.tool" src/ | wc -l  # 应输出: 40
 
 # 生成覆盖率报告
 python -m pytest tests/ --cov=src --cov-report=html
@@ -251,7 +483,7 @@ A: 支持`.xlsx`、`.xlsm`格式，通过导入导出支持`.csv`格式
 A: 完全支持中文工作表名和内容
 
 **Q: 大文件处理性能如何？**
-A: 基于openpyxl性能，建议对大文件进行分批处理
+A: SQL查询自动缓存DataFrame，同一文件重复查询提速30-100倍。大表(2000行)首次~230ms，缓存后2-8ms。
 
 **Q: 如何确保数据安全？**
 A: 完整错误处理，默认保留公式，支持操作预览
@@ -283,7 +515,7 @@ A: 使用专门的配置表对比工具，支持ID对象跟踪
 
 | 🎯 **快速开始** | 🛠️ **工具参考** | 📚 **学习指南** |
 |----------------|----------------|----------------|
-| [🚀 安装配置](#-快速入门-3分钟设置) | [📋 完整工具列表](#️-完整工具列表38个专业工具) | [📖 使用指南](#-使用指南) |
+| [🚀 安装配置](#-快速入门-3分钟设置) | [📋 完整工具列表](#️-完整工具列表40个专业工具) | [📖 使用指南](#-使用指南) |
 | [⚡ 命令速查](#-快速参考) | [🏗️ 技术架构](#️-技术架构) | [🚨 故障排除](#-故障排除) |
 | [🎮 游戏配置管理](#-使用指南) | [📊 项目信息](#-项目信息) | [❓ 常见问题](#-常见问题) |
 

@@ -207,3 +207,9 @@ def formula_excel_file(temp_dir):
 
     wb.save(file_path)
     return str(file_path)
+
+
+@pytest.fixture
+def game_config_file():
+    """Provide path to the game config test file with dual-row headers"""
+    return str(Path(__file__).parent / "test_data" / "game_config.xlsx")
