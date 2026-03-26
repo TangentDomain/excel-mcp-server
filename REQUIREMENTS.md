@@ -211,6 +211,7 @@
 - **测试**：16个新测试（test_sql_enhanced.py），779全通过
 - **验收标准**：每项至少2个测试用例 ✅ | 更新文件头支持列表 ✅ | 不支持项目有替代提示 ✅
 - **状态**：IN_PROGRESS（核心功能已完成，UNION/窗口函数/扩展JOIN留待后续）
+- **v1.0.19修复**：EXISTS关联子查询无表限定符列引用re.sub参数顺序bug
 
 ### REQ-017 [P1→DONE] Streamable HTTP + SSE传输模式
 - **来源**：竞品分析 — haris-musa支持三重传输，我们仅stdio
