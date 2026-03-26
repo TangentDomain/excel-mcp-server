@@ -203,9 +203,10 @@ def _validate_path(file_path: str) -> Optional[Dict[str, Any]]:
 operation_logger = OperationLogger()
 
 # ==================== 配置和初始化 ====================
-# 开启详细日志用于调试
+# 日志级别: 默认WARNING，设置EXCEL_MCP_DEBUG=1开启DEBUG
+_log_level = logging.DEBUG if os.environ.get('EXCEL_MCP_DEBUG') else logging.WARNING
 logging.basicConfig(
-    level=logging.DEBUG,  # 改为DEBUG级别获取更多信息
+    level=_log_level,
     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
     handlers=[
         logging.StreamHandler(),
@@ -266,8 +267,8 @@ mcp = FastMCP(
 4. excel_update_query / excel_update_range - 数据更新
 5. excel_compare_sheets - 版本对比
 """,
-    debug=True,
-    log_level="DEBUG"
+    debug=bool(os.environ.get('EXCEL_MCP_DEBUG')),
+    log_level="DEBUG" if os.environ.get('EXCEL_MCP_DEBUG') else "WARNING"
 )
 
 
