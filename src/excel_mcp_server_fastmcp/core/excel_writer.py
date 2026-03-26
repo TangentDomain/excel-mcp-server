@@ -881,7 +881,7 @@ class ExcelWriter:
                     elif isinstance(actual_value, bool):
                         return "boolean"
 
-            except:
+            except Exception:
                 pass
             return "unknown"
 
@@ -1128,7 +1128,7 @@ class ExcelWriter:
             if not values:
                 return 0
             return float(np.mean(values))
-        except:
+        except Exception:
             return sum(values) / len(values) if values else 0
 
     def _numpy_min(self, values: list) -> float:
@@ -1138,7 +1138,7 @@ class ExcelWriter:
             if not values:
                 return 0
             return float(np.min(values))
-        except:
+        except Exception:
             return min(values) if values else 0
 
     def _numpy_max(self, values: list) -> float:
@@ -1148,7 +1148,7 @@ class ExcelWriter:
             if not values:
                 return 0
             return float(np.max(values))
-        except:
+        except Exception:
             return max(values) if values else 0
 
     def _numpy_median(self, values: list) -> float:
@@ -1158,7 +1158,7 @@ class ExcelWriter:
             if not values:
                 return 0
             return float(np.median(values))
-        except:
+        except Exception:
             sorted_values = sorted(values)
             n = len(sorted_values)
             if n == 0:
@@ -1175,7 +1175,7 @@ class ExcelWriter:
             if len(values) < 2:
                 return 0
             return float(np.std(values, ddof=1))
-        except:
+        except Exception:
             if len(values) < 2:
                 return 0
             mean = sum(values) / len(values)
@@ -1189,7 +1189,7 @@ class ExcelWriter:
             if len(values) < 2:
                 return 0
             return float(np.var(values, ddof=1))
-        except:
+        except Exception:
             if len(values) < 2:
                 return 0
             mean = sum(values) / len(values)
@@ -1202,7 +1202,7 @@ class ExcelWriter:
             if not values:
                 return 0
             return float(np.percentile(values, percentile * 100))
-        except:
+        except Exception:
             if not values:
                 return 0
             sorted_values = sorted(values)
@@ -1243,7 +1243,7 @@ class ExcelWriter:
             else:
                 threshold = float(condition)
                 return int(np.sum(arr == threshold))
-        except:
+        except Exception:
             # 回退到基础实现
             count = 0
             for value in values:
@@ -1282,7 +1282,7 @@ class ExcelWriter:
             else:
                 threshold = float(condition)
                 return float(np.sum(arr[arr == threshold]))
-        except:
+        except Exception:
             # 回退到基础实现
             total = 0
             for value in values:
@@ -1308,7 +1308,7 @@ class ExcelWriter:
                 filtered = arr[arr < threshold]
                 return float(np.mean(filtered)) if len(filtered) > 0 else 0
             # 添加更多条件...
-        except:
+        except Exception:
             # 回退到基础实现
             filtered_values = []
             for value in values:
@@ -1326,7 +1326,7 @@ class ExcelWriter:
                 return 0
             mode_result = stats.mode(values, keepdims=True)
             return float(mode_result[0][0])
-        except:
+        except Exception:
             # 简单实现：返回最频繁出现的值
             if not values:
                 return 0
@@ -1341,7 +1341,7 @@ class ExcelWriter:
             if len(values) < 3:
                 return 0
             return float(stats.skew(values))
-        except:
+        except Exception:
             return 0
 
     def _numpy_kurtosis(self, values: list) -> float:
@@ -1351,7 +1351,7 @@ class ExcelWriter:
             if len(values) < 4:
                 return 0
             return float(stats.kurtosis(values))
-        except:
+        except Exception:
             return 0
 
     def _numpy_geomean(self, values: list) -> float:
@@ -1361,7 +1361,7 @@ class ExcelWriter:
             if not values or any(v <= 0 for v in values):
                 return 0
             return float(stats.gmean(values))
-        except:
+        except Exception:
             if not values or any(v <= 0 for v in values):
                 return 0
             import math
@@ -1377,7 +1377,7 @@ class ExcelWriter:
             if not values or any(v <= 0 for v in values):
                 return 0
             return float(stats.hmean(values))
-        except:
+        except Exception:
             if not values or any(v <= 0 for v in values):
                 return 0
             return len(values) / sum(1.0 / v for v in values)

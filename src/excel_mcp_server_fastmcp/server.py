@@ -17,6 +17,7 @@ Excel MCP Server - 基于 FastMCP 和 openpyxl 实现
 """
 
 import functools
+import json
 import logging
 import os
 import re
@@ -168,12 +169,14 @@ def _track_call(func):
             result = func(*args, **kwargs)
             duration_ms = (time.perf_counter() - start) * 1000
             _tracker.record(func.__name__, duration_ms, success=True)
-            logger.debug(f"[TOOL] {func.__name__}: {duration_ms:.1f}ms")
+            logger.debug(f"[TOOL] {func.__name__}: {duration_ms:.1f}ms",
+                         extra={'tool': func.__name__, 'duration_ms': round(duration_ms, 1)})
             return result
         except Exception as e:
             duration_ms = (time.perf_counter() - start) * 1000
             _tracker.record(func.__name__, duration_ms, success=False)
-            logger.debug(f"[TOOL] {func.__name__}: {duration_ms:.1f}ms ERROR: {e}")
+            logger.debug(f"[TOOL] {func.__name__}: {duration_ms:.1f}ms ERROR: {e}",
+                         extra={'tool': func.__name__, 'duration_ms': round(duration_ms, 1), 'error': str(e)})
             raise
     return wrapper
 
@@ -285,16 +288,45 @@ def _validate_path(file_path: str) -> Optional[Dict[str, Any]]:
 # 全局操作日志器
 operation_logger = OperationLogger()
 
+# ==================== 结构化JSON日志 ====================
+class JsonFormatter(logging.Formatter):
+    """结构化JSON日志格式化器，每条日志输出为单行JSON对象
+    
+    输出字段: ts(ISO时间戳), level, module, message
+    可选字段: tool(工具名), duration_ms(耗时), error(错误信息), file_path, operation
+    激活方式: EXCEL_MCP_JSON_LOG=1
+    """
+    def format(self, record):
+        log_entry = {
+            'ts': datetime.now().isoformat(),
+            'level': record.levelname,
+            'module': record.module,
+            'message': record.getMessage(),
+        }
+        for field in ('tool', 'duration_ms', 'error', 'file_path', 'operation'):
+            value = getattr(record, field, None)
+            if value is not None:
+                log_entry[field] = value
+        return json.dumps(log_entry, ensure_ascii=False)
+
+
 # ==================== 配置和初始化 ====================
 # 日志级别: 默认WARNING，设置EXCEL_MCP_DEBUG=1开启DEBUG
 _log_level = logging.DEBUG if os.environ.get('EXCEL_MCP_DEBUG') else logging.WARNING
-logging.basicConfig(
-    level=_log_level,
-    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
-    handlers=[
-        logging.StreamHandler(),
-    ]
-)
+_json_log = os.environ.get('EXCEL_MCP_JSON_LOG')
+if _json_log:
+    _handler = logging.StreamHandler()
+    _handler.setFormatter(JsonFormatter())
+    logging.basicConfig(level=_log_level, handlers=[_handler], force=True)
+else:
+    logging.basicConfig(
+        level=_log_level,
+        format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
+        handlers=[
+            logging.StreamHandler(),
+        ],
+        force=True,
+    )
 logger = logging.getLogger(__name__)
 
 # 启动时清理孤儿临时文件

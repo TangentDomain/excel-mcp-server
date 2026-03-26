@@ -10,7 +10,7 @@
 [![Python Version](https://img.shields.io/badge/python-3.10+-blue.svg)](https://www.python.org/downloads/)
 [![Powered by: FastMCP](https://img.shields.io/badge/Powered%20by-FastMCP-orange)](https://github.com/jlowin/fastmcp)
 ![Status](https://img.shields.io/badge/status-stable-green.svg)
-![Tests](https://img.shields.io/badge/tests-775%20tests-brightgreen.svg)
+![Tests](https://img.shields.io/badge/tests-784%20tests-brightgreen.svg)
 ![Tools](https://img.shields.io/badge/tools-42%20verified%20tools-green.svg)
 [![CI](https://github.com/TangentDomain/excel-mcp-server/actions/workflows/ci.yml/badge.svg)](https://github.com/TangentDomain/excel-mcp-server/actions/workflows/ci.yml)
 
@@ -44,7 +44,7 @@ MCP client configuration:
 }
 ```
 
-> 💡 **Debug mode**: Set environment variable `EXCEL_MCP_DEBUG=1` to enable verbose logging (default: WARNING level).
+> 💡 **Debug mode**: Set environment variable `EXCEL_MCP_DEBUG=1` to enable verbose logging (default: WARNING level). Set `EXCEL_MCP_JSON_LOG=1` for structured JSON logging (one JSON object per line with ts/level/tool/duration_ms fields).
 
 ### Option 2: Install from Source
 
@@ -553,7 +553,7 @@ Tool Layer (Common Functions)
 ## 📊 Project Information
 
 ### Quality Validation Metrics
-- **Test Cases**: 775 (behavior validation, no coverage padding)
+- **Test Cases**: 784 (behavior validation, no coverage padding)
 - **Test Files**: 34 test files
 - **Test Code**: 13,574 lines
 - **Tool Count**: 42 (@mcp.tool decorator verified)
