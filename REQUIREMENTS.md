@@ -86,8 +86,9 @@
   - ✅ 第29轮：JSON报告输出，按类别汇总（sql/read/search/write）
   - ✅ 第35轮：ToolCallTracker + @_track_call装饰器 — 自动追踪42个工具调用次数/耗时/错误率
   - ✅ 第35轮：excel_server_stats工具 — 运行时统计查询（第42个工具）
+  - ✅ 第36轮：JsonFormatter结构化JSON日志 — EXCEL_MCP_JSON_LOG=1激活，单行JSON输出
 - **验收**：benchmark自动运行并输出对比报告，日志格式统一
-- **状态**：OPEN（性能基线已完成，结构化日志和工具使用频率追踪待后续实现）
+- **状态**：OPEN（性能基线+追踪器+JSON日志已完成，错误分类统计待后续实现）
 
 ### REQ-010 [P1] 工程治理
 - **来源**：CEO要求 — 项目不仅要功能完善，工程本身也要健康
