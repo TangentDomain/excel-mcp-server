@@ -338,76 +338,78 @@ if _cleaned:
 # 创建FastMCP服务器实例，开启调试模式和详细日志
 mcp = FastMCP(
     name="excel-mcp",
-    instructions=r"""🎮 游戏开发Excel配置表管理专家
+    instructions=r"""🎮 游戏开发Excel配置表管理专家 — 46个工具
 
 ## 🔥 核心原则：SQL优先
 
 **优先使用 `excel_query`** - 所有数据查询分析任务
 - 复杂条件筛选 ✅ WHERE, LIKE, IN, BETWEEN, 子查询
 - 聚合统计分析 ✅ COUNT, SUM, AVG, MAX, MIN, GROUP BY, HAVING
-- 高级查询 ✅ CASE WHEN, CTE(WITH), EXISTS, JOIN
+- 高级查询 ✅ CASE WHEN, CTE(WITH), EXISTS, JOIN(5种)
 - 排序限制 ✅ ORDER BY, LIMIT, OFFSET
 - 字符串函数 ✅ UPPER, LOWER, TRIM, LENGTH, CONCAT, REPLACE, SUBSTRING
+- 结果合并 ✅ UNION, UNION ALL
+- 窗口函数 ✅ ROW_NUMBER, RANK, DENSE_RANK
 
 ## 📊 工具选择决策树
 ```
-需要数据分析/查询？   → excel_query (SQL引擎，支持WHERE/GROUP BY/JOIN/子查询/CTE)
-需要快速了解表结构？ → excel_describe_table (列名+类型+样本)
-需要定位单元格？     → excel_search (返回row/column)
-需要批量修改数据？   → excel_update_query (SQL UPDATE语法)
-需要修改指定单元格？ → excel_update_range (范围写入)
-需要格式调整？       → excel_format_cells
+数据分析/查询/筛选/聚合？ → excel_query (SQL引擎)
+快速了解单表结构？        → excel_describe_table (列名+类型+样本值+行数)
+批量获取所有表的中英表头？ → excel_get_sheet_headers (双行表头专用)
+定位文本位置？            → excel_search (返回row/column)
+跨文件搜索？              → excel_search_directory
+批量条件修改？            → excel_update_query (SQL UPDATE, 支持dry_run)
+写入指定单元格范围？      → excel_update_range (二维数组写入)
+按ID合并导入配置？        → excel_upsert_row (存在更新/不存在插入)
+批量导入多行数据？        → excel_batch_insert_rows
+创建配置表变体？          → excel_copy_sheet (复制工作表)
+按ID对比两表差异？        → excel_compare_sheets (对象级: 新增/删除/修改)
+逐单元格对比差异？        → excel_compare_files (单元格级)
+格式调整？                → excel_format_cells (preset: highlight/warning/success)
 ```
 
-## ✅ SQL已支持功能 (38项)
-基础查询: SELECT, DISTINCT, 别名(AS), 数学表达式(+-*/%)
-条件筛选: WHERE, =/>/</<=/>=/!=, LIKE, IN, NOT IN, BETWEEN, AND/OR, IS NULL, NOT
-高级查询: 子查询(WHERE col IN (SELECT...)), CASE WHEN, COALESCE, EXISTS, CTE(WITH)
-聚合统计: COUNT(*), COUNT(col), SUM, AVG, MAX, MIN, GROUP BY, HAVING, TOTAL行
-排序限制: ORDER BY DESC/ASC, LIMIT, OFFSET
-表关联: INNER JOIN, LEFT JOIN（同文件内工作表）
-字符串函数: UPPER, LOWER, TRIM, LENGTH, CONCAT, REPLACE, SUBSTRING, LEFT, RIGHT
-窗口函数: ROW_NUMBER, RANK, DENSE_RANK（OVER PARTITION BY ... ORDER BY ...）
+## ✅ SQL已支持功能 (45项)
+基础(4): SELECT, DISTINCT, 别名(AS), 数学表达式(+-*/%)
+条件(12): WHERE, =, >, <, <=, >=, !=, LIKE, NOT LIKE, IN, NOT IN, BETWEEN, AND, OR, IS NULL, IS NOT NULL, NOT
+高级(5): 子查询(WHERE col IN (SELECT...)), CASE WHEN, COALESCE, EXISTS, CTE(WITH ... AS ...)
+聚合(9): COUNT(*), COUNT(col), COUNT(DISTINCT), SUM, AVG, MAX, MIN, GROUP BY, HAVING, TOTAL行
+排序(3): ORDER BY DESC/ASC, LIMIT, OFFSET
+合并(2): UNION(去重), UNION ALL(不去重)
+关联(5): INNER JOIN, LEFT JOIN, RIGHT JOIN, FULL JOIN, CROSS JOIN（同文件内工作表）
+字符串(9): UPPER, LOWER, TRIM, LENGTH, CONCAT, REPLACE, SUBSTRING, LEFT, RIGHT
+窗口(3): ROW_NUMBER, RANK, DENSE_RANK（OVER PARTITION BY ... ORDER BY ...）
 
-## ❌ SQL不支持功能
-INSERT/DELETE, FROM子查询
+## ❌ SQL不支持
+INSERT, DELETE, FROM子查询(用 WHERE col IN (SELECT...) 替代)
 
 ## ✅ UNION / UNION ALL
-合并多个 SELECT 查询结果。UNION 去重，UNION ALL 保留重复行。
-支持 ORDER BY 和 LIMIT 应用于合并结果。
+合并多个SELECT查询结果。支持ORDER BY和LIMIT。
 ```sql
-SELECT name, damage FROM 技能配置 WHERE 技能类型='法师' UNION ALL SELECT name, damage FROM 技能配置 WHERE 技能类型='战士' ORDER BY damage DESC LIMIT 10
+SELECT name FROM 技能配置 WHERE 类型='法师' UNION ALL SELECT name FROM 技能配置 WHERE 类型='战士' ORDER BY name LIMIT 10
 ```
-替代方案: 子查询用 WHERE col IN (SELECT...)，不支持FROM子查询
 
 ## ✅ 窗口函数 (ROW_NUMBER / RANK / DENSE_RANK)
-在查询结果上计算排名。支持 PARTITION BY 分区和 ORDER BY 排序。
-ROW_NUMBER: 连续编号(1,2,3)；RANK: 并列跳过(1,2,2,4)；DENSE_RANK: 并列不跳过(1,2,2,3)
+在查询结果上计算排名，支持PARTITION BY分区。
 ```sql
--- 每个职业内按伤害排名
 SELECT skill_name, skill_type, ROW_NUMBER() OVER (PARTITION BY skill_type ORDER BY damage DESC) as rn FROM 技能配置
--- 在聚合结果上排名
-SELECT skill_type, AVG(damage) as avg_dmg, RANK() OVER (ORDER BY AVG(damage) DESC) as r FROM 技能配置 GROUP BY skill_type
 ```
 
 ## ⚠️ 重要原则
-- 双行表头自动识别: 第1行中文描述+第2行英文字段名，可用中英文列名查询
+- 双行表头: 第1行中文描述+第2行英文字段名，中英文列名均可查询
 - 1-based索引: 第1行=1, 第1列=1
-- 范围格式: 必须包含工作表名 "技能表!A1:Z100"
-- 默认覆盖: update_range默认覆盖，需保留数据用insert_mode=True
+- 范围格式: "工作表名!A1:Z100"（必须含工作表名）
+- 默认覆盖: update_range默认覆盖，保留数据用insert_mode=True
 
 ## 🎮 游戏配置表示例
 技能统计: SELECT 技能类型, AVG(伤害), COUNT(*) FROM 技能表 GROUP BY 技能类型
 高级筛选: SELECT * FROM 技能表 WHERE 伤害 > (SELECT AVG(伤害) FROM 技能表)
 条件表达式: SELECT 技能名, CASE WHEN 伤害>100 THEN '高' ELSE '低' END AS 等级 FROM 技能表
 CTE: WITH 高伤 AS (SELECT * FROM 技能表 WHERE 伤害>100) SELECT COUNT(*) FROM 高伤
+UNION: SELECT 技能名 FROM 法师技能 UNION ALL SELECT 技能名 FROM 战士技能
+窗口函数: SELECT *, ROW_NUMBER() OVER (PARTITION BY 类型 ORDER BY 伤害 DESC) as 排名 FROM 技能配置
 
 ## ⚡ 常用流程
-1. excel_list_sheets - 列出工作表
-2. excel_describe_table - 快速了解表结构（列名+类型+样本）
-3. excel_query - SQL查询分析
-4. excel_update_query / excel_update_range - 数据更新
-5. excel_compare_sheets - 版本对比
+1. excel_list_sheets → 2. excel_describe_table → 3. excel_query → 4. excel_update_query/excel_update_range → 5. excel_compare_sheets
 """,
     debug=bool(os.environ.get('EXCEL_MCP_DEBUG')),
     log_level="DEBUG" if os.environ.get('EXCEL_MCP_DEBUG') else "WARNING"
@@ -420,7 +422,7 @@ CTE: WITH 高伤 AS (SELECT * FROM 技能表 WHERE 伤害>100) SELECT COUNT(*) F
 @_track_call
 def excel_list_sheets(file_path: str) -> Dict[str, Any]:
     """
-列出Excel文件中所有工作表名称。查询前先用此工具确认有哪些工作表。
+列出Excel文件中所有工作表名称。SQL查询前先用此工具确认有哪些工作表。
     """
     _path_err = _validate_path(file_path)
     if _path_err:
@@ -434,6 +436,7 @@ def excel_get_sheet_headers(file_path: str) -> Dict[str, Any]:
     """
 批量获取所有工作表的双行表头（游戏开发专用）。
 返回每个表的字段描述（中文）和字段名（英文）。专为游戏配置表双行表头设计。
+查看单个表的详细结构（类型+样本值+行数）请用excel_describe_table。
     """
     _path_err = _validate_path(file_path)
     if _path_err:
@@ -497,8 +500,8 @@ def excel_get_range(
     include_formatting: bool = False
 ) -> Dict[str, Any]:
     """
-读取指定范围的原始单元格数据。适合精确读取已知区域（如"Sheet1!A1:C10"）。
-如需查询/筛选/聚合，优先使用excel_query。
+读取指定范围的原始单元格数据（calamine引擎，极速）。适合精确读取已知区域（如"Sheet1!A1:C10"）。
+如需查询/筛选/聚合分析，优先使用excel_query。
     """
     _path_err = _validate_path(file_path)
     if _path_err:
@@ -551,6 +554,7 @@ def excel_get_headers(
     """
 获取单个工作表的表头行。返回指定行的列名列表。
 查看所有工作表的双行表头（中英映射）请用excel_get_sheet_headers。
+快速查看完整表结构（列名+类型+样本值）请用excel_describe_table。
     """
     _path_err = _validate_path(file_path)
     if _path_err:
@@ -568,8 +572,10 @@ def excel_update_range(
     insert_mode: bool = True
 ) -> Dict[str, Any]:
     """
-写入数据到指定范围。适合批量写入已知数据（二维数组）。
-如需条件修改（如"火系伤害+10%"），优先使用excel_update_query。
+写入数据到指定范围（二维数组）。适合批量写入已知数据到精确位置。
+如需条件修改（如"火系伤害+10%"），优先使用excel_update_query（SQL UPDATE语法）。
+按ID合并导入（存在更新/不存在插入）请用excel_upsert_row。
+追加数据到末尾请用excel_batch_insert_rows或先excel_find_last_row确定位置。
     """
     _path_err = _validate_path(file_path)
     if _path_err:
@@ -1302,6 +1308,7 @@ def excel_find_last_row(
 ) -> Dict[str, Any]:
     """
 查找工作表最后一行（有数据的最大行号）。追加数据前用此工具确定插入位置。
+可指定column参数查找某列的最后一行。批量追加多行请用excel_batch_insert_rows。
     """
     _path_err = _validate_path(file_path)
     if _path_err:
@@ -1835,9 +1842,10 @@ def excel_describe_table(
     sheet_name: str = None
 ) -> Dict[str, Any]:
     """
-快速查看Excel工作表结构。查询前先用此工具了解有哪些列、什么类型。
+快速查看Excel工作表结构。SQL查询前先用此工具了解有哪些列、什么类型、有多少行数据。
 自动识别双行表头（第1行中文描述+第2行英文字段名），输出中英映射。
-返回: 列名、类型、非空数量、示例值、行数。
+返回: 列名、数据类型(number/text/date/mixed)、非空数量、示例值、总行数。
+批量获取所有工作表的中英表头映射请用excel_get_sheet_headers。
     """
     _path_err = _validate_path(file_path)
     if _path_err:
@@ -1971,7 +1979,8 @@ def excel_format_cells(
     preset: Optional[str] = None
 ) -> Dict[str, Any]:
     """
-格式化单元格样式。支持preset(highlight/warning/success)和自定义格式。
+格式化单元格样式。快速高亮用preset参数: "highlight"(黄色背景), "warning"(红色背景), "success"(绿色背景)。
+也支持自定义格式(字体/背景色/加粗/边框等)。设置边框请用excel_set_borders。
     """
     _path_err = _validate_path(file_path)
     if _path_err:
@@ -1987,7 +1996,8 @@ def excel_merge_cells(
     range: str
 ) -> Dict[str, Any]:
     """
-合并指定范围的单元格（如"A1:C3"）。
+合并指定范围的单元格为一个大单元格（如"A1:C3"）。仅保留左上角单元格的值。
+取消合并请用excel_unmerge_cells。
     """
     _path_err = _validate_path(file_path)
     if _path_err:
@@ -2003,7 +2013,7 @@ def excel_unmerge_cells(
     range: str
 ) -> Dict[str, Any]:
     """
-取消合并指定范围的单元格。
+取消合并指定范围内的已合并单元格，恢复为独立单元格。合并请用excel_merge_cells。
     """
     _path_err = _validate_path(file_path)
     if _path_err:
@@ -2020,7 +2030,8 @@ def excel_set_borders(
     border_style: str = "thin"
 ) -> Dict[str, Any]:
     """
-为范围设置边框。样式: thin/thick/medium/double/dotted/dashed。
+为指定范围设置边框。border_style可选: thin(细线)/thick(粗线)/medium(中等)/double(双线)/dotted(点线)/dashed(虚线)。
+简单高亮请用excel_format_cells的preset参数。
     """
     _path_err = _validate_path(file_path)
     if _path_err:
@@ -2073,8 +2084,9 @@ def excel_compare_files(
     file2_path: str
 ) -> Dict[str, Any]:
     """
-对比两个Excel文件的所有工作表差异（结构差异+单元格值变化）。输出逐单元格对比。
-按ID列做对象级对比（新增/删除/修改记录）请用excel_compare_sheets。
+对比两个Excel文件的所有工作表差异（结构差异+逐单元格值变化）。
+输出每个单元格的旧值→新值对比。适合检查配置表整体改动。
+按ID列做对象级对比（新增/删除/修改的记录行）请用excel_compare_sheets。
     """
     for _p in [file1_path, file2_path]:
         _err = _validate_path(_p)
