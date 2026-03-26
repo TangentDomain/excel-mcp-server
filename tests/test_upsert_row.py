@@ -4,48 +4,49 @@ import pytest
 from openpyxl import Workbook
 
 
-FIXTURE_PATH = os.path.join(os.path.dirname(__file__), 'test_data', 'upsert_test.xlsx')
-
-
-@pytest.fixture
-def workbook():
-    """Create a test workbook with sample data."""
+def _create_workbook(path, sheet_title, headers, rows):
+    """Create a test workbook and save to path."""
     wb = Workbook()
     ws = wb.active
-    ws.title = "技能配置"
-
-    # 单行表头
-    ws.append(["skill_id", "skill_name", "skill_type", "damage", "cooldown"])
-    ws.append([1001, "火球术", "法师", 150, 3.0])
-    ws.append([1002, "冰冻术", "法师", 120, 4.0])
-    ws.append([1003, "斩击", "战士", 200, 2.0])
-
-    os.makedirs(os.path.dirname(FIXTURE_PATH), exist_ok=True)
-    wb.save(FIXTURE_PATH)
-    yield FIXTURE_PATH
-    if os.path.exists(FIXTURE_PATH):
-        os.remove(FIXTURE_PATH)
+    ws.title = sheet_title
+    ws.append(headers)
+    for row in rows:
+        ws.append(row)
+    os.makedirs(os.path.dirname(path), exist_ok=True)
+    wb.save(path)
+    return path
 
 
 @pytest.fixture
-def dual_header_workbook():
-    """Create a test workbook with dual-header (Chinese + English)."""
+def workbook(tmp_path):
+    """Create a test workbook with sample data (parallel-safe)."""
+    path = str(tmp_path / "upsert_test.xlsx")
+    _create_workbook(path, "技能配置",
+                     ["skill_id", "skill_name", "skill_type", "damage", "cooldown"],
+                     [
+                         [1001, "火球术", "法师", 150, 3.0],
+                         [1002, "冰冻术", "法师", 120, 4.0],
+                         [1003, "斩击", "战士", 200, 2.0],
+                     ])
+    yield path
+
+
+@pytest.fixture
+def dual_header_workbook(tmp_path):
+    """Create a test workbook with dual-header (Chinese + English), parallel-safe."""
+    path = str(tmp_path / "dual_header_test.xlsx")
     wb = Workbook()
     ws = wb.active
     ws.title = "装备配置"
-
     # 双行表头
     ws.append(["装备ID", "装备名称", "品质", "攻击力"])
     ws.append(["equip_id", "equip_name", "rarity", "attack"])
     ws.append([2001, "铁剑", "普通", 50])
     ws.append([2002, "魔杖", "稀有", 120])
     ws.append([2003, "圣剑", "传说", 300])
-
-    os.makedirs(os.path.dirname(FIXTURE_PATH), exist_ok=True)
-    wb.save(FIXTURE_PATH)
-    yield FIXTURE_PATH
-    if os.path.exists(FIXTURE_PATH):
-        os.remove(FIXTURE_PATH)
+    os.makedirs(os.path.dirname(path), exist_ok=True)
+    wb.save(path)
+    yield path
 
 
 class TestUpsertUpdate:
@@ -226,21 +227,16 @@ class TestBatchInsertRows:
     """Tests for batch_insert_rows functionality."""
 
     @pytest.fixture
-    def batch_workbook(self):
-        """Create a test workbook for batch insert tests."""
-        wb = Workbook()
-        ws = wb.active
-        ws.title = "怪物配置"
-        ws.append(["monster_id", "monster_name", "level", "hp"])
-        ws.append([3001, "哥布林", 5, 100])
-        ws.append([3002, "狼人", 10, 300])
-
-        path = os.path.join(os.path.dirname(__file__), 'test_data', 'batch_insert_test.xlsx')
-        os.makedirs(os.path.dirname(path), exist_ok=True)
-        wb.save(path)
+    def batch_workbook(self, tmp_path):
+        """Create a test workbook for batch insert tests (parallel-safe)."""
+        path = str(tmp_path / "batch_insert_test.xlsx")
+        _create_workbook(path, "怪物配置",
+                         ["monster_id", "monster_name", "level", "hp"],
+                         [
+                             [3001, "哥布林", 5, 100],
+                             [3002, "狼人", 10, 300],
+                         ])
         yield path
-        if os.path.exists(path):
-            os.remove(path)
 
     def test_batch_insert_basic(self, batch_workbook):
         """Batch insert multiple rows."""
