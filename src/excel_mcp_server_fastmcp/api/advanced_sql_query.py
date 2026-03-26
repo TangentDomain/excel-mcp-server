@@ -663,11 +663,7 @@ class AdvancedSQLQueryEngine:
                     null_list.append((col, False))
             else:
                 self._collect_condition_types(inner, eq, rng, like, in_list, between, null_list)
-        elif isinstance(condition, exp.And):
-            for child in condition.flatten():
-                if child is not condition:
-                    self._collect_condition_types(child, eq, rng, like, in_list, between, null_list)
-        elif isinstance(condition, exp.Or):
+        elif isinstance(condition, (exp.And, exp.Or)):
             for child in condition.flatten():
                 if child is not condition:
                     self._collect_condition_types(child, eq, rng, like, in_list, between, null_list)
@@ -1801,6 +1797,42 @@ class AdvancedSQLQueryEngine:
 
         return df
 
+    @staticmethod
+    def _like_to_regex(value_str: str) -> str:
+        """将SQL LIKE模式转换为pandas regex模式（%→.*  _→.）"""
+        pattern = str(value_str).strip("'\"")
+        return pattern.replace('%', '.*').replace('_', '.')
+
+    def _in_to_pandas(self, in_expr: exp.In, df: pd.DataFrame, negate: bool = False) -> str:
+        """将IN/NOT IN条件转换为pandas表达式（支持子查询和值列表）
+
+        Args:
+            in_expr: sqlglot In表达式
+            df: 当前DataFrame
+            negate: True→NOT IN（~isin），False→IN（isin）
+        """
+        left = self._expression_to_column_reference(in_expr.this, df)
+        prefix = "~" if negate else ""
+
+        # 子查询模式 (IN (SELECT ...))
+        subquery = in_expr.args.get('query')
+        if subquery and isinstance(subquery, exp.Subquery):
+            try:
+                sub_result = self._execute_subquery(subquery, self._current_worksheets)
+                if len(sub_result.columns) > 0:
+                    sub_values = sub_result.iloc[:, 0].dropna().tolist()
+                    values_str = ', '.join(repr(v) for v in sub_values)
+                    return f"{prefix}{left}.isin([{values_str}])"
+                return f"{prefix}{left}.isin([])"
+            except Exception as e:
+                op = "NOT IN" if negate else "IN"
+                raise ValueError(f"{op}子查询执行失败: {e}")
+
+        # 值列表模式
+        values = [self._expression_to_value(v, df) for v in in_expr.expressions]
+        values_str = ', '.join(str(v) for v in values)
+        return f"{prefix}{left}.isin([{values_str}])"
+
     def _sql_condition_to_pandas(self, condition: exp.Expression, df: pd.DataFrame) -> str:
         """将SQL条件转换为pandas查询字符串"""
         op_type = type(condition)
@@ -1820,38 +1852,17 @@ class AdvancedSQLQueryEngine:
             return f"({left}) | ({right})"
 
         elif isinstance(condition, exp.Paren):
-            # 括号表达式，直接处理内部表达式
             return self._sql_condition_to_pandas(condition.this, df)
 
         elif isinstance(condition, exp.Not):
             inner = condition.this
-            # NOT LIKE: NOT > Like → 排除匹配行
             if isinstance(inner, exp.Like):
                 left = self._expression_to_column_reference(inner.this, df)
                 right = self._expression_to_value(inner.expression, df)
-                pattern = str(right).strip("'\"")
-                pattern = pattern.replace('%', '.*').replace('_', '.')
-                return f"~{left}.str.match('{pattern}', case=False, na=False)"
-            # NOT IN: NOT > In → 排除列表中值
+                regex = self._like_to_regex(right)
+                return f"~{left}.str.match('{regex}', case=False, na=False)"
             if isinstance(inner, exp.In):
-                left = self._expression_to_column_reference(inner.this, df)
-                # 检查是否有子查询
-                subquery = inner.args.get('query')
-                if subquery and isinstance(subquery, exp.Subquery):
-                    try:
-                        sub_result = self._execute_subquery(subquery, self._current_worksheets)
-                        if len(sub_result.columns) > 0:
-                            sub_values = sub_result.iloc[:, 0].dropna().tolist()
-                            values_str = ', '.join(repr(v) for v in sub_values)
-                            return f"~{left}.isin([{values_str}])"
-                        return f"~{left}.isin([])"
-                    except Exception as e:
-                        raise ValueError(f"NOT IN子查询执行失败: {e}")
-                values = []
-                for value in inner.expressions:
-                    values.append(self._expression_to_value(value, df))
-                values_str = ', '.join(str(v) for v in values)
-                return f"~{left}.isin([{values_str}])"
+                return self._in_to_pandas(inner, df, negate=True)
             # 其他NOT表达式（IS NOT NULL等）
             pandas_expr = self._sql_condition_to_pandas(inner, df)
             return f"~({pandas_expr})"
@@ -1859,43 +1870,19 @@ class AdvancedSQLQueryEngine:
         elif isinstance(condition, exp.Like):
             left = self._expression_to_column_reference(condition.this, df)
             right = self._expression_to_value(condition.expression, df)
-            pattern = str(right).strip("'\"")
-            # 转换SQL LIKE模式为pandas str.contains（默认大小写不敏感，适配游戏配置表场景）
-            pattern = pattern.replace('%', '.*').replace('_', '.')
-            return f"{left}.str.match('{pattern}', case=False, na=False)"
+            regex = self._like_to_regex(right)
+            return f"{left}.str.match('{regex}', case=False, na=False)"
 
         elif isinstance(condition, exp.In):
-            left_col_name = condition.this.name if isinstance(condition.this, exp.Column) else None
-            # 检查是否有子查询 (IN (SELECT ...))
-            subquery = condition.args.get('query')
-            if subquery and isinstance(subquery, exp.Subquery):
-                left = self._expression_to_column_reference(condition.this, df)
-                try:
-                    sub_result = self._execute_subquery(subquery, self._current_worksheets)
-                    if len(sub_result.columns) > 0:
-                        sub_values = sub_result.iloc[:, 0].dropna().tolist()
-                        values_str = ', '.join(repr(v) for v in sub_values)
-                        return f"{left}.isin([{values_str}])"
-                    return f"{left}.isin([])"
-                except Exception as e:
-                    raise ValueError(f"IN子查询执行失败: {e}")
-            else:
-                left = self._expression_to_column_reference(condition.this, df)
-                values = []
-                for value in condition.expressions:
-                    values.append(self._expression_to_value(value, df))
-                values_str = ', '.join(str(v) for v in values)
-                return f"{left}.isin([{values_str}])"
+            return self._in_to_pandas(condition, df, negate=False)
 
-        # EXISTS (子查询)
+        # EXISTS (子查询) — 需要逐行评估，返回None触发行过滤回退
         elif isinstance(condition, exp.Exists):
-            # EXISTS需要逐行评估（特别是关联子查询），返回None触发行过滤回退
             return None
 
         # IS NULL (sqlglot解析为 exp.Is)
         elif isinstance(condition, exp.Is):
             left = self._expression_to_column_reference(condition.this, df)
-            # IS NOT NULL会被解析为 Not > Is
             return f"{left}.isna()"
 
         # BETWEEN x AND y
@@ -1944,38 +1931,21 @@ class AdvancedSQLQueryEngine:
                             return f"`{alias}`"
                         break
 
-            # 精确匹配：查找列名等于函数名的列
-            if func_name in df.columns:
-                return f"`{func_name}`"
-            
-            # 模糊匹配：查找列名包含函数名的列
+            # 模糊匹配：查找列名包含函数名的列（count→count_star/avg_dmg等）
             for col in df.columns:
                 if func_name in col.lower():
                     return f"`{col}`"
             
-            # 对于COUNT(*)，尝试查找包含"count"的列
-            if func_name == 'count':
-                for col in df.columns:
-                    if 'count' in col.lower():
-                        return f"`{col}`"
-            
-            # 如果只有一个数值列，就使用它（常见于全表聚合）
-            numeric_cols = []
-            for col in df.columns:
-                try:
-                    pd.to_numeric(df[col], errors='coerce')
-                    numeric_cols.append(col)
-                except Exception:
-                    pass
-            
+            # 单数值列兜底（常见于全表聚合场景）
+            numeric_cols = [
+                col for col in df.columns
+                if pd.to_numeric(df[col], errors='coerce').notna().sum() > 0
+            ]
             if len(numeric_cols) == 1:
                 return f"`{numeric_cols[0]}`"
-            
-            # 如果有多个列，尝试返回第一个（作为后备方案）
-            if len(df.columns) > 0:
+            if df.columns.size > 0:
                 return f"`{df.columns[0]}`"
 
-            # 如果没有找到匹配的列，抛出错误
             raise ValueError(f"无法找到聚合函数 {func_name} 对应的列。可用列: {list(df.columns)}")
 
         else:
@@ -2075,8 +2045,8 @@ class AdvancedSQLQueryEngine:
             elif isinstance(condition, exp.Like):
                 val = str(self._get_row_value(condition.this, row) or '')
                 pattern = str(self._get_row_value(condition.expression, row) or '')
-                pattern = pattern.replace('%', '.*').replace('_', '.')
-                return bool(re.match(pattern, val, re.IGNORECASE))
+                regex = self._like_to_regex(pattern)
+                return bool(re.match(regex, val, re.IGNORECASE))
 
             elif isinstance(condition, exp.In):
                 val = self._get_row_value(condition.this, row)
