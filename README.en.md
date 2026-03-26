@@ -10,7 +10,7 @@
 [![Python Version](https://img.shields.io/badge/python-3.10+-blue.svg)](https://www.python.org/downloads/)
 [![Powered by: FastMCP](https://img.shields.io/badge/Powered%20by-FastMCP-orange)](https://github.com/jlowin/fastmcp)
 ![Status](https://img.shields.io/badge/status-stable-green.svg)
-![Tests](https://img.shields.io/badge/tests-985%20tests-brightgreen.svg)
+![Tests](https://img.shields.io/badge/tests-998%20tests-brightgreen.svg)
 ![Tools](https://img.shields.io/badge/tools-45%20verified%20tools-green.svg)
 [![CI](https://github.com/TangentDomain/excel-mcp-server/actions/workflows/ci.yml/badge.svg)](https://github.com/TangentDomain/excel-mcp-server/actions/workflows/ci.yml)
 
@@ -434,6 +434,9 @@ SELECT * FROM EquipTable WHERE quality NOT IN ('deprecated', 'internal_test')
 -- JOIN cross-table queries (within same file)
 SELECT a.skill_name, b.equip_name FROM SkillTable a INNER JOIN EquipTable b ON a.equip_id = b.equip_id
 SELECT a.name, b.hp FROM MonsterTable a LEFT JOIN MonsterDropTable b ON a.id = b.monster_id WHERE a.level > 10
+
+-- Cross-file JOIN (@'filepath' syntax, supports absolute and relative paths)
+SELECT s.name, d.item FROM Skills@'/path/to/skills.xlsx' s JOIN Drops@'/path/to/drops.xlsx' d ON s.skill_id = d.skill_id
 
 -- Subqueries (WHERE col IN / NOT IN / Scalar)
 SELECT * FROM SkillTable WHERE skill_type IN (SELECT DISTINCT skill_type FROM SkillTable WHERE damage > 200)

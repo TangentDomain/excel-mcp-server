@@ -11,7 +11,7 @@
 | 🎯 工具描述 | REQ-006 | P1 | AI选工具准确率、参数命名一致性 | 持续迭代 |
 | 🔧 工程治理 | REQ-010 | P1 | 代码复杂度/重复/依赖健康/架构 | 持续迭代 |
 | 📈 可观测性 | REQ-013 | P2 | 结构化日志/工具频率/错误分类 | DONE ✅ |
-| 🔗 跨文件JOIN | REQ-027 | P0 | SQL跨文件查询 | OPEN（最高优先级） |
+| 🔗 跨文件JOIN | REQ-027 | P0 | SQL跨文件查询 | DONE ✅ |
 | 🌍 兼容性 | REQ-012 | P1 | 多客户端/跨平台/CI矩阵 | 大部分完成 |
 | 🏗️ 基建 | REQ-008 | P2 | git worktree隔离 | DONE ✅ |
 | 🤖 AI体验优化 | REQ-025 | P1 | 返回值统一/错误结构化/大结果截断/重复工具合并 | 持续迭代 |
@@ -205,11 +205,11 @@
 - **来源**：REQ-016未完成项拆分
 - **描述**：
   1. ~~UNION/UNION ALL：合并查询结果~~ ✅（第55轮实现）
-  2. 窗口函数：ROW_NUMBER、RANK、DENSE_RANK（复杂度高，游戏场景少见）
+  2. ~~窗口函数：ROW_NUMBER、RANK、DENSE_RANK（复杂度高，游戏场景少见）~~ ✅（第56轮实现）
   3. ~~RIGHT/FULL/CROSS JOIN（游戏场景极少使用）~~ ✅（第58轮实现）
-  4. 跨文件JOIN：`SELECT * FROM 技能表@file1.xlsx s JOIN 掉落表@file2.xlsx d ON s.技能ID = d.技能ID`
+  4. ~~跨文件JOIN：`SELECT * FROM 技能表@file1.xlsx s JOIN 掉落表@file2.xlsx d ON s.技能ID = d.技能ID`~~ ✅（第80轮实现）
 - **验收标准**：每项至少2个测试，更新文件头支持列表
-- **状态**：OPEN（仅剩跨文件JOIN）
+- **状态**：DONE ✅（全部完成）
 - **已完成**：
   - ✅ 第55轮：UNION/UNION ALL（递归提取SELECT+concat+去重+ORDER BY+LIMIT，13个测试）
   - ✅ 第58轮：RIGHT/FULL/CROSS JOIN（17个测试，SQL功能37→38）
