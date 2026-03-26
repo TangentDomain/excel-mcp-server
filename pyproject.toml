@@ -9,7 +9,6 @@ description = "Excel MCP Server based on FastMCP and openpyxl"
 readme = "README.md"
 requires-python = ">=3.10"
 dependencies = [
-    "fastmcp>=0.1.0",
     "openpyxl>=3.1.0",
     "mcp>=1.0.0",
     "xlcalculator>=0.5.0",
@@ -145,8 +144,6 @@ module = [
     "fastmcp.*",
     "mcp.*",
     "xlcalculator.*",
-    "formulas.*",
-    "xlwings.*",
 ]
 ignore_missing_imports = true
 
