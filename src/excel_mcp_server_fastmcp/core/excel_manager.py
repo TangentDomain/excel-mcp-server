@@ -422,6 +422,184 @@ class ExcelManager:
                 error=str(e)
             )
 
+    def copy_sheet(
+        self,
+        source_name: str,
+        new_name: Optional[str] = None,
+        index: Optional[int] = None
+    ) -> OperationResult:
+        """
+        复制工作表到同一文件中（含数据和格式）
+
+        Args:
+            source_name: 源工作表名称
+            new_name: 新工作表名称（为空则自动生成 "源表名_副本"）
+            index: 插入位置索引（None表示追加到末尾）
+
+        Returns:
+            OperationResult: 复制操作的结果
+        """
+        try:
+            if not source_name or not source_name.strip():
+                raise DataValidationError("源工作表名称不能为空")
+
+            source_name = source_name.strip()
+
+            workbook = load_workbook(self.file_path)
+
+            if source_name not in workbook.sheetnames:
+                available = ', '.join(workbook.sheetnames)
+                raise SheetNotFoundError(f"工作表不存在: {source_name}（可用: {available}）")
+
+            source_sheet = workbook[source_name]
+
+            # 自动生成新名称
+            if not new_name or not new_name.strip():
+                new_name = f"{source_name}_副本"
+            else:
+                new_name = new_name.strip()
+
+            # 处理名称冲突
+            base_name = new_name
+            counter = 1
+            while new_name in workbook.sheetnames:
+                new_name = f"{base_name}_{counter}"
+                counter += 1
+                if counter > 100:
+                    raise DataValidationError(f"无法生成唯一工作表名称: {base_name}")
+
+            # 规范化名称
+            new_name = self._normalize_sheet_name(new_name)
+
+            # openpyxl copy_worksheet 创建副本
+            target = workbook.copy_worksheet(source_sheet)
+            target.title = new_name
+
+            # 调整位置（copy_worksheet 默认追加到末尾）
+            if index is not None:
+                total = len(workbook.sheetnames)
+                if index < 0 or index > total:
+                    raise DataValidationError(f"索引超出范围: {index}，应在 0-{total} 之间")
+                workbook.move_sheet(new_name, offset=index - (total - 1))
+
+            workbook.save(self.file_path)
+
+            new_index = workbook.sheetnames.index(new_name)
+            sheet_info = SheetInfo(
+                index=new_index,
+                name=new_name,
+                max_row=target.max_row,
+                max_column=target.max_column,
+                max_column_letter=get_column_letter(target.max_column) if target.max_column > 0 else 'A'
+            )
+
+            return OperationResult(
+                success=True,
+                data=sheet_info,
+                message=f"成功复制工作表 '{source_name}' 为 '{new_name}'（{target.max_row}行 × {target.max_column}列）",
+                metadata={
+                    'file_path': self.file_path,
+                    'source_name': source_name,
+                    'new_name': new_name,
+                    'copied_rows': target.max_row,
+                    'copied_columns': target.max_column,
+                    'new_index': new_index,
+                    'total_sheets': len(workbook.sheetnames),
+                    'all_sheets': workbook.sheetnames
+                }
+            )
+
+        except Exception as e:
+            logger.error(f"复制工作表失败: {e}")
+            return OperationResult(success=False, error=str(e))
+
+    def rename_column(
+        self,
+        sheet_name: str,
+        old_header: str,
+        new_header: str,
+        header_row: int = 1
+    ) -> OperationResult:
+        """
+        重命名指定工作表的列（修改表头单元格值）
+
+        Args:
+            sheet_name: 工作表名称
+            old_header: 当前列名（必须精确匹配表头单元格值）
+            new_header: 新列名
+            header_row: 表头所在行号（默认1，双行表头场景可设为2）
+
+        Returns:
+            OperationResult: 操作结果
+        """
+        try:
+            if not sheet_name or not sheet_name.strip():
+                raise DataValidationError("工作表名称不能为空")
+            if not old_header or not old_header.strip():
+                raise DataValidationError("当前列名不能为空")
+            if not new_header or not new_header.strip():
+                raise DataValidationError("新列名不能为空")
+
+            old_header = old_header.strip()
+            new_header = new_header.strip()
+
+            if old_header == new_header:
+                raise DataValidationError("新列名与当前列名相同，无需修改")
+
+            workbook = load_workbook(self.file_path)
+
+            if sheet_name not in workbook.sheetnames:
+                available = ', '.join(workbook.sheetnames)
+                raise SheetNotFoundError(f"工作表不存在: {sheet_name}（可用: {available}）")
+
+            sheet = workbook[sheet_name]
+
+            if header_row < 1 or header_row > sheet.max_row:
+                raise DataValidationError(f"表头行号 {header_row} 超出范围（1-{sheet.max_row}）")
+
+            # 查找匹配的表头单元格
+            col_idx = None
+            for col in range(1, sheet.max_column + 1):
+                cell_value = sheet.cell(row=header_row, column=col).value
+                if cell_value is not None and str(cell_value).strip() == old_header:
+                    col_idx = col
+                    break
+
+            if col_idx is None:
+                # 收集实际列名用于提示
+                actual_headers = []
+                for col in range(1, sheet.max_column + 1):
+                    v = sheet.cell(row=header_row, column=col).value
+                    if v is not None:
+                        actual_headers.append(str(v).strip())
+                raise DataValidationError(
+                    f"在行 {header_row} 中未找到列名 '{old_header}'（实际列名: {', '.join(actual_headers[:10])}）"
+                )
+
+            # 修改列名
+            old_value = sheet.cell(row=header_row, column=col_idx).value
+            sheet.cell(row=header_row, column=col_idx).value = new_header
+            col_letter = get_column_letter(col_idx)
+
+            workbook.save(self.file_path)
+
+            return OperationResult(
+                success=True,
+                message=f"成功将列 '{old_header}' 重命名为 '{new_header}'（{col_letter}{header_row}）",
+                metadata={
+                    'file_path': self.file_path,
+                    'sheet_name': sheet_name,
+                    'old_header': old_header,
+                    'new_header': new_header,
+                    'cell': f"{col_letter}{header_row}",
+                    'header_row': header_row
+                }
+            )
+
+        except Exception as e:
+            logger.error(f"重命名列失败: {e}")
+            return OperationResult(success=False, error=str(e))
+
     @staticmethod
     def get_file_info(file_path: str) -> OperationResult:
         """
