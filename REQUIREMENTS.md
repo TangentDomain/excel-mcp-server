@@ -202,3 +202,9 @@
   10. RIGHT JOIN、FULL JOIN、CROSS JOIN
 - **验收标准**：每项至少2个测试用例，更新文件头支持列表，不支持的项目记录原因
 - **状态**：OPEN
+
+### REQ-017 [P1→DONE] Streamable HTTP + SSE传输模式
+- **来源**：竞品分析 — haris-musa支持三重传输，我们仅stdio
+- **描述**：暴露FastMCP原生支持的三种传输模式（stdio/sse/streamable-http）
+- **验收标准**：命令行参数选择传输模式，不影响现有stdio功能
+- **状态**：DONE ✅（main()新增--stdio/--sse/--streamable-http/--mount-path参数）
