@@ -14,7 +14,7 @@
 ![工具数量](https://img.shields.io/badge/tools-46%20verified%20tools-green.svg)
 [![CI](https://github.com/TangentDomain/excel-mcp-server/actions/workflows/ci.yml/badge.svg)](https://github.com/TangentDomain/excel-mcp-server/actions/workflows/ci.yml)
 
-**ExcelMCP** 是专为游戏开发设计的Excel配置表管理MCP服务器。通过AI自然语言指令，实现技能配置表、装备数据、怪物属性等游戏配置的智能化操作。基于**FastMCP**构建，读取使用**python-calamine**（Rust引擎，2300x提速），写入使用**openpyxl**，拥有**46个专业工具**和**938个测试用例**，确保企业级可靠性。
+**ExcelMCP** 是专为游戏开发设计的Excel配置表管理MCP服务器。通过AI自然语言指令，实现技能配置表、装备数据、怪物属性等游戏配置的智能化操作。基于**FastMCP**构建，读取使用**python-calamine**（Rust引擎，2300x提速），写入使用**openpyxl**，拥有**46个专业工具**和**939个测试用例**，确保企业级可靠性。
 
 🎯 **核心功能**: 技能系统、装备管理、怪物配置、数值平衡、版本对比、策划工具链
 
