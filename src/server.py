@@ -1891,6 +1891,9 @@ def excel_compare_sheets(
             return _err
     return ExcelOperations.compare_sheets(file1_path, sheet1_name, file2_path, sheet2_name, id_column, header_row)
 # ==================== 主程序 ====================
-if __name__ == "__main__":
-    # 运行FastMCP服务器
+def main():
+    """Entry point for excel-mcp-server-fastmcp."""
     mcp.run()
+
+if __name__ == "__main__":
+    main()

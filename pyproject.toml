@@ -19,6 +19,9 @@ dependencies = [
     "sqlglot>=27.29.0",
 ]
 
+[project.scripts]
+excel-mcp-server-fastmcp = "server:main"
+
 [project.optional-dependencies]
 dev = [
     "pytest>=7.0.0",
