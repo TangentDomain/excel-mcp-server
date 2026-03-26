@@ -389,7 +389,7 @@ class AdvancedSQLQueryEngine:
             if '\\u' in clean_col:
                 try:
                     clean_col = clean_col.encode('raw_unicode_escape').decode('unicode_escape')
-                except:
+                except Exception:
                     pass
 
             # 清理特殊字符，但保持中文
@@ -1368,7 +1368,7 @@ class AdvancedSQLQueryEngine:
                 try:
                     pd.to_numeric(df[col], errors='coerce')
                     numeric_cols.append(col)
-                except:
+                except Exception:
                     pass
             
             if len(numeric_cols) == 1:
@@ -1648,7 +1648,7 @@ class AdvancedSQLQueryEngine:
             # 注意：需要从grouped的obj获取原始DataFrame
             try:
                 original_df = grouped.obj
-            except:
+            except Exception:
                 original_df = None
             
             # 应用对应的聚合函数
@@ -2233,7 +2233,7 @@ class AdvancedSQLQueryEngine:
             # 文件锁（Linux fcntl，其他平台优雅降级）
             try:
                 import fcntl
-                lock_fd = open(file_path + '.lock', 'w')
+                lock_fd = open(file_path + '.lock', 'w', encoding='utf-8')
                 fcntl.flock(lock_fd, fcntl.LOCK_EX)
             except (ImportError, OSError):
                 lock_fd = None
