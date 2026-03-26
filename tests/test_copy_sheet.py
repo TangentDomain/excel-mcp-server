@@ -4,12 +4,8 @@ import pytest
 from openpyxl import Workbook
 
 
-FIXTURE_PATH = os.path.join(os.path.dirname(__file__), 'test_data', 'copy_sheet_test.xlsx')
-
-
-@pytest.fixture
-def workbook():
-    """Create a test workbook with sample data."""
+def _create_multi_sheet_workbook(path):
+    """Create a test workbook with two sheets and dual-header."""
     wb = Workbook()
     ws = wb.active
     ws.title = "技能配置"
@@ -27,11 +23,17 @@ def workbook():
     ws2.append(["铁剑", "普通"])
     ws2.append(["魔杖", "稀有"])
 
-    os.makedirs(os.path.dirname(FIXTURE_PATH), exist_ok=True)
-    wb.save(FIXTURE_PATH)
-    yield FIXTURE_PATH
-    if os.path.exists(FIXTURE_PATH):
-        os.remove(FIXTURE_PATH)
+    os.makedirs(os.path.dirname(path), exist_ok=True)
+    wb.save(path)
+    return path
+
+
+@pytest.fixture
+def workbook(tmp_path):
+    """Create a test workbook with sample data (parallel-safe)."""
+    path = str(tmp_path / "copy_sheet_test.xlsx")
+    _create_multi_sheet_workbook(path)
+    yield path
 
 
 class TestCopySheet:
