@@ -10,9 +10,12 @@
 - 条件表达式: CASE WHEN, COALESCE/IFNULL
 - 表关联: INNER JOIN, LEFT JOIN（同文件内工作表关联）
 - 子查询: WHERE col IN (SELECT ...), 标量子查询, EXISTS
+- CTE: WITH ... AS (SELECT ...)
+- 字符串函数: UPPER, LOWER, TRIM, LENGTH, CONCAT, REPLACE, SUBSTRING, LEFT, RIGHT
 
 不支持功能：
-- CTE (WITH)、UNION
+- FROM子查询（FROM (SELECT ...)）
+- UNION
 - 窗口函数 (ROW_NUMBER等)
 - RIGHT JOIN, FULL JOIN, CROSS JOIN
 - INSERT/UPDATE/DELETE
@@ -456,12 +459,10 @@ class AdvancedSQLQueryEngine:
             # 子查询支持已实现，不再拒绝
             # IN子查询、标量子查询、EXISTS子查询均支持
 
-            # 检查不支持的CTE (WITH) 和 UNION
-            if parsed_sql.find(exp.With):
-                return {
-                    'valid': False,
-                    'error': '不支持CTE (WITH)语法。💡 替代方案：将CTE改为子查询'
-                }
+            # CTE (WITH) 支持
+            with_clause = parsed_sql.args.get('with_')
+            if with_clause:
+                return {'valid': True}  # CTE在_execute_query中处理
             if parsed_sql.find(exp.Union):
                 return {
                     'valid': False,
@@ -831,13 +832,34 @@ class AdvancedSQLQueryEngine:
         Returns:
             pd.DataFrame: 查询结果
         """
+        # 处理CTE (WITH ... AS ...)
+        with_clause = parsed_sql.args.get('with_')
+        if with_clause:
+            # 复制worksheets_data避免修改原始数据，逐步添加CTE结果
+            cte_data = dict(worksheets_data)
+            for cte_expr in with_clause.expressions:
+                cte_name = cte_expr.alias
+                cte_query = cte_expr.this  # inner Select
+                try:
+                    # 每个CTE在已有的cte_data上执行（支持CTE引用前面的CTE）
+                    cte_result = self._execute_query(cte_query, cte_data, limit=None)
+                    cte_data[cte_name] = cte_result
+                except Exception as e:
+                    raise ValueError(f"CTE '{cte_name}' 执行失败: {e}")
+            # 从parsed_sql中移除with_子句，让后续逻辑正常处理
+            parsed_sql = parsed_sql.copy()
+            parsed_sql.set('with_', None)
+
         # 获取FROM子句中的表名
         from_table = self._get_from_table(parsed_sql)
 
-        if from_table not in worksheets_data:
-            raise ValueError(f"表 '{from_table}' 不存在。可用表: {list(worksheets_data.keys())}")
+        # 查找表名时也搜索CTE定义的临时表
+        effective_data = cte_data if with_clause else worksheets_data
 
-        base_df = worksheets_data[from_table].copy()
+        if from_table not in effective_data:
+            raise ValueError(f"表 '{from_table}' 不存在。可用表: {list(effective_data.keys())}")
+
+        base_df = effective_data[from_table].copy()
 
         # 构建表别名映射
         self._table_aliases = {}
@@ -853,14 +875,14 @@ class AdvancedSQLQueryEngine:
         # 应用JOIN子句
         joins = parsed_sql.args.get('joins')
         if joins:
-            base_df = self._apply_join_clause(joins, base_df, worksheets_data, from_table)
+            base_df = self._apply_join_clause(joins, base_df, effective_data, from_table)
 
         # 应用WHERE条件
         # 保存WHERE前的DataFrame，用于空结果智能建议
         base_df_before_where = base_df.copy()
         self._df_before_where = base_df_before_where
         # 保存当前工作表数据供子查询使用
-        self._current_worksheets = worksheets_data
+        self._current_worksheets = effective_data
         base_df = self._apply_where_clause(parsed_sql, base_df)
 
         # 检查是否有聚合函数
@@ -987,6 +1009,10 @@ class AdvancedSQLQueryEngine:
                         results.append(self._evaluate_coalesce_for_row(original_expr, row))
                     result_data[alias_name] = pd.Series(results, index=df.index)
 
+                elif self._is_string_function(original_expr):
+                    # 字符串函数: UPPER, LOWER, TRIM, LENGTH, CONCAT, REPLACE, SUBSTRING, LEFT, RIGHT
+                    result_data[alias_name] = self._evaluate_string_function(original_expr, df)
+
                 elif self._is_mathematical_expression(original_expr):
                     # 数学表达式
                     result_data[alias_name] = self._evaluate_math_expression(original_expr, df)
@@ -1068,6 +1094,136 @@ class AdvancedSQLQueryEngine:
             return pd.Series(results, index=df.index)
         else:
             raise ValueError(f"不支持的数学表达式部分: {expr}")
+
+    def _is_string_function(self, expr) -> bool:
+        """检查是否为字符串函数"""
+        return isinstance(expr, (exp.Upper, exp.Lower, exp.Trim, exp.Length,
+                                exp.Concat, exp.Replace, exp.Substring, exp.Left, exp.Right))
+
+    def _evaluate_string_function(self, expr, df: pd.DataFrame) -> pd.Series:
+        """计算字符串函数，返回pd.Series"""
+        func_name = type(expr).__name__.lower()
+
+        if func_name == 'upper':
+            val_series = self._expr_to_series(expr.this, df)
+            return val_series.astype(str).str.upper()
+
+        elif func_name == 'lower':
+            val_series = self._expr_to_series(expr.this, df)
+            return val_series.astype(str).str.lower()
+
+        elif func_name == 'trim':
+            val_series = self._expr_to_series(expr.this, df)
+            return val_series.astype(str).str.strip()
+
+        elif func_name == 'length':
+            val_series = self._expr_to_series(expr.this, df)
+            return val_series.astype(str).str.len()
+
+        elif func_name == 'concat':
+            # CONCAT(a, b, ...) — expressions列表包含所有参数
+            parts = [self._expr_to_series(arg, df).astype(str) for arg in expr.expressions]
+            if parts:
+                result = parts[0]
+                for p in parts[1:]:
+                    result = result + p
+                return result
+            return pd.Series([''] * len(df), index=df.index)
+
+        elif func_name == 'replace':
+            # REPLACE(str, old, new) — sqlglot: this=string, expression=old, replacement=new
+            val_series = self._expr_to_series(expr.this, df).astype(str)
+            old_val = str(self._literal_value(expr.args.get('expression'))) if expr.args.get('expression') else ''
+            new_val = str(self._literal_value(expr.args.get('replacement'))) if expr.args.get('replacement') else ''
+            return val_series.str.replace(old_val, new_val, regex=False)
+
+        elif func_name in ('substring', 'left', 'right'):
+            val_series = self._expr_to_series(expr.this, df).astype(str)
+            if func_name == 'substring':
+                # sqlglot: this=string, start=1-based, length=count
+                start = int(self._literal_value(expr.args.get('start'))) - 1 if expr.args.get('start') else 0
+                length = int(self._literal_value(expr.args.get('length'))) if expr.args.get('length') else len(val_series.iloc[0])
+                return val_series.str.slice(start, start + length)
+            elif func_name == 'left':
+                # sqlglot: this=string, expression=count
+                n = int(self._literal_value(expr.args.get('expression'))) if expr.args.get('expression') else 1
+                return val_series.str.slice(0, n)
+            elif func_name == 'right':
+                # sqlglot: this=string, expression=count
+                n = int(self._literal_value(expr.args.get('expression'))) if expr.args.get('expression') else 1
+                return val_series.str.slice(-n)
+
+        raise ValueError(f"不支持的字符串函数: {func_name}")
+
+    def _evaluate_string_function_for_row(self, expr, row: pd.Series) -> Any:
+        """逐行评估字符串函数"""
+        func_name = type(expr).__name__.lower()
+        val = self._get_row_value(expr.this, row)
+        if val is None:
+            return None
+        val = str(val)
+
+        if func_name == 'upper':
+            return val.upper()
+        elif func_name == 'lower':
+            return val.lower()
+        elif func_name == 'trim':
+            return val.strip()
+        elif func_name == 'length':
+            return len(val)
+        elif func_name == 'concat':
+            parts = [str(self._get_row_value(arg, row) or '') for arg in expr.expressions]
+            return ''.join(parts)
+        elif func_name == 'replace':
+            old_val = str(self._literal_value(expr.args.get('expression'))) if expr.args.get('expression') else ''
+            new_val = str(self._literal_value(expr.args.get('replacement'))) if expr.args.get('replacement') else ''
+            return val.replace(old_val, new_val)
+        elif func_name == 'substring':
+            start = int(self._literal_value(expr.args.get('start'))) - 1 if expr.args.get('start') else 0
+            length = int(self._literal_value(expr.args.get('length'))) if expr.args.get('length') else len(val)
+            return val[start:start + length]
+        elif func_name == 'left':
+            n = int(self._literal_value(expr.args.get('expression'))) if expr.args.get('expression') else 1
+            return val[:n]
+        elif func_name == 'right':
+            n = int(self._literal_value(expr.args.get('expression'))) if expr.args.get('expression') else 1
+            return val[-n:] if n > 0 else ''
+        return val
+
+    def _expr_to_series(self, expr, df: pd.DataFrame) -> pd.Series:
+        """将表达式转换为pd.Series（支持列引用、字面量、数学表达式、字符串函数）"""
+        if isinstance(expr, exp.Column):
+            col_name = expr.name
+            if col_name in df.columns:
+                return df[col_name]
+            # 表限定符
+            table_part = expr.table if hasattr(expr, 'table') and expr.table else None
+            qualified = f"{table_part}.{col_name}" if table_part else None
+            if qualified and qualified in df.columns:
+                return df[qualified]
+            raise ValueError(f"列 '{qualified or col_name}' 不存在")
+        elif isinstance(expr, exp.Literal):
+            val = expr.this
+            return pd.Series([val] * len(df), index=df.index)
+        elif isinstance(expr, (exp.Add, exp.Sub, exp.Mul, exp.Div)):
+            return self._evaluate_math_expression(expr, df)
+        elif isinstance(expr, exp.Coalesce):
+            results = [self._evaluate_coalesce_for_row(expr, df.iloc[i]) for i in range(len(df))]
+            return pd.Series(results, index=df.index)
+        elif self._is_string_function(expr):
+            return self._evaluate_string_function(expr, df)
+        elif isinstance(expr, exp.Case):
+            return self._evaluate_case_expression(expr, df)
+        else:
+            raise ValueError(f"不支持的表达式类型: {type(expr).__name__}")
+
+    def _literal_value(self, expr) -> Any:
+        """提取字面量值"""
+        if isinstance(expr, exp.Literal):
+            return expr.this
+        elif isinstance(expr, exp.Column):
+            return expr.name
+        return str(expr)
 
     def _get_from_table(self, parsed_sql: exp.Expression) -> str:
         """获取FROM子句中的表名"""
@@ -1252,12 +1408,21 @@ class AdvancedSQLQueryEngine:
         if not where_clause:
             return df
 
-        # 如果WHERE包含COALESCE/CASE WHEN/EXISTS等复杂表达式，直接使用逐行过滤
+        # 如果WHERE包含COALESCE/CASE WHEN/EXISTS/字符串函数等复杂表达式，直接使用逐行过滤
         where_expr = where_clause.this
         has_complex = (
             where_expr.find(exp.Coalesce) is not None or
             where_expr.find(exp.Case) is not None or
-            where_expr.find(exp.Exists) is not None
+            where_expr.find(exp.Exists) is not None or
+            where_expr.find(exp.Upper) is not None or
+            where_expr.find(exp.Lower) is not None or
+            where_expr.find(exp.Trim) is not None or
+            where_expr.find(exp.Length) is not None or
+            where_expr.find(exp.Concat) is not None or
+            where_expr.find(exp.Replace) is not None or
+            where_expr.find(exp.Substring) is not None or
+            where_expr.find(exp.Left) is not None or
+            where_expr.find(exp.Right) is not None
         )
 
         if has_complex:
@@ -1727,6 +1892,9 @@ class AdvancedSQLQueryEngine:
 
         elif isinstance(expr, (exp.Add, exp.Sub, exp.Mul, exp.Div)):
             return self._evaluate_math_for_row(expr, row)
+
+        elif self._is_string_function(expr):
+            return self._evaluate_string_function_for_row(expr, row)
 
         else:
             return None

@@ -318,3 +318,171 @@ class TestCombinedExpressions:
                 assert float(row[1]) > 30
             except (ValueError, TypeError):
                 pass
+
+
+class TestCTE:
+    """CTE (WITH ... AS ...) 测试"""
+
+    def test_basic_cte(self, game_config):
+        """基本CTE查询"""
+        from src.excel_mcp_server_fastmcp.api.advanced_sql_query import execute_advanced_sql_query
+
+        result = execute_advanced_sql_query(
+            game_config,
+            "WITH high AS (SELECT * FROM 技能配置 WHERE 伤害 > 100) SELECT skill_name, damage FROM high ORDER BY damage DESC"
+        )
+        assert result['success'] is True
+        data = result['data']
+        rows = [r for r in data if r != data[0]]
+        assert len(rows) >= 3
+        # 第一行应该是最高伤害
+        assert float(rows[0][1]) >= float(rows[1][1])
+
+    def test_multi_cte(self, multi_sheet_config):
+        """多CTE链式引用"""
+        from src.excel_mcp_server_fastmcp.api.advanced_sql_query import execute_advanced_sql_query
+
+        result = execute_advanced_sql_query(
+            multi_sheet_config,
+            "WITH mages AS (SELECT * FROM 技能配置 WHERE skill_type='mage'), strong AS (SELECT * FROM mages WHERE damage > 150) SELECT skill_name FROM strong"
+        )
+        assert result['success'] is True
+        data = result['data']
+        rows = [r for r in data if r != data[0]]
+        assert len(rows) >= 1
+
+    def test_cte_with_aggregation(self, game_config):
+        """CTE + 聚合查询"""
+        from src.excel_mcp_server_fastmcp.api.advanced_sql_query import execute_advanced_sql_query
+
+        result = execute_advanced_sql_query(
+            game_config,
+            "WITH stats AS (SELECT 技能类型, AVG(伤害) as avg_dmg FROM 技能配置 GROUP BY 技能类型) SELECT * FROM stats ORDER BY avg_dmg DESC"
+        )
+        assert result['success'] is True
+        data = result['data']
+        rows = [r for r in data if r != data[0]]
+        assert len(rows) >= 2  # 至少2种类型
+
+
+class TestStringFunctions:
+    """字符串函数测试"""
+
+    def test_upper_in_select(self, multi_sheet_config):
+        """UPPER函数"""
+        from src.excel_mcp_server_fastmcp.api.advanced_sql_query import execute_advanced_sql_query
+
+        result = execute_advanced_sql_query(
+            multi_sheet_config,
+            "SELECT UPPER(skill_name) as name FROM 技能配置 WHERE skill_type='warrior'"
+        )
+        assert result['success'] is True
+        data = result['data']
+        rows = [r for r in data if r != data[0]]
+        assert len(rows) >= 1
+        assert rows[0][0] == 'SLASH'
+
+    def test_lower_in_select(self, multi_sheet_config):
+        """LOWER函数"""
+        from src.excel_mcp_server_fastmcp.api.advanced_sql_query import execute_advanced_sql_query
+
+        result = execute_advanced_sql_query(
+            multi_sheet_config,
+            "SELECT LOWER(skill_type) as low_type FROM 技能配置 LIMIT 1"
+        )
+        assert result['success'] is True
+        data = result['data']
+        rows = [r for r in data if r != data[0]]
+        assert len(rows) == 1
+
+    def test_trim_in_select(self, multi_sheet_config):
+        """TRIM函数"""
+        from src.excel_mcp_server_fastmcp.api.advanced_sql_query import execute_advanced_sql_query
+
+        # 创建带空格的数据
+        from openpyxl import Workbook
+        wb = Workbook()
+        ws = wb.active
+        ws.title = 'test'
+        ws.append(['name', 'val'])
+        ws.append(['  hello  ', 1])
+        ws.append(['  world  ', 2])
+        import tempfile, os
+        path = os.path.join(tempfile.gettempdir(), 'test_trim.xlsx')
+        wb.save(path)
+
+        result = execute_advanced_sql_query(path, "SELECT TRIM(name) as clean FROM test")
+        assert result['success'] is True
+        rows = [r for r in result['data'] if r != result['data'][0]]
+        assert rows[0][0] == 'hello'
+
+    def test_length_in_select(self, multi_sheet_config):
+        """LENGTH函数"""
+        from src.excel_mcp_server_fastmcp.api.advanced_sql_query import execute_advanced_sql_query
+
+        result = execute_advanced_sql_query(
+            multi_sheet_config,
+            "SELECT skill_name, LENGTH(skill_name) as len FROM 技能配置 WHERE skill_type='warrior'"
+        )
+        assert result['success'] is True
+        data = result['data']
+        rows = [r for r in data if r != data[0]]
+        assert len(rows) >= 1
+        assert rows[0][1] == len('slash')
+
+    def test_concat_in_select(self, multi_sheet_config):
+        """CONCAT函数"""
+        from src.excel_mcp_server_fastmcp.api.advanced_sql_query import execute_advanced_sql_query
+
+        result = execute_advanced_sql_query(
+            multi_sheet_config,
+            "SELECT CONCAT(skill_type, '-', skill_name) as label FROM 技能配置 WHERE skill_type='mage'"
+        )
+        assert result['success'] is True
+        data = result['data']
+        rows = [r for r in data if r != data[0]]
+        assert len(rows) >= 1
+        assert rows[0][0] == 'mage-fireball'
+
+    def test_replace_in_select(self, multi_sheet_config):
+        """REPLACE函数"""
+        from src.excel_mcp_server_fastmcp.api.advanced_sql_query import execute_advanced_sql_query
+
+        result = execute_advanced_sql_query(
+            multi_sheet_config,
+            "SELECT REPLACE(skill_name, 'ball', 'BOMB') as new_name FROM 技能配置 WHERE skill_name='fireball'"
+        )
+        assert result['success'] is True
+        data = result['data']
+        rows = [r for r in data if r != data[0]]
+        assert len(rows) == 1
+        assert rows[0][0] == 'fireBOMB'
+
+    def test_substring_in_select(self, multi_sheet_config):
+        """SUBSTRING函数"""
+        from src.excel_mcp_server_fastmcp.api.advanced_sql_query import execute_advanced_sql_query
+
+        result = execute_advanced_sql_query(
+            multi_sheet_config,
+            "SELECT SUBSTRING(skill_name, 1, 3) as short FROM 技能配置 WHERE skill_name='fireball'"
+        )
+        assert result['success'] is True
+        data = result['data']
+        rows = [r for r in data if r != data[0]]
+        assert len(rows) == 1
+        assert rows[0][0] == 'fir'  # SQL 1-based: first 3 chars
+
+    def test_upper_in_where(self, multi_sheet_config):
+        """WHERE中使用UPPER函数"""
+        from src.excel_mcp_server_fastmcp.api.advanced_sql_query import execute_advanced_sql_query
+
+        result = execute_advanced_sql_query(
+            multi_sheet_config,
+            "SELECT skill_name FROM 技能配置 WHERE UPPER(skill_type) = 'MAGE'"
+        )
+        assert result['success'] is True
+        data = result['data']
+        rows = [r for r in data if r != data[0]]
+        assert len(rows) >= 1
+        for row in rows:
+            assert row[0] in ('fireball', 'ice')
