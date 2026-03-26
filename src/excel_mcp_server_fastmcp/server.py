@@ -1906,6 +1906,11 @@ def excel_compare_sheets(
 # ==================== 主程序 ====================
 def main():
     """Entry point for excel-mcp-server-fastmcp."""
+    import sys
+    if len(sys.argv) > 1 and sys.argv[1] in ('--version', '-v'):
+        from excel_mcp_server_fastmcp import __version__
+        print(f"excel-mcp-server-fastmcp {__version__}", flush=True)
+        sys.exit(0)
     mcp.run()
 
 if __name__ == "__main__":
