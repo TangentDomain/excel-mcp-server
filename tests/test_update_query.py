@@ -267,3 +267,27 @@ class TestNumpySerialization:
         assert result['success'] is True
         json_str = json.dumps(result)
         assert json_str
+
+    def test_update_with_chinese_column_names(self, game_config_copy):
+        """中文列名UPDATE：SET和WHERE都使用中文列名"""
+        from src.api.advanced_sql_query import execute_advanced_update_query
+
+        result = execute_advanced_update_query(
+            game_config_copy,
+            "UPDATE 技能配置 SET 伤害 = 伤害 * 1.1 WHERE 技能类型 = '法师'",
+            dry_run=True
+        )
+        assert result['success'] is True
+        assert result['affected_rows'] == 4
+
+    def test_update_chinese_set_english_where(self, game_config_copy):
+        """混合列名UPDATE：SET中文、WHERE英文"""
+        from src.api.advanced_sql_query import execute_advanced_update_query
+
+        result = execute_advanced_update_query(
+            game_config_copy,
+            "UPDATE 技能配置 SET 伤害 = 伤害 * 1.1 WHERE skill_type = '法师'",
+            dry_run=True
+        )
+        assert result['success'] is True
+        assert result['affected_rows'] == 4

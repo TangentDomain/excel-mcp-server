@@ -2052,6 +2052,12 @@ class AdvancedSQLQueryEngine:
                     'affected_rows': 0, 'changes': []}
 
         # 解析UPDATE语句
+        # 中文列名替换（与SELECT查询保持一致）
+        try:
+            sql = self._replace_cn_columns_in_sql(sql, worksheets_data)
+        except Exception:
+            pass  # 替换失败时继续用原始SQL
+
         try:
             parsed = sqlglot.parse_one(sql, read='mysql')
         except ParseError as e:
