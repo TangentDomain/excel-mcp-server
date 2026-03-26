@@ -8,7 +8,7 @@
 - 排序限制: ORDER BY, LIMIT, OFFSET
 - 算术运算: 加减乘除
 - 条件表达式: CASE WHEN, COALESCE/IFNULL
-- 表关联: INNER JOIN, LEFT JOIN, RIGHT JOIN, FULL JOIN, CROSS JOIN（同文件内工作表关联）
+- 表关联: INNER JOIN, LEFT JOIN, RIGHT JOIN, FULL JOIN, CROSS JOIN（同文件内工作表关联 + 跨文件关联）
 - 子查询: WHERE col IN (SELECT ...), 标量子查询, EXISTS
 - CTE: WITH ... AS (SELECT ...)
 - 字符串函数: UPPER, LOWER, TRIM, LENGTH, CONCAT, REPLACE, SUBSTRING, LEFT, RIGHT
@@ -159,6 +159,13 @@ class AdvancedSQLQueryEngine:
                     'query_info': {'error_type': 'data_load_failed'}
                 }
 
+            # 跨文件引用解析：FROM 表名@'path' 语法
+            # 在sqlglot解析前处理，加载外部文件并合并worksheets_data
+            if "@'" in sql or '@"' in sql:
+                sql, worksheets_data = self._resolve_cross_file_references(
+                    sql, file_path, worksheets_data
+                )
+
             # 中文列名替换：将SQL中的中文列名替换为英文列名（在解析前）
             sql = self._replace_cn_columns_in_sql(sql, worksheets_data)
 
@@ -253,6 +260,88 @@ class AdvancedSQLQueryEngine:
                 'data': [],
                 'query_info': {'error_type': 'engine_error', 'details': str(e)}
             }
+
+    def _resolve_cross_file_references(
+        self, sql: str, primary_file_path: str, primary_worksheets: Dict[str, pd.DataFrame]
+    ) -> Tuple[str, Dict[str, pd.DataFrame]]:
+        """
+        解析SQL中的跨文件引用（@'path'语法），加载外部文件数据并合并到worksheets_data
+
+        语法：FROM 技能表@'/path/to/file1.xlsx' s JOIN 掉落表@'/path/to/file2.xlsx' d ON ...
+        支持单引号和双引号包裹路径，支持相对路径（相对于主文件目录）
+
+        Args:
+            sql: 原始SQL语句
+            primary_file_path: 主文件路径
+            primary_worksheets: 主文件的worksheets_data
+
+        Returns:
+            Tuple[str, Dict]: (清理后的SQL, 合并后的worksheets_data)
+        """
+        # 正则匹配 @'path' 或 @"path" 模式
+        # 路径可以包含字母、数字、./、../、_、-、空格等
+        cross_file_pattern = re.compile(
+            r"""@(['"])(.*?)\1""",
+            re.DOTALL
+        )
+
+        matches = list(cross_file_pattern.finditer(sql))
+        if not matches:
+            return sql, primary_worksheets
+
+        merged_data = dict(primary_worksheets)
+        cleaned_sql = sql
+        primary_dir = os.path.dirname(os.path.abspath(primary_file_path))
+        loaded_files = {}  # filepath -> worksheets_data（避免重复加载）
+
+        # 从后向前替换，避免索引偏移
+        for match in reversed(matches):
+            quote_char = match.group(1)
+            ref_path = match.group(2).strip()
+
+            # 解析相对路径（相对于主文件目录）
+            if not os.path.isabs(ref_path):
+                ref_path = os.path.join(primary_dir, ref_path)
+
+            ref_path = os.path.normpath(ref_path)
+
+            # 验证文件存在
+            if not os.path.exists(ref_path):
+                raise ValueError(
+                    f"跨文件引用的文件不存在: {ref_path}。"
+                    f"请检查路径是否正确（支持绝对路径和相对于主文件的相对路径）"
+                )
+
+            # 加载文件（带缓存，避免重复加载）
+            if ref_path not in loaded_files:
+                ext_worksheets = self._load_data_with_cache(ref_path)
+                if not ext_worksheets:
+                    raise ValueError(f"无法加载跨文件引用的Excel数据: {ref_path}")
+                loaded_files[ref_path] = ext_worksheets
+
+            ext_worksheets = loaded_files[ref_path]
+
+            # 合并工作表数据，处理名称冲突
+            # 冲突时：主文件优先（已存在的不覆盖），外部文件重命名添加文件前缀
+            file_basename = os.path.splitext(os.path.basename(ref_path))[0]
+            for sheet_name, df in ext_worksheets.items():
+                if sheet_name in merged_data:
+                    # 名称冲突：为外部文件的工作表添加文件前缀
+                    prefixed_name = f"{file_basename}.{sheet_name}"
+                    if prefixed_name in merged_data:
+                        # 即使加前缀也冲突，添加数字后缀
+                        counter = 2
+                        while f"{prefixed_name}_{counter}" in merged_data:
+                            counter += 1
+                        prefixed_name = f"{prefixed_name}_{counter}"
+                    merged_data[prefixed_name] = df
+                else:
+                    merged_data[sheet_name] = df
+
+            # 从SQL中移除 @'path' 部分，保留表名和别名
+            cleaned_sql = cleaned_sql[:match.start()] + cleaned_sql[match.end():]
+
+        return cleaned_sql, merged_data
 
     def _load_data_with_cache(self, file_path: str, sheet_name: Optional[str] = None) -> Optional[Dict[str, pd.DataFrame]]:
         """
