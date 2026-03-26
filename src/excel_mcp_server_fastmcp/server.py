@@ -2028,13 +2028,28 @@ def excel_server_stats() -> Dict[str, Any]:
 
 # ==================== 主程序 ====================
 def main():
-    """Entry point for excel-mcp-server-fastmcp."""
+    """Entry point for excel-mcp-server-fastmcp.
+
+    支持三种传输模式：
+    - stdio（默认）：本地使用，uvx/claude/cursor
+    - sse：Server-Sent Events远程模式
+    - streamable-http：Streamable HTTP远程模式，推荐用于团队共享
+    """
     import sys
     if len(sys.argv) > 1 and sys.argv[1] in ('--version', '-v'):
         from excel_mcp_server_fastmcp import __version__
         print(f"excel-mcp-server-fastmcp {__version__}", flush=True)
         sys.exit(0)
-    mcp.run()
+
+    transport = 'stdio'
+    mount_path = None
+    for arg in sys.argv[1:]:
+        if arg in ('--stdio', '--sse', '--streamable-http'):
+            transport = arg[2:]  # remove '--'
+        elif arg.startswith('--mount-path='):
+            mount_path = arg.split('=', 1)[1]
+
+    mcp.run(transport=transport, mount_path=mount_path)
 
 if __name__ == "__main__":
     main()

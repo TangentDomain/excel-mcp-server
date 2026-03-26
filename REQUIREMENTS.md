@@ -186,3 +186,25 @@
 - **来源**：自我进化评价 — 写入失败可能损坏文件
 - **描述**：excel_update_query写入前创建临时备份，失败自动回滚
 - **状态**：DONE ✅（第17轮，shutil.copy2备份+回滚+1个测试验证）
+
+### REQ-016 [P0] SQL引擎增强
+- **来源**：用户实测反馈 — 测试报告发现3个不支持功能
+- **描述**：SQL查询引擎新增能力：
+  1. 子查询：`WHERE col IN (SELECT ...)`、标量子查询
+  2. CASE WHEN表达式：`CASE WHEN 条件 THEN 值 ELSE 默认 END`
+  3. COALESCE/IFNULL：空值替换
+  4. EXISTS：`WHERE EXISTS (SELECT ...)`
+  5. LEFT JOIN NULL处理bug修复
+  6. 字符串函数：UPPER、LOWER、TRIM、SUBSTRING/LEFT/RIGHT、CONCAT、REPLACE、LENGTH
+  7. CTE (WITH)：`WITH temp AS (SELECT ...)`
+  8. UNION/UNION ALL：合并查询结果
+  9. 窗口函数：ROW_NUMBER、RANK、DENSE_RANK（OVER子句）
+  10. RIGHT JOIN、FULL JOIN、CROSS JOIN
+- **验收标准**：每项至少2个测试用例，更新文件头支持列表，不支持的项目记录原因
+- **状态**：OPEN
+
+### REQ-017 [P1→DONE] Streamable HTTP + SSE传输模式
+- **来源**：竞品分析 — haris-musa支持三重传输，我们仅stdio
+- **描述**：暴露FastMCP原生支持的三种传输模式（stdio/sse/streamable-http）
+- **验收标准**：命令行参数选择传输模式，不影响现有stdio功能
+- **状态**：DONE ✅（main()新增--stdio/--sse/--streamable-http/--mount-path参数）

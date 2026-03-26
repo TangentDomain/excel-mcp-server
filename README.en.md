@@ -10,11 +10,11 @@
 [![Python Version](https://img.shields.io/badge/python-3.10+-blue.svg)](https://www.python.org/downloads/)
 [![Powered by: FastMCP](https://img.shields.io/badge/Powered%20by-FastMCP-orange)](https://github.com/jlowin/fastmcp)
 ![Status](https://img.shields.io/badge/status-stable-green.svg)
-![Tests](https://img.shields.io/badge/tests-752%20tests-brightgreen.svg)
+![Tests](https://img.shields.io/badge/tests-779%20tests-brightgreen.svg)
 ![Tools](https://img.shields.io/badge/tools-42%20verified%20tools-green.svg)
 [![CI](https://github.com/TangentDomain/excel-mcp-server/actions/workflows/ci.yml/badge.svg)](https://github.com/TangentDomain/excel-mcp-server/actions/workflows/ci.yml)
 
-**ExcelMCP** is an Excel configuration table management MCP server designed for game development. Through AI natural language commands, it enables intelligent operations on game configurations such as skill tables, equipment data, and monster attributes. Built with **FastMCP**, reads use **python-calamine** (Rust engine, 2300x speedup), writes use **openpyxl**. Features **42 professional tools** and **752 test cases**, ensuring enterprise-grade reliability.
+**ExcelMCP** is an Excel configuration table management MCP server designed for game development. Through AI natural language commands, it enables intelligent operations on game configurations such as skill tables, equipment data, and monster attributes. Built with **FastMCP**, reads use **python-calamine** (Rust engine, 2300x speedup), writes use **openpyxl**. Features **42 professional tools** and **779 test cases**, ensuring enterprise-grade reliability.
 
 🎯 **Core Features**: Skill systems, equipment management, monster configuration, numerical balancing, version comparison, designer toolchain
 
@@ -325,7 +325,7 @@ SELECT a.skill_name, b.equip_name FROM SkillConfig a INNER JOIN EquipConfig b ON
 ### 🔍 Search & Analysis
 - `excel_search` - Regex expression search
 - `excel_search_directory` - Directory batch search
-- `excel_query` - SQL query (supports dual-row headers, WHERE/GROUP BY/HAVING/ORDER BY/LIMIT/OFFSET/DISTINCT/JOIN/math expressions)
+- `excel_query` - SQL query (supports dual-row headers, WHERE/GROUP BY/HAVING/ORDER BY/LIMIT/OFFSET/DISTINCT/JOIN/subqueries/CTE/CASE WHEN/COALESCE/string functions/math expressions)
 - `excel_update_query` - SQL UPDATE batch modification (SET constant/column ref/arithmetic, WHERE condition, dry_run preview)
 - `excel_describe_table` - View table structure (column names, types, descriptions, sample values, auto-detect dual-row headers)
 - `excel_compare_sheets` - Worksheet comparison (game config optimized)
@@ -429,6 +429,27 @@ SELECT * FROM EquipTable WHERE quality NOT IN ('deprecated', 'internal_test')
 -- JOIN cross-table queries (within same file)
 SELECT a.skill_name, b.equip_name FROM SkillTable a INNER JOIN EquipTable b ON a.equip_id = b.equip_id
 SELECT a.name, b.hp FROM MonsterTable a LEFT JOIN MonsterDropTable b ON a.id = b.monster_id WHERE a.level > 10
+
+-- Subqueries (WHERE col IN / NOT IN / Scalar)
+SELECT * FROM SkillTable WHERE skill_type IN (SELECT DISTINCT skill_type FROM SkillTable WHERE damage > 200)
+SELECT * FROM SkillTable WHERE damage > (SELECT AVG(damage) FROM SkillTable)
+
+-- EXISTS subqueries (correlated)
+SELECT * FROM MonsterTable WHERE EXISTS (SELECT 1 FROM DropTable WHERE DropTable.monster_id = MonsterTable.id)
+
+-- CASE WHEN conditional expressions
+SELECT skill_name, CASE WHEN damage > 200 THEN 'High' WHEN damage > 100 THEN 'Mid' ELSE 'Low' END as tier FROM SkillTable
+
+-- CTE (WITH ... AS ...)
+WITH high_dmg AS (SELECT * FROM SkillTable WHERE damage > 150) SELECT * FROM high_dmg ORDER BY damage DESC
+
+-- COALESCE / IFNULL null replacement
+SELECT skill_name, COALESCE(description, 'N/A') as desc FROM SkillTable
+
+-- String functions
+SELECT UPPER(skill_name), LOWER(skill_type) FROM SkillTable
+SELECT CONCAT(skill_type, ':', skill_name) as label FROM SkillTable
+SELECT REPLACE(description, 'attack', 'strike') FROM SkillTable
 ```
 
 **SQL UPDATE Batch Modification:**
@@ -447,9 +468,9 @@ UPDATE SkillTable SET damage = damage * 1.1 WHERE element = 'Fire'  -- dry_run=T
 ```
 
 **Unsupported Syntax (with clear alternative suggestions):**
-- CASE WHEN (suggest: conditional queries or external processing)
-- Subqueries / CTE / Window functions
-- RIGHT JOIN / CROSS JOIN (rarely used in game scenarios)
+- FROM subqueries `FROM (SELECT ...)` (suggest: use WHERE subqueries or CTEs)
+- UNION / Window functions (suggest: separate queries or subqueries + GROUP BY)
+- RIGHT JOIN / CROSS JOIN / FULL JOIN (rarely used in game scenarios)
 
 **Query Performance:**
 - Same-file repeated queries auto-cache, 30-100x speedup
