@@ -1033,12 +1033,16 @@ class AdvancedSQLQueryEngine:
                 suggestion = self._suggest_column_name(col, list(df.columns))
                 raise ValueError(f"窗口函数中列 '{col}' 不存在。可用列: {list(df.columns)}。{suggestion}")
 
-        if func_type == 'RowNumber':
-            return self._compute_row_number(df, partition_cols, order_cols, ascending)
-        elif func_type == 'Rank':
-            return self._compute_rank(df, partition_cols, order_cols, ascending)
-        elif func_type == 'DenseRank':
-            return self._compute_dense_rank(df, partition_cols, order_cols, ascending)
+        # 窗口函数分发表
+        _window_dispatch = {
+            'RowNumber': self._compute_row_number,
+            'Rank': self._compute_rank,
+            'DenseRank': self._compute_dense_rank,
+        }
+        handler = _window_dispatch.get(func_type)
+        if handler:
+            return handler(df, partition_cols, order_cols, ascending)
+        raise ValueError(f"不支持的窗口函数: {func_type}")
 
     def _resolve_window_column(self, col_name: str, df_columns: list,
                                 select_alias_map: Dict[str, str]) -> str:
@@ -1523,21 +1527,21 @@ class AdvancedSQLQueryEngine:
         if func_name == 'replace':
             # REPLACE(str, old, new) — sqlglot: this=string, expression=old, replacement=new
             val_series = self._expr_to_series(expr.this, df).astype(str)
-            old_val = str(self._literal_value(expr.args.get('expression'))) if expr.args.get('expression') else ''
-            new_val = str(self._literal_value(expr.args.get('replacement'))) if expr.args.get('replacement') else ''
+            old_val = self._get_arg(expr, 'expression', '', str)
+            new_val = self._get_arg(expr, 'replacement', '', str)
             return val_series.str.replace(old_val, new_val, regex=False)
 
         if func_name in ('substring', 'left', 'right'):
             val_series = self._expr_to_series(expr.this, df).astype(str)
             if func_name == 'substring':
-                start = int(self._literal_value(expr.args.get('start'))) - 1 if expr.args.get('start') else 0
-                length = int(self._literal_value(expr.args.get('length'))) if expr.args.get('length') else len(val_series.iloc[0])
+                start = self._get_arg(expr, 'start', 1, int) - 1
+                length = self._get_arg(expr, 'length', len(val_series.iloc[0]), int)
                 return val_series.str.slice(start, start + length)
             if func_name == 'left':
-                n = int(self._literal_value(expr.args.get('expression'))) if expr.args.get('expression') else 1
+                n = self._get_arg(expr, 'expression', 1, int)
                 return val_series.str.slice(0, n)
             # right
-            n = int(self._literal_value(expr.args.get('expression'))) if expr.args.get('expression') else 1
+            n = self._get_arg(expr, 'expression', 1, int)
             return val_series.str.slice(-n)
 
         raise ValueError(f"不支持的字符串函数: {func_name}")
@@ -1567,18 +1571,18 @@ class AdvancedSQLQueryEngine:
             parts = [str(self._get_row_value(arg, row) or '') for arg in expr.expressions]
             return ''.join(parts)
         if func_name == 'replace':
-            old_val = str(self._literal_value(expr.args.get('expression'))) if expr.args.get('expression') else ''
-            new_val = str(self._literal_value(expr.args.get('replacement'))) if expr.args.get('replacement') else ''
+            old_val = self._get_arg(expr, 'expression', '', str)
+            new_val = self._get_arg(expr, 'replacement', '', str)
             return val.replace(old_val, new_val)
         if func_name == 'substring':
-            start = int(self._literal_value(expr.args.get('start'))) - 1 if expr.args.get('start') else 0
-            length = int(self._literal_value(expr.args.get('length'))) if expr.args.get('length') else len(val)
+            start = self._get_arg(expr, 'start', 1, int) - 1
+            length = self._get_arg(expr, 'length', len(val), int)
             return val[start:start + length]
         if func_name == 'left':
-            n = int(self._literal_value(expr.args.get('expression'))) if expr.args.get('expression') else 1
+            n = self._get_arg(expr, 'expression', 1, int)
             return val[:n]
         if func_name == 'right':
-            n = int(self._literal_value(expr.args.get('expression'))) if expr.args.get('expression') else 1
+            n = self._get_arg(expr, 'expression', 1, int)
             return val[-n:] if n > 0 else ''
         return val
 
@@ -1615,6 +1619,21 @@ class AdvancedSQLQueryEngine:
         elif isinstance(expr, exp.Column):
             return expr.name
         return str(expr)
+
+    def _get_arg(self, expr, arg_name, default=None, type_fn=None):
+        """从表达式参数中提取值，支持类型转换
+
+        消除字符串函数中重复的 _literal_value(expr.args.get(...)) 模式。
+        例如: int(self._literal_value(expr.args.get('n'))) if expr.args.get('n') else 1
+        简化为: self._get_arg(expr, 'n', 1, int)
+        """
+        arg = expr.args.get(arg_name)
+        if arg is None:
+            return default
+        val = self._literal_value(arg)
+        if type_fn and val is not None:
+            return type_fn(val)
+        return val
 
     def _get_from_table(self, parsed_sql: exp.Expression) -> str:
         """获取FROM子句中的表名"""
