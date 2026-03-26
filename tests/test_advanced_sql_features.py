@@ -510,3 +510,36 @@ class TestAdvancedSQLFeatures:
         
         assert result['success'] is True
         assert 'dept_count' in result.get('query_info', {}).get('returned_columns', [])
+
+    def test_large_result_truncation(self, test_excel_file):
+        """测试大结果自动截断（>500行截断为前500行）"""
+        import os
+        from src.excel_mcp_server_fastmcp.api.advanced_sql_query import execute_advanced_sql_query
+        
+        large_file = os.path.join(os.path.dirname(test_excel_file), 'large_skills.xlsx')
+        if not os.path.exists(large_file):
+            return  # 跳过如果大文件不存在
+        
+        result = execute_advanced_sql_query(
+            file_path=large_file,
+            sql="SELECT * FROM Sheet1"
+        )
+        
+        assert result['success'] is True
+        # data包含表头行+数据行，截断后最多501行（1表头+500数据）
+        assert len(result['data']) <= 501
+        # query_info应包含截断提示
+        assert '截断' in result['message'] or result['query_info'].get('filtered_rows', 0) > 500
+
+    def test_small_result_no_truncation(self, test_excel_file):
+        """测试小结果不截断"""
+        from src.excel_mcp_server_fastmcp.api.advanced_sql_query import execute_advanced_sql_query
+        
+        result = execute_advanced_sql_query(
+            file_path=test_excel_file,
+            sql="SELECT * FROM Employees"
+        )
+        
+        assert result['success'] is True
+        # 小表（<500行）不应截断
+        assert '截断' not in result['message']

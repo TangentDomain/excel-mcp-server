@@ -2485,6 +2485,16 @@ class AdvancedSQLQueryEngine:
                 for _, row in result_df.iterrows():
                     data.append([self._serialize_value(val) for val in row])
 
+        # 大结果自动截断：保护AI上下文窗口（MAX_RESULT_ROWS=500）
+        MAX_RESULT_ROWS = 500
+        truncated = False
+        data_row_count = len(result_df)
+        if data_row_count > MAX_RESULT_ROWS:
+            # 保留表头行 + 前MAX_RESULT_ROWS行数据
+            keep_rows = MAX_RESULT_ROWS + (1 if include_headers else 0)
+            data = data[:keep_rows]
+            truncated = True
+
         # GROUP BY 聚合结果自动追加 TOTAL 行
         has_total_row = False
         if has_group_by and include_headers:
@@ -2507,14 +2517,18 @@ class AdvancedSQLQueryEngine:
             has_limit = parsed_sql is not None and parsed_sql.args.get('limit') is not None
             if not has_limit:
                 perf_hint = f'（结果较多，建议加 LIMIT 缩小范围）'
+        if truncated:
+            perf_hint += f'（结果已截断为前{MAX_RESULT_ROWS}行，共{data_row_count}行，请加 LIMIT 精确查询）'
 
         result = {
             'success': True,
-            'message': f'SQL查询成功执行，返回 {len(result_df)} 行结果' + ('（含TOTAL汇总行）' if has_total_row else '') + perf_hint,
+            'message': f'SQL查询成功执行，返回 {data_row_count} 行结果' + ('（含TOTAL汇总行）' if has_total_row else '') + perf_hint,
             'data': data,
             'query_info': {
                 'original_rows': total_original_rows,
-                'filtered_rows': len(result_df),
+                'filtered_rows': data_row_count,
+                'returned_rows': len(data) - (1 if include_headers else 0) - (1 if has_total_row else 0),
+                'truncated': truncated,
                 'query_applied': True,
                 'sql_query': sql,
                 'columns_returned': len(result_df.columns) if not result_df.empty else 0,
