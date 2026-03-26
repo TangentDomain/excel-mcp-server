@@ -10,11 +10,11 @@
 [![Python 版本](https://img.shields.io/badge/python-3.10+-blue.svg)](https://www.python.org/downloads/)
 [![技术支持: FastMCP](https://img.shields.io/badge/Powered%20by-FastMCP-orange)](https://github.com/jlowin/fastmcp)
 ![状态](https://img.shields.io/badge/status-stable-green.svg)
-![测试覆盖](https://img.shields.io/badge/tests-761%20tests-brightgreen.svg)
-![工具数量](https://img.shields.io/badge/tools-41%20verified%20tools-green.svg)
+![测试覆盖](https://img.shields.io/badge/tests-775%20tests-brightgreen.svg)
+![工具数量](https://img.shields.io/badge/tools-42%20verified%20tools-green.svg)
 [![CI](https://github.com/TangentDomain/excel-mcp-server/actions/workflows/ci.yml/badge.svg)](https://github.com/TangentDomain/excel-mcp-server/actions/workflows/ci.yml)
 
-**ExcelMCP** 是专为游戏开发设计的Excel配置表管理MCP服务器。通过AI自然语言指令，实现技能配置表、装备数据、怪物属性等游戏配置的智能化操作。基于**FastMCP**构建，读取使用**python-calamine**（Rust引擎，2300x提速），写入使用**openpyxl**，拥有**41个专业工具**和**761个测试用例**，确保企业级可靠性。
+**ExcelMCP** 是专为游戏开发设计的Excel配置表管理MCP服务器。通过AI自然语言指令，实现技能配置表、装备数据、怪物属性等游戏配置的智能化操作。基于**FastMCP**构建，读取使用**python-calamine**（Rust引擎，2300x提速），写入使用**openpyxl**，拥有**42个专业工具**和**775个测试用例**，确保企业级可靠性。
 
 🎯 **核心功能**: 技能系统、装备管理、怪物配置、数值平衡、版本对比、策划工具链
 
@@ -306,7 +306,7 @@ SELECT a.skill_name, b.equip_name FROM SkillConfig a INNER JOIN EquipConfig b ON
 
 ---
 
-## 🛠️ 完整工具列表（41个专业工具）
+## 🛠️ 完整工具列表（42个专业工具）
 
 ### 📁 文件与工作表管理
 - `excel_create_file` - 创建新Excel文件，支持自定义工作表
@@ -339,6 +339,7 @@ SELECT a.skill_name, b.equip_name FROM SkillConfig a INNER JOIN EquipConfig b ON
 - `excel_compare_sheets` - 工作表对比（游戏配置优化）
 - `excel_compare_files` - 多工作表文件对比
 - `excel_check_duplicate_ids` - ID重复检测
+- `excel_server_stats` - 服务器运行统计（工具调用次数、耗时、错误率）
 
 ### 🛡️ 安全与备份
 - `excel_create_backup` - 创建文件自动备份
@@ -522,7 +523,7 @@ ExcelMCP 内置多层安全防护，保护用户数据和系统安全：
 ```
 src/excel_mcp_server_fastmcp/    # 主包（pip install 后可直接 import）
 ├── __init__.py                   # 包入口，暴露 main()
-├── server.py                     # MCP接口层（41个工具定义）
+├── server.py                     # MCP接口层（42个工具定义）
 ├── api/                          # API业务逻辑层
 │   ├── excel_operations.py       # Excel操作统一入口
 │   └── advanced_sql_query.py     # SQL查询引擎
@@ -574,10 +575,10 @@ API业务逻辑层 (集中式处理)
 ## 📊 项目信息
 
 ### 质量验证指标
-- **测试用例**: 761个（行为验证，无覆盖率填充）
+- **测试用例**: 775个（行为验证，无覆盖率填充）
 - **测试文件**: 34个测试文件
 - **测试代码**: 13,574行
-- **工具数量**: 41个 (@mcp.tool装饰器验证)
+- **工具数量**: 42个 (@mcp.tool装饰器验证)
 - **架构层次**: 4层分层设计 (MCP→API→Core→Utils)
 
 ### 验证命令
@@ -586,7 +587,7 @@ API业务逻辑层 (集中式处理)
 python -m pytest tests/ -q --tb=short -n auto --timeout=30
 
 # 验证工具完整性
-grep -c "def excel_" src/excel_mcp_server_fastmcp/server.py  # 应输出: 41
+grep -c "def excel_" src/excel_mcp_server_fastmcp/server.py  # 应输出: 42
 
 # 生成覆盖率报告
 python -m pytest tests/ --cov=src --cov-report=html
@@ -642,7 +643,7 @@ A: 使用专门的配置表对比工具，支持ID对象跟踪
 
 | 🎯 **快速开始** | 🛠️ **工具参考** | 📚 **学习指南** |
 |----------------|----------------|----------------|
-| [🚀 安装配置](#-快速入门-3分钟设置) | [📋 完整工具列表](#️-完整工具列表41个专业工具) | [📖 使用指南](#-使用指南) |
+| [🚀 安装配置](#-快速入门-3分钟设置) | [📋 完整工具列表](#️-完整工具列表42个专业工具) | [📖 使用指南](#-使用指南) |
 | [⚡ 命令速查](#-快速参考) | [🏗️ 技术架构](#️-技术架构) | [🚨 故障排除](#-故障排除) |
 | [🎮 游戏配置管理](#-使用指南) | [📊 项目信息](#-项目信息) | [❓ 常见问题](#-常见问题) |
 
