@@ -1341,12 +1341,8 @@ class AdvancedSQLQueryEngine:
                     result_data[alias_name] = self._evaluate_case_expression(original_expr, df)
 
                 elif isinstance(original_expr, exp.Coalesce):
-                    # COALESCE/IFNULL表达式
-                    results = []
-                    for idx in range(len(df)):
-                        row = df.iloc[idx]
-                        results.append(self._evaluate_coalesce_for_row(original_expr, row))
-                    result_data[alias_name] = pd.Series(results, index=df.index)
+                    # COALESCE/IFNULL表达式（向量化）
+                    result_data[alias_name] = self._evaluate_coalesce_vectorized(original_expr, df)
 
                 elif self._is_string_function(original_expr):
                     # 字符串函数: UPPER, LOWER, TRIM, LENGTH, CONCAT, REPLACE, SUBSTRING, LEFT, RIGHT
@@ -1453,12 +1449,8 @@ class AdvancedSQLQueryEngine:
         elif isinstance(expr, exp.Literal):
             return self._expression_to_value(expr, df)
         elif isinstance(expr, exp.Coalesce):
-            # COALESCE在数学表达式中
-            results = []
-            for idx in range(len(df)):
-                row = df.iloc[idx]
-                results.append(self._evaluate_coalesce_for_row(expr, row))
-            return pd.Series(results, index=df.index)
+            # COALESCE在数学表达式中（向量化）
+            return self._evaluate_coalesce_vectorized(expr, df)
         else:
             raise ValueError(f"不支持的数学表达式部分: {expr}")
 
@@ -1576,8 +1568,7 @@ class AdvancedSQLQueryEngine:
         elif isinstance(expr, (exp.Add, exp.Sub, exp.Mul, exp.Div)):
             return self._evaluate_math_expression(expr, df)
         elif isinstance(expr, exp.Coalesce):
-            results = [self._evaluate_coalesce_for_row(expr, df.iloc[i]) for i in range(len(df))]
-            return pd.Series(results, index=df.index)
+            return self._evaluate_coalesce_vectorized(expr, df)
         elif self._is_string_function(expr):
             return self._evaluate_string_function(expr, df)
         elif isinstance(expr, exp.Case):
@@ -2194,7 +2185,13 @@ class AdvancedSQLQueryEngine:
             return row.get(col_name)
 
         elif isinstance(expr, exp.Literal):
-            return expr.this
+            if expr.is_string:
+                return expr.this
+            else:
+                try:
+                    return float(expr.this) if '.' in str(expr.this) else int(expr.this)
+                except (ValueError, TypeError):
+                    return expr.this
 
         elif isinstance(expr, exp.Coalesce):
             return self._evaluate_coalesce_for_row(expr, row)
@@ -2309,13 +2306,9 @@ class AdvancedSQLQueryEngine:
                         result_data[alias_name] = case_series.groupby(case_series).first()
                 else:
                     result_data[alias_name] = case_series.groupby(case_series).first()
-            # 处理COALESCE表达式
+            # 处理COALESCE表达式（向量化）
             elif isinstance(original_expr, exp.Coalesce):
-                coalesce_results = []
-                for idx in range(len(df)):
-                    row = df.iloc[idx]
-                    coalesce_results.append(self._evaluate_coalesce_for_row(original_expr, row))
-                coalesce_series = pd.Series(coalesce_results)
+                coalesce_series = self._evaluate_coalesce_vectorized(original_expr, df)
                 if alias_name not in group_by_columns:
                     group_by_columns.append(alias_name)
                 result_data[alias_name] = coalesce_series.groupby(coalesce_series).first()
@@ -2403,7 +2396,7 @@ class AdvancedSQLQueryEngine:
             for if_clause in ifs:
                 condition = if_clause.this
                 if self._evaluate_condition_for_row(condition, row):
-                    return self._get_row_value(if_clause.args.get('true'), row)
+                    return self._get_expression_value(if_clause.args.get('true'), row)
             # 没有匹配的WHEN，返回ELSE默认值
             if default_value is not None:
                 if isinstance(default_value, exp.Literal):
@@ -2415,35 +2408,11 @@ class AdvancedSQLQueryEngine:
                 return None
             return None
         else:
-            # 向量化模式 - 逐行构建Series
-            results = []
-            for idx in range(len(df)):
-                row = df.iloc[idx]
-                matched = False
-                for if_clause in ifs:
-                    condition = if_clause.this
-                    try:
-                        if self._evaluate_condition_for_row(condition, row):
-                            true_expr = if_clause.args.get('true')
-                            val = self._get_expression_value(true_expr, row)
-                            results.append(val)
-                            matched = True
-                            break
-                    except Exception:
-                        continue
-                if not matched:
-                    if default_value is not None:
-                        if isinstance(default_value, exp.Literal):
-                            results.append(default_value.this if default_value.is_string else (
-                                float(default_value.this) if '.' in str(default_value.this) else int(default_value.this)
-                            ))
-                        elif isinstance(default_value, exp.Column):
-                            results.append(row.get(default_value.name))
-                        else:
-                            results.append(None)
-                    else:
-                        results.append(None)
-            return pd.Series(results, index=df.index)
+            # 向量化模式 - 复用逐行评估
+            return pd.Series(
+                [self._evaluate_case_expression(case_expr, df, df.iloc[i]) for i in range(len(df))],
+                index=df.index
+            )
 
     def _get_expression_value(self, expr: exp.Expression, row: pd.Series) -> Any:
         """获取表达式在指定行的值（支持列引用、字面量、算术表达式）"""
@@ -2487,6 +2456,44 @@ class AdvancedSQLQueryEngine:
             if val is not None and not (isinstance(val, float) and np.isnan(val)):
                 return val
         return None
+
+    def _evaluate_coalesce_vectorized(self, coalesce_expr: exp.Coalesce, df: pd.DataFrame) -> pd.Series:
+        """向量化评估COALESCE/IFNULL表达式（用于DataFrame）
+
+        使用 pandas combine_first 实现真正的向量化操作，
+        替代逐行 _evaluate_coalesce_for_row 循环。
+        仅当所有参数为列引用或字面量时可向量化，否则回退逐行。
+        """
+        values = [coalesce_expr.this] + list(coalesce_expr.expressions)
+        result = None
+        fallback = False
+
+        for val_expr in values:
+            if isinstance(val_expr, exp.Column) and val_expr.name in df.columns:
+                series = df[val_expr.name].astype(object)
+            elif isinstance(val_expr, exp.Literal):
+                if val_expr.is_string:
+                    series = pd.Series([val_expr.this] * len(df), index=df.index, dtype=object)
+                else:
+                    try:
+                        v = float(val_expr.this) if '.' in str(val_expr.this) else int(val_expr.this)
+                        series = pd.Series([v] * len(df), index=df.index, dtype=object)
+                    except (ValueError, TypeError):
+                        series = pd.Series([None] * len(df), index=df.index, dtype=object)
+            else:
+                fallback = True
+                break
+
+            if result is None:
+                result = series
+            else:
+                result = result.combine_first(series)
+
+        if fallback:
+            results = [self._evaluate_coalesce_for_row(coalesce_expr, df.iloc[i]) for i in range(len(df))]
+            return pd.Series(results, index=df.index)
+
+        return result
 
 
     def _generate_aggregate_alias(self, expr: exp.Expression) -> str:
@@ -2649,14 +2656,10 @@ class AdvancedSQLQueryEngine:
                 df[temp_col] = self._evaluate_case_expression(expr, df)
                 df.rename(columns={temp_col: col_name}, inplace=True)
                 return col_name
-            # COALESCE表达式：临时计算
+            # COALESCE表达式：临时计算（向量化）
             if isinstance(expr, exp.Coalesce):
                 temp_col = f"__order_temp_{col_name}"
-                results = []
-                for idx in range(len(df)):
-                    row = df.iloc[idx]
-                    results.append(self._evaluate_coalesce_for_row(expr, row))
-                df[temp_col] = pd.Series(results, index=df.index)
+                df[temp_col] = self._evaluate_coalesce_vectorized(expr, df)
                 df.rename(columns={temp_col: col_name}, inplace=True)
                 return col_name
 
