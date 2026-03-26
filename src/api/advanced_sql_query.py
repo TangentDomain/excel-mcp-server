@@ -664,6 +664,61 @@ class AdvancedSQLQueryEngine:
                     return val
         return None
 
+    def _generate_having_empty_suggestion(self, condition, df_before_having) -> str:
+        """生成HAVING导致空结果时的智能建议
+
+        Args:
+            condition: HAVING条件表达式
+            df_before_having: HAVING过滤前的聚合结果DataFrame
+        """
+        hints = ['\nHAVING分析：']
+        hints.append(f'• GROUP BY聚合后有{len(df_before_having)}组数据')
+
+        # 分析HAVING条件类型
+        if isinstance(condition, exp.GT):
+            col = self._extract_column_name(condition.left)
+            val = self._extract_literal_value(condition.right)
+            if col and col in df_before_having.columns:
+                col_max = pd.to_numeric(df_before_having[col], errors='coerce').max()
+                hints.append(f'• 列"{col}"的最大值为{col_max}，HAVING要求 >{val}，无满足条件的组')
+                if col_max <= val:
+                    hints.append(f'• 建议：降低阈值（如改为 >{max(0, val * 0.8):.0f}）或移除HAVING查看全部分组')
+        elif isinstance(condition, exp.GTE):
+            col = self._extract_column_name(condition.left)
+            val = self._extract_literal_value(condition.right)
+            if col and col in df_before_having.columns:
+                col_max = pd.to_numeric(df_before_having[col], errors='coerce').max()
+                hints.append(f'• 列"{col}"的最大值为{col_max}，HAVING要求 >={val}，无满足条件的组')
+        elif isinstance(condition, exp.LT):
+            col = self._extract_column_name(condition.left)
+            val = self._extract_literal_value(condition.right)
+            if col and col in df_before_having.columns:
+                col_min = pd.to_numeric(df_before_having[col], errors='coerce').min()
+                hints.append(f'• 列"{col}"的最小值为{col_min}，HAVING要求 <{val}，无满足条件的组')
+        elif isinstance(condition, exp.LTE):
+            col = self._extract_column_name(condition.left)
+            val = self._extract_literal_value(condition.right)
+            if col and col in df_before_having.columns:
+                col_min = pd.to_numeric(df_before_having[col], errors='coerce').min()
+                hints.append(f'• 列"{col}"的最小值为{col_min}，HAVING要求 <={val}，无满足条件的组')
+        elif isinstance(condition, exp.EQ):
+            col = self._extract_column_name(condition.left)
+            val = self._extract_literal_value(condition.right)
+            if col and col in df_before_having.columns:
+                unique_vals = df_before_having[col].dropna().unique()
+                if len(unique_vals) <= 10:
+                    vals_str = ', '.join(str(v) for v in unique_vals)
+                    hints.append(f'• 列"{col}"的值为: {vals_str}，不等于{val}')
+                else:
+                    hints.append(f'• 列"{col}"有{len(unique_vals)}个不同值，不等于{val}')
+        else:
+            hints.append(f'• HAVING条件较复杂，建议去掉HAVING先查看聚合结果')
+
+        # 通用建议
+        hints.append('• 可先去掉HAVING查看全部分组结果，再调整过滤条件')
+
+        return '\n'.join(hints)
+
     def _suggest_column_name(self, col_name: str, available_cols: List[str], max_suggestions: int = 3) -> str:
         """
         当列名不存在时，用编辑距离找出最相似的列名作为建议。
@@ -747,6 +802,8 @@ class AdvancedSQLQueryEngine:
 
             # 应用HAVING条件
             if parsed_sql.args.get('having'):
+                # 保存HAVING前的DataFrame，用于HAVING空结果建议
+                self._df_before_having = base_df.copy()
                 base_df = self._apply_having_clause(parsed_sql, base_df)
 
             # ORDER BY（聚合查询：在GROUP BY之后）
@@ -1605,11 +1662,20 @@ class AdvancedSQLQueryEngine:
             }
         }
 
-        # 空结果智能建议：分析WHERE条件类型，给出针对性提示
+        # 空结果智能建议：分析WHERE/HAVING条件类型，给出针对性提示
         if result_df.empty:
-            result['query_info']['suggestion'] = self._generate_empty_result_suggestion(
+            suggestion = self._generate_empty_result_suggestion(
                 parsed_sql, df_before_where, worksheets_data
             )
+            # HAVING空结果追加聚合中间结果信息
+            df_before_having = getattr(self, '_df_before_having', None)
+            if df_before_having is not None and not df_before_having.empty:
+                having_clause = parsed_sql.args.get('having')
+                if having_clause:
+                    suggestion += self._generate_having_empty_suggestion(
+                        having_clause.this, df_before_having
+                    )
+            result['query_info']['suggestion'] = suggestion
 
         # 生成Markdown表格（方便AI和人类阅读）
         if data and len(data) > 0:

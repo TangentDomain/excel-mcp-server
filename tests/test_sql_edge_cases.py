@@ -324,3 +324,11 @@ class TestSQLQueryKnownLimitations:
         assert result['success'] is True
         suggestion = result['query_info'].get('suggestion', '')
         assert '多个AND条件' in suggestion or '减少条件' in suggestion
+
+    def test_empty_result_having_suggestion(self, game_config_file):
+        """HAVING condition causing empty result shows aggregate intermediate data"""
+        result = excel_query(game_config_file, "SELECT 技能类型, AVG(伤害) as avg_dmg FROM 技能配置 GROUP BY 技能类型 HAVING AVG(伤害) > 99999")
+        assert result['success'] is True
+        suggestion = result['query_info'].get('suggestion', '')
+        assert 'HAVING' in suggestion
+        assert 'GROUP BY聚合后' in suggestion
