@@ -116,6 +116,8 @@
   - ✅ 第34轮：excel_writer.py 10个方法添加workbook.close()（修复文件句柄泄漏）
   - ✅ 第34轮：_create_temp_workbook移除重复代码块（公式计算不再加载文件2次）
   - ✅ 第34轮：eval()替换为_safe_eval_expr() AST白名单验证（拒绝__import__等危险调用）
+  - ✅ 第47轮：智能追加优化+excel_writer.py/advanced_sql_query.py/excel_operations.py内联import提升
+  - ✅ 第48轮：excel_operations.py 32处冗余内联import全面清理（-29行），excel_writer.py 5处（-5行）
 - **验收**：每轮评价中包含工程治理评估，发现问题立即修复或建需求
 - **状态**：OPEN（持续迭代，不关闭）
 
