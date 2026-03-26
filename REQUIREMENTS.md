@@ -204,6 +204,7 @@
   10. ❌ UNION/UNION ALL：合并查询结果（需要跨DataFrame concat逻辑）
   11. ❌ 窗口函数：ROW_NUMBER、RANK（复杂度高，游戏场景少见）
   12. ❌ RIGHT/FULL/CROSS JOIN（游戏场景极少使用）
+  13. ❌ 跨文件JOIN：类似数据库跨库查询，`SELECT * FROM 技能表@file1.xlsx s JOIN 掉落表@file2.xlsx d ON s.技能ID = d.技能ID`
 - **测试**：16个新测试（test_sql_enhanced.py），779全通过
 - **验收标准**：每项至少2个测试用例 ✅ | 更新文件头支持列表 ✅ | 不支持项目有替代提示 ✅
 - **状态**：IN_PROGRESS（核心功能已完成，UNION/窗口函数/扩展JOIN留待后续）
