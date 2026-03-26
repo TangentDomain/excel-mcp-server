@@ -1854,7 +1854,7 @@ class AdvancedSQLQueryEngine:
                                     else:
                                         # 无表限定符：精确替换（避免误替换子查询表的列）
                                         pattern = r'\b' + re.escape(col_name) + r'\b'
-                                        inner_sql = re.sub(repr(val), inner_sql, count=1)
+                                        inner_sql = re.sub(pattern, repr(val), inner_sql, count=1)
                         try:
                             parsed_inner = sqlglot.parse_one(inner_sql)
                             sub_result = self._execute_query(parsed_inner, self._current_worksheets)

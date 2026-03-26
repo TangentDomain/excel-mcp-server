@@ -250,6 +250,69 @@ class TestExists:
         assert len(rows) == 0
 
 
+    def test_exists_unqualified_correlated(self, tmp_path):
+        """EXISTS关联子查询: 无表限定符的列引用（测试re.sub参数顺序bug修复）"""
+        from openpyxl import Workbook
+        from src.excel_mcp_server_fastmcp.api.advanced_sql_query import execute_advanced_sql_query
+
+        wb = Workbook()
+        # 技能表: 单行表头，避免双行表头干扰
+        ws1 = wb.active
+        ws1.title = '技能表'
+        ws1.append(['skill_name', 'damage', 'cooldown'])
+        ws1.append(['fireball', 200, 5])
+        ws1.append(['heal', 0, 3])
+
+        # 怪物表: hp列仅怪物表有，用于关联
+        ws2 = wb.create_sheet('怪物表')
+        ws2.append(['monster_name', 'hp', 'atk'])
+        ws2.append(['dragon', 5000, 300])
+        ws2.append(['slime', 100, 10])
+
+        path = str(tmp_path / 'test_exists_unqual.xlsx')
+        wb.save(path)
+
+        # damage仅技能表有 → 无表限定符时触发关联子查询替换
+        result = execute_advanced_sql_query(
+            path,
+            "SELECT skill_name FROM 技能表 WHERE EXISTS (SELECT 1 FROM 怪物表 WHERE hp > damage)"
+        )
+        assert result['success'] is True
+        data = result['data']
+        rows = [r for r in data if r != data[0]]
+        # heal(damage=0): 怪物hp 5000>0, 100>0 → EXISTS True
+        # fireball(damage=200): 怪物hp 5000>200 True, 100>200 False → EXISTS True
+        assert len(rows) == 2
+
+    def test_exists_unqualified_no_match(self, tmp_path):
+        """EXISTS关联子查询无匹配: 无表限定符"""
+        from openpyxl import Workbook
+        from src.excel_mcp_server_fastmcp.api.advanced_sql_query import execute_advanced_sql_query
+
+        wb = Workbook()
+        ws1 = wb.active
+        ws1.title = '技能表'
+        ws1.append(['skill_name', 'damage', 'cooldown'])
+        ws1.append(['fireball', 200, 5])
+
+        ws2 = wb.create_sheet('怪物表')
+        ws2.append(['monster_name', 'hp', 'atk'])
+        ws2.append(['dragon', 5000, 300])
+
+        path = str(tmp_path / 'test_exists_nomatch.xlsx')
+        wb.save(path)
+
+        # damage=200, 怪物hp=5000 < 99999 → 无匹配
+        result = execute_advanced_sql_query(
+            path,
+            "SELECT skill_name FROM 技能表 WHERE EXISTS (SELECT 1 FROM 怪物表 WHERE hp > 99999)"
+        )
+        assert result['success'] is True
+        data = result['data']
+        rows = [r for r in data if r != data[0]]
+        assert len(rows) == 0
+
+
 class TestLeftJoinNull:
     """LEFT JOIN NULL处理测试"""
 
