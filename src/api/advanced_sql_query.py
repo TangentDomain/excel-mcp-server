@@ -94,7 +94,8 @@ class AdvancedSQLQueryEngine:
         sql: str,
         sheet_name: Optional[str] = None,
         limit: Optional[int] = None,
-        include_headers: bool = True
+        include_headers: bool = True,
+        output_format: str = "table"
     ) -> Dict[str, Any]:
         """
         执行SQL查询，支持完整的SQL语法
@@ -105,6 +106,7 @@ class AdvancedSQLQueryEngine:
             sheet_name: 工作表名称（可选，默认使用第一个）
             limit: 限制返回行数
             include_headers: 是否包含表头
+            output_format: 输出格式 table/json/csv
 
         Returns:
             Dict: 查询结果
@@ -190,7 +192,8 @@ class AdvancedSQLQueryEngine:
                     include_headers,
                     has_group_by=has_group_by,
                     parsed_sql=parsed_sql,
-                    df_before_where=self._df_before_where
+                    df_before_where=self._df_before_where,
+                    output_format=output_format
                 )
                 # 注入执行时间
                 result['query_info']['execution_time_ms'] = round(_query_elapsed, 1)
@@ -1586,7 +1589,8 @@ class AdvancedSQLQueryEngine:
         include_headers: bool,
         has_group_by: bool = False,
         parsed_sql: exp.Expression = None,
-        df_before_where: pd.DataFrame = None
+        df_before_where: pd.DataFrame = None,
+        output_format: str = "table"
     ) -> Dict[str, Any]:
         """格式化查询结果
 
@@ -1594,6 +1598,7 @@ class AdvancedSQLQueryEngine:
             has_group_by: 如果为True且有数值聚合列，自动追加TOTAL行
             parsed_sql: 解析后的SQL表达式，用于空结果智能建议
             df_before_where: WHERE过滤前的DataFrame，用于空结果智能建议
+            output_format: 输出格式 table/json/csv
         """
 
         # 计算原始数据统计
@@ -1715,6 +1720,35 @@ class AdvancedSQLQueryEngine:
                 md_lines.append(f'| ... 共{len(data) - 1}行，仅显示前50行 |')
             result['query_info']['markdown_table'] = '\n'.join(md_lines)
 
+        # 生成JSON/CSV格式输出
+        if data and len(data) > 0 and output_format != 'table':
+            headers_row = data[0]
+            data_rows = data[1:]
+            records = []
+            for row in data_rows:
+                records.append(dict(zip(
+                    [str(h) for h in headers_row],
+                    row
+                )))
+
+            if output_format == 'json':
+                import json
+                result['formatted_output'] = json.dumps(records, ensure_ascii=False, indent=2)
+                result['query_info']['output_format'] = 'json'
+                result['query_info']['record_count'] = len(records)
+            elif output_format == 'csv':
+                import csv
+                import io
+                output = io.StringIO()
+                writer = csv.writer(output)
+                if include_headers:
+                    writer.writerow([str(h) for h in headers_row])
+                for row in data_rows:
+                    writer.writerow([str(v) if v is not None else '' for v in row])
+                result['formatted_output'] = output.getvalue()
+                result['query_info']['output_format'] = 'csv'
+                result['query_info']['record_count'] = len(records)
+
         # 双行表头时附加描述信息
         if column_descriptions:
             result['query_info']['dual_header'] = True
@@ -1768,7 +1802,8 @@ def execute_advanced_sql_query(
     sql: str,
     sheet_name: Optional[str] = None,
     limit: Optional[int] = None,
-    include_headers: bool = True
+    include_headers: bool = True,
+    output_format: str = "table"
 ) -> Dict[str, Any]:
     """
     便捷函数：执行高级SQL查询
@@ -1778,6 +1813,8 @@ def execute_advanced_sql_query(
         sql: SQL查询语句
         sheet_name: 工作表名称（可选）
         limit: 结果限制
+        include_headers: 是否包含表头
+        output_format: 输出格式 table/json/csv
         include_headers: 是否包含表头
 
     Returns:
@@ -1790,7 +1827,8 @@ def execute_advanced_sql_query(
             sql=sql,
             sheet_name=sheet_name,
             limit=limit,
-            include_headers=include_headers
+            include_headers=include_headers,
+            output_format=output_format
         )
     except ImportError as e:
         return {

@@ -332,3 +332,43 @@ class TestSQLQueryKnownLimitations:
         suggestion = result['query_info'].get('suggestion', '')
         assert 'HAVING' in suggestion
         assert 'GROUP BY聚合后' in suggestion
+
+    def test_output_format_json(self, game_config_file):
+        """output_format=json returns formatted JSON in formatted_output field"""
+        result = excel_query(game_config_file, "SELECT skill_name, damage FROM 技能配置 LIMIT 2", output_format='json')
+        assert result['success'] is True
+        assert 'formatted_output' in result
+        assert result['query_info']['output_format'] == 'json'
+        assert result['query_info']['record_count'] == 2
+        import json
+        records = json.loads(result['formatted_output'])
+        assert len(records) == 2
+        assert 'skill_name' in records[0]
+        assert 'damage' in records[0]
+
+    def test_output_format_csv(self, game_config_file):
+        """output_format=csv returns CSV string in formatted_output field"""
+        result = excel_query(game_config_file, "SELECT skill_name, damage FROM 技能配置 LIMIT 2", output_format='csv')
+        assert result['success'] is True
+        assert 'formatted_output' in result
+        assert result['query_info']['output_format'] == 'csv'
+        assert result['query_info']['record_count'] == 2
+        lines = result['formatted_output'].strip().split('\n')
+        assert len(lines) == 3  # header + 2 data rows
+        assert 'skill_name' in lines[0]
+
+    def test_output_format_table_default(self, game_config_file):
+        """Default output_format=table does NOT add formatted_output, keeps markdown_table"""
+        result = excel_query(game_config_file, "SELECT skill_name FROM 技能配置 LIMIT 1")
+        assert result['success'] is True
+        assert 'formatted_output' not in result
+        assert 'markdown_table' in result['query_info']
+
+    def test_output_format_json_group_by(self, game_config_file):
+        """JSON format works with GROUP BY + TOTAL row"""
+        result = excel_query(game_config_file, "SELECT skill_type, AVG(damage) as avg_dmg FROM 技能配置 GROUP BY skill_type", output_format='json')
+        assert result['success'] is True
+        import json
+        records = json.loads(result['formatted_output'])
+        types = [r['skill_type'] for r in records]
+        assert 'TOTAL' in types

@@ -25,15 +25,15 @@
 
 ### REQ-004 [P2] 查询结果导出（JSON/CSV）
 - **来源**：策划视角评价 — 结果只有markdown，缺JSON/CSV
-- **描述**：excel_query支持format参数，可选markdown/json/csv
-- **验收**：`excel_query(file, "SELECT * FROM 技能表", format="csv")` 返回CSV字符串
-- **状态**：OPEN
+- **描述**：excel_query支持output_format参数，可选table/json/csv
+- **验收**：`excel_query(file, "SELECT * FROM 技能表", output_format="csv")` 返回CSV字符串
+- **状态**：IN_PROGRESS
 
 ### REQ-005 [P2] excel_describe_table支持中文列名查询
 - **来源**：AI视角评价 — 双行表头场景下describe不够智能
 - **描述**：describe_table自动识别双行表头，显示中英映射
 - **验收**：对双行表头文件调用describe_table，输出中英文列名对照表
-- **状态**：OPEN
+- **状态**：DONE ✅（第3轮已实现双行表头自动识别，header_type='dual'时返回中英文对照）
 
 ## DONE（已完成）
 
