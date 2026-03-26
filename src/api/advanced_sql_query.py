@@ -664,6 +664,84 @@ class AdvancedSQLQueryEngine:
                     return val
         return None
 
+    def _generate_having_empty_suggestion(self, having_expr, df_before_having) -> str:
+        """生成HAVING导致空结果时的智能建议
+
+        Args:
+            having_expr: HAVING表达式（完整的having clause）
+            df_before_having: HAVING过滤前的聚合结果DataFrame
+        """
+        hints = ['\nHAVING分析：']
+        hints.append(f'• GROUP BY聚合后有{len(df_before_having)}组数据')
+
+        condition = having_expr.this
+        col = self._extract_column_name(condition.left)
+        val = self._extract_literal_value(condition.right)
+
+        # HAVING中聚合函数表达式的列名可能是别名，尝试从DataFrame列匹配
+        if not col:
+            left_str = str(condition.left).lower()
+            # 策略1：子串匹配
+            for c in df_before_having.columns:
+                if c.lower() in left_str or left_str in c.lower():
+                    col = c
+                    break
+            # 策略2：拆分表达式中的标识符（如AVG(damage) → 检查含avg和damage的列）
+            if not col:
+                import re
+                tokens = set(re.findall(r'[a-zA-Z_]+', left_str))
+                if tokens:
+                    for c in df_before_having.columns:
+                        c_tokens = set(re.findall(r'[a-zA-Z_]+', c.lower()))
+                        # 至少有一个token匹配（排除通用token如avg, sum, count, min, max）
+                        generic = {'avg', 'sum', 'count', 'min', 'max'}
+                        specific = tokens - generic
+                        if specific and specific & c_tokens:
+                            col = c
+                            break
+
+        if not col or col not in df_before_having.columns:
+            # 无法匹配列名，显示所有聚合列的实际范围
+            if len(df_before_having.columns) > 0:
+                for c in df_before_having.columns:
+                    numeric = pd.to_numeric(df_before_having[c], errors='coerce').dropna()
+                    if len(numeric) > 0:
+                        hints.append(f'• 列"{c}"范围: {numeric.min()} ~ {numeric.max()}')
+            hints.append('• HAVING条件较复杂，建议去掉HAVING先查看聚合结果')
+            hints.append('• 可先去掉HAVING查看全部分组结果，再调整过滤条件')
+            return '\n'.join(hints)
+
+        numeric = pd.to_numeric(df_before_having[col], errors='coerce').dropna()
+        if len(numeric) == 0:
+            hints.append(f'• 列"{col}"没有数值数据')
+            hints.append('• 可先去掉HAVING查看全部分组结果，再调整过滤条件')
+            return '\n'.join(hints)
+
+        if isinstance(condition, exp.GT):
+            col_max = numeric.max()
+            hints.append(f'• 列"{col}"的最大值为{col_max}，HAVING要求 >{val}，无满足条件的组')
+        elif isinstance(condition, exp.GTE):
+            col_max = numeric.max()
+            hints.append(f'• 列"{col}"的最大值为{col_max}，HAVING要求 >={val}，无满足条件的组')
+        elif isinstance(condition, exp.LT):
+            col_min = numeric.min()
+            hints.append(f'• 列"{col}"的最小值为{col_min}，HAVING要求 <{val}，无满足条件的组')
+        elif isinstance(condition, exp.LTE):
+            col_min = numeric.min()
+            hints.append(f'• 列"{col}"的最小值为{col_min}，HAVING要求 <={val}，无满足条件的组')
+        elif isinstance(condition, exp.EQ):
+            unique_vals = df_before_having[col].dropna().unique()
+            if len(unique_vals) <= 10:
+                vals_str = ', '.join(str(v) for v in unique_vals)
+                hints.append(f'• 列"{col}"的值为: {vals_str}，不等于{val}')
+            else:
+                hints.append(f'• 列"{col}"有{len(unique_vals)}个不同值，不等于{val}')
+        else:
+            hints.append(f'• HAVING条件较复杂，建议去掉HAVING先查看聚合结果')
+
+        hints.append('• 可先去掉HAVING查看全部分组结果，再调整过滤条件')
+        return '\n'.join(hints)
+
     def _suggest_column_name(self, col_name: str, available_cols: List[str], max_suggestions: int = 3) -> str:
         """
         当列名不存在时，用编辑距离找出最相似的列名作为建议。
@@ -747,6 +825,8 @@ class AdvancedSQLQueryEngine:
 
             # 应用HAVING条件
             if parsed_sql.args.get('having'):
+                # 保存HAVING前的DataFrame，用于HAVING空结果建议
+                self._df_before_having = base_df.copy()
                 base_df = self._apply_having_clause(parsed_sql, base_df)
 
             # ORDER BY（聚合查询：在GROUP BY之后）
@@ -1524,16 +1604,17 @@ class AdvancedSQLQueryEngine:
             """智能序列化值：数值保持数值类型，None转空字符串"""
             if val is None:
                 return ''
-            if isinstance(val, float) and val == int(val):
-                return int(val)  # 170.0 → 170
             if isinstance(val, (np.integer,)):
                 return int(val)
             if isinstance(val, (np.floating,)):
                 f = float(val)
                 if f == int(f):
                     return int(f)
-                # 非整数浮点数保留2位小数，避免166.66666666666666
                 return round(f, 2)
+            if isinstance(val, float):
+                if val == int(val):
+                    return int(val)
+                return round(val, 2)
             return val
 
         data = []
@@ -1605,11 +1686,20 @@ class AdvancedSQLQueryEngine:
             }
         }
 
-        # 空结果智能建议：分析WHERE条件类型，给出针对性提示
+        # 空结果智能建议：分析WHERE/HAVING条件类型，给出针对性提示
         if result_df.empty:
-            result['query_info']['suggestion'] = self._generate_empty_result_suggestion(
+            suggestion = self._generate_empty_result_suggestion(
                 parsed_sql, df_before_where, worksheets_data
             )
+            # HAVING空结果追加聚合中间结果信息
+            df_before_having = getattr(self, '_df_before_having', None)
+            if df_before_having is not None and not df_before_having.empty:
+                having_clause = parsed_sql.args.get('having')
+                if having_clause:
+                    suggestion += self._generate_having_empty_suggestion(
+                        having_clause, df_before_having
+                    )
+            result['query_info']['suggestion'] = suggestion
 
         # 生成Markdown表格（方便AI和人类阅读）
         if data and len(data) > 0:
