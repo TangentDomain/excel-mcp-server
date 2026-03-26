@@ -543,3 +543,74 @@ class TestAdvancedSQLFeatures:
         assert result['success'] is True
         # 小表（<500行）不应截断
         assert '截断' not in result['message']
+
+
+class TestLikeToRegexAndInToPandas:
+    """测试重构提取的共享方法：_like_to_regex 和 _in_to_pandas"""
+
+    @pytest.fixture
+    def test_excel_file(self):
+        """创建测试用Excel文件（含Department列用于IN/NOT IN测试）"""
+        data = {
+            'ID': [1, 2, 3, 4, 5],
+            'Name': ['Alice', 'Bob', 'Charlie', 'David', 'Eve'],
+            'Age': [25, 30, 35, 40, 45],
+            'Department': ['Sales', 'IT', 'HR', 'Sales', 'IT'],
+            'Salary': [50000, 60000, 55000, 70000, 65000]
+        }
+        df = pd.DataFrame(data)
+        with tempfile.NamedTemporaryFile(suffix='.xlsx', delete=False) as tmp:
+            df.to_excel(tmp.name, index=False, sheet_name="Employees")
+            yield tmp.name
+        try:
+            os.unlink(tmp.name)
+        except:
+            pass
+
+    def test_like_to_regex_basic(self):
+        """测试SQL LIKE模式到regex的转换"""
+        from src.excel_mcp_server_fastmcp.api.advanced_sql_query import AdvancedSQLQueryEngine
+        assert AdvancedSQLQueryEngine._like_to_regex("'%fire%'") == '.*fire.*'
+        assert AdvancedSQLQueryEngine._like_to_regex("'hello'") == 'hello'
+        assert AdvancedSQLQueryEngine._like_to_regex("'%a%c'") == '.*a.*c'
+
+    def test_like_to_regex_underscore(self):
+        """测试_通配符转换"""
+        from src.excel_mcp_server_fastmcp.api.advanced_sql_query import AdvancedSQLQueryEngine
+        assert AdvancedSQLQueryEngine._like_to_regex("'_test'") == '.test'
+        assert AdvancedSQLQueryEngine._like_to_regex("'%_'") == '.*.'
+
+    def test_like_to_regex_strips_quotes(self):
+        """测试引号剥离"""
+        from src.excel_mcp_server_fastmcp.api.advanced_sql_query import AdvancedSQLQueryEngine
+        assert AdvancedSQLQueryEngine._like_to_regex('"value"') == 'value'
+        assert AdvancedSQLQueryEngine._like_to_regex("value") == 'value'
+
+    def test_not_in_sql_query(self, test_excel_file):
+        """测试NOT IN通过_in_to_pandas共享方法正常工作"""
+        from src.excel_mcp_server_fastmcp.api.advanced_sql_query import execute_advanced_sql_query
+        result = execute_advanced_sql_query(
+            file_path=test_excel_file,
+            sql="SELECT * FROM Employees WHERE Department NOT IN ('Engineering', 'Marketing')"
+        )
+        assert result['success'] is True
+        for row in result['data'][1:]:
+            dept_idx = result['data'][0].index('Department')
+            assert row[dept_idx] not in ('Engineering', 'Marketing')
+
+    def test_in_and_not_in_consistency(self, test_excel_file):
+        """测试IN和NOT IN结果互斥"""
+        from src.excel_mcp_server_fastmcp.api.advanced_sql_query import execute_advanced_sql_query
+        result_in = execute_advanced_sql_query(
+            file_path=test_excel_file,
+            sql="SELECT Name FROM Employees WHERE Department IN ('IT')"
+        )
+        result_not_in = execute_advanced_sql_query(
+            file_path=test_excel_file,
+            sql="SELECT Name FROM Employees WHERE Department NOT IN ('IT')"
+        )
+        assert result_in['success'] is True
+        assert result_not_in['success'] is True
+        in_names = {row[0] for row in result_in['data'][1:]}
+        not_in_names = {row[0] for row in result_not_in['data'][1:]}
+        assert in_names.isdisjoint(not_in_names), "IN和NOT IN结果不应有交集"
