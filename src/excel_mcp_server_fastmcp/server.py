@@ -359,7 +359,7 @@ mcp = FastMCP(
 需要格式调整？       → excel_format_cells
 ```
 
-## ✅ SQL已支持功能 (35项)
+## ✅ SQL已支持功能 (37项)
 基础查询: SELECT, DISTINCT, 别名(AS), 数学表达式(+-*/%)
 条件筛选: WHERE, =/>/</<=/>=/!=, LIKE, IN, NOT IN, BETWEEN, AND/OR, IS NULL, NOT
 高级查询: 子查询(WHERE col IN (SELECT...)), CASE WHEN, COALESCE, EXISTS, CTE(WITH)
