@@ -8,7 +8,7 @@
 - 排序限制: ORDER BY, LIMIT, OFFSET
 - 算术运算: 加减乘除
 - 条件表达式: CASE WHEN, COALESCE/IFNULL
-- 表关联: INNER JOIN, LEFT JOIN（同文件内工作表关联）
+- 表关联: INNER JOIN, LEFT JOIN, RIGHT JOIN, FULL JOIN, CROSS JOIN（同文件内工作表关联）
 - 子查询: WHERE col IN (SELECT ...), 标量子查询, EXISTS
 - CTE: WITH ... AS (SELECT ...)
 - 字符串函数: UPPER, LOWER, TRIM, LENGTH, CONCAT, REPLACE, SUBSTRING, LEFT, RIGHT
@@ -17,8 +17,7 @@
 
 不支持功能：
 - FROM子查询（FROM (SELECT ...)）
-- RIGHT JOIN, FULL JOIN, CROSS JOIN
-- INSERT/UPDATE/DELETE
+- FROM子查询（FROM (SELECT ...)）
 """
 
 import os
@@ -1591,7 +1590,7 @@ class AdvancedSQLQueryEngine:
 
     def _apply_join_clause(self, joins, left_df: pd.DataFrame, worksheets_data: Dict[str, pd.DataFrame], left_table: str) -> pd.DataFrame:
         """
-        应用JOIN子句，支持INNER JOIN和LEFT JOIN
+        应用JOIN子句，支持INNER/LEFT/RIGHT/FULL/CROSS JOIN
 
         Args:
             joins: sqlglot joins列表
@@ -1616,9 +1615,12 @@ class AdvancedSQLQueryEngine:
             if join_side and str(join_side).upper() == 'LEFT':
                 join_kind = 'left'
             elif join_side and str(join_side).upper() == 'RIGHT':
-                return pd.DataFrame()  # 不支持RIGHT JOIN，返回空
+                join_kind = 'right'
+            elif (join_side and str(join_side).upper() == 'FULL') or \
+                 (join_kind_name and str(join_kind_name).upper() == 'FULL'):
+                join_kind = 'outer'
             elif join_kind_name and str(join_kind_name).upper() == 'CROSS':
-                return pd.DataFrame()  # 不支持CROSS JOIN，返回空
+                join_kind = 'cross'
 
             # 解析右表
             right_table_expr = join.this
@@ -1648,35 +1650,43 @@ class AdvancedSQLQueryEngine:
 
             right_df = worksheets_data[right_table].copy()
 
-            # 解析ON条件
+            # 解析ON条件（CROSS JOIN不需要ON）
             on_clause = join.args.get('on')
-            if not on_clause:
+            left_on_col = None
+            right_on_col = None
+            actual_right_on = None
+
+            if join_kind == 'cross':
+                # CROSS JOIN: 笛卡尔积，不需要ON条件
+                pass
+            elif not on_clause:
                 raise ValueError("JOIN缺少ON条件")
+            else:
+                left_on_col, right_on_col = self._parse_join_on_condition(on_clause, left_table, right_table, right_alias)
 
-            left_on_col, right_on_col = self._parse_join_on_condition(on_clause, left_table, right_table, right_alias)
-
-            # 验证列存在
-            if left_on_col not in result_df.columns:
-                raise ValueError(f"JOIN ON条件: 左表 '{left_table}' 没有列 '{left_on_col}'。可用列: {list(result_df.columns)}")
-            if right_on_col not in right_df.columns:
-                raise ValueError(f"JOIN ON条件: 右表 '{right_table}' 没有列 '{right_on_col}'。可用列: {list(right_df.columns)}")
+                # 验证列存在
+                if left_on_col not in result_df.columns:
+                    raise ValueError(f"JOIN ON条件: 左表 '{left_table}' 没有列 '{left_on_col}'。可用列: {list(result_df.columns)}")
+                if right_on_col not in right_df.columns:
+                    raise ValueError(f"JOIN ON条件: 右表 '{right_table}' 没有列 '{right_on_col}'。可用列: {list(right_df.columns)}")
 
             # 执行JOIN
             # 为右表列添加别名前缀避免冲突
             right_df_renamed = right_df.copy()
             col_mapping = {}
             for col in right_df_renamed.columns:
-                if col in result_df.columns and col != left_on_col:
+                if col in result_df.columns and (left_on_col is None or col != left_on_col):
                     new_col = f"{right_alias}.{col}"
                     col_mapping[col] = new_col
-                elif col == left_on_col and left_on_col == right_on_col:
+                elif left_on_col and col == left_on_col and left_on_col == right_on_col:
                     # ON列同名：右表列重命名避免合并后重复
                     new_col = f"{right_alias}.{col}"
                     col_mapping[col] = new_col
             right_df_renamed = right_df_renamed.rename(columns=col_mapping)
 
             # 调整右表ON列名（如果被重命名了）
-            actual_right_on = col_mapping.get(right_on_col, right_on_col)
+            if right_on_col:
+                actual_right_on = col_mapping.get(right_on_col, right_on_col)
 
             # 合并双行表头描述
             if right_table in self._header_descriptions:
@@ -1684,15 +1694,19 @@ class AdvancedSQLQueryEngine:
                     if orig_col in self._header_descriptions[right_table]:
                         self._header_descriptions[right_table][new_col] = self._header_descriptions[right_table][orig_col]
 
-            result_df = result_df.merge(
-                right_df_renamed,
-                left_on=left_on_col,
-                right_on=actual_right_on,
-                how=join_kind
-            )
+            if join_kind == 'cross':
+                # CROSS JOIN: 笛卡尔积（无需ON列）
+                result_df = result_df.merge(right_df_renamed, how='cross')
+            else:
+                result_df = result_df.merge(
+                    right_df_renamed,
+                    left_on=left_on_col,
+                    right_on=actual_right_on,
+                    how=join_kind
+                )
 
             # 合并后删除重复的ON列（右表侧）
-            if actual_right_on in result_df.columns and actual_right_on != left_on_col:
+            if actual_right_on and actual_right_on in result_df.columns and actual_right_on != left_on_col:
                 result_df = result_df.drop(columns=[actual_right_on])
 
         return result_df
