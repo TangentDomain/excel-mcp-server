@@ -2951,7 +2951,7 @@ class AdvancedSQLQueryEngine:
                         break
 
                 if is_likely_date:
-                    converted = pd.to_datetime(series, errors='coerce')
+                    converted = pd.to_datetime(series, errors='coerce', format='mixed')
                     if not converted.isna().all():
                         data_types[col] = 'datetime'
                         continue
