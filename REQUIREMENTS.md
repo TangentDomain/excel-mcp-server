@@ -38,6 +38,7 @@
   - ✅ 第32轮：excel_describe_table单次遍历所有列（N×M→M行I/O）
   - ✅ 第32轮：DESCRIBE内存优化（类型推断限制前100个值）
   - ✅ 第33轮：python-calamine替代openpyxl读取路径（get_range 1.6s→0.7ms，2300x提速）
+  - ✅ 第47轮：智能追加优化（insert_mode目标行>末尾时跳过O(n)行移动+公式遍历）
 - **后续方向**：
   - 写入场景：openpyxl的write_only模式或批量写入优化
   - 缓存预热/预加载策略
