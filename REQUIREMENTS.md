@@ -5,6 +5,13 @@
 
 ## OPEN（待实现）
 
+### REQ-008 [P2] 定时任务使用git worktree隔离测试
+- **来源**：CEO建议 — 避免测试影响主工作目录
+- **描述**：定时任务在 worktree 中进行开发和测试，测试通过后再合并回 develop/main
+- **好处**：多个子代理可并行开发、测试不会污染主工作目录、失败可快速丢弃
+- **验收**：定时任务自动创建worktree→开发→测试→合并→清理worktree
+- **状态**：OPEN
+
 ### REQ-006 [P1] 工具描述持续优化
 - **来源**：AI视角评价 — 工具描述直接影响AI选工具的准确率
 - **描述**：根据AI实际使用反馈，持续优化工具描述的清晰度和场景引导
@@ -19,38 +26,6 @@
 - **验收**：AI选工具错误率降低，高频场景不再选错
 - **状态**：OPEN（持续迭代，不关闭）
 
-### REQ-001 [P0→P2] 游戏领域函数
-- **来源**：策划视角评价 — DPM/DPS是高频需求，目前需要手动算
-- **描述**：支持游戏常用计算宏，如 DPM（每分钟伤害）、DPS（每秒伤害）、暴击期望等
-- **验收**：`SELECT DPM(伤害, CD) FROM 技能表` 能直接返回每分钟伤害值
-- **状态**：OPEN
-- **备注**：降级为P2。数学表达式已支持 `damage/cooldown*60` 计算DPM，MCP验证9.0ms完成。需求价值在于降低记忆成本，但非阻塞。建议通过文档引导（常用公式速查）替代内置函数。
-
-### REQ-002 [P1] 增量更新（WHERE条件批量修改）
-- **来源**：策划视角评价 — 只能全量覆盖range，不能条件修改
-- **描述**：支持基于WHERE条件的批量更新，如"把所有火系技能伤害+10%"
-- **验收**：`UPDATE 技能表 SET 伤害 = 伤害 * 1.1 WHERE 元素 = '火'` 能批量修改
-- **状态**：DONE ✅（第15轮，新增excel_update_query第41个工具，支持SET常量/列引用/算术，WHERE复用全部条件语法，dry_run预览，14个测试通过）
-
-### REQ-003 [P1] JOIN支持（跨表关联查询）
-- **来源**：策划视角评价 — 技能表关联装备表做不了
-- **描述**：支持多表JOIN查询，先支持同文件内的工作表关联
-- **验收**：`SELECT a.技能名, b.装备名 FROM 技能表 a JOIN 装备表 b ON a.装备ID = b.ID`
-- **状态**：DONE ✅（第16轮，INNER JOIN + LEFT JOIN，表别名/ON等值连接/列名消歧义/限定列名，15个测试通过）
-- **限制**：不支持RIGHT JOIN/CROSS JOIN/多ON条件
-
-### REQ-004 [P2] 查询结果导出（JSON/CSV）
-- **来源**：策划视角评价 — 结果只有markdown，缺JSON/CSV
-- **描述**：excel_query支持output_format参数，可选table/json/csv
-- **验收**：`excel_query(file, "SELECT * FROM 技能表", output_format="csv")` 返回CSV字符串
-- **状态**：DONE ✅（第14轮，JSON/CSV/TABLE三种格式，4个测试通过）
-
-### REQ-005 [P2] excel_describe_table支持中文列名查询
-- **来源**：AI视角评价 — 双行表头场景下describe不够智能
-- **描述**：describe_table自动识别双行表头，显示中英映射
-- **验收**：对双行表头文件调用describe_table，输出中英文列名对照表
-- **状态**：DONE ✅（第3轮已实现双行表头自动识别，header_type='dual'时返回中英文对照）
-
 ## DONE（已完成）
 
 ### REQ-000 SQL查询引擎
@@ -62,3 +37,27 @@
 - **来源**：游戏场景适配
 - **描述**：自动检测第1行中文描述+第2行英文字段名
 - **状态**：DONE ✅（第3轮）
+
+### REQ-001 [P0→P2→DONE] 游戏领域函数
+- **来源**：策划视角评价 — DPM/DPS是高频需求
+- **状态**：DONE ✅（通过README策划教程中DPM数学表达式示例满足）
+
+### REQ-002 [P1→DONE] 增量更新（WHERE条件批量修改）
+- **状态**：DONE ✅（第15轮，excel_update_query第41个工具，14个测试通过）
+
+### REQ-003 [P1→DONE] JOIN支持（跨表关联查询）
+- **状态**：DONE ✅（第16轮，INNER/LEFT JOIN，15个测试通过）
+
+### REQ-004 [P2→DONE] 查询结果导出（JSON/CSV）
+- **状态**：DONE ✅（第14轮，JSON/CSV/TABLE三种格式，4个测试通过）
+
+### REQ-005 [P2→DONE] excel_describe_table支持中文列名查询
+- **状态**：DONE ✅（第3轮，双行表头自动识别+中英文对照）
+
+### REQ-007 [P1→DONE] README文档同步更新
+- **状态**：DONE ✅（第17轮，README已同步：JOIN/UPDATE文档、badge 1271测试/41工具）
+
+### REQ-009 [P1→DONE] UPDATE事务保护
+- **来源**：自我进化评价 — 写入失败可能损坏文件
+- **描述**：excel_update_query写入前创建临时备份，失败自动回滚
+- **状态**：DONE ✅（第17轮，shutil.copy2备份+回滚+1个测试验证）
