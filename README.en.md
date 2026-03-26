@@ -14,7 +14,7 @@
 ![Tools](https://img.shields.io/badge/tools-46%20verified%20tools-green.svg)
 [![CI](https://github.com/TangentDomain/excel-mcp-server/actions/workflows/ci.yml/badge.svg)](https://github.com/TangentDomain/excel-mcp-server/actions/workflows/ci.yml)
 
-**ExcelMCP** is an Excel configuration table management MCP server designed for game development. Through AI natural language commands, it enables intelligent operations on game configurations such as skill tables, equipment data, and monster attributes. Built with **FastMCP**, reads use **python-calamine** (Rust engine, 2300x speedup), writes use **openpyxl**. Features **46 professional tools** and **965 test cases**, ensuring enterprise-grade reliability.
+**ExcelMCP** is an Excel configuration table management MCP server designed for game development. Through AI natural language commands, it enables intelligent operations on game configurations such as skill tables, equipment data, and monster attributes. Built with **FastMCP**, reads use **python-calamine** (Rust engine, 2300x speedup), writes use **openpyxl**. Features **46 professional tools** and **985 test cases**, ensuring enterprise-grade reliability.
 
 🎯 **Core Features**: Skill systems, equipment management, monster configuration, numerical balancing, version comparison, designer toolchain
 
@@ -593,9 +593,9 @@ Tool Layer (Common Functions)
 ## 📊 Project Information
 
 ### Quality Validation Metrics
-- **Test Cases**: 798 (behavior validation, no coverage padding)
-- **Test Files**: 34 test files
-- **Test Code**: 13,574 lines
+- **Test Cases**: 985 (behavior validation, no coverage padding)
+- **Test Files**: 49 test files
+- **Test Code**: 16,496 lines
 - **Tool Count: 46 (@mcp.tool decorator verified)
 - **Architecture Layers**: 4-layer design (MCP→API→Core→Utils)
 
