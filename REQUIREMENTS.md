@@ -55,6 +55,7 @@
   - ✅ 第24轮：移除死依赖fastmcp + 修复误导错误提示 + 清理mypy残留引用
   - ✅ 第24轮：包元数据完善（license/authors/keywords/classifiers/urls）
   - ✅ 第26轮：发现错误响应格式不一致（_validate_path用message，ExcelOperations用error），记录待修复
+  - ✅ 第27轮：错误响应格式标准化（formatter.py归一化error→message，_format_error_result改用message）
 - **验收**：每轮评价中包含工程治理评估，发现问题立即修复或建需求
 - **状态**：OPEN（持续迭代，不关闭）
 
