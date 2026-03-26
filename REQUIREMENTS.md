@@ -187,13 +187,18 @@
 - **描述**：excel_update_query写入前创建临时备份，失败自动回滚
 - **状态**：DONE ✅（第17轮，shutil.copy2备份+回滚+1个测试验证）
 
-### REQ-016 [P0] SQL引擎增强（子查询/CASE/COALESCE/EXISTS）
+### REQ-016 [P0] SQL引擎增强
 - **来源**：用户实测反馈 — 测试报告发现3个不支持功能
-- **描述**：SQL查询引擎新增5项能力：
+- **描述**：SQL查询引擎新增能力：
   1. 子查询：`WHERE col IN (SELECT ...)`、标量子查询
   2. CASE WHEN表达式：`CASE WHEN 条件 THEN 值 ELSE 默认 END`
   3. COALESCE/IFNULL：空值替换
   4. EXISTS：`WHERE EXISTS (SELECT ...)`
   5. LEFT JOIN NULL处理bug修复
-- **验收标准**：5项全部实现，每个至少2个测试用例，更新文件头支持列表
+  6. 字符串函数：UPPER、LOWER、TRIM、SUBSTRING/LEFT/RIGHT、CONCAT、REPLACE、LENGTH
+  7. CTE (WITH)：`WITH temp AS (SELECT ...)`
+  8. UNION/UNION ALL：合并查询结果
+  9. 窗口函数：ROW_NUMBER、RANK、DENSE_RANK（OVER子句）
+  10. RIGHT JOIN、FULL JOIN、CROSS JOIN
+- **验收标准**：每项至少2个测试用例，更新文件头支持列表，不支持的项目记录原因
 - **状态**：OPEN
