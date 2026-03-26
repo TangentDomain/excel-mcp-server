@@ -1582,9 +1582,16 @@ class AdvancedSQLQueryEngine:
                     if col in desc_map:
                         column_descriptions[col] = desc_map[col]
 
+        # 性能提示：无LIMIT且返回行数过多时建议加LIMIT
+        perf_hint = ''
+        if len(result_df) > 100:
+            has_limit = parsed_sql is not None and parsed_sql.args.get('limit') is not None
+            if not has_limit:
+                perf_hint = f'（结果较多，建议加 LIMIT 缩小范围）'
+
         result = {
             'success': True,
-            'message': f'SQL查询成功执行，返回 {len(result_df)} 行结果' + ('（含TOTAL汇总行）' if has_total_row else ''),
+            'message': f'SQL查询成功执行，返回 {len(result_df)} 行结果' + ('（含TOTAL汇总行）' if has_total_row else '') + perf_hint,
             'data': data,
             'query_info': {
                 'original_rows': total_original_rows,
