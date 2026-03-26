@@ -138,23 +138,7 @@ class AdvancedSQLQueryEngine:
 
             # 加载Excel数据（带缓存）
             import time as _time
-            mtime = os.path.getmtime(file_path)
-            cache_key = file_path
-            if cache_key in self._df_cache:
-                cached_mtime, cached_data, cached_desc = self._df_cache[cache_key]
-                if cached_mtime == mtime:
-                    worksheets_data = cached_data
-                    self._header_descriptions = cached_desc
-                else:
-                    # 文件已修改，重新加载
-                    worksheets_data = self._load_excel_data(file_path, sheet_name)
-                    self._df_cache[cache_key] = (mtime, worksheets_data, self._header_descriptions)
-            else:
-                worksheets_data = self._load_excel_data(file_path, sheet_name)
-                self._df_cache[cache_key] = (mtime, worksheets_data, self._header_descriptions)
-                # LRU淘汰：超过最大缓存数时删除最早缓存的文件
-                while len(self._df_cache) > self._max_cache_size:
-                    self._df_cache.pop(next(iter(self._df_cache)))
+            worksheets_data = self._load_data_with_cache(file_path, sheet_name)
 
             if not worksheets_data:
                 return {
@@ -256,6 +240,39 @@ class AdvancedSQLQueryEngine:
                 'data': [],
                 'query_info': {'error_type': 'engine_error', 'details': str(e)}
             }
+
+    def _load_data_with_cache(self, file_path: str, sheet_name: Optional[str] = None) -> Optional[Dict[str, pd.DataFrame]]:
+        """
+        带缓存的Excel数据加载（公共方法，供execute_sql_query和execute_update_query复用）
+
+        使用mtime检测文件变更，LRU淘汰防止内存泄漏。
+
+        Args:
+            file_path: Excel文件路径
+            sheet_name: 工作表名称（可选）
+
+        Returns:
+            worksheets_data字典，加载失败返回None
+        """
+        mtime = os.path.getmtime(file_path)
+        cache_key = file_path
+        if cache_key in self._df_cache:
+            cached_mtime, cached_data, cached_desc = self._df_cache[cache_key]
+            if cached_mtime == mtime:
+                self._header_descriptions = cached_desc
+                return cached_data
+            else:
+                # 文件已修改，重新加载
+                worksheets_data = self._load_excel_data(file_path, sheet_name)
+                self._df_cache[cache_key] = (mtime, worksheets_data, self._header_descriptions)
+                return worksheets_data
+        else:
+            worksheets_data = self._load_excel_data(file_path, sheet_name)
+            self._df_cache[cache_key] = (mtime, worksheets_data, self._header_descriptions)
+            # LRU淘汰：超过最大缓存数时删除最早缓存的文件
+            while len(self._df_cache) > self._max_cache_size:
+                self._df_cache.pop(next(iter(self._df_cache)))
+            return worksheets_data
 
     def _load_excel_data(self, file_path: str, sheet_name: Optional[str] = None) -> Dict[str, pd.DataFrame]:
         """
@@ -2055,21 +2072,7 @@ class AdvancedSQLQueryEngine:
                     'affected_rows': 0, 'changes': []}
 
         # 加载数据（使用缓存）
-        mtime = os.path.getmtime(file_path)
-        cache_key = file_path
-        if cache_key in self._df_cache:
-            cached_mtime, cached_data, cached_desc = self._df_cache[cache_key]
-            if cached_mtime == mtime:
-                worksheets_data = cached_data
-                self._header_descriptions = cached_desc
-            else:
-                worksheets_data = self._load_excel_data(file_path, sheet_name)
-                self._df_cache[cache_key] = (mtime, worksheets_data, self._header_descriptions)
-        else:
-            worksheets_data = self._load_excel_data(file_path, sheet_name)
-            self._df_cache[cache_key] = (mtime, worksheets_data, self._header_descriptions)
-            while len(self._df_cache) > self._max_cache_size:
-                self._df_cache.pop(next(iter(self._df_cache)))
+        worksheets_data = self._load_data_with_cache(file_path, sheet_name)
 
         if not worksheets_data:
             return {'success': False, 'message': '无法加载Excel数据',
@@ -2276,7 +2279,7 @@ class AdvancedSQLQueryEngine:
                 lock_fd.close()
 
             # 清除缓存（文件已修改）
-            self._df_cache.pop(cache_key, None)
+            self._df_cache.pop(file_path, None)
 
             elapsed = (_time.time() - start_time) * 1000
             return {'success': True,
