@@ -18,9 +18,11 @@ Excel MCP Server - 基于 FastMCP 和 openpyxl 实现
 
 import logging
 import os
+import re
 import shutil
 from datetime import datetime
 from enum import Enum
+from pathlib import Path
 from typing import Optional, List, Dict, Any, Union
 
 try:
@@ -93,6 +95,92 @@ class OperationLogger:
         operations = self.current_session[0]['operations']
         return operations[-limit:] if len(operations) > limit else operations
 
+# ==================== 安全验证模块 ====================
+class SecurityValidator:
+    """文件路径安全验证，防止路径穿越和资源耗尽"""
+
+    # 允许的文件扩展名
+    ALLOWED_EXTENSIONS = {'.xlsx', '.xlsm', '.xls', '.csv', '.json', '.bak'}
+    # 文件大小上限（50MB）
+    MAX_FILE_SIZE = 50 * 1024 * 1024
+    # 危险公式模式（DDE攻击、命令执行等）
+    DANGEROUS_FORMULA_PATTERNS = [
+        re.compile(r'\bDDE\b', re.IGNORECASE),
+        re.compile(r'\bCMD\b', re.IGNORECASE),
+        re.compile(r'\bSHELL\b', re.IGNORECASE),
+        re.compile(r'\bREGISTER\b', re.IGNORECASE),
+        re.compile(r'\|.*\|', re.IGNORECASE),  # DDE链接格式
+        re.compile(r'@SUM', re.IGNORECASE),  # Lotus 1-2-3 兼容性攻击
+    ]
+
+    @classmethod
+    def validate_file_path(cls, file_path: str) -> Dict[str, Any]:
+        """验证文件路径安全性，返回 {'valid': bool, 'error': str|None}"""
+        if not file_path:
+            return {'valid': False, 'error': '文件路径不能为空'}
+
+        # 解析为绝对路径并规范化
+        try:
+            resolved = Path(file_path).resolve()
+        except (OSError, ValueError) as e:
+            return {'valid': False, 'error': f'无效的文件路径: {e}'}
+
+        # 路径穿越检测：规范化后路径必须以 / 开头（绝对路径）且不含 ..
+        if '..' in Path(file_path).parts:
+            return {'valid': False, 'error': '文件路径不允许包含 ".." 路径穿越'}
+
+        # 拒绝符号链接（用原始路径检查，resolve会解析符号链接）
+        try:
+            if Path(file_path).is_symlink():
+                return {'valid': False, 'error': '不允许通过符号链接访问文件'}
+        except OSError:
+            pass
+
+        # 拒绝隐藏文件（以 . 开头）
+        basename = os.path.basename(file_path)
+        if basename.startswith('.') and not basename.endswith('.bak'):
+            return {'valid': False, 'error': f'不允许访问隐藏文件: {basename}'}
+
+        # 扩展名检查（对有扩展名的文件检查）
+        _, ext = os.path.splitext(file_path)
+        if ext and ext.lower() not in cls.ALLOWED_EXTENSIONS:
+            return {'valid': False, 'error': f'不支持的文件格式: {ext}（允许: {", ".join(sorted(cls.ALLOWED_EXTENSIONS))}）'}
+
+        return {'valid': True, 'error': None}
+
+    @classmethod
+    def validate_file_size(cls, file_path: str) -> Dict[str, Any]:
+        """验证文件大小是否在允许范围内"""
+        try:
+            size = os.path.getsize(file_path)
+            if size > cls.MAX_FILE_SIZE:
+                return {'valid': False, 'error': f'文件过大: {size / 1024 / 1024:.1f}MB（上限{cls.MAX_FILE_SIZE / 1024 / 1024:.0f}MB）'}
+            return {'valid': True, 'error': None}
+        except OSError as e:
+            return {'valid': False, 'error': f'无法获取文件大小: {e}'}
+
+    @classmethod
+    def validate_formula(cls, formula: str) -> Dict[str, Any]:
+        """验证公式安全性，检测危险模式"""
+        for pattern in cls.DANGEROUS_FORMULA_PATTERNS:
+            if pattern.search(formula):
+                return {'valid': False, 'error': f'检测到危险公式模式，公式中不允许包含 {pattern.pattern}'}
+        return {'valid': True, 'error': None}
+
+
+def _validate_path(file_path: str) -> Optional[Dict[str, Any]]:
+    """统一的文件路径安全验证入口，失败返回错误dict，通过返回None"""
+    result = SecurityValidator.validate_file_path(file_path)
+    if not result['valid']:
+        return {'success': False, 'message': f'🔒 安全验证失败: {result["error"]}'}
+    # 文件存在时额外检查大小
+    if os.path.exists(file_path):
+        size_result = SecurityValidator.validate_file_size(file_path)
+        if not size_result['valid']:
+            return {'success': False, 'message': f'🔒 安全验证失败: {size_result["error"]}'}
+    return None
+
+
 # 全局操作日志器
 operation_logger = OperationLogger()
 
@@ -164,6 +252,9 @@ def excel_list_sheets(file_path: str) -> Dict[str, Any]:
     """
 列出Excel文件中所有工作表名称。
     """
+    _path_err = _validate_path(file_path)
+    if _path_err:
+        return _path_err
     return ExcelOperations.list_sheets(file_path)
 
 
@@ -173,6 +264,9 @@ def excel_get_sheet_headers(file_path: str) -> Dict[str, Any]:
 批量获取所有工作表的双行表头（游戏开发专用）。
 返回每个表的字段描述（中文）和字段名（英文）。专为游戏配置表双行表头设计。
     """
+    _path_err = _validate_path(file_path)
+    if _path_err:
+        return _path_err
     return ExcelOperations.get_sheet_headers(file_path)
 
 
@@ -191,6 +285,9 @@ def excel_search(
     """
 在单个Excel文件中搜索文本。返回匹配的单元格位置和值。支持正则。
     """
+    _path_err = _validate_path(file_path)
+    if _path_err:
+        return _path_err
     return ExcelOperations.search(file_path, pattern, sheet_name, case_sensitive, whole_word, use_regex, include_values, include_formulas, range)
 
 
@@ -224,6 +321,9 @@ def excel_get_range(
 读取指定范围的原始单元格数据。适合精确读取已知区域（如"Sheet1!A1:C10"）。
 如需查询/筛选/聚合，优先使用excel_query。
     """
+    _path_err = _validate_path(file_path)
+    if _path_err:
+        return _path_err
     # 增强参数验证
     from .utils.validators import ExcelValidator, DataValidationError
 
@@ -272,6 +372,9 @@ def excel_get_headers(
     """
 获取指定工作表的表头信息。支持指定表头行号。
     """
+    _path_err = _validate_path(file_path)
+    if _path_err:
+        return _path_err
     return ExcelOperations.get_headers(file_path, sheet_name, header_row, max_columns)
 
 
@@ -287,6 +390,9 @@ def excel_update_range(
 写入数据到指定范围。适合批量写入已知数据（二维数组）。
 如需条件修改（如"火系伤害+10%"），优先使用excel_update_query。
     """
+    _path_err = _validate_path(file_path)
+    if _path_err:
+        return _path_err
     # 增强参数验证
     from .utils.validators import ExcelValidator, DataValidationError
 
@@ -365,6 +471,9 @@ def excel_preview_operation(
     """
 预览操作影响范围和当前数据，不实际执行。操作前确认用。
     """
+    _path_err = _validate_path(file_path)
+    if _path_err:
+        return _path_err
     # 读取当前数据
     current_data = ExcelOperations.get_range(file_path, range)
 
@@ -454,6 +563,9 @@ def excel_assess_data_impact(
     """
 全面评估操作对数据的潜在影响。比preview_operation更详细。
     """
+    _path_err = _validate_path(file_path)
+    if _path_err:
+        return _path_err
     from .utils.validators import ExcelValidator, DataValidationError
 
     try:
@@ -726,6 +838,9 @@ def excel_get_operation_history(
     """
 获取操作历史记录。可按文件过滤。
     """
+    _path_err = _validate_path(file_path)
+    if _path_err:
+        return _path_err
     try:
         recent_operations = operation_logger.get_recent_operations(limit)
 
@@ -781,6 +896,9 @@ def excel_create_backup(
     """
 创建Excel文件备份。默认存入同目录.backup/文件夹。
     """
+    _path_err = _validate_path(file_path)
+    if _path_err:
+        return _path_err
     if not os.path.exists(file_path):
         return {
             'success': False,
@@ -839,6 +957,13 @@ def excel_restore_backup(
     """
 从备份恢复Excel文件。可恢复到原位置或指定位置。
     """
+    """
+从备份恢复Excel文件。可恢复到原位置或指定位置。
+    """
+    _path_err = _validate_path(backup_path)
+    if _path_err:
+        return _path_err
+
     if not os.path.exists(backup_path):
         return {
             'success': False,
@@ -893,6 +1018,9 @@ def excel_list_backups(
     """
 列出指定文件的所有备份版本。
     """
+    _path_err = _validate_path(file_path)
+    if _path_err:
+        return _path_err
     try:
         # 确定备份目录
         if backup_dir is None:
@@ -954,6 +1082,9 @@ def excel_insert_rows(
     """
 在指定位置插入空行。
     """
+    _path_err = _validate_path(file_path)
+    if _path_err:
+        return _path_err
     return ExcelOperations.insert_rows(file_path, sheet_name, row_index, count)
 
 
@@ -967,6 +1098,9 @@ def excel_insert_columns(
     """
 在指定位置插入空列（1-based索引，1=A列）。
     """
+    _path_err = _validate_path(file_path)
+    if _path_err:
+        return _path_err
     return ExcelOperations.insert_columns(file_path, sheet_name, column_index, count)
 
 
@@ -979,6 +1113,9 @@ def excel_find_last_row(
     """
 查找工作表最后一行（有数据的最大行号）。
     """
+    _path_err = _validate_path(file_path)
+    if _path_err:
+        return _path_err
     return ExcelOperations.find_last_row(file_path, sheet_name, column)
 
 
@@ -990,6 +1127,9 @@ def excel_create_file(
     """
 创建新的Excel文件（默认含1个空工作表）。
     """
+    _path_err = _validate_path(file_path)
+    if _path_err:
+        return _path_err
     return ExcelOperations.create_file(file_path, sheet_names)
 
 
@@ -1003,6 +1143,9 @@ def excel_export_to_csv(
     """
 将Excel工作表导出为CSV文件。支持指定编码(utf-8/gbk)。
     """
+    _path_err = _validate_path(file_path)
+    if _path_err:
+        return _path_err
     return ExcelOperations.export_to_csv(file_path, output_path, sheet_name, encoding)
 
 
@@ -1017,6 +1160,14 @@ def excel_import_from_csv(
     """
 从CSV文件导入数据创建Excel文件。
     """
+    """
+从CSV文件导入数据创建Excel文件。
+    """
+    for _p in [csv_path, output_path]:
+        _err = _validate_path(_p)
+        if _err:
+            return _err
+
     return ExcelOperations.import_from_csv(csv_path, output_path, sheet_name, encoding, has_header)
 
 
@@ -1029,6 +1180,14 @@ def excel_convert_format(
     """
 转换Excel文件格式。支持xlsx/xlsm/csv/json互转。
     """
+    """
+转换Excel文件格式。支持xlsx/xlsm/csv/json互转。
+    """
+    for _p in [input_path, output_path]:
+        _err = _validate_path(_p)
+        if _err:
+            return _err
+
     return ExcelOperations.convert_format(input_path, output_path, target_format)
 
 
@@ -1041,6 +1200,14 @@ def excel_merge_files(
     """
 合并多个Excel文件。支持三种模式: sheets(各文件独立工作表)/append(追加行)/horizontal(按列拼接)。
     """
+    """
+合并多个Excel文件。支持三种模式: sheets(各文件独立工作表)/append(追加行)/horizontal(按列拼接)。
+    """
+    for _f in input_files:
+        _err = _validate_path(_f)
+        if _err:
+            return _err
+
     return ExcelOperations.merge_files(input_files, output_path, merge_mode)
 
 
@@ -1049,6 +1216,9 @@ def excel_get_file_info(file_path: str) -> Dict[str, Any]:
     """
 获取Excel文件信息：大小、工作表数量、格式、创建/修改时间。
     """
+    _path_err = _validate_path(file_path)
+    if _path_err:
+        return _path_err
     return ExcelOperations.get_file_info(file_path)
 
 
@@ -1061,6 +1231,9 @@ def excel_create_sheet(
     """
 创建新工作表，可指定位置。
     """
+    _path_err = _validate_path(file_path)
+    if _path_err:
+        return _path_err
     return ExcelOperations.create_sheet(file_path, sheet_name, index)
 
 
@@ -1072,6 +1245,9 @@ def excel_delete_sheet(
     """
 删除指定工作表。
     """
+    _path_err = _validate_path(file_path)
+    if _path_err:
+        return _path_err
     # 开始操作会话
     operation_logger.start_session(file_path)
 
@@ -1116,6 +1292,9 @@ def excel_rename_sheet(
     """
 重命名工作表。新名称不能与已有工作表重复。
     """
+    _path_err = _validate_path(file_path)
+    if _path_err:
+        return _path_err
     return ExcelOperations.rename_sheet(file_path, old_name, new_name)
 
 
@@ -1129,6 +1308,9 @@ def excel_delete_rows(
     """
 删除指定位置的行。
     """
+    _path_err = _validate_path(file_path)
+    if _path_err:
+        return _path_err
     # 开始操作会话
     operation_logger.start_session(file_path)
 
@@ -1175,6 +1357,9 @@ def excel_delete_columns(
     """
 删除指定位置的列（1-based索引）。
     """
+    _path_err = _validate_path(file_path)
+    if _path_err:
+        return _path_err
     # 开始操作会话
     operation_logger.start_session(file_path)
 
@@ -1220,6 +1405,12 @@ def excel_set_formula(
     """
 设置单元格公式（不含等号）。如"SUM(A1:A10)"。返回计算结果。
     """
+    _path_err = _validate_path(file_path)
+    if _path_err:
+        return _path_err
+    _formula_err = SecurityValidator.validate_formula(formula)
+    if not _formula_err['valid']:
+        return {'success': False, 'message': f'🔒 安全验证失败: {_formula_err["error"]}'}
     return ExcelOperations.set_formula(file_path, sheet_name, cell_address, formula)
 
 @mcp.tool()
@@ -1230,6 +1421,9 @@ def excel_evaluate_formula(
     """
 临时执行公式并返回结果，不修改文件。可做快速计算器。
     """
+    _formula_err = SecurityValidator.validate_formula(formula)
+    if not _formula_err['valid']:
+        return {'success': False, 'message': f'🔒 安全验证失败: {_formula_err["error"]}'}
     return ExcelOperations.evaluate_formula(formula, context_sheet)
 
 
@@ -1250,6 +1444,9 @@ SQL查询Excel数据。优先使用此工具而非excel_get_range进行数据查
 输出格式: table(默认Markdown)/json/csv
 示例: excel_query("技能表.xlsx", "SELECT 类型, AVG(伤害) FROM 技能配置 GROUP BY 类型 HAVING COUNT(*)>2 ORDER BY AVG(伤害) DESC")
     """
+    _path_err = _validate_path(file_path)
+    if _path_err:
+        return _path_err
     # 参数验证
     if not file_path or not file_path.strip():
         return {
@@ -1363,6 +1560,9 @@ WHERE条件复用excel_query全部语法，支持中文列名。
 dry_run=True 可预览影响范围不实际修改。
 示例: excel_update_query("技能表.xlsx", "UPDATE 技能配置 SET 伤害 = 伤害 * 1.1 WHERE 元素 = '火'", dry_run=True)
     """
+    _path_err = _validate_path(file_path)
+    if _path_err:
+        return _path_err
     if not file_path or not file_path.strip():
         return {'success': False, 'message': '文件路径不能为空',
                 'affected_rows': 0, 'changes': []}
@@ -1403,6 +1603,9 @@ def excel_describe_table(
 自动识别双行表头（第1行中文描述+第2行英文字段名），输出中英映射。
 返回: 列名、类型、非空数量、示例值、行数。
     """
+    _path_err = _validate_path(file_path)
+    if _path_err:
+        return _path_err
     if not file_path or not file_path.strip():
         return {'success': False, 'message': '文件路径不能为空', 'data': []}
 
@@ -1526,6 +1729,9 @@ def excel_format_cells(
     """
 格式化单元格样式。支持preset(highlight/warning/success)和自定义格式。
     """
+    _path_err = _validate_path(file_path)
+    if _path_err:
+        return _path_err
     return ExcelOperations.format_cells(file_path, sheet_name, range, formatting, preset)
 
 
@@ -1538,6 +1744,9 @@ def excel_merge_cells(
     """
 合并指定范围的单元格（如"A1:C3"）。
     """
+    _path_err = _validate_path(file_path)
+    if _path_err:
+        return _path_err
     return ExcelOperations.merge_cells(file_path, sheet_name, range)
 
 
@@ -1550,6 +1759,9 @@ def excel_unmerge_cells(
     """
 取消合并指定范围的单元格。
     """
+    _path_err = _validate_path(file_path)
+    if _path_err:
+        return _path_err
     return ExcelOperations.unmerge_cells(file_path, sheet_name, range)
 
 
@@ -1563,6 +1775,9 @@ def excel_set_borders(
     """
 为范围设置边框。样式: thin/thick/medium/double/dotted/dashed。
     """
+    _path_err = _validate_path(file_path)
+    if _path_err:
+        return _path_err
     return ExcelOperations.set_borders(file_path, sheet_name, range, border_style)
 
 
@@ -1577,6 +1792,9 @@ def excel_set_row_height(
     """
 调整行高（磅值，如25.0）。可同时调整连续多行。
     """
+    _path_err = _validate_path(file_path)
+    if _path_err:
+        return _path_err
     return ExcelOperations.set_row_height(file_path, sheet_name, row_index, height, count)
 
 
@@ -1591,6 +1809,9 @@ def excel_set_column_width(
     """
 调整列宽（字符单位，如15.0）。可同时调整连续多列。
     """
+    _path_err = _validate_path(file_path)
+    if _path_err:
+        return _path_err
     return ExcelOperations.set_column_width(file_path, sheet_name, column_index, width, count)
 
 
@@ -1605,6 +1826,10 @@ def excel_compare_files(
 对比两个Excel文件的所有工作表差异（结构差异+单元格值变化）。
 如需按ID做对象级对比（新增/删除/修改），使用excel_compare_sheets。
     """
+    for _p in [file1_path, file2_path]:
+        _err = _validate_path(_p)
+        if _err:
+            return _err
     return ExcelOperations.compare_files(file1_path, file2_path)
 
 
@@ -1619,6 +1844,9 @@ def excel_check_duplicate_ids(
 检查配置表ID列是否有重复值。返回重复ID及其所在行。
 也可用excel_query实现: SELECT ID, COUNT(*) as c FROM 表 GROUP BY ID HAVING c>1
     """
+    _path_err = _validate_path(file_path)
+    if _path_err:
+        return _path_err
     return ExcelOperations.check_duplicate_ids(file_path, sheet_name, id_column, header_row)
 
 
@@ -1634,6 +1862,10 @@ def excel_compare_sheets(
     """
 按ID列精确对比两个工作表，输出新增/删除/修改的记录。
     """
+    for _p in [file1_path, file2_path]:
+        _err = _validate_path(_p)
+        if _err:
+            return _err
     return ExcelOperations.compare_sheets(file1_path, sheet1_name, file2_path, sheet2_name, id_column, header_row)
 # ==================== 主程序 ====================
 if __name__ == "__main__":
