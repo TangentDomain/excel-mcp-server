@@ -19,6 +19,13 @@
 
 import os
 import re
+import json
+import csv
+import io
+import time
+import difflib
+import shutil
+import tempfile
 import logging
 from contextlib import contextmanager
 from typing import Dict, List, Any, Optional, Union, Tuple, Generator
@@ -138,7 +145,6 @@ class AdvancedSQLQueryEngine:
                 }
 
             # 加载Excel数据（带缓存）
-            import time as _time
             worksheets_data = self._load_data_with_cache(file_path, sheet_name)
 
             if not worksheets_data:
@@ -167,8 +173,7 @@ class AdvancedSQLQueryEngine:
                 }
 
             # 解析和执行SQL
-            import time as _time
-            _query_start = _time.time()
+            _query_start = time.time()
             try:
                 parsed_sql = sqlglot.parse_one(sql, dialect="mysql")
 
@@ -184,7 +189,7 @@ class AdvancedSQLQueryEngine:
 
                 # 执行查询
                 result_data = self._execute_query(parsed_sql, worksheets_data, limit)
-                _query_elapsed = (_time.time() - _query_start) * 1000
+                _query_elapsed = (time.time() - _query_start) * 1000
 
                 # 格式化结果（传入parsed_sql和WHERE前数据用于空结果智能建议）
                 has_group_by = parsed_sql.args.get('group') is not None
@@ -727,7 +732,6 @@ class AdvancedSQLQueryEngine:
                     break
             # 策略2：拆分表达式中的标识符（如AVG(damage) → 检查含avg和damage的列）
             if not col:
-                import re
                 tokens = set(re.findall(r'[a-zA-Z_]+', left_str))
                 if tokens:
                     for c in df_before_having.columns:
@@ -794,7 +798,6 @@ class AdvancedSQLQueryEngine:
         Returns:
             str: 格式化的建议字符串
         """
-        import difflib
         if not available_cols:
             return ""
 
@@ -1846,23 +1849,6 @@ class AdvancedSQLQueryEngine:
         total_original_rows = sum(len(df) for df in worksheets_data.values())
 
         # 准备返回数据
-        def _serialize_value(val):
-            """智能序列化值：数值保持数值类型，None转空字符串"""
-            if val is None:
-                return ''
-            if isinstance(val, (np.integer,)):
-                return int(val)
-            if isinstance(val, (np.floating,)):
-                f = float(val)
-                if f == int(f):
-                    return int(f)
-                return round(f, 2)
-            if isinstance(val, float):
-                if val == int(val):
-                    return int(val)
-                return round(val, 2)
-            return val
-
         data = []
         if include_headers:
             # 包含表头（无论是否有数据）
@@ -1872,32 +1858,25 @@ class AdvancedSQLQueryEngine:
             # 添加数据行（如果有的话）
             if not result_df.empty:
                 for _, row in result_df.iterrows():
-                    data.append([_serialize_value(val) for val in row])
+                    data.append([self._serialize_value(val) for val in row])
         else:
             # 不包含表头，只返回数据
             if not result_df.empty:
                 for _, row in result_df.iterrows():
-                    data.append([_serialize_value(val) for val in row])
+                    data.append([self._serialize_value(val) for val in row])
 
-        # GROUP BY 聚合结果自动追加 TOTAL 行
+        # GROUP BY 聚合结果自动追加 TOTAL 行（从原始DataFrame计算，非序列化后数据）
         has_total_row = False
         if has_group_by and not result_df.empty and len(result_df) > 1 and include_headers:
-            numeric_cols = []
+            total_row = [''] * len(result_df.columns)
+            total_row[0] = 'TOTAL'
+            has_numeric = False
             for i, col in enumerate(result_df.columns):
-                # 检测数值列（聚合结果通常是数值）
                 series = pd.to_numeric(result_df[col], errors='coerce')
                 if series.notna().sum() > len(result_df) * 0.5:
-                    numeric_cols.append(i)
-            if numeric_cols:
-                total_row = [''] * len(result_df.columns)
-                total_row[0] = 'TOTAL'
-                for i in numeric_cols:
-                    col_sum = 0.0
-                    for row_idx in range(1, len(data)):  # 跳过表头行
-                        val = data[row_idx][i]
-                        if isinstance(val, (int, float)):
-                            col_sum += val
-                    total_row[i] = _serialize_value(col_sum)
+                    total_row[i] = self._serialize_value(series.sum())
+                    has_numeric = True
+            if has_numeric:
                 data.append(total_row)
                 has_total_row = True
 
@@ -1973,13 +1952,10 @@ class AdvancedSQLQueryEngine:
                 )))
 
             if output_format == 'json':
-                import json
                 result['formatted_output'] = json.dumps(records, ensure_ascii=False, indent=2)
                 result['query_info']['output_format'] = 'json'
                 result['query_info']['record_count'] = len(records)
             elif output_format == 'csv':
-                import csv
-                import io
                 output = io.StringIO()
                 writer = csv.writer(output)
                 if include_headers:
@@ -2024,9 +2000,8 @@ class AdvancedSQLQueryEngine:
                         break
 
                 if is_likely_date:
-                    # 对可能是日期的列进行转换
-                    pd.to_datetime(series, errors='coerce', format='mixed')
-                    if not pd.to_datetime(series, errors='coerce').isna().all():
+                    converted = pd.to_datetime(series, errors='coerce')
+                    if not converted.isna().all():
                         data_types[col] = 'datetime'
                         continue
             except Exception:
@@ -2060,8 +2035,7 @@ class AdvancedSQLQueryEngine:
         Returns:
             Dict: 更新结果
         """
-        import time as _time
-        start_time = _time.time()
+        start_time = time.time()
 
         # 验证文件
         if not os.path.exists(file_path):
@@ -2204,14 +2178,14 @@ class AdvancedSQLQueryEngine:
                 df.at[idx, col_name] = new_val
 
         if not changes:
-            elapsed = (_time.time() - start_time) * 1000
+            elapsed = (time.time() - start_time) * 1000
             return {'success': True,
                     'message': f'匹配 {len(affected_indices)} 行，但值无变化',
                     'affected_rows': len(affected_indices),
                     'changes': [], 'execution_time_ms': round(elapsed, 1)}
 
         if dry_run:
-            elapsed = (_time.time() - start_time) * 1000
+            elapsed = (time.time() - start_time) * 1000
             return {'success': True,
                     'message': f'[预览] 将修改 {len(changes)} 个单元格（{len(affected_indices)} 行）',
                     'affected_rows': len(affected_indices),
@@ -2219,8 +2193,6 @@ class AdvancedSQLQueryEngine:
                     'execution_time_ms': round(elapsed, 1)}
 
         # 写回Excel（事务保护：失败自动回滚）
-        import shutil
-        import tempfile
         backup_path = None
         try:
             with self._file_lock(file_path):
@@ -2252,7 +2224,7 @@ class AdvancedSQLQueryEngine:
                 # 清除缓存（文件已修改）
                 self._df_cache.pop(file_path, None)
 
-                elapsed = (_time.time() - start_time) * 1000
+                elapsed = (time.time() - start_time) * 1000
                 return {'success': True,
                         'message': f'成功更新 {len(changes)} 个单元格（{len(affected_indices)} 行）',
                         'affected_rows': len(affected_indices),
@@ -2270,7 +2242,7 @@ class AdvancedSQLQueryEngine:
             return {'success': False,
                     'message': f'写入Excel失败，已自动回滚: {e}',
                     'affected_rows': 0, 'changes': changes,
-                    'execution_time_ms': round((_time.time() - start_time) * 1000, 1)}
+                    'execution_time_ms': round((time.time() - start_time) * 1000, 1)}
 
     @contextmanager
     def _file_lock(self, file_path: str) -> Generator[None, None, None]:
@@ -2296,8 +2268,8 @@ class AdvancedSQLQueryEngine:
                     pass
                 lock_fd.close()
 
-    def _serialize_update_value(self, val: Any) -> Any:
-        """将值序列化为JSON安全类型（numpy→Python原生）"""
+    def _serialize_value(self, val: Any) -> Any:
+        """智能序列化值：数值保持数值类型，None转空字符串，numpy→Python原生"""
         if val is None:
             return ''
         if isinstance(val, (np.integer,)):
@@ -2308,6 +2280,10 @@ class AdvancedSQLQueryEngine:
         if isinstance(val, float):
             return int(val) if val == int(val) else round(val, 2)
         return val
+
+    def _serialize_update_value(self, val: Any) -> Any:
+        """将值序列化为JSON安全类型（numpy→Python原生）— 委托给_serialize_value"""
+        return self._serialize_value(val)
 
     def _evaluate_update_expression(
         self, expr: exp.Expression, df: pd.DataFrame, row_idx: int
