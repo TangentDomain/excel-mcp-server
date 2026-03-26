@@ -20,7 +20,8 @@
 import os
 import re
 import logging
-from typing import Dict, List, Any, Optional, Union, Tuple
+from contextlib import contextmanager
+from typing import Dict, List, Any, Optional, Union, Tuple, Generator
 import pandas as pd
 import numpy as np
 
@@ -2231,62 +2232,42 @@ class AdvancedSQLQueryEngine:
         import shutil
         import tempfile
         backup_path = None
-        lock_fd = None
         try:
-            # 文件锁（Linux fcntl，其他平台优雅降级）
-            try:
-                import fcntl
-                lock_fd = open(file_path + '.lock', 'w', encoding='utf-8')
-                fcntl.flock(lock_fd, fcntl.LOCK_EX)
-            except (ImportError, OSError):
-                lock_fd = None
+            with self._file_lock(file_path):
+                # 创建临时备份（事务保护）
+                backup_path = tempfile.mktemp(suffix='.xlsx.bak')
+                shutil.copy2(file_path, backup_path)
 
-            # 创建临时备份（事务保护，用NamedTemporaryFile确保可清理）
-            backup_path = tempfile.mktemp(suffix='.xlsx.bak')
-            shutil.copy2(file_path, backup_path)
+                # 检测双行表头偏移
+                header_row_offset = 0
+                desc_map = self._header_descriptions.get(matched_sheet, {})
+                if desc_map:
+                    header_row_offset = 1  # 双行表头，数据从第3行开始
 
-            # 检测双行表头偏移
-            header_row_offset = 0
-            desc_map = self._header_descriptions.get(matched_sheet, {})
-            if desc_map:
-                header_row_offset = 1  # 双行表头，数据从第3行开始
+                wb = openpyxl.load_workbook(file_path)
+                ws = wb[matched_sheet]
 
-            wb = openpyxl.load_workbook(file_path)
-            ws = wb[matched_sheet]
+                for change in changes:
+                    excel_row = change['row'] + header_row_offset
+                    col_idx = list(df.columns).index(change['column']) + 1
+                    ws.cell(row=excel_row, column=col_idx, value=change['new_value'])
 
-            for change in changes:
-                excel_row = change['row'] + header_row_offset
-                col_idx = list(df.columns).index(change['column']) + 1
-                ws.cell(row=excel_row, column=col_idx, value=change['new_value'])
+                wb.save(file_path)
+                wb.close()
 
-            wb.save(file_path)
-            wb.close()
+                # 写入成功，删除备份
+                if backup_path and os.path.exists(backup_path):
+                    os.remove(backup_path)
 
-            # 写入成功，删除备份
-            if backup_path and os.path.exists(backup_path):
-                os.remove(backup_path)
+                # 清除缓存（文件已修改）
+                self._df_cache.pop(file_path, None)
 
-            # 释放文件锁
-            if lock_fd:
-                try:
-                    import fcntl
-                    fcntl.flock(lock_fd, fcntl.LOCK_UN)
-                    lock_path = file_path + '.lock'
-                    if os.path.exists(lock_path):
-                        os.remove(lock_path)
-                except Exception:
-                    pass
-                lock_fd.close()
-
-            # 清除缓存（文件已修改）
-            self._df_cache.pop(file_path, None)
-
-            elapsed = (_time.time() - start_time) * 1000
-            return {'success': True,
-                    'message': f'成功更新 {len(changes)} 个单元格（{len(affected_indices)} 行）',
-                    'affected_rows': len(affected_indices),
-                    'changes': changes,
-                    'execution_time_ms': round(elapsed, 1)}
+                elapsed = (_time.time() - start_time) * 1000
+                return {'success': True,
+                        'message': f'成功更新 {len(changes)} 个单元格（{len(affected_indices)} 行）',
+                        'affected_rows': len(affected_indices),
+                        'changes': changes,
+                        'execution_time_ms': round(elapsed, 1)}
 
         except Exception as e:
             # 事务回滚：从备份恢复
@@ -2296,7 +2277,24 @@ class AdvancedSQLQueryEngine:
                     os.remove(backup_path)
                 except Exception:
                     pass
-            # 释放文件锁
+            return {'success': False,
+                    'message': f'写入Excel失败，已自动回滚: {e}',
+                    'affected_rows': 0, 'changes': changes,
+                    'execution_time_ms': round((_time.time() - start_time) * 1000, 1)}
+
+    @contextmanager
+    def _file_lock(self, file_path: str) -> Generator[None, None, None]:
+        """文件锁上下文管理器（Linux fcntl，其他平台优雅降级）"""
+        lock_fd = None
+        try:
+            try:
+                import fcntl
+                lock_fd = open(file_path + '.lock', 'w', encoding='utf-8')
+                fcntl.flock(lock_fd, fcntl.LOCK_EX)
+            except (ImportError, OSError):
+                lock_fd = None
+            yield
+        finally:
             if lock_fd:
                 try:
                     import fcntl
@@ -2307,10 +2305,6 @@ class AdvancedSQLQueryEngine:
                 except Exception:
                     pass
                 lock_fd.close()
-            return {'success': False,
-                    'message': f'写入Excel失败，已自动回滚: {e}',
-                    'affected_rows': 0, 'changes': changes,
-                    'execution_time_ms': round((_time.time() - start_time) * 1000, 1)}
 
     def _serialize_update_value(self, val: Any) -> Any:
         """将值序列化为JSON安全类型（numpy→Python原生）"""
