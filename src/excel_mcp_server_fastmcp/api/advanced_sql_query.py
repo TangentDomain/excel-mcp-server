@@ -2380,6 +2380,18 @@ class AdvancedSQLQueryEngine:
             return ''
 
 
+# 模块级单例引擎，DataFrame缓存跨调用共享
+_shared_engine: Optional[AdvancedSQLQueryEngine] = None
+
+
+def _get_engine() -> AdvancedSQLQueryEngine:
+    """获取共享SQL引擎实例（缓存跨调用复用）"""
+    global _shared_engine
+    if _shared_engine is None:
+        _shared_engine = AdvancedSQLQueryEngine()
+    return _shared_engine
+
+
 def execute_advanced_sql_query(
     file_path: str,
     sql: str,
@@ -2398,13 +2410,12 @@ def execute_advanced_sql_query(
         limit: 结果限制
         include_headers: 是否包含表头
         output_format: 输出格式 table/json/csv
-        include_headers: 是否包含表头
 
     Returns:
         Dict: 查询结果
     """
     try:
-        engine = AdvancedSQLQueryEngine()
+        engine = _get_engine()
         return engine.execute_sql_query(
             file_path=file_path,
             sql=sql,
@@ -2448,7 +2459,7 @@ def execute_advanced_update_query(
         Dict: 更新结果
     """
     try:
-        engine = AdvancedSQLQueryEngine()
+        engine = _get_engine()
         return engine.execute_update_query(
             file_path=file_path,
             sql=sql,
