@@ -28,6 +28,7 @@ import csv
 import io
 import time
 import difflib
+import operator
 import shutil
 import tempfile
 import logging
@@ -1059,28 +1060,22 @@ class AdvancedSQLQueryEngine:
         """检查是否为数学表达式"""
         return isinstance(expr, (exp.Add, exp.Sub, exp.Mul, exp.Div, exp.Mod))
 
+    # 数学运算符分发表：二元运算符统一处理
+    _MATH_BINARY_OPS = {
+        exp.Add: operator.add,
+        exp.Sub: operator.sub,
+        exp.Mul: operator.mul,
+        exp.Div: operator.truediv,
+        exp.Mod: operator.mod,
+    }
+
     def _evaluate_math_expression(self, expr, df: pd.DataFrame):
         """计算数学表达式"""
-        if isinstance(expr, exp.Add):
+        op_type = type(expr)
+        if op_type in self._MATH_BINARY_OPS:
             left = self._evaluate_math_expression(expr.left, df)
             right = self._evaluate_math_expression(expr.right, df)
-            return left + right
-        elif isinstance(expr, exp.Sub):
-            left = self._evaluate_math_expression(expr.left, df)
-            right = self._evaluate_math_expression(expr.right, df)
-            return left - right
-        elif isinstance(expr, exp.Mul):
-            left = self._evaluate_math_expression(expr.left, df)
-            right = self._evaluate_math_expression(expr.right, df)
-            return left * right
-        elif isinstance(expr, exp.Div):
-            left = self._evaluate_math_expression(expr.left, df)
-            right = self._evaluate_math_expression(expr.right, df)
-            return left / right
-        elif isinstance(expr, exp.Mod):
-            left = self._evaluate_math_expression(expr.left, df)
-            right = self._evaluate_math_expression(expr.right, df)
-            return left % right
+            return self._MATH_BINARY_OPS[op_type](left, right)
         elif isinstance(expr, exp.Column):
             return df[expr.name]
         elif isinstance(expr, exp.Literal):
@@ -1100,27 +1095,26 @@ class AdvancedSQLQueryEngine:
         return isinstance(expr, (exp.Upper, exp.Lower, exp.Trim, exp.Length,
                                 exp.Concat, exp.Replace, exp.Substring, exp.Left, exp.Right))
 
+    # 简单字符串函数分发表：一元操作，统一模式 val_series.astype(str).str.<op>()
+    _SIMPLE_STR_OPS = {
+        exp.Upper: 'upper',
+        exp.Lower: 'lower',
+        exp.Trim: 'strip',
+        exp.Length: 'len',
+    }
+
     def _evaluate_string_function(self, expr, df: pd.DataFrame) -> pd.Series:
         """计算字符串函数，返回pd.Series"""
-        func_name = type(expr).__name__.lower()
+        func_type = type(expr)
 
-        if func_name == 'upper':
+        # 简单字符串函数：分发表处理
+        if func_type in self._SIMPLE_STR_OPS:
             val_series = self._expr_to_series(expr.this, df)
-            return val_series.astype(str).str.upper()
+            return getattr(val_series.astype(str).str, self._SIMPLE_STR_OPS[func_type])()
 
-        elif func_name == 'lower':
-            val_series = self._expr_to_series(expr.this, df)
-            return val_series.astype(str).str.lower()
+        func_name = func_type.__name__.lower()
 
-        elif func_name == 'trim':
-            val_series = self._expr_to_series(expr.this, df)
-            return val_series.astype(str).str.strip()
-
-        elif func_name == 'length':
-            val_series = self._expr_to_series(expr.this, df)
-            return val_series.astype(str).str.len()
-
-        elif func_name == 'concat':
+        if func_name == 'concat':
             # CONCAT(a, b, ...) — expressions列表包含所有参数
             parts = [self._expr_to_series(arg, df).astype(str) for arg in expr.expressions]
             if parts:
