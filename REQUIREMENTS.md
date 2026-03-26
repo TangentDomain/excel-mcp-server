@@ -90,7 +90,8 @@
 - **已知问题（第24轮发现）**：
   - excel_search 没有 search_type 参数，搜索模式通过 use_regex 布尔值控制
   - excel_compare_sheets 用 file1_path/file2_path 而非 file_path（与多数工具不一致）
-  - excel_query 和 excel_update_query 都用 query_expression 参数名（AI可能混淆SELECT和UPDATE）
+- **第25轮已修复**：
+  - ✅ excel_query/excel_update_query 参数名统一问题 → update_expression（消除混淆）
 - **验收**：AI选工具错误率降低，高频场景不再选错
 - **状态**：OPEN（持续迭代，不关闭）
 
