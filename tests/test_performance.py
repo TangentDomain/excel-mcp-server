@@ -27,6 +27,9 @@ except ImportError:
 class TestPerformanceBenchmarks:
     """性能基准测试套件"""
 
+    # 性能测试在并行执行(xdist)时可能超时，单独设置更长超时
+    pytestmark = pytest.mark.timeout(120)
+
     @pytest.fixture
     def large_dataset_file(self, temp_dir):
         """创建中型数据集测试文件（优化后）"""
