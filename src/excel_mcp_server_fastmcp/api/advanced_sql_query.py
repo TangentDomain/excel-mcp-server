@@ -1305,16 +1305,7 @@ class AdvancedSQLQueryEngine:
                 continue
 
             # 处理别名
-            if isinstance(select_expr, exp.Alias):
-                alias_name = select_expr.alias  # alias直接是字符串
-                original_expr = select_expr.this
-            else:
-                original_expr = select_expr
-                # 如果没有别名，使用原始列名
-                if isinstance(original_expr, exp.Column):
-                    alias_name = original_expr.name
-                else:
-                    alias_name = f"col_{i}"
+            alias_name, original_expr = self._extract_select_alias(select_expr, i)
 
             # 计算表达式值
             try:
@@ -1392,6 +1383,29 @@ class AdvancedSQLQueryEngine:
             return result_df
         else:
             return df
+
+    def _extract_select_alias(self, select_expr, index: int) -> tuple:
+        """
+        从SELECT表达式提取别名和原始表达式。
+        复用于 _apply_select_expressions 和 _apply_group_by_aggregation。
+
+        Args:
+            select_expr: SELECT表达式节点
+            index: 表达式索引（用于生成默认别名 col_N）
+
+        Returns:
+            (alias_name, original_expr) 元组
+        """
+        if isinstance(select_expr, exp.Alias):
+            return select_expr.alias, select_expr.this
+        # 无别名：优先用列名，否则用聚合别名，最后 col_N
+        if isinstance(select_expr, exp.Column):
+            return select_expr.name, select_expr
+        if self._is_aggregate_function(select_expr):
+            return self._generate_aggregate_alias(select_expr), select_expr
+        if hasattr(select_expr, 'name') and select_expr.name:
+            return select_expr.name, select_expr
+        return f"col_{index}", select_expr
 
     def _is_mathematical_expression(self, expr) -> bool:
         """检查是否为数学表达式"""
@@ -2196,13 +2210,8 @@ class AdvancedSQLQueryEngine:
         select_exprs = {}
 
         for i, select_expr in enumerate(parsed_sql.expressions):
-            if isinstance(select_expr, exp.Alias):
-                alias_name = select_expr.alias  # alias直接是字符串
-                original_expr = select_expr.this
-                select_exprs[alias_name] = original_expr
-            else:
-                alias_name = f"col_{i}"
-                select_exprs[alias_name] = select_expr
+            alias_name, original_expr = self._extract_select_alias(select_expr, i)
+            select_exprs[alias_name] = original_expr
 
         # 检查聚合函数
         for alias_name, expr in select_exprs.items():
@@ -2233,19 +2242,7 @@ class AdvancedSQLQueryEngine:
 
         # 按SELECT表达式顺序处理列
         for i, select_expr in enumerate(parsed_sql.expressions):
-            if isinstance(select_expr, exp.Alias):
-                alias_name = select_expr.alias
-                original_expr = select_expr.this
-            else:
-                # 对于没有别名的表达式，生成有意义的别名
-                if self._is_aggregate_function(select_expr):
-                    # 聚合函数无别名：生成如 count_star, avg_damage, sum_hp 等
-                    alias_name = self._generate_aggregate_alias(select_expr)
-                elif hasattr(select_expr, 'name') and select_expr.name:
-                    alias_name = select_expr.name
-                else:
-                    alias_name = f"col_{i}"
-                original_expr = select_expr
+            alias_name, original_expr = self._extract_select_alias(select_expr, i)
 
             ordered_columns.append(alias_name)
 
