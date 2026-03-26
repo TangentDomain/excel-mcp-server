@@ -398,7 +398,7 @@ if _cleaned:
 # 创建FastMCP服务器实例，开启调试模式和详细日志
 mcp = FastMCP(
     name="excel-mcp",
-    instructions=r"""🎮 游戏开发Excel配置表管理专家 — 46个工具
+    instructions=r"""🎮 游戏开发Excel配置表管理专家 — 45个工具
 
 ## 🔥 核心原则：SQL优先
 
@@ -706,98 +706,7 @@ def excel_update_range(
         }
 
 
-@mcp.tool()
-@_track_call
-def excel_preview_operation(
-    file_path: str,
-    range: str,
-    operation_type: str = "update",
-    data: Optional[List[List[Any]]] = None
-) -> Dict[str, Any]:
-    """
-预览操作影响范围和当前数据，不实际执行。修改前确认用。
-全面评估请用excel_assess_data_impact。
-    """
-    _path_err = _validate_path(file_path)
-    if _path_err:
-        return _path_err
-    # 读取当前数据
-    current_data = ExcelOperations.get_range(file_path, range)
 
-    if not current_data.get('success'):
-        return {
-            'success': False,
-            'error': 'PREVIEW_FAILED',
-            'message': f"无法预览操作: {current_data.get('message', '未知错误')}"
-        }
-
-    # 分析影响
-    data_rows = len(current_data.get('data', []))
-    data_cols = len(current_data.get('data', [])) if data_rows > 0 else 0
-    total_cells = data_rows * data_cols
-
-    # 检查是否包含非空数据
-    has_data = any(
-        any(cell is not None and str(cell).strip() for cell in row)
-        for row in current_data.get('data', [])
-    )
-
-    # 安全评估
-    risk_level = "LOW"
-    if has_data:
-        if total_cells > 100:
-            risk_level = "HIGH"
-        elif total_cells > 20:
-            risk_level = "MEDIUM"
-        else:
-            risk_level = "LOW"
-
-    return {
-        'success': True,
-        'operation_type': operation_type,
-        'range': range,
-        'current_data': current_data.get('data', []),
-        'impact_assessment': {
-            'rows_affected': data_rows,
-            'columns_affected': data_cols,
-            'total_cells': total_cells,
-            'has_existing_data': has_data,
-            'risk_level': risk_level
-        },
-        'recommendations': _get_safety_recommendations(operation_type, has_data, risk_level),
-        'safety_warning': _generate_safety_warning(operation_type, has_data, risk_level)
-    }
-
-
-def _get_safety_recommendations(operation_type: str, has_data: bool, risk_level: str) -> List[str]:
-    """获取安全操作建议"""
-    recommendations = []
-
-    if operation_type == "update":
-        if has_data:
-            recommendations.append("⚠️ 范围内已有数据，建议使用 insert_mode=True")
-            if risk_level == "HIGH":
-                recommendations.append("🔴 大范围数据操作，强烈建议先备份")
-            recommendations.append("📊 建议先预览完整数据再操作")
-        else:
-            recommendations.append("✅ 范围为空，可以安全操作")
-
-    elif operation_type == "delete":
-        recommendations.append("🗑️ 删除操作不可逆，请确认")
-        if has_data:
-            recommendations.append("⚠️ 将删除现有数据，请仔细检查")
-
-    return recommendations
-
-
-def _generate_safety_warning(operation_type: str, has_data: bool, risk_level: str) -> str:
-    """生成安全警告"""
-    if risk_level == "HIGH":
-        return f"🔴 高风险警告: {operation_type}操作将影响大量数据，请谨慎操作"
-    elif risk_level == "MEDIUM":
-        return f"🟡 中等风险: {operation_type}操作将影响部分数据，建议先备份"
-    else:
-        return f"✅ 低风险: {operation_type}操作影响较小，可以安全执行"
 
 
 @mcp.tool()
@@ -806,33 +715,77 @@ def excel_assess_data_impact(
     file_path: str,
     range: str,
     operation_type: str = "update",
-    data: Optional[List[List[Any]]] = None
+    data: Optional[List[List[Any]]] = None,
+    detailed: bool = True
 ) -> Dict[str, Any]:
     """
-全面评估操作对数据的潜在影响（风险等级、数据类型分析、结果预测）。
-简单预览请用excel_preview_operation。
+评估操作对数据的潜在影响。修改/删除前确认用，不实际执行。
+detailed=False时返回快速预览（行数+列数+风险等级+当前数据），适合简单检查。
+detailed=True（默认）时返回全面评估（数据类型分析+结果预测+安全建议）。
     """
     _path_err = _validate_path(file_path)
     if _path_err:
         return _path_err
 
-    try:
-        # 验证范围表达式
-        range_validation = ExcelValidator.validate_range_expression(range)
-        range_info = range_validation['range_info']
-
-        # 获取当前数据
-        current_data_result = ExcelOperations.get_range(file_path, range)
-
-        if not current_data_result.get('success'):
+    # 详细模式下先验证范围表达式
+    if detailed:
+        try:
+            range_validation = ExcelValidator.validate_range_expression(range)
+            range_info = range_validation['range_info']
+        except DataValidationError as e:
             return {
                 'success': False,
-                'error': 'DATA_RETRIEVAL_FAILED',
-                'message': f"无法获取当前数据: {current_data_result.get('message', '未知错误')}"
+                'error': 'VALIDATION_FAILED',
+                'message': f"参数验证失败: {str(e)}"
             }
 
-        current_data = current_data_result.get('data', [])
+    # 获取当前数据
+    current_data_result = ExcelOperations.get_range(file_path, range)
 
+    if not current_data_result.get('success'):
+        return {
+            'success': False,
+            'error': 'PREVIEW_FAILED',
+            'message': f"无法预览操作: {current_data_result.get('message', '未知错误')}"
+        }
+
+    current_data = current_data_result.get('data', [])
+
+    if not detailed:
+        # 快速预览模式（原preview_operation行为）
+        data_rows = len(current_data)
+        data_cols = len(current_data[0]) if data_rows > 0 else 0
+        total_cells = data_rows * data_cols
+
+        has_data = any(
+            any(cell is not None and str(cell).strip() for cell in row)
+            for row in current_data
+        )
+
+        risk_level = "LOW"
+        if has_data:
+            if total_cells > 100:
+                risk_level = "HIGH"
+            elif total_cells > 20:
+                risk_level = "MEDIUM"
+
+        return {
+            'success': True,
+            'operation_type': operation_type,
+            'range': range,
+            'current_data': current_data,
+            'impact_assessment': {
+                'rows_affected': data_rows,
+                'columns_affected': data_cols,
+                'total_cells': total_cells,
+                'has_existing_data': has_data,
+                'risk_level': risk_level
+            },
+            'safety_warning': _generate_safety_warning(operation_type, has_data, risk_level)
+        }
+
+    # 详细评估模式（原assess_data_impact行为）
+    try:
         # 分析当前数据内容
         data_analysis = _analyze_current_data(current_data)
 
@@ -848,7 +801,7 @@ def excel_assess_data_impact(
         )
 
         # 生成建议
-        recommendations = _generate_safety_recommendations(
+        recommendations = _generate_assessment_recommendations(
             operation_type,
             data_analysis,
             risk_assessment,
@@ -895,6 +848,16 @@ def excel_assess_data_impact(
             'error': 'ASSESSMENT_FAILED',
             'message': f"数据影响评估失败: {str(e)}"
         }
+
+
+def _generate_safety_warning(operation_type: str, has_data: bool, risk_level: str) -> str:
+    """生成安全警告"""
+    if risk_level == "HIGH":
+        return f"🔴 高风险警告: {operation_type}操作将影响大量数据，请谨慎操作"
+    elif risk_level == "MEDIUM":
+        return f"🟡 中等风险: {operation_type}操作将影响部分数据，建议先备份"
+    else:
+        return f"✅ 低风险: {operation_type}操作影响较小，可以安全执行"
 
 
 def _analyze_current_data(data: List[List[Any]]) -> Dict[str, Any]:
@@ -1015,13 +978,13 @@ def _assess_operation_risk(
     }
 
 
-def _generate_safety_recommendations(
+def _generate_assessment_recommendations(
     operation_type: str,
     data_analysis: Dict[str, Any],
     risk_assessment: Dict[str, Any],
     scale_info: Dict[str, Any]
 ) -> List[str]:
-    """生成安全建议"""
+    """生成详细评估的安全建议"""
     recommendations = []
 
     # 基础建议

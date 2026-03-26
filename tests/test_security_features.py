@@ -12,7 +12,6 @@ from datetime import datetime
 
 from src.excel_mcp_server_fastmcp.server import (
     OperationLogger,
-    excel_preview_operation,
     excel_assess_data_impact,
     excel_create_backup,
     excel_restore_backup,
@@ -20,7 +19,7 @@ from src.excel_mcp_server_fastmcp.server import (
     excel_get_operation_history,
     _analyze_current_data,
     _assess_operation_risk,
-    _generate_safety_recommendations,
+    _generate_assessment_recommendations,
     _predict_operation_result
 )
 from src.excel_mcp_server_fastmcp.utils.validators import ExcelValidator, DataValidationError
@@ -263,7 +262,7 @@ class TestRiskAssessment:
         }
         scale_info = {'total_cells': 5000}
 
-        recommendations = _generate_safety_recommendations(
+        recommendations = _generate_assessment_recommendations(
             "update", data_analysis, risk_assessment, scale_info
         )
 
@@ -384,16 +383,20 @@ class TestIntegrationSecurityWorkflow:
         assert 'risk_assessment' in assessment_result
         assert 'safety_recommendations' in assessment_result
 
-        # 2. 操作预览
-        preview_result = excel_preview_operation(
+        # 2. 快速预览模式（detailed=False）
+        preview_result = excel_assess_data_impact(
             self.test_file,
             "Sheet1!A1:C3",
-            "update"
+            "update",
+            None,
+            detailed=False
         )
 
         assert preview_result['success'] is True
         assert 'impact_assessment' in preview_result
         assert 'safety_warning' in preview_result
+        assert preview_result['impact_assessment']['rows_affected'] == 2
+        assert preview_result['impact_assessment']['columns_affected'] == 3
 
         # 3. 验证风险评估一致性
         risk_level = assessment_result['risk_assessment']['overall_risk']
