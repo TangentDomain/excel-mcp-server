@@ -1682,28 +1682,42 @@ def excel_describe_table(
         headers = rows[header_row_idx]
         descriptions = rows[0] if is_dual_header else None
 
-        # 读取所有数据行统计信息
+        # 读取所有数据行统计信息 — 单次遍历所有列（优化：旧方案逐列遍历→N列×M行，新方案一次遍历→M行）
         data_start = header_row_idx + 1
+        num_cols = len(headers)
         col_stats = {}
-        for col_idx, col_name in enumerate(headers):
+        # 初始化统计结构
+        col_name_list = []
+        for col_idx in range(num_cols):
+            col_name = headers[col_idx]
             if col_name is None:
                 col_name = f"column_{col_idx + 1}"
             col_name = str(col_name).strip()
             if not col_name:
                 col_name = f"column_{col_idx + 1}"
+            col_name_list.append(col_name)
+            col_stats[col_name] = {
+                'values': [],
+                'sample_values': [],
+                'non_null': 0
+            }
 
-            values = []
-            sample_values = []
-            non_null_count = 0
-            for row in ws.iter_rows(min_row=data_start + 1, min_col=col_idx + 1, max_col=col_idx + 1, values_only=True):
-                val = row[0]
+        # 单次遍历所有行和列
+        for row in ws.iter_rows(min_row=data_start + 1, values_only=True):
+            for col_idx in range(min(len(row), num_cols)):
+                val = row[col_idx]
                 if val is not None:
-                    non_null_count += 1
-                    values.append(val)
-                    if len(sample_values) < 3:
-                        sample_values.append(val)
+                    col_name = col_name_list[col_idx]
+                    stats = col_stats[col_name]
+                    stats['non_null'] += 1
+                    stats['values'].append(val)
+                    if len(stats['sample_values']) < 3:
+                        stats['sample_values'].append(val)
 
-            # 推断类型
+        # 推断类型并构建最终结果
+        for col_idx, col_name in enumerate(col_name_list):
+            stats = col_stats[col_name]
+            values = stats['values']
             if not values:
                 col_type = "empty"
             elif all(isinstance(v, (int, float)) and not isinstance(v, bool) for v in values[:100]):
@@ -1719,8 +1733,8 @@ def excel_describe_table(
                 'name': col_name,
                 'type': col_type,
                 'description': description,
-                'non_null': non_null_count,
-                'sample_values': sample_values[:3]
+                'non_null': stats['non_null'],
+                'sample_values': stats['sample_values'][:3]
             }
 
         # 统计行数
