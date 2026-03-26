@@ -95,6 +95,7 @@ class ExcelWriter:
 
             # 保存文件
             workbook.save(self.file_path)
+            workbook.close()
 
             mode_description = "插入模式" if insert_mode else "覆盖模式"
 
@@ -155,6 +156,7 @@ class ExcelWriter:
 
             # 保存文件
             workbook.save(self.file_path)
+            workbook.close()
 
             return OperationResult(
                 success=True,
@@ -213,6 +215,7 @@ class ExcelWriter:
             # 保存文件
             workbook.save(self.file_path)
 
+            workbook.close()
             return OperationResult(
                 success=True,
                 message=f"成功插入{count}列",
@@ -279,6 +282,7 @@ class ExcelWriter:
             # 保存文件
             workbook.save(self.file_path)
 
+            workbook.close()
             return OperationResult(
                 success=True,
                 message=f"成功从第{start_row}行开始删除{actual_count}行",
@@ -345,6 +349,7 @@ class ExcelWriter:
             # 保存文件
             workbook.save(self.file_path)
 
+            workbook.close()
             return OperationResult(
                 success=True,
                 message=f"成功删除{actual_count}列",
@@ -766,21 +771,16 @@ class ExcelWriter:
         temp_sheet = temp_workbook.active
         temp_sheet.title = "Calculation"
 
-        # 只有当文件路径存在时才加载原始工作簿
+        # 从原始工作簿复制数据到临时工作表（用于公式计算的上下文）
         if self.file_path and os.path.exists(self.file_path):
             try:
-                # 加载原始工作簿（用于提供数据上下文） - 使用只读模式
                 original_workbook = load_workbook(self.file_path, data_only=False, read_only=True)
 
-                # 选择要复制的源工作表
                 if context_sheet and context_sheet in original_workbook.sheetnames:
                     source_sheet = original_workbook[context_sheet]
                 else:
-                    # 使用活动工作表或第一个工作表
                     source_sheet = original_workbook.active
 
-                # 复制数据到临时工作表
-                # 直接在这里实现数据复制，避免额外的类方法
                 for row in source_sheet.iter_rows(
                     max_row=min(source_sheet.max_row, 1000),
                     max_col=min(source_sheet.max_column, 100)
@@ -798,35 +798,6 @@ class ExcelWriter:
                 logger.warning(f"无法加载原始工作簿，使用空工作簿: {e}")
         else:
             logger.debug("没有文件路径或文件不存在，使用空工作簿进行计算")
-
-        # 复制数据到临时工作表（如果有源数据）
-        source_sheet = None
-        if self.file_path and os.path.exists(self.file_path):
-            try:
-                original_workbook = load_workbook(self.file_path, data_only=False, read_only=True)
-
-                if context_sheet and context_sheet in original_workbook.sheetnames:
-                    source_sheet = original_workbook[context_sheet]
-                else:
-                    source_sheet = original_workbook.active
-
-                # 复制数据到临时工作表（只复制有数据的区域以提升性能）
-                if source_sheet.max_row > 1 or source_sheet.max_column > 1:
-                    for row in source_sheet.iter_rows(
-                        max_row=min(source_sheet.max_row, 1000),  # 限制复制范围，提升性能
-                        max_col=min(source_sheet.max_column, 100)
-                    ):
-                        for cell in row:
-                            if cell.value is not None:
-                                target_cell = temp_sheet.cell(
-                                    row=cell.row,
-                                    column=cell.column
-                                )
-                                target_cell.value = cell.value
-
-                original_workbook.close()
-            except Exception as e:
-                logger.warning(f"复制数据失败，使用空工作簿: {e}")
 
         # 保存到临时文件
         temp_file_path = TempFileManager.create_temp_excel_file()
@@ -914,6 +885,26 @@ class ExcelWriter:
                 pass
             return "unknown"
 
+    def _safe_eval_expr(self, expr: str):
+        """安全求值简单数学表达式（仅支持数字和+-*/运算符）"""
+        import ast
+        try:
+            tree = ast.parse(expr, mode='eval')
+            # 只允许数字常量和算术运算符
+            for node in ast.walk(tree):
+                if isinstance(node, (ast.Expression, ast.BinOp, ast.UnaryOp, ast.Constant)):
+                    if isinstance(node, ast.Constant) and not isinstance(node.value, (int, float)):
+                        return None
+                elif isinstance(node, ast.Num):  # Python <3.8 compat
+                    pass
+                elif isinstance(node, ast.operator):
+                    pass
+                else:
+                    return None
+            return eval(compile(tree, '<expr>', 'eval'))
+        except (SyntaxError, TypeError, ValueError, ZeroDivisionError):
+            return None
+
     def _basic_formula_parse(self, formula: str, sheet) -> any:
         """增强的基础公式解析器 - 支持numpy统计函数"""
         import re
@@ -924,10 +915,9 @@ class ExcelWriter:
 
         # 简单的数学表达式 - 不依赖工作表
         if re.match(r'^[\d\+\-\*\/\s\(\)\.]+$', formula):
-            try:
-                return eval(formula)  # 注意：这在生产环境中需要更安全的实现
-            except Exception as e:
-                logger.warning(f"简单数学表达式计算失败: {formula}, 错误: {e}")
+            result = self._safe_eval_expr(formula)
+            if result is not None:
+                return result
 
         # 数字列表统计函数 - 不依赖工作表
         # SUM函数 (数字列表)
@@ -1083,13 +1073,6 @@ class ExcelWriter:
             return self._numpy_harmean(values)
 
         # ==================== 其他函数 ====================
-
-        # 简单的数学表达式
-        if re.match(r'^[\d\+\-\*\/\s\(\)\.]+$', formula):
-            try:
-                return eval(formula)  # 注意：这在生产环境中需要更安全的实现
-            except:
-                pass
 
         # IF函数简单实现
         if_match = re.match(r'IF\((.+),\s*"?([^,"]+)"?,\s*"?([^,"]+)"?\)', formula, re.IGNORECASE)
@@ -1498,6 +1481,7 @@ class ExcelWriter:
 
             # 保存文件
             workbook.save(self.file_path)
+            workbook.close()
 
             return OperationResult(
                 success=True,
@@ -1556,6 +1540,7 @@ class ExcelWriter:
 
             # 保存文件
             workbook.save(self.file_path)
+            workbook.close()
 
             return OperationResult(
                 success=True,
@@ -1641,6 +1626,7 @@ class ExcelWriter:
 
             # 保存文件
             workbook.save(self.file_path)
+            workbook.close()
 
             return OperationResult(
                 success=True,
@@ -1698,6 +1684,7 @@ class ExcelWriter:
 
             # 保存文件
             workbook.save(self.file_path)
+            workbook.close()
 
             return OperationResult(
                 success=True,
@@ -1754,6 +1741,7 @@ class ExcelWriter:
 
             # 保存文件
             workbook.save(self.file_path)
+            workbook.close()
 
             return OperationResult(
                 success=True,
