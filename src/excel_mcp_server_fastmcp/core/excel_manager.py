@@ -674,3 +674,240 @@ class ExcelManager:
                 success=False,
                 error=f"获取文件信息失败: {str(e)}"
             )
+
+    def upsert_row(
+        self,
+        sheet_name: str,
+        key_column: str,
+        key_value,
+        updates: dict,
+        header_row: int = 1
+    ) -> OperationResult:
+        """
+        Upsert行：按键列查找，存在则更新，不存在则插入新行。
+
+        Args:
+            sheet_name: 工作表名称
+            key_column: 用于匹配的列名
+            key_value: 用于匹配的值
+            updates: 要写入的列值字典（含key_column对应的值）
+            header_row: 表头所在行号（默认1）
+
+        Returns:
+            OperationResult: 操作结果，含action(update/insert)、行号等信息
+        """
+        try:
+            if not sheet_name or not sheet_name.strip():
+                raise DataValidationError("工作表名称不能为空")
+            if not key_column or not key_column.strip():
+                raise DataValidationError("键列名不能为空")
+            if key_value is None:
+                raise DataValidationError("键值不能为None")
+            if not updates or not isinstance(updates, dict):
+                raise DataValidationError("更新数据不能为空，需提供列值字典")
+
+            key_column = key_column.strip()
+            sheet_name = sheet_name.strip()
+
+            workbook = load_workbook(self.file_path)
+
+            if sheet_name not in workbook.sheetnames:
+                available = ', '.join(workbook.sheetnames)
+                raise SheetNotFoundError(f"工作表不存在: {sheet_name}（可用: {available}）")
+
+            sheet = workbook[sheet_name]
+
+            if header_row < 1 or header_row > sheet.max_row:
+                raise DataValidationError(f"表头行号 {header_row} 超出范围（1-{sheet.max_row}）")
+
+            # 构建列名→列索引映射
+            col_map = {}
+            for col in range(1, sheet.max_column + 1):
+                cell_val = sheet.cell(row=header_row, column=col).value
+                if cell_val is not None:
+                    col_map[str(cell_val).strip()] = col
+
+            if key_column not in col_map:
+                actual = list(col_map.keys())[:10]
+                raise DataValidationError(
+                    f"键列 '{key_column}' 不存在。实际列名: {', '.join(actual)}"
+                )
+
+            key_col_idx = col_map[key_column]
+
+            # 查找匹配行
+            target_row = None
+            for row in range(header_row + 1, sheet.max_row + 1):
+                cell_val = sheet.cell(row=row, column=key_col_idx).value
+                if cell_val is not None and str(cell_val).strip() == str(key_value).strip():
+                    target_row = row
+                    break
+
+            # 执行upsert
+            if target_row is not None:
+                # UPDATE: 更新已有行
+                updated_cols = []
+                for col_name, value in updates.items():
+                    col_name_stripped = col_name.strip()
+                    if col_name_stripped in col_map:
+                        col_idx = col_map[col_name_stripped]
+                        sheet.cell(row=target_row, column=col_idx, value=value)
+                        updated_cols.append(col_name_stripped)
+
+                workbook.save(self.file_path)
+                workbook.close()
+
+                return OperationResult(
+                    success=True,
+                    data={
+                        'action': 'update',
+                        'row': target_row,
+                        'updated_columns': updated_cols,
+                        'updated_count': len(updated_cols)
+                    },
+                    message=f"更新行 {target_row}（键列 '{key_column}'='{key_value}'），修改了 {len(updated_cols)} 列",
+                    metadata={
+                        'file_path': self.file_path,
+                        'sheet_name': sheet_name,
+                        'key_column': key_column,
+                        'key_value': str(key_value),
+                        'action': 'update',
+                        'target_row': target_row,
+                        'updated_columns': updated_cols
+                    }
+                )
+            else:
+                # INSERT: 在末尾追加新行
+                last_row = sheet.max_row
+                new_row = last_row + 1
+
+                # 确保所有列都写入（按表头顺序）
+                inserted_cols = []
+                for col_name, col_idx in sorted(col_map.items(), key=lambda x: x[1]):
+                    if col_name in updates:
+                        sheet.cell(row=new_row, column=col_idx, value=updates[col_name])
+                        inserted_cols.append(col_name)
+                    elif col_name == key_column:
+                        # 确保key_column的值被写入（即使updates中没有）
+                        sheet.cell(row=new_row, column=col_idx, value=key_value)
+                        inserted_cols.append(col_name)
+
+                workbook.save(self.file_path)
+                workbook.close()
+
+                return OperationResult(
+                    success=True,
+                    data={
+                        'action': 'insert',
+                        'row': new_row,
+                        'inserted_columns': inserted_cols,
+                        'inserted_count': len(inserted_cols)
+                    },
+                    message=f"插入新行 {new_row}（键列 '{key_column}'='{key_value}'），写入了 {len(inserted_cols)} 列",
+                    metadata={
+                        'file_path': self.file_path,
+                        'sheet_name': sheet_name,
+                        'key_column': key_column,
+                        'key_value': str(key_value),
+                        'action': 'insert',
+                        'new_row': new_row,
+                        'inserted_columns': inserted_cols
+                    }
+                )
+
+        except Exception as e:
+            logger.error(f"Upsert行失败: {e}")
+            return OperationResult(success=False, error=str(e))
+
+    def batch_insert_rows(
+        self,
+        sheet_name: str,
+        data: list,
+        header_row: int = 1
+    ) -> OperationResult:
+        """
+        批量插入多行数据到工作表末尾。
+
+        Args:
+            sheet_name: 工作表名称
+            data: 行数据列表，每行为{列名: 值}字典
+            header_row: 表头所在行号（默认1）
+
+        Returns:
+            OperationResult: 操作结果
+        """
+        try:
+            if not sheet_name or not sheet_name.strip():
+                raise DataValidationError("工作表名称不能为空")
+            if not data or not isinstance(data, list):
+                raise DataValidationError("数据不能为空，需提供行数据列表")
+            if len(data) > 10000:
+                raise DataValidationError(f"单次最多插入10000行，当前{len(data)}行")
+
+            sheet_name = sheet_name.strip()
+
+            workbook = load_workbook(self.file_path)
+
+            if sheet_name not in workbook.sheetnames:
+                available = ', '.join(workbook.sheetnames)
+                raise SheetNotFoundError(f"工作表不存在: {sheet_name}（可用: {available}）")
+
+            sheet = workbook[sheet_name]
+
+            if header_row < 1 or header_row > sheet.max_row:
+                raise DataValidationError(f"表头行号 {header_row} 超出范围（1-{sheet.max_row}）")
+
+            # 构建列名→列索引映射
+            col_map = {}
+            for col in range(1, sheet.max_column + 1):
+                cell_val = sheet.cell(row=header_row, column=col).value
+                if cell_val is not None:
+                    col_map[str(cell_val).strip()] = col
+
+            if not col_map:
+                raise DataValidationError("未找到表头列名")
+
+            # 从末尾行开始追加
+            start_row = sheet.max_row + 1
+            unknown_cols = set()
+
+            for i, row_data in enumerate(data):
+                if not isinstance(row_data, dict):
+                    raise DataValidationError(f"第{i + 1}行数据必须是字典，实际类型: {type(row_data).__name__}")
+                row_num = start_row + i
+                for col_name, value in row_data.items():
+                    col_name_stripped = col_name.strip()
+                    if col_name_stripped in col_map:
+                        sheet.cell(row=row_num, column=col_map[col_name_stripped], value=value)
+                    else:
+                        unknown_cols.add(col_name_stripped)
+
+            workbook.save(self.file_path)
+            workbook.close()
+
+            inserted_count = len(data)
+            unknown_list = sorted(unknown_cols)[:5] if unknown_cols else []
+
+            return OperationResult(
+                success=True,
+                data={
+                    'action': 'batch_insert',
+                    'start_row': start_row,
+                    'end_row': start_row + inserted_count - 1,
+                    'inserted_count': inserted_count,
+                    'unknown_columns': unknown_list
+                },
+                message=f"批量插入 {inserted_count} 行（第{start_row}-{start_row + inserted_count - 1}行）",
+                metadata={
+                    'file_path': self.file_path,
+                    'sheet_name': sheet_name,
+                    'action': 'batch_insert',
+                    'start_row': start_row,
+                    'inserted_count': inserted_count,
+                    'unknown_columns': unknown_list
+                }
+            )
+
+        except Exception as e:
+            logger.error(f"批量插入行失败: {e}")
+            return OperationResult(success=False, error=str(e))
