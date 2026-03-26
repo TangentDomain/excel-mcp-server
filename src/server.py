@@ -1626,7 +1626,8 @@ def excel_evaluate_formula(
 def excel_query(
     file_path: str,
     query_expression: str,
-    include_headers: bool = True
+    include_headers: bool = True,
+    output_format: str = "table"
 ) -> Dict[str, Any]:
     """SQL查询 - 优先使用的查询分析工具
     
@@ -1638,6 +1639,7 @@ Args:
     file_path: Excel文件路径
     query_expression: SQL语句
     include_headers: 是否包含表头
+    output_format: 输出格式，可选 "table"(默认), "json", "csv"
 
 Returns:
     {success, data, query_info, message}
@@ -1661,6 +1663,16 @@ Returns:
             'query_info': {'error_type': 'parameter_validation'}
         }
 
+    # 验证 output_format
+    valid_formats = ('table', 'json', 'csv')
+    if output_format and output_format not in valid_formats:
+        return {
+            'success': False,
+            'message': f'不支持的输出格式: {output_format}。可选: {", ".join(valid_formats)}',
+            'data': [],
+            'query_info': {'error_type': 'parameter_validation'}
+        }
+
     # 使用高级SQL查询引擎
     try:
         from .api.advanced_sql_query import execute_advanced_sql_query
@@ -1669,7 +1681,8 @@ Returns:
             sql=query_expression,
             sheet_name=None,  # 统一使用SQL FROM子句中的表名
             limit=None,  # 统一使用SQL中的LIMIT
-            include_headers=include_headers
+            include_headers=include_headers,
+            output_format=output_format or 'table'
         )
 
     except ImportError:
