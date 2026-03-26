@@ -39,6 +39,7 @@ except ImportError as e:
 
 # 导入API模块
 from .api.excel_operations import ExcelOperations
+from .utils.validators import ExcelValidator, DataValidationError
 
 # ==================== 操作日志系统 ====================
 class OperationLogger:
@@ -477,7 +478,6 @@ def excel_get_range(
     if _path_err:
         return _path_err
     # 增强参数验证
-    from .utils.validators import ExcelValidator, DataValidationError
 
     try:
         # 验证范围表达式格式
@@ -548,8 +548,6 @@ def excel_update_range(
     _path_err = _validate_path(file_path)
     if _path_err:
         return _path_err
-    # 增强参数验证
-    from .utils.validators import ExcelValidator, DataValidationError
 
     try:
         # 验证范围表达式格式
@@ -725,7 +723,6 @@ def excel_assess_data_impact(
     _path_err = _validate_path(file_path)
     if _path_err:
         return _path_err
-    from .utils.validators import ExcelValidator, DataValidationError
 
     try:
         # 验证范围表达式
