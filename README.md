@@ -11,10 +11,10 @@
 [![技术支持: FastMCP](https://img.shields.io/badge/Powered%20by-FastMCP-orange)](https://github.com/jlowin/fastmcp)
 ![状态](https://img.shields.io/badge/status-stable-green.svg)
 ![测试覆盖](https://img.shields.io/badge/tests-985%20tests-brightgreen.svg)
-![工具数量](https://img.shields.io/badge/tools-46%20verified%20tools-green.svg)
+![工具数量](https://img.shields.io/badge/tools-45%20verified%20tools-green.svg)
 [![CI](https://github.com/TangentDomain/excel-mcp-server/actions/workflows/ci.yml/badge.svg)](https://github.com/TangentDomain/excel-mcp-server/actions/workflows/ci.yml)
 
-**ExcelMCP** 是专为游戏开发设计的Excel配置表管理MCP服务器。通过AI自然语言指令，实现技能配置表、装备数据、怪物属性等游戏配置的智能化操作。基于**FastMCP**构建，读取使用**python-calamine**（Rust引擎，2300x提速），写入使用**openpyxl**，拥有**46个专业工具**和**985个测试用例**，确保企业级可靠性。
+**ExcelMCP** 是专为游戏开发设计的Excel配置表管理MCP服务器。通过AI自然语言指令，实现技能配置表、装备数据、怪物属性等游戏配置的智能化操作。基于**FastMCP**构建，读取使用**python-calamine**（Rust引擎，2300x提速），写入使用**openpyxl**，拥有**45个专业工具**和**985个测试用例**，确保企业级可靠性。
 
 🎯 **核心功能**: 技能系统、装备管理、怪物配置、数值平衡、版本对比、策划工具链
 
@@ -131,7 +131,7 @@ python scripts/benchmark.py --compare      # 与上次结果对比
 | 版本对比分析 | `excel_compare_sheets` + `excel_compare_files` | "对比新旧版本配置表差异" |
 | 数据统计查询 | `excel_query` | "查询技能表中各职业平均攻击力" |
 | 条件批量修改 | `excel_update_query` | "把火系技能伤害提升20%" |
-| 批量修改前预览 | `excel_preview_operation` + `excel_assess_data_impact` | "预览删除第5-10行的影响" |
+| 批量修改前预览 | `excel_assess_data_impact`（detailed=False快速预览，detailed=True全面评估） | "预览删除第5-10行的影响" |
 | 修改前备份 | `excel_create_backup` | "备份当前技能表再修改" |
 | 公式试算 | `excel_evaluate_formula` | "临时计算SUM(A2:A100)看结果" |
 
@@ -308,7 +308,7 @@ SELECT a.skill_name, b.equip_name FROM SkillConfig a INNER JOIN EquipConfig b ON
 
 ---
 
-## 🛠️ 完整工具列表（46个专业工具）
+## 🛠️ 完整工具列表（45个专业工具）
 
 ### 📁 文件与工作表管理
 - `excel_create_file` - 创建新Excel文件，支持自定义工作表
@@ -351,8 +351,7 @@ SELECT a.skill_name, b.equip_name FROM SkillConfig a INNER JOIN EquipConfig b ON
 - `excel_create_backup` - 创建文件自动备份
 - `excel_restore_backup` - 从备份恢复文件
 - `excel_list_backups` - 列出所有备份记录
-- `excel_preview_operation` - 预览操作影响范围和当前数据
-- `excel_assess_data_impact` - 全面评估操作的潜在影响
+- `excel_assess_data_impact` - 评估操作对数据的潜在影响（detailed=False快速预览/detailed=True全面评估）
 
 ### 📜 操作历史
 - `excel_get_operation_history` - 获取操作历史记录和统计
@@ -568,7 +567,7 @@ ExcelMCP 内置多层安全防护，保护用户数据和系统安全：
 ```
 src/excel_mcp_server_fastmcp/    # 主包（pip install 后可直接 import）
 ├── __init__.py                   # 包入口，暴露 main()
-├── server.py                     # MCP接口层（46个工具定义）
+├── server.py                     # MCP接口层（45个工具定义）
 ├── api/                          # API业务逻辑层
 │   ├── excel_operations.py       # Excel操作统一入口
 │   └── advanced_sql_query.py     # SQL查询引擎
@@ -623,7 +622,7 @@ API业务逻辑层 (集中式处理)
 - **测试用例**: 985个（行为验证，无覆盖率填充）
 - **测试文件**: 49个测试文件
 - **测试代码**: 16,496行
-- **工具数量: 46个 (@mcp.tool装饰器验证)
+- **工具数量: 45个 (@mcp.tool装饰器验证)
 - **架构层次**: 4层分层设计 (MCP→API→Core→Utils)
 
 ### 验证命令
@@ -632,7 +631,7 @@ API业务逻辑层 (集中式处理)
 python -m pytest tests/ -q --tb=short -n auto --timeout=30
 
 # 验证工具完整性
-grep -c "def excel_" src/excel_mcp_server_fastmcp/server.py  # 应输出: 46
+grep -c "def excel_" src/excel_mcp_server_fastmcp/server.py  # 应输出: 45
 
 # 生成覆盖率报告
 python -m pytest tests/ --cov=src --cov-report=html
