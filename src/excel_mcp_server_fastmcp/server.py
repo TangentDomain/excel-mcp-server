@@ -359,7 +359,7 @@ mcp = FastMCP(
 需要格式调整？       → excel_format_cells
 ```
 
-## ✅ SQL已支持功能 (37项)
+## ✅ SQL已支持功能 (38项)
 基础查询: SELECT, DISTINCT, 别名(AS), 数学表达式(+-*/%)
 条件筛选: WHERE, =/>/</<=/>=/!=, LIKE, IN, NOT IN, BETWEEN, AND/OR, IS NULL, NOT
 高级查询: 子查询(WHERE col IN (SELECT...)), CASE WHEN, COALESCE, EXISTS, CTE(WITH)
@@ -370,7 +370,7 @@ mcp = FastMCP(
 窗口函数: ROW_NUMBER, RANK, DENSE_RANK（OVER PARTITION BY ... ORDER BY ...）
 
 ## ❌ SQL不支持功能
-INSERT/DELETE, RIGHT JOIN, CROSS JOIN, FROM子查询
+INSERT/DELETE, FROM子查询
 
 ## ✅ UNION / UNION ALL
 合并多个 SELECT 查询结果。UNION 去重，UNION ALL 保留重复行。
@@ -1710,9 +1710,9 @@ SQL查询Excel数据（只读）。优先使用此工具而非excel_get_range进
 高级: 子查询(WHERE col IN(SELECT...))/CASE WHEN/COALESCE/EXISTS/CTE(WITH)/UNION/UNION ALL/窗口函数(ROW_NUMBER/RANK/DENSE_RANK)
 聚合: COUNT/SUM/AVG/MAX/MIN/COUNT(DISTINCT)/GROUP BY/HAVING/TOTAL行
 排序: ORDER BY DESC/ASC/LIMIT/OFFSET
-关联: INNER JOIN/LEFT JOIN（同文件内工作表）
+关联: INNER JOIN/LEFT JOIN/RIGHT JOIN/FULL JOIN/CROSS JOIN（同文件内工作表）
 字符串: UPPER/LOWER/TRIM/LENGTH/CONCAT/REPLACE/SUBSTRING/LEFT/RIGHT
-不支持: INSERT/DELETE/RIGHT JOIN/CROSS JOIN/FROM子查询
+不支持: INSERT/DELETE/FROM子查询
 输出格式: table(默认Markdown)/json/csv
 示例: excel_query("技能表.xlsx", "SELECT 类型, AVG(伤害) FROM 技能配置 GROUP BY 类型 HAVING COUNT(*)>2 ORDER BY AVG(伤害) DESC")
     """
