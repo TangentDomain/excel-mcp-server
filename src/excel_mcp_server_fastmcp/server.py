@@ -1468,7 +1468,8 @@ def excel_query(
     output_format: str = "table"
 ) -> Dict[str, Any]:
     """
-SQL查询Excel数据。优先使用此工具而非excel_get_range进行数据查询和分析。
+SQL查询Excel数据（只读）。优先使用此工具而非excel_get_range进行数据查询和分析。
+参数query_expression只接受SELECT语句。批量修改请用excel_update_query。
 支持中文列名、双行表头自动识别、数学表达式。
 支持: SELECT/WHERE/GROUP BY/HAVING/ORDER BY/LIMIT/OFFSET/DISTINCT/IN/BETWEEN/IS NULL/NOT LIKE/NOT IN/JOIN
 聚合: COUNT/SUM/AVG/MAX/MIN/COUNT(DISTINCT)
@@ -1582,11 +1583,12 @@ SQL查询Excel数据。优先使用此工具而非excel_get_range进行数据查
 @mcp.tool()
 def excel_update_query(
     file_path: str,
-    query_expression: str,
+    update_expression: str,
     dry_run: bool = False
 ) -> Dict[str, Any]:
     """
 SQL UPDATE批量修改Excel数据。优先使用此工具而非excel_update_range进行条件修改。
+参数update_expression只接受UPDATE语句（如"UPDATE 表 SET 列=值 WHERE 条件"），查询请用excel_query。
 支持: SET 列=常量/列引用/算术表达式(如 伤害*1.1, 攻击力+10)
 WHERE条件复用excel_query全部语法，支持中文列名。
 事务保护：写入失败自动回滚，不会损坏文件。
@@ -1600,12 +1602,12 @@ dry_run=True 可预览影响范围不实际修改。
         return {'success': False, 'message': '文件路径不能为空',
                 'affected_rows': 0, 'changes': []}
 
-    if not query_expression or not query_expression.strip():
+    if not update_expression or not update_expression.strip():
         return {'success': False, 'message': 'UPDATE语句不能为空',
                 'affected_rows': 0, 'changes': []}
 
     # 安全检查：只允许UPDATE语句
-    stripped = query_expression.strip().upper()
+    stripped = update_expression.strip().upper()
     if not stripped.startswith('UPDATE'):
         return {'success': False,
                 'message': '只支持UPDATE语句。查询请使用 excel_query',
@@ -1615,7 +1617,7 @@ dry_run=True 可预览影响范围不实际修改。
         from .api.advanced_sql_query import execute_advanced_update_query
         return execute_advanced_update_query(
             file_path=file_path,
-            sql=query_expression,
+            sql=update_expression,
             dry_run=dry_run
         )
     except ImportError:
@@ -1904,6 +1906,11 @@ def excel_compare_sheets(
 # ==================== 主程序 ====================
 def main():
     """Entry point for excel-mcp-server-fastmcp."""
+    import sys
+    if len(sys.argv) > 1 and sys.argv[1] in ('--version', '-v'):
+        from excel_mcp_server_fastmcp import __version__
+        print(f"excel-mcp-server-fastmcp {__version__}", flush=True)
+        sys.exit(0)
     mcp.run()
 
 if __name__ == "__main__":

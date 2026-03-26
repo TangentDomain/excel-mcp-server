@@ -12,6 +12,7 @@
 ![状态](https://img.shields.io/badge/status-stable-green.svg)
 ![测试覆盖](https://img.shields.io/badge/tests-761%20tests-brightgreen.svg)
 ![工具数量](https://img.shields.io/badge/tools-41%20verified%20tools-green.svg)
+[![CI](https://github.com/TangentDomain/excel-mcp-server/actions/workflows/ci.yml/badge.svg)](https://github.com/TangentDomain/excel-mcp-server/actions/workflows/ci.yml)
 
 **ExcelMCP** 是专为游戏开发设计的Excel配置表管理MCP服务器。通过AI自然语言指令，实现技能配置表、装备数据、怪物属性等游戏配置的智能化操作。基于**FastMCP**和**openpyxl**构建，拥有**41个专业工具**和**761个测试用例**，确保企业级可靠性。
 
@@ -77,6 +78,10 @@ MCP客户端配置：
 
 ### 验证安装
 ```bash
+# 检查版本
+excel-mcp-server-fastmcp --version
+
+# 运行测试
 python -m pytest tests/ --tb=short -q
 ```
 

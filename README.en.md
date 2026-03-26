@@ -12,6 +12,7 @@
 ![Status](https://img.shields.io/badge/status-stable-green.svg)
 ![Tests](https://img.shields.io/badge/tests-761%20tests-brightgreen.svg)
 ![Tools](https://img.shields.io/badge/tools-41%20verified%20tools-green.svg)
+[![CI](https://github.com/TangentDomain/excel-mcp-server/actions/workflows/ci.yml/badge.svg)](https://github.com/TangentDomain/excel-mcp-server/actions/workflows/ci.yml)
 
 **ExcelMCP** is an Excel configuration table management MCP server designed for game development. Through AI natural language commands, it enables intelligent operations on game configurations such as skill tables, equipment data, and monster attributes. Built with **FastMCP** and **openpyxl**, it features **41 professional tools** and **761 test cases**, ensuring enterprise-grade reliability.
 
@@ -77,6 +78,10 @@ MCP client configuration:
 
 ### Verify Installation
 ```bash
+# Check version
+excel-mcp-server-fastmcp --version
+
+# Run tests
 python -m pytest tests/ --tb=short -q
 ```
 
