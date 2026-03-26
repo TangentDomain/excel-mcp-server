@@ -13,15 +13,18 @@ import re
 import tempfile
 import time
 from collections import Counter
+from datetime import datetime, date
 from typing import List, Any, Optional
 from openpyxl import load_workbook, Workbook
 from openpyxl.utils import range_boundaries
+from openpyxl.utils.cell import coordinate_from_string
 from openpyxl.styles import Font, PatternFill, Border, Alignment, Side
 
 from ..models.types import RangeInfo, ModifiedCell, OperationResult, RangeType
 from ..utils.validators import ExcelValidator
 from ..utils.parsers import RangeParser
 from ..utils.temp_file_manager import TempFileManager
+from ..utils.formula_cache import get_formula_cache
 from ..utils.exceptions import SheetNotFoundError, DataValidationError
 
 logger = logging.getLogger(__name__)
@@ -530,7 +533,6 @@ class ExcelWriter:
                 formula = formula[1:]
 
             # 验证单元格地址格式
-            from openpyxl.utils.cell import coordinate_from_string
             try:
                 coordinate_from_string(cell_address)
             except ValueError as e:
@@ -673,12 +675,6 @@ class ExcelWriter:
             OperationResult: 公式执行结果
         """
         try:
-            import tempfile
-            import os
-            from openpyxl import Workbook
-            import time
-            from ..utils.formula_cache import get_formula_cache
-
             start_time = time.time()
 
             # 确保公式不以等号开头
@@ -882,7 +878,6 @@ class ExcelWriter:
                     pass
 
                 # 检查是否是日期
-                from datetime import datetime, date
                 if isinstance(value, (datetime, date)):
                     return "date"
 

@@ -38,6 +38,7 @@
   - ✅ 第32轮：excel_describe_table单次遍历所有列（N×M→M行I/O）
   - ✅ 第32轮：DESCRIBE内存优化（类型推断限制前100个值）
   - ✅ 第33轮：python-calamine替代openpyxl读取路径（get_range 1.6s→0.7ms，2300x提速）
+  - ✅ 第47轮：智能追加优化（insert_mode目标行>末尾时跳过O(n)行移动+公式遍历）
 - **后续方向**：
   - 写入场景：openpyxl的write_only模式或批量写入优化
   - 缓存预热/预加载策略
@@ -214,3 +215,40 @@
 - **描述**：暴露FastMCP原生支持的三种传输模式（stdio/sse/streamable-http）
 - **验收标准**：命令行参数选择传输模式，不影响现有stdio功能
 - **状态**：DONE ✅（main()新增--stdio/--sse/--streamable-http/--mount-path参数）
+
+### REQ-018 [P1] Upsert（INSERT ON DUPLICATE KEY UPDATE）
+- **来源**：数据库能力发散 — 类比MySQL的UPSERT
+- **描述**：写入时自动判断ID是否存在，存在则更新，不存在则插入。策划合并配置高频操作。
+- **语法参考**：`UPSERT INTO 技能表 VALUES (1001, '火球术', ...) ON DUPLICATE KEY UPDATE 伤害=VALUES(伤害)`
+- **验收标准**：单条upsert + 批量upsert，至少3个测试
+- **状态**：OPEN
+
+### REQ-019 [P1] 批量INSERT
+- **来源**：数据库能力发散 — 类比 `INSERT INTO ... VALUES (...), (...), (...)`
+- **描述**：一次插入多行数据，当前只能逐行写入。策划批量导入几十条配置时效率提升显著。
+- **验收标准**：批量INSERT + 与现有逐行写入兼容，至少3个测试
+- **状态**：OPEN
+
+### REQ-020 [P2] View（命名查询/保存的SQL）
+- **来源**：数据库能力发散 — 类比 `CREATE VIEW v AS SELECT ...`
+- **描述**：保存常用SQL查询为命名视图，后续直接调用视图名获取结果。避免每次重写复杂SQL。
+- **语法参考**：`CREATE VIEW 高伤技能 AS SELECT * FROM 技能表 WHERE 伤害 > 200`，之后 `SELECT * FROM 高伤技能`
+- **验收标准**：创建/调用/删除视图，视图跟随文件生命周期，至少3个测试
+- **状态**：OPEN
+
+### REQ-021 [P2] 写入校验（约束体系）
+- **来源**：数据库能力发散 — 类比 FK/Unique/Check/Enum 约束
+- **描述**：写入数据时自动校验：
+  1. **FK约束**：引用其他表的ID是否存在（如怪物.掉落装备ID → 装备表.装备ID）
+  2. **Unique约束**：ID列不允许重复
+  3. **Check约束**：数值范围校验（伤害不能为负数、冷却不能为0）
+  4. **Enum约束**：品质只能填普通/稀有/史诗/传说
+  5. **Default值**：新增行自动填充默认值
+- **验收标准**：每种约束至少2个测试，违规时返回清晰错误信息
+- **状态**：OPEN
+
+### REQ-022 [P2] Auto Increment（自增ID）
+- **来源**：数据库能力发散 — 类比 AUTO_INCREMENT / SERIAL
+- **描述**：新增行时自动分配下一个可用ID，策划不用手动维护ID连续性。
+- **验收标准**：单行自增 + 批量自增 + 指定起始值，至少3个测试
+- **状态**：OPEN
