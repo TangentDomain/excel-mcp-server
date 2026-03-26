@@ -10,10 +10,10 @@
 [![Python Version](https://img.shields.io/badge/python-3.10+-blue.svg)](https://www.python.org/downloads/)
 [![Powered by: FastMCP](https://img.shields.io/badge/Powered%20by-FastMCP-orange)](https://github.com/jlowin/fastmcp)
 ![Status](https://img.shields.io/badge/status-stable-green.svg)
-![Tests](https://img.shields.io/badge/tests-759%20tests-brightgreen.svg)
+![Tests](https://img.shields.io/badge/tests-761%20tests-brightgreen.svg)
 ![Tools](https://img.shields.io/badge/tools-41%20verified%20tools-green.svg)
 
-**ExcelMCP** is an Excel configuration table management MCP server designed for game development. Through AI natural language commands, it enables intelligent operations on game configurations such as skill tables, equipment data, and monster attributes. Built with **FastMCP** and **openpyxl**, it features **41 professional tools** and **759 test cases**, ensuring enterprise-grade reliability.
+**ExcelMCP** is an Excel configuration table management MCP server designed for game development. Through AI natural language commands, it enables intelligent operations on game configurations such as skill tables, equipment data, and monster attributes. Built with **FastMCP** and **openpyxl**, it features **41 professional tools** and **761 test cases**, ensuring enterprise-grade reliability.
 
 🎯 **Core Features**: Skill systems, equipment management, monster configuration, numerical balancing, version comparison, designer toolchain
 
@@ -539,7 +539,7 @@ Tool Layer (Common Functions)
 ## 📊 Project Information
 
 ### Quality Validation Metrics
-- **Test Cases**: 759 (behavior validation, no coverage padding)
+- **Test Cases**: 761 (behavior validation, no coverage padding)
 - **Test Files**: 34 test files
 - **Test Code**: 13,574 lines
 - **Tool Count**: 41 (@mcp.tool decorator verified)
