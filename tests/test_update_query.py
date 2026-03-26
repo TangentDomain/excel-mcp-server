@@ -213,3 +213,18 @@ class TestUpdateQueryBasic:
         with open(game_config_copy, 'rb') as f:
             modified_hash = hashlib.md5(f.read()).hexdigest()
         assert original_hash != modified_hash
+
+
+class TestFileLockProtection:
+    """文件锁保护测试"""
+
+    def test_single_write_with_lock(self, game_config_copy):
+        """单次写入文件锁正常工作不报错"""
+        from src.api.advanced_sql_query import execute_advanced_update_query
+        result = execute_advanced_update_query(
+            file_path=game_config_copy,
+            sql="UPDATE 技能配置 SET damage = damage + 10 WHERE 1=1",
+            dry_run=False
+        )
+        assert result['success'] is True
+        assert result['affected_rows'] > 0

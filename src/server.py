@@ -167,6 +167,24 @@ class SecurityValidator:
                 return {'valid': False, 'error': f'检测到危险公式模式，公式中不允许包含 {pattern.pattern}'}
         return {'valid': True, 'error': None}
 
+    @classmethod
+    def cleanup_orphan_temp_files(cls, temp_dir: str = None) -> int:
+        """清理孤儿临时文件（.xlsx.bak），返回清理数量"""
+        import tempfile, glob, time
+        target = temp_dir or tempfile.gettempdir()
+        pattern = os.path.join(target, '*.xlsx.bak')
+        cleaned = 0
+        for f in glob.glob(pattern):
+            try:
+                # 超过1小时的临时备份文件自动清理
+                age = time.time() - os.path.getmtime(f)
+                if age > 3600:
+                    os.remove(f)
+                    cleaned += 1
+            except OSError:
+                pass
+        return cleaned
+
 
 def _validate_path(file_path: str) -> Optional[Dict[str, Any]]:
     """统一的文件路径安全验证入口，失败返回错误dict，通过返回None"""
@@ -194,6 +212,11 @@ logging.basicConfig(
     ]
 )
 logger = logging.getLogger(__name__)
+
+# 启动时清理孤儿临时文件
+_cleaned = SecurityValidator.cleanup_orphan_temp_files()
+if _cleaned:
+    logger.info(f"启动清理: 删除 {_cleaned} 个孤儿临时文件")
 
 # 创建FastMCP服务器实例，开启调试模式和详细日志
 mcp = FastMCP(
