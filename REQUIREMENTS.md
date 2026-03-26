@@ -5,11 +5,12 @@
 
 ## OPEN（待实现）
 
-### REQ-001 [P0] 游戏领域函数
+### REQ-001 [P0→P2] 游戏领域函数
 - **来源**：策划视角评价 — DPM/DPS是高频需求，目前需要手动算
 - **描述**：支持游戏常用计算宏，如 DPM（每分钟伤害）、DPS（每秒伤害）、暴击期望等
 - **验收**：`SELECT DPM(伤害, CD) FROM 技能表` 能直接返回每分钟伤害值
 - **状态**：OPEN
+- **备注**：降级为P2。数学表达式已支持 `damage/cooldown*60` 计算DPM，MCP验证9.0ms完成。需求价值在于降低记忆成本，但非阻塞。建议通过文档引导（常用公式速查）替代内置函数。
 
 ### REQ-002 [P1] 增量更新（WHERE条件批量修改）
 - **来源**：策划视角评价 — 只能全量覆盖range，不能条件修改
@@ -27,7 +28,7 @@
 - **来源**：策划视角评价 — 结果只有markdown，缺JSON/CSV
 - **描述**：excel_query支持output_format参数，可选table/json/csv
 - **验收**：`excel_query(file, "SELECT * FROM 技能表", output_format="csv")` 返回CSV字符串
-- **状态**：IN_PROGRESS
+- **状态**：DONE ✅（第14轮，JSON/CSV/TABLE三种格式，4个测试通过）
 
 ### REQ-005 [P2] excel_describe_table支持中文列名查询
 - **来源**：AI视角评价 — 双行表头场景下describe不够智能
