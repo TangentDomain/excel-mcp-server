@@ -553,3 +553,92 @@ class TestFormulaDispatch:
         assert ExcelWriter._apply_condition(values, ">50", "sum") == 400.0
         assert ExcelWriter._apply_condition(values, "<50", "average") == 25.0
         assert ExcelWriter._apply_condition(values, ">999", "average") == 0
+
+    # ==================== 智能追加优化测试 ====================
+
+    def test_smart_append_at_end(self, sample_excel_file):
+        """智能追加：目标行在数据末尾之后时，跳过insert_rows"""
+        from openpyxl import load_workbook
+        writer = ExcelWriter(sample_excel_file)
+
+        # 获取当前数据末尾行
+        wb = load_workbook(sample_excel_file)
+        max_row = wb.active.max_row
+        wb.close()
+
+        # 在数据末尾之后写入（min_row > max_row）
+        target_row = max_row + 2
+        target_range = f"Sheet1!A{target_row}:C{target_row}"
+        result = writer.update_range(target_range, [["追加行1", "追加行2", "追加行3"]])
+
+        assert result.success
+        assert result.metadata.get('smart_append') is True
+        assert result.metadata.get('mode_description') == '智能追加模式'
+
+        # 验证数据确实写入了
+        wb = load_workbook(sample_excel_file)
+        cell_value = wb.active.cell(row=target_row, column=1).value
+        wb.close()
+        assert cell_value == '追加行1'
+
+    def test_smart_append_multiple_rows(self, sample_excel_file):
+        """智能追加：多行追加到末尾"""
+        from openpyxl import load_workbook
+        writer = ExcelWriter(sample_excel_file)
+
+        wb = load_workbook(sample_excel_file)
+        max_row = wb.active.max_row
+        wb.close()
+
+        target_row = max_row + 5
+        data = [
+            ["行1-A", "行1-B"],
+            ["行2-A", "行2-B"],
+            ["行3-A", "行3-B"],
+        ]
+        result = writer.update_range(
+            f"Sheet1!A{target_row}:B{target_row + 2}", data
+        )
+
+        assert result.success
+        assert result.metadata.get('smart_append') is True
+        assert result.metadata.get('modified_cells_count') == 6
+
+    def test_no_smart_append_in_data_range(self, sample_excel_file):
+        """非追加场景：目标行在数据范围内，不应触发智能追加"""
+        from openpyxl import load_workbook
+        writer = ExcelWriter(sample_excel_file)
+
+        wb = load_workbook(sample_excel_file)
+        max_row = wb.active.max_row
+        wb.close()
+
+        # 在数据范围内写入（min_row <= max_row）
+        if max_row >= 3:
+            target_row = 3
+        else:
+            target_row = max_row
+
+        result = writer.update_range(
+            f"Sheet1!A{target_row}", [["替换值"]], insert_mode=True
+        )
+
+        assert result.success
+        assert result.metadata.get('smart_append') is False
+        assert result.metadata.get('mode_description') == '插入模式'
+
+    def test_overwrite_mode_no_smart_append(self, sample_excel_file):
+        """覆盖模式不应触发智能追加"""
+        from openpyxl import load_workbook
+        writer = ExcelWriter(sample_excel_file)
+
+        wb = load_workbook(sample_excel_file)
+        max_row = wb.active.max_row
+        wb.close()
+
+        result = writer.update_range(
+            f"Sheet1!A{max_row + 5}", [["覆盖值"]], insert_mode=False
+        )
+
+        assert result.success
+        assert result.metadata.get('smart_append') is False

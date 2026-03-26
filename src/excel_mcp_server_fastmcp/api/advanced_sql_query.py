@@ -1772,8 +1772,7 @@ class AdvancedSQLQueryEngine:
                 val = str(self._get_row_value(condition.this, row) or '')
                 pattern = str(self._get_row_value(condition.expression, row) or '')
                 pattern = pattern.replace('%', '.*').replace('_', '.')
-                import re as re_mod
-                return bool(re_mod.match(pattern, val, re_mod.IGNORECASE))
+                return bool(re.match(pattern, val, re.IGNORECASE))
 
             elif isinstance(condition, exp.In):
                 val = self._get_row_value(condition.this, row)
@@ -1854,9 +1853,8 @@ class AdvancedSQLQueryEngine:
                                         inner_sql = inner_sql.replace(f"{table_part}.{col_name}", repr(val), 1)
                                     else:
                                         # 无表限定符：精确替换（避免误替换子查询表的列）
-                                        import re as re_mod
-                                        pattern = r'\b' + re_mod.escape(col_name) + r'\b'
-                                        inner_sql = re_mod.sub(repr(val), inner_sql, count=1)
+                                        pattern = r'\b' + re.escape(col_name) + r'\b'
+                                        inner_sql = re.sub(repr(val), inner_sql, count=1)
                         try:
                             parsed_inner = sqlglot.parse_one(inner_sql)
                             sub_result = self._execute_query(parsed_inner, self._current_worksheets)
