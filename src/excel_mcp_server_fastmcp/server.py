@@ -232,10 +232,12 @@ mcp = FastMCP(
 
 ## 📊 工具选择决策树
 ```
-需要数据分析/查询？ → excel_query (SQL引擎)
-需要定位单元格？   → excel_search (返回row/column)
-需要数据修改？     → excel_update_range
-需要格式调整？     → excel_format_cells
+需要数据分析/查询？   → excel_query (SQL引擎，支持WHERE/GROUP BY/JOIN)
+需要快速了解表结构？ → excel_describe_table (列名+类型+样本)
+需要定位单元格？     → excel_search (返回row/column)
+需要批量修改数据？   → excel_update_query (SQL UPDATE语法)
+需要修改指定单元格？ → excel_update_range (范围写入)
+需要格式调整？       → excel_format_cells
 ```
 
 ## ✅ SQL已支持功能 (29项)
@@ -259,10 +261,10 @@ mcp = FastMCP(
 
 ## ⚡ 常用流程
 1. excel_list_sheets - 列出工作表
-2. excel_get_headers - 查看表头
-3. excel_query - SQL查询
-4. excel_update_range - 数据更新
-5. excel_format_cells - 格式美化
+2. excel_describe_table - 快速了解表结构（列名+类型+样本）
+3. excel_query - SQL查询分析
+4. excel_update_query / excel_update_range - 数据更新
+5. excel_compare_sheets - 版本对比
 """,
     debug=True,
     log_level="DEBUG"
