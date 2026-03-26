@@ -17,15 +17,37 @@
 
 🎯 **核心功能**: 技能系统、装备管理、怪物配置、数值平衡、版本对比、策划工具链
 
+📦 **一键安装**: `uvx excel-mcp-server-fastmcp` — 从PyPI直接运行，零配置
+
 ---
 
-## 🚀 快速入门 (3分钟设置)
+## 🚀 快速入门
 
-### 安装步骤
+### 方式一：uvx 一键运行（推荐）
+
+无需克隆项目，从PyPI直接运行：
+
+```bash
+uvx excel-mcp-server-fastmcp
+```
+
+MCP客户端配置：
+```json
+{
+  "mcpServers": {
+    "excelmcp": {
+      "command": "uvx",
+      "args": ["excel-mcp-server-fastmcp"]
+    }
+  }
+}
+```
+
+### 方式二：从源码安装
 
 1. **克隆项目**
    ```bash
-   git clone https://github.com/tangjian/excel-mcp-server.git
+   git clone https://github.com/TangentDomain/excel-mcp-server.git
    cd excel-mcp-server
    ```
 
@@ -44,8 +66,7 @@
      "mcpServers": {
        "excelmcp": {
          "command": "python",
-         "args": ["-m", "src.server"],
-         "env": {"PYTHONPATH": "${workspaceRoot}"}
+         "args": ["-m", "excel_mcp_server_fastmcp"]
        }
      }
    }
@@ -485,6 +506,33 @@ ExcelMCP 内置多层安全防护，保护用户数据和系统安全：
 
 ## 🏗️ 技术架构
 
+### 包结构
+```
+src/excel_mcp_server_fastmcp/    # 主包（pip install 后可直接 import）
+├── __init__.py                   # 包入口，暴露 main()
+├── server.py                     # MCP接口层（41个工具定义）
+├── api/                          # API业务逻辑层
+│   ├── excel_operations.py       # Excel操作统一入口
+│   └── advanced_sql_query.py     # SQL查询引擎
+├── core/                         # 核心操作层
+│   ├── excel_reader.py           # 读取操作
+│   ├── excel_writer.py           # 写入操作
+│   ├── excel_search.py           # 搜索操作
+│   ├── excel_manager.py          # 工作簿管理
+│   ├── excel_compare.py          # 版本对比
+│   └── excel_converter.py        # 格式转换
+├── models/                       # 数据模型
+│   └── types.py                  # 类型定义
+└── utils/                        # 工具层
+    ├── validators.py             # 路径/数据验证 + 安全防护
+    ├── error_handler.py          # 统一错误处理
+    ├── formatter.py              # 结果格式化
+    ├── parsers.py                # 参数解析
+    ├── temp_file_manager.py      # 临时文件管理
+    ├── formula_cache.py          # 公式缓存
+    └── exceptions.py             # 自定义异常
+```
+
 ### 分层设计模式
 ```
 MCP接口层 (纯委托)
@@ -525,7 +573,7 @@ API业务逻辑层 (集中式处理)
 python -m pytest tests/ -q --tb=short -n auto --timeout=30
 
 # 验证工具完整性
-grep -c "def excel_" src/server.py  # 应输出: 41
+grep -c "def excel_" src/excel_mcp_server_fastmcp/server.py  # 应输出: 41
 
 # 生成覆盖率报告
 python -m pytest tests/ --cov=src --cov-report=html
