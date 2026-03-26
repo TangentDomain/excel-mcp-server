@@ -5,6 +5,7 @@ Excel MCP Server - Excel写入模块
 """
 
 import ast
+import json
 import logging
 import math
 import os
@@ -78,24 +79,33 @@ class ExcelWriter:
             min_col, min_row, max_col, max_row = range_boundaries(cell_range_for_boundaries)
 
             # 处理插入模式
+            is_smart_append = False
             if insert_mode:
-                # 插入模式：在指定位置插入足够的行数
                 rows_to_insert = len(data)
                 if rows_to_insert > 0:
-                    # 保存公式位置信息，以便后续调整
-                    formula_positions = {}
-                    if preserve_formulas:
-                        for row in sheet.iter_rows():
-                            for cell in row:
-                                if cell.data_type == 'f':
-                                    formula_positions[cell.coordinate] = cell.value
+                    # 智能追加：目标行在数据末尾之后时，跳过 insert_rows（O(n)行移动）
+                    # 追加场景无需遍历公式，因为新行位于所有现有数据之后
+                    current_max_row = sheet.max_row
+                    if min_row > current_max_row:
+                        is_smart_append = True
+                        logger.info(f"智能追加：目标行{min_row} > 数据末尾{current_max_row}，跳过行插入")
+                    else:
+                        # 插入模式：在指定位置插入足够的行数
+                        # 保存公式位置信息，以便后续调整
+                        formula_positions = {}
+                        if preserve_formulas:
+                            for row in sheet.iter_rows():
+                                for cell in row:
+                                    if cell.data_type == 'f':
+                                        formula_positions[cell.coordinate] = cell.value
 
-                    sheet.insert_rows(min_row, rows_to_insert)
-                    logger.info(f"插入模式：在第{min_row}行插入了{rows_to_insert}行")
+                        sheet.insert_rows(min_row, rows_to_insert)
+                        logger.info(f"插入模式：在第{min_row}行插入了{rows_to_insert}行")
 
-            # 写入数据
+            # 写入数据（追加模式下新行无公式，跳过公式保留检查）
             modified_cells = self._write_data(
-                sheet, data, min_row, min_col, preserve_formulas
+                sheet, data, min_row, min_col,
+                preserve_formulas and not is_smart_append
             )
 
             # 保存文件
@@ -103,6 +113,8 @@ class ExcelWriter:
             workbook.close()
 
             mode_description = "插入模式" if insert_mode else "覆盖模式"
+            if is_smart_append:
+                mode_description = "智能追加模式"
 
             return OperationResult(
                 success=True,
@@ -114,7 +126,8 @@ class ExcelWriter:
                     'modified_cells_count': len(modified_cells),
                     'insert_mode': insert_mode,
                     'mode_description': mode_description,
-                    'rows_inserted': len(data) if insert_mode else 0
+                    'rows_inserted': len(data) if insert_mode else 0,
+                    'smart_append': is_smart_append
                 }
             )
 
@@ -467,7 +480,6 @@ class ExcelWriter:
                     try:
                         if isinstance(value, (list, dict, tuple)):
                             # 复杂数据类型转换为JSON字符串
-                            import json
                             cell.value = json.dumps(value, ensure_ascii=False)
                         elif hasattr(value, '__str__'):
                             # 有字符串表示的对象
