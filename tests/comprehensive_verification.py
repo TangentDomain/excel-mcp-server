@@ -18,11 +18,11 @@ project_root = Path(__file__).parent.parent
 sys.path.insert(0, str(project_root))
 
 from src.server import mcp
-from src.core.excel_manager import ExcelManager
-from src.core.excel_writer import ExcelWriter
-from src.core.excel_reader import ExcelReader
-from src.utils.formula_cache import get_formula_cache
-from src.utils.validators import DataValidationError
+from src.excel_mcp_server_fastmcp.core.excel_manager import ExcelManager
+from src.excel_mcp_server_fastmcp.core.excel_writer import ExcelWriter
+from src.excel_mcp_server_fastmcp.core.excel_reader import ExcelReader
+from src.excel_mcp_server_fastmcp.utils.formula_cache import get_formula_cache
+from src.excel_mcp_server_fastmcp.utils.validators import DataValidationError
 
 
 def test_real_world_scenario():
@@ -131,15 +131,15 @@ def test_mcp_server_integration():
             return False
 
         # 测试核心模块是否正常
-        from src.core.excel_manager import ExcelManager
-        from src.core.excel_writer import ExcelWriter
-        from src.core.excel_reader import ExcelReader
-        from src.core.excel_search import ExcelSearcher
+        from src.excel_mcp_server_fastmcp.core.excel_manager import ExcelManager
+        from src.excel_mcp_server_fastmcp.core.excel_writer import ExcelWriter
+        from src.excel_mcp_server_fastmcp.core.excel_reader import ExcelReader
+        from src.excel_mcp_server_fastmcp.core.excel_search import ExcelSearcher
 
         print("   [OK] 所有核心模块导入成功")
 
         # 测试错误处理模块
-        from src.utils.error_handler import unified_error_handler
+        from src.excel_mcp_server_fastmcp.utils.error_handler import unified_error_handler
         print("   [OK] 统一错误处理模块加载成功")
 
         # 测试缓存模块
@@ -214,7 +214,7 @@ def test_safety_features():
 
     try:
         # 测试范围验证
-        from src.utils.validators import ExcelValidator
+        from src.excel_mcp_server_fastmcp.utils.validators import ExcelValidator
 
         # 测试有效范围
         valid_ranges = [

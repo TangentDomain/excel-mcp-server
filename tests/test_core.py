@@ -9,11 +9,11 @@ import pytest
 import tempfile
 from pathlib import Path
 
-from src.core.excel_reader import ExcelReader
-from src.core.excel_writer import ExcelWriter
-from src.core.excel_manager import ExcelManager
-from src.models.types import OperationResult, SheetInfo, CellInfo, ModifiedCell
-from src.utils.exceptions import ExcelFileNotFoundError, SheetNotFoundError
+from src.excel_mcp_server_fastmcp.core.excel_reader import ExcelReader
+from src.excel_mcp_server_fastmcp.core.excel_writer import ExcelWriter
+from src.excel_mcp_server_fastmcp.core.excel_manager import ExcelManager
+from src.excel_mcp_server_fastmcp.models.types import OperationResult, SheetInfo, CellInfo, ModifiedCell
+from src.excel_mcp_server_fastmcp.utils.exceptions import ExcelFileNotFoundError, SheetNotFoundError
 
 
 class TestExcelCore:

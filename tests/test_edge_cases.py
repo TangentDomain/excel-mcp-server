@@ -5,7 +5,7 @@ Additional edge case tests for backup/restore, formatting, and utility tools.
 import pytest
 import os
 import shutil
-from src.server import (
+from src.excel_mcp_server_fastmcp.server import (
     excel_create_backup,
     excel_restore_backup,
     excel_list_backups,

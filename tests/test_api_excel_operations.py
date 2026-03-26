@@ -21,8 +21,8 @@ import unittest.mock
 from pathlib import Path
 from openpyxl import Workbook
 
-from src.api.excel_operations import ExcelOperations
-from src.models.types import OperationResult
+from src.excel_mcp_server_fastmcp.api.excel_operations import ExcelOperations
+from src.excel_mcp_server_fastmcp.models.types import OperationResult
 
 
 class TestExcelOperations:
@@ -167,7 +167,7 @@ class TestExcelOperations:
 
     # ==================== 业务逻辑执行测试 ====================
 
-    @unittest.mock.patch('src.api.excel_operations.ExcelReader')
+    @unittest.mock.patch('src.excel_mcp_server_fastmcp.api.excel_operations.ExcelReader')
     def test_execute_get_range_reader_lifecycle(self, mock_reader_class):
         """测试ExcelReader的生命周期管理（通过get_range方法）"""
         # 设置mock
@@ -190,7 +190,7 @@ class TestExcelOperations:
         # 验证结果
         assert result['success'] is True
 
-    @unittest.mock.patch('src.api.excel_operations.ExcelReader')
+    @unittest.mock.patch('src.excel_mcp_server_fastmcp.api.excel_operations.ExcelReader')
     def test_execute_get_range_exception_handling(self, mock_reader_class):
         """测试异常处理"""
         # 设置mock抛出异常
@@ -207,16 +207,16 @@ class TestExcelOperations:
 
     # ==================== 结果格式化测试 ====================
 
-    @unittest.mock.patch('src.api.excel_operations.format_operation_result')
+    @unittest.mock.patch('src.excel_mcp_server_fastmcp.api.excel_operations.format_operation_result')
     def test_format_get_range_result(self, mock_formatter):
         """测试结果格式化功能（通过get_range方法）"""
         # 设置mock
-        from src.models.types import OperationResult
+        from src.excel_mcp_server_fastmcp.models.types import OperationResult
         sample_result = OperationResult(success=True, data=[])
         expected_formatted = {"success": True, "data": [], "formatted": True}
         mock_formatter.return_value = expected_formatted
 
-        with unittest.mock.patch('src.api.excel_operations.ExcelReader') as mock_reader_class:
+        with unittest.mock.patch('src.excel_mcp_server_fastmcp.api.excel_operations.ExcelReader') as mock_reader_class:
             mock_reader = unittest.mock.MagicMock()
             mock_reader_class.return_value = mock_reader
             mock_reader.get_range.return_value = sample_result
@@ -251,7 +251,7 @@ class TestExcelOperations:
         assert result['success'] is False
         assert 'range必须包含工作表名' in result['error']
 
-    @unittest.mock.patch('src.api.excel_operations.ExcelReader')
+    @unittest.mock.patch('src.excel_mcp_server_fastmcp.api.excel_operations.ExcelReader')
     def test_get_range_error_handling_execution_failure(self, mock_reader_class):
         """测试get_range的业务执行错误处理"""
         # 设置mock：模拟文件不存在的情况
@@ -264,7 +264,7 @@ class TestExcelOperations:
 
     # ==================== 日志功能测试 ====================
 
-    @unittest.mock.patch('src.api.excel_operations.logger')
+    @unittest.mock.patch('src.excel_mcp_server_fastmcp.api.excel_operations.logger')
     def test_debug_logging_enabled(self, mock_logger, test_excel_file):
         """测试启用调试日志时的日志记录"""
         # 临时启用调试日志
@@ -283,7 +283,7 @@ class TestExcelOperations:
             # 恢复原始设置
             ExcelOperations.DEBUG_LOG_ENABLED = original_debug_setting
 
-    @unittest.mock.patch('src.api.excel_operations.logger')
+    @unittest.mock.patch('src.excel_mcp_server_fastmcp.api.excel_operations.logger')
     def test_debug_logging_disabled(self, mock_logger, test_excel_file):
         """测试禁用调试日志时不记录调试信息"""
         # 确保调试日志被禁用
@@ -302,7 +302,7 @@ class TestExcelOperations:
             # 恢复原始设置
             ExcelOperations.DEBUG_LOG_ENABLED = original_debug_setting
 
-    @unittest.mock.patch('src.api.excel_operations.logger')
+    @unittest.mock.patch('src.excel_mcp_server_fastmcp.api.excel_operations.logger')
     def test_error_logging(self, mock_logger):
         """测试错误情况下的日志记录"""
         # 临时启用调试日志
@@ -383,7 +383,7 @@ class TestExcelOperations:
 
     # ==================== 性能和资源管理测试 ====================
 
-    @unittest.mock.patch('src.api.excel_operations.ExcelReader')
+    @unittest.mock.patch('src.excel_mcp_server_fastmcp.api.excel_operations.ExcelReader')
     def test_resource_management_multiple_calls(self, mock_reader_class):
         """测试多次调用的资源管理"""
         mock_reader = unittest.mock.MagicMock()
@@ -512,7 +512,7 @@ class TestExcelOperations:
         assert not result['success']
         assert "列参数必须是字符串或整数" in result['error']
 
-    @unittest.mock.patch('src.api.excel_operations.logger')
+    @unittest.mock.patch('src.excel_mcp_server_fastmcp.api.excel_operations.logger')
     def test_find_last_row_logging(self, mock_logger, test_excel_file):
         """测试find_last_row的日志记录"""
         # 开启调试日志

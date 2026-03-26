@@ -15,8 +15,8 @@ project_root = Path(__file__).parent.parent
 sys.path.insert(0, str(project_root))
 
 # 直接导入
-sys.path.insert(0, os.path.join(project_root, 'src'))
-from api.advanced_sql_query import AdvancedSQLQueryEngine, execute_advanced_sql_query
+sys.path.insert(0, os.path.join(project_root, "src"))
+from excel_mcp_server_fastmcp.api.advanced_sql_query import AdvancedSQLQueryEngine, execute_advanced_sql_query
 import sqlglot
 
 
@@ -375,7 +375,7 @@ class TestAdvancedSQLQuery:
 
 def test_parameter_validation(sample_excel_file):
     """测试参数验证"""
-    from api.advanced_sql_query import execute_advanced_sql_query
+    from excel_mcp_server_fastmcp.api.advanced_sql_query import execute_advanced_sql_query
 
     # 测试空SQL语句
     result = execute_advanced_sql_query(
@@ -396,7 +396,7 @@ def test_parameter_validation(sample_excel_file):
 def test_integration_with_original_interface(sample_excel_file):
     """测试与原始接口的集成"""
     # 直接测试高级SQL查询引擎，绕过相对导入问题
-    from api.advanced_sql_query import execute_advanced_sql_query
+    from excel_mcp_server_fastmcp.api.advanced_sql_query import execute_advanced_sql_query
 
     # 首先检查文件的实际工作表
     import pandas as pd

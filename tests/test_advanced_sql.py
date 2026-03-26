@@ -9,7 +9,7 @@ import pytest
 from pathlib import Path
 from openpyxl import Workbook
 
-from src.api.advanced_sql_query import AdvancedSQLQueryEngine
+from src.excel_mcp_server_fastmcp.api.advanced_sql_query import AdvancedSQLQueryEngine
 
 
 class TestAdvancedSQLBasic:

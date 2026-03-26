@@ -13,14 +13,14 @@ import threading
 from unittest.mock import Mock, patch, MagicMock, call
 from typing import Any, Dict
 
-from src.utils.error_handler import (
+from src.excel_mcp_server_fastmcp.utils.error_handler import (
     ErrorHandler,
     unified_error_handler,
     extract_file_context,
     extract_formula_context
 )
-from src.models.types import OperationResult
-from src.utils.exceptions import (
+from src.excel_mcp_server_fastmcp.models.types import OperationResult
+from src.excel_mcp_server_fastmcp.utils.exceptions import (
     ExcelFileNotFoundError, SheetNotFoundError, DataValidationError
 )
 
@@ -697,7 +697,7 @@ class TestErrorHandlerIntegration:
 
     def test_logging_integration(self):
         """测试日志集成"""
-        with patch('src.utils.error_handler.logger') as mock_logger:
+        with patch('src.excel_mcp_server_fastmcp.utils.error_handler.logger') as mock_logger:
             @unified_error_handler("logging_test")
             def failing_function():
                 raise ValueError("测试日志记录")

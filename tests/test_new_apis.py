@@ -12,8 +12,8 @@ project_root = Path(__file__).parent.parent
 sys.path.insert(0, str(project_root))
 sys.path.insert(0, str(project_root / "src"))
 
-# 直接导入src.server模块
-import src.server as server
+# 直接导入src.excel_mcp_server_fastmcp.server模块
+import src.excel_mcp_server_fastmcp.server as server
 
 
 class TestNewAPIs:

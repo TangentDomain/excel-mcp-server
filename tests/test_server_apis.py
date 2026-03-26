@@ -34,7 +34,7 @@ class TestServerAPIs:
 
     def test_list_sheets_api(self, test_file):
         """测试列出工作表API"""
-        from src.api.excel_operations import ExcelOperations
+        from src.excel_mcp_server_fastmcp.api.excel_operations import ExcelOperations
         result = ExcelOperations.list_sheets(test_file)
         
         assert result['success'] is True
@@ -42,7 +42,7 @@ class TestServerAPIs:
 
     def test_get_file_info_api(self, test_file):
         """测试获取文件信息API"""
-        from src.api.excel_operations import ExcelOperations
+        from src.excel_mcp_server_fastmcp.api.excel_operations import ExcelOperations
         result = ExcelOperations.get_file_info(test_file)
         
         assert result['success'] is True
@@ -50,28 +50,28 @@ class TestServerAPIs:
 
     def test_get_range_api(self, test_file):
         """测试获取范围API"""
-        from src.api.excel_operations import ExcelOperations
+        from src.excel_mcp_server_fastmcp.api.excel_operations import ExcelOperations
         result = ExcelOperations.get_range(test_file, "Sheet1!A1:B3")
         
         assert result['success'] is True
 
     def test_get_headers_api(self, test_file):
         """测试获取表头API"""
-        from src.api.excel_operations import ExcelOperations
+        from src.excel_mcp_server_fastmcp.api.excel_operations import ExcelOperations
         result = ExcelOperations.get_headers(test_file, "Sheet1")
         
         assert result['success'] is True
 
     def test_find_last_row_api(self, test_file):
         """测试查找最后一行API"""
-        from src.api.excel_operations import ExcelOperations
+        from src.excel_mcp_server_fastmcp.api.excel_operations import ExcelOperations
         result = ExcelOperations.find_last_row(test_file, "Sheet1")
         
         assert result['success'] is True
 
     def test_search_api(self, test_file):
         """测试搜索API"""
-        from src.api.excel_operations import ExcelOperations
+        from src.excel_mcp_server_fastmcp.api.excel_operations import ExcelOperations
         result = ExcelOperations.search(test_file, "Test", "Sheet1")
         
         assert result['success'] is True
@@ -114,7 +114,7 @@ class TestServerAdvancedAPIs:
 
     def test_create_sheet_api(self, test_file_for_create):
         """测试创建工作表API"""
-        from src.api.excel_operations import ExcelOperations
+        from src.excel_mcp_server_fastmcp.api.excel_operations import ExcelOperations
         result = ExcelOperations.create_sheet(
             file_path=test_file_for_create,
             sheet_name="NewSheet"
@@ -124,7 +124,7 @@ class TestServerAdvancedAPIs:
 
     def test_delete_sheet_api(self, multi_sheet_file):
         """测试删除工作表API"""
-        from src.api.excel_operations import ExcelOperations
+        from src.excel_mcp_server_fastmcp.api.excel_operations import ExcelOperations
         result = ExcelOperations.delete_sheet(multi_sheet_file, "Config")
         
         # 可能成功也可能失败，取决于实现
@@ -132,7 +132,7 @@ class TestServerAdvancedAPIs:
 
     def test_rename_sheet_api(self, test_file_for_create):
         """测试重命名工作表API"""
-        from src.api.excel_operations import ExcelOperations
+        from src.excel_mcp_server_fastmcp.api.excel_operations import ExcelOperations
         result = ExcelOperations.rename_sheet(
             file_path=test_file_for_create,
             old_name="Sheet1",
@@ -162,7 +162,7 @@ class TestServerFormatAPIs:
 
     def test_format_cells_api(self, format_file):
         """测试格式化单元格API"""
-        from src.api.excel_operations import ExcelOperations
+        from src.excel_mcp_server_fastmcp.api.excel_operations import ExcelOperations
         result = ExcelOperations.format_cells(
             file_path=format_file,
             sheet_name="FormatSheet",
@@ -174,7 +174,7 @@ class TestServerFormatAPIs:
 
     def test_set_borders_api(self, format_file):
         """测试设置边框API"""
-        from src.api.excel_operations import ExcelOperations
+        from src.excel_mcp_server_fastmcp.api.excel_operations import ExcelOperations
         result = ExcelOperations.set_borders(
             file_path=format_file,
             sheet_name="FormatSheet",
@@ -205,7 +205,7 @@ class TestServerDataAPIs:
 
     def test_insert_rows_api(self, data_file):
         """测试插入行API"""
-        from src.api.excel_operations import ExcelOperations
+        from src.excel_mcp_server_fastmcp.api.excel_operations import ExcelOperations
         result = ExcelOperations.insert_rows(
             file_path=data_file,
             sheet_name="DataSheet",
@@ -217,7 +217,7 @@ class TestServerDataAPIs:
 
     def test_delete_rows_api(self, data_file):
         """测试删除行API"""
-        from src.api.excel_operations import ExcelOperations
+        from src.excel_mcp_server_fastmcp.api.excel_operations import ExcelOperations
         result = ExcelOperations.delete_rows(
             file_path=data_file,
             sheet_name="DataSheet",
@@ -229,7 +229,7 @@ class TestServerDataAPIs:
 
     def test_insert_columns_api(self, data_file):
         """测试插入列API"""
-        from src.api.excel_operations import ExcelOperations
+        from src.excel_mcp_server_fastmcp.api.excel_operations import ExcelOperations
         result = ExcelOperations.insert_columns(
             file_path=data_file,
             sheet_name="DataSheet",
@@ -241,7 +241,7 @@ class TestServerDataAPIs:
 
     def test_delete_columns_api(self, data_file):
         """测试删除列API"""
-        from src.api.excel_operations import ExcelOperations
+        from src.excel_mcp_server_fastmcp.api.excel_operations import ExcelOperations
         result = ExcelOperations.delete_columns(
             file_path=data_file,
             sheet_name="DataSheet",
@@ -289,7 +289,7 @@ class TestServerCompareAPIs:
 
     def test_compare_sheets_api(self, compare_file1, compare_file2):
         """测试比较工作表API"""
-        from src.api.excel_operations import ExcelOperations
+        from src.excel_mcp_server_fastmcp.api.excel_operations import ExcelOperations
         result = ExcelOperations.compare_sheets(
             file1_path=compare_file1,
             sheet1_name="Data",
@@ -301,7 +301,7 @@ class TestServerCompareAPIs:
 
     def test_check_duplicate_ids_api(self, compare_file1):
         """测试检查重复ID API"""
-        from src.api.excel_operations import ExcelOperations
+        from src.excel_mcp_server_fastmcp.api.excel_operations import ExcelOperations
         result = ExcelOperations.check_duplicate_ids(
             file_path=compare_file1,
             sheet_name="Data",
@@ -332,7 +332,7 @@ class TestServerExportAPIs:
 
     def test_export_to_csv_api(self, export_file, temp_dir):
         """测试导出CSV API"""
-        from src.api.excel_operations import ExcelOperations
+        from src.excel_mcp_server_fastmcp.api.excel_operations import ExcelOperations
         csv_path = temp_dir / "export.csv"
         
         result = ExcelOperations.export_to_csv(
@@ -345,7 +345,7 @@ class TestServerExportAPIs:
 
     def test_convert_format_api(self, export_file, temp_dir):
         """测试格式转换 API"""
-        from src.api.excel_operations import ExcelOperations
+        from src.excel_mcp_server_fastmcp.api.excel_operations import ExcelOperations
         output_path = temp_dir / "output.xls"
         
         result = ExcelOperations.convert_format(

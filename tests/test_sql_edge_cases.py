@@ -6,7 +6,7 @@ Tests actual behavior including known limitations.
 import pytest
 import os
 from openpyxl import Workbook
-from src.server import excel_query
+from src.excel_mcp_server_fastmcp.server import excel_query
 
 
 @pytest.fixture

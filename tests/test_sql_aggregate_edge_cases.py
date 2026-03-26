@@ -41,7 +41,7 @@ class TestAggregateFunctionsWithoutGroupBy:
 
     def test_count_star_without_group_by(self, test_excel_file):
         """测试无GROUP BY的COUNT(*)"""
-        from src.api.advanced_sql_query import execute_advanced_sql_query
+        from src.excel_mcp_server_fastmcp.api.advanced_sql_query import execute_advanced_sql_query
         
         result = execute_advanced_sql_query(
             file_path=test_excel_file,
@@ -53,7 +53,7 @@ class TestAggregateFunctionsWithoutGroupBy:
 
     def test_sum_without_group_by(self, test_excel_file):
         """测试无GROUP BY的SUM()"""
-        from src.api.advanced_sql_query import execute_advanced_sql_query
+        from src.excel_mcp_server_fastmcp.api.advanced_sql_query import execute_advanced_sql_query
         
         result = execute_advanced_sql_query(
             file_path=test_excel_file,
@@ -66,7 +66,7 @@ class TestAggregateFunctionsWithoutGroupBy:
 
     def test_avg_without_group_by(self, test_excel_file):
         """测试无GROUP BY的AVG()"""
-        from src.api.advanced_sql_query import execute_advanced_sql_query
+        from src.excel_mcp_server_fastmcp.api.advanced_sql_query import execute_advanced_sql_query
         
         result = execute_advanced_sql_query(
             file_path=test_excel_file,
@@ -79,7 +79,7 @@ class TestAggregateFunctionsWithoutGroupBy:
 
     def test_max_without_group_by(self, test_excel_file):
         """测试无GROUP BY的MAX()"""
-        from src.api.advanced_sql_query import execute_advanced_sql_query
+        from src.excel_mcp_server_fastmcp.api.advanced_sql_query import execute_advanced_sql_query
         
         result = execute_advanced_sql_query(
             file_path=test_excel_file,
@@ -91,7 +91,7 @@ class TestAggregateFunctionsWithoutGroupBy:
 
     def test_min_without_group_by(self, test_excel_file):
         """测试无GROUP BY的MIN()"""
-        from src.api.advanced_sql_query import execute_advanced_sql_query
+        from src.excel_mcp_server_fastmcp.api.advanced_sql_query import execute_advanced_sql_query
         
         result = execute_advanced_sql_query(
             file_path=test_excel_file,
@@ -103,7 +103,7 @@ class TestAggregateFunctionsWithoutGroupBy:
 
     def test_count_column_without_group_by(self, test_excel_file):
         """测试无GROUP BY的COUNT(column)"""
-        from src.api.advanced_sql_query import execute_advanced_sql_query
+        from src.excel_mcp_server_fastmcp.api.advanced_sql_query import execute_advanced_sql_query
         
         result = execute_advanced_sql_query(
             file_path=test_excel_file,
@@ -115,7 +115,7 @@ class TestAggregateFunctionsWithoutGroupBy:
 
     def test_multiple_aggregates_without_group_by(self, test_excel_file):
         """测试无GROUP BY的多个聚合函数"""
-        from src.api.advanced_sql_query import execute_advanced_sql_query
+        from src.excel_mcp_server_fastmcp.api.advanced_sql_query import execute_advanced_sql_query
         
         result = execute_advanced_sql_query(
             file_path=test_excel_file,
@@ -157,7 +157,7 @@ class TestHavingClause:
 
     def test_having_count(self, test_excel_file):
         """测试HAVING COUNT(*) - 注意：由于HAVING子句的复杂性，测试当前是否返回结果"""
-        from src.api.advanced_sql_query import execute_advanced_sql_query
+        from src.excel_mcp_server_fastmcp.api.advanced_sql_query import execute_advanced_sql_query
         
         result = execute_advanced_sql_query(
             file_path=test_excel_file,
@@ -171,7 +171,7 @@ class TestHavingClause:
 
     def test_having_sum(self, test_excel_file):
         """测试HAVING SUM() - 注意：由于HAVING子句的复杂性，测试当前是否返回结果"""
-        from src.api.advanced_sql_query import execute_advanced_sql_query
+        from src.excel_mcp_server_fastmcp.api.advanced_sql_query import execute_advanced_sql_query
         
         result = execute_advanced_sql_query(
             file_path=test_excel_file,
@@ -183,7 +183,7 @@ class TestHavingClause:
 
     def test_having_avg(self, test_excel_file):
         """测试HAVING AVG() - 注意：由于HAVING子句的复杂性，测试当前是否返回结果"""
-        from src.api.advanced_sql_query import execute_advanced_sql_query
+        from src.excel_mcp_server_fastmcp.api.advanced_sql_query import execute_advanced_sql_query
         
         result = execute_advanced_sql_query(
             file_path=test_excel_file,
@@ -195,7 +195,7 @@ class TestHavingClause:
 
     def test_having_using_alias(self, test_excel_file):
         """测试使用别名的HAVING子句"""
-        from src.api.advanced_sql_query import execute_advanced_sql_query
+        from src.excel_mcp_server_fastmcp.api.advanced_sql_query import execute_advanced_sql_query
         
         result = execute_advanced_sql_query(
             file_path=test_excel_file,
@@ -208,7 +208,7 @@ class TestHavingClause:
 
     def test_having_min_max(self, test_excel_file):
         """测试HAVING MIN/MAX()"""
-        from src.api.advanced_sql_query import execute_advanced_sql_query
+        from src.excel_mcp_server_fastmcp.api.advanced_sql_query import execute_advanced_sql_query
         
         result = execute_advanced_sql_query(
             file_path=test_excel_file,
@@ -244,7 +244,7 @@ class TestAggregateWithGroupBy:
 
     def test_group_by_count(self, test_excel_file):
         """测试GROUP BY + COUNT"""
-        from src.api.advanced_sql_query import execute_advanced_sql_query
+        from src.excel_mcp_server_fastmcp.api.advanced_sql_query import execute_advanced_sql_query
         
         result = execute_advanced_sql_query(
             file_path=test_excel_file,
@@ -255,7 +255,7 @@ class TestAggregateWithGroupBy:
 
     def test_group_by_sum(self, test_excel_file):
         """测试GROUP BY + SUM"""
-        from src.api.advanced_sql_query import execute_advanced_sql_query
+        from src.excel_mcp_server_fastmcp.api.advanced_sql_query import execute_advanced_sql_query
         
         result = execute_advanced_sql_query(
             file_path=test_excel_file,
@@ -266,7 +266,7 @@ class TestAggregateWithGroupBy:
 
     def test_group_by_avg(self, test_excel_file):
         """测试GROUP BY + AVG"""
-        from src.api.advanced_sql_query import execute_advanced_sql_query
+        from src.excel_mcp_server_fastmcp.api.advanced_sql_query import execute_advanced_sql_query
         
         result = execute_advanced_sql_query(
             file_path=test_excel_file,
@@ -277,7 +277,7 @@ class TestAggregateWithGroupBy:
 
     def test_group_by_min_max(self, test_excel_file):
         """测试GROUP BY + MIN/MAX"""
-        from src.api.advanced_sql_query import execute_advanced_sql_query
+        from src.excel_mcp_server_fastmcp.api.advanced_sql_query import execute_advanced_sql_query
         
         result = execute_advanced_sql_query(
             file_path=test_excel_file,
@@ -288,7 +288,7 @@ class TestAggregateWithGroupBy:
 
     def test_multiple_aggregates_with_group_by(self, test_excel_file):
         """测试GROUP BY + 多个聚合函数"""
-        from src.api.advanced_sql_query import execute_advanced_sql_query
+        from src.excel_mcp_server_fastmcp.api.advanced_sql_query import execute_advanced_sql_query
         
         result = execute_advanced_sql_query(
             file_path=test_excel_file,
@@ -345,7 +345,7 @@ class TestAggregateEdgeCases:
 
     def test_aggregate_with_where(self, test_excel_file):
         """测试聚合函数 + WHERE条件"""
-        from src.api.advanced_sql_query import execute_advanced_sql_query
+        from src.excel_mcp_server_fastmcp.api.advanced_sql_query import execute_advanced_sql_query
         
         result = execute_advanced_sql_query(
             file_path=test_excel_file,
@@ -357,7 +357,7 @@ class TestAggregateEdgeCases:
 
     def test_aggregate_with_order_by(self, test_excel_file):
         """测试聚合函数 + ORDER BY"""
-        from src.api.advanced_sql_query import execute_advanced_sql_query
+        from src.excel_mcp_server_fastmcp.api.advanced_sql_query import execute_advanced_sql_query
         
         result = execute_advanced_sql_query(
             file_path=test_excel_file,
@@ -368,7 +368,7 @@ class TestAggregateEdgeCases:
 
     def test_aggregate_with_limit(self, test_excel_file):
         """测试聚合函数 + LIMIT"""
-        from src.api.advanced_sql_query import execute_advanced_sql_query
+        from src.excel_mcp_server_fastmcp.api.advanced_sql_query import execute_advanced_sql_query
         
         result = execute_advanced_sql_query(
             file_path=test_excel_file,
@@ -379,7 +379,7 @@ class TestAggregateEdgeCases:
 
     def test_aggregate_with_null_column(self, test_excel_with_nulls):
         """测试聚合函数处理含空值的列"""
-        from src.api.advanced_sql_query import execute_advanced_sql_query
+        from src.excel_mcp_server_fastmcp.api.advanced_sql_query import execute_advanced_sql_query
         
         result = execute_advanced_sql_query(
             file_path=test_excel_with_nulls,
@@ -391,7 +391,7 @@ class TestAggregateEdgeCases:
 
     def test_sum_with_null_column(self, test_excel_with_nulls):
         """测试SUM处理含空值的列"""
-        from src.api.advanced_sql_query import execute_advanced_sql_query
+        from src.excel_mcp_server_fastmcp.api.advanced_sql_query import execute_advanced_sql_query
         
         result = execute_advanced_sql_query(
             file_path=test_excel_with_nulls,
@@ -403,7 +403,7 @@ class TestAggregateEdgeCases:
 
     def test_avg_with_null_column(self, test_excel_with_nulls):
         """测试AVG处理含空值的列"""
-        from src.api.advanced_sql_query import execute_advanced_sql_query
+        from src.excel_mcp_server_fastmcp.api.advanced_sql_query import execute_advanced_sql_query
         
         result = execute_advanced_sql_query(
             file_path=test_excel_with_nulls,

@@ -4,7 +4,7 @@ import os
 import tempfile
 import pytest
 from unittest.mock import patch
-from src.server import SecurityValidator, _validate_path
+from src.excel_mcp_server_fastmcp.server import SecurityValidator, _validate_path
 
 
 class TestPathTraversal:

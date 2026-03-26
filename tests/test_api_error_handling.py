@@ -9,7 +9,7 @@ import pytest
 from pathlib import Path
 from openpyxl import Workbook
 
-from src.api.excel_operations import ExcelOperations
+from src.excel_mcp_server_fastmcp.api.excel_operations import ExcelOperations
 
 
 class TestExcelOperationsErrors:
