@@ -9,7 +9,10 @@ import os
 import time
 import random
 import string
+import logging
 from typing import Optional
+
+logger = logging.getLogger(__name__)
 
 
 class TempFileManager:

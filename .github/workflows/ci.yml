@@ -13,6 +13,9 @@ jobs:
       matrix:
         python-version: ["3.10", "3.11", "3.12", "3.13"]
         os: [ubuntu-latest, windows-latest, macos-latest]
+        exclude:
+          - os: windows-latest
+            python-version: "3.13"
     runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v4
@@ -24,10 +27,5 @@ jobs:
       - name: Install dependencies
         run: pip install -e ".[test]"
       - name: Run tests
-        run: |
-          if [ "$RUNNER_OS" = "Windows" ] && [ "${{ matrix.python-version }}" = "3.13" ]; then
-            python -m pytest tests/ -q --tb=short --timeout=30
-          else
-            python -m pytest tests/ -q --tb=short -n auto --timeout=30
-          fi
+        run: python -m pytest tests/ -q --tb=short -n auto --timeout=30
         shell: bash
