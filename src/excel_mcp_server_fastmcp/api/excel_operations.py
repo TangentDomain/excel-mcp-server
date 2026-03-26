@@ -1650,9 +1650,9 @@ class ExcelOperations:
             # 读取Excel文件，处理编码问题
             if sheet_name is None:
                 # 读取第一个工作表
-                df = pd.read_excel(file_path, dtype=str, engine='openpyxl')
+                df = pd.read_excel(file_path, dtype=str, engine='calamine')
             else:
-                df = pd.read_excel(file_path, sheet_name=sheet_name, dtype=str, engine='openpyxl')
+                df = pd.read_excel(file_path, sheet_name=sheet_name, dtype=str, engine='calamine')
 
             original_rows = len(df)
             original_cols = len(df.columns)

@@ -2,6 +2,7 @@
 Excel MCP Server - Excel搜索模块
 
 提供Excel文件搜索功能
+使用python-calamine（Rust引擎）加速纯值搜索，openpyxl作为公式搜索的后备方案
 """
 
 import os
@@ -10,12 +11,20 @@ import logging
 from pathlib import Path
 from typing import List, Optional, Dict, Any
 from openpyxl import load_workbook
+from openpyxl.utils import get_column_letter
 
 from ..models.types import SearchMatch, MatchType, OperationResult
 from ..utils.validators import ExcelValidator
 from ..utils.parsers import RangeParser
 
 logger = logging.getLogger(__name__)
+
+# 尝试导入calamine
+try:
+    from python_calamine import CalamineWorkbook
+    _HAS_CALAMINE = True
+except ImportError:
+    _HAS_CALAMINE = False
 
 
 class ExcelSearcher:
@@ -63,7 +72,28 @@ class ExcelSearcher:
             except re.error as e:
                 raise ValueError(f"无效的正则表达式: {e}")
 
-            # 加载Excel文件 - 添加兼容性处理
+            # calamine快速路径（仅限纯值搜索，不搜公式）
+            if not search_formulas and _HAS_CALAMINE:
+                try:
+                    matches = self._search_calamine(
+                        regex, sheet_name, range_expression
+                    )
+                    return OperationResult(
+                        success=True,
+                        data=matches,
+                        metadata={
+                            'file_path': self.file_path,
+                            'pattern': pattern,
+                            'total_matches': len(matches),
+                            'search_values': search_values,
+                            'search_formulas': search_formulas,
+                            'range_expression': range_expression
+                        }
+                    )
+                except Exception as e:
+                    logger.debug(f"calamine搜索失败，回退openpyxl: {e}")
+
+            # openpyxl路径（公式搜索或calamine不可用）
             try:
                 workbook = load_workbook(
                     self.file_path,
@@ -119,6 +149,84 @@ class ExcelSearcher:
         if 's' in flags.lower():
             regex_flags |= re.DOTALL
         return regex_flags
+
+    def _search_calamine(
+        self,
+        regex: re.Pattern,
+        sheet_name: Optional[str] = None,
+        range_expression: Optional[str] = None
+    ) -> List[SearchMatch]:
+        """使用calamine快速搜索纯值（不搜公式）"""
+        wb = CalamineWorkbook.from_path(self.file_path)
+        matches = []
+
+        # 解析范围表达式
+        range_info = None
+        target_sheet_name = sheet_name
+        if range_expression:
+            range_info = RangeParser.parse_range_expression(range_expression)
+            if range_info.sheet_name:
+                target_sheet_name = range_info.sheet_name
+
+        # 确定要搜索的工作表
+        if target_sheet_name:
+            if target_sheet_name not in wb.sheet_names:
+                raise ValueError(f"工作表 '{target_sheet_name}' 不存在")
+            sheets_to_search = [target_sheet_name]
+        else:
+            sheets_to_search = wb.sheet_names
+
+        for s_name in sheets_to_search:
+            ws = wb.get_sheet_by_name(s_name)
+            # 跳过空工作表（calamine iter_rows在空表上会panic）
+            if ws.height == 0:
+                continue
+            all_rows = list(ws.iter_rows())
+
+            for r_idx, row in enumerate(all_rows):
+                for c_idx, val in enumerate(row):
+                    if val is None:
+                        continue
+
+                    # 范围过滤
+                    if range_info:
+                        r1, c1 = r_idx + 1, c_idx + 1  # 转为1-based
+                        if not self._in_range(range_info, r1, c1):
+                            continue
+
+                    cell_str = str(val)
+                    for match in regex.finditer(cell_str):
+                        coord = f"{get_column_letter(c_idx + 1)}{r_idx + 1}"
+                        matches.append(SearchMatch(
+                            sheet=s_name,
+                            cell=coord,
+                            value=cell_str,
+                            match=match.group(),
+                            match_start=match.start(),
+                            match_end=match.end(),
+                            match_type=MatchType.VALUE
+                        ))
+
+        return matches
+
+    def _in_range(self, range_info, row: int, col: int) -> bool:
+        """检查单元格(row,col)是否在范围内（1-based）"""
+        rt = range_info.range_type
+        if rt in [RangeType.ROW_RANGE, RangeType.SINGLE_ROW]:
+            parts = range_info.cell_range.split(':')
+            min_r = int(parts[0])
+            max_r = int(parts[1]) if len(parts) > 1 else min_r
+            return min_r <= row <= max_r
+        elif rt in [RangeType.COLUMN_RANGE, RangeType.SINGLE_COLUMN]:
+            from openpyxl.utils import column_index_from_string
+            parts = range_info.cell_range.split(':')
+            min_c = column_index_from_string(parts[0])
+            max_c = column_index_from_string(parts[1]) if len(parts) > 1 else min_c
+            return min_c <= col <= max_c
+        else:
+            from openpyxl.utils import range_boundaries
+            min_c, min_r, max_c, max_r = range_boundaries(range_info.cell_range)
+            return min_r <= row <= max_r and min_c <= col <= max_c
 
     def _search_workbook(
         self,
