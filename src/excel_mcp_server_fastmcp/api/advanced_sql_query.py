@@ -1707,45 +1707,21 @@ class AdvancedSQLQueryEngine:
     def _evaluate_condition_for_row(self, condition: exp.Expression, row: pd.Series) -> bool:
         """为单行评估条件"""
         try:
-            if isinstance(condition, exp.EQ):
-                left_val = self._get_row_value(condition.left, row)
-                right_val = self._get_row_value(condition.right, row)
-                return left_val == right_val
-
-            elif isinstance(condition, exp.NEQ):
-                left_val = self._get_row_value(condition.left, row)
-                right_val = self._get_row_value(condition.right, row)
-                return left_val != right_val
-
-            elif isinstance(condition, exp.GT):
-                left_val = self._get_row_value(condition.left, row)
-                right_val = self._get_row_value(condition.right, row)
-                try:
-                    return float(left_val) > float(right_val)
-                except (TypeError, ValueError):
-                    return False
-
-            elif isinstance(condition, exp.GTE):
+            # 比较运算符分发表（EQ/NEQ直接比较，GT/GTE/LT/LTE数值比较）
+            _COMPARISON_OPS = {
+                exp.EQ: lambda l, r: l == r,
+                exp.NEQ: lambda l, r: l != r,
+                exp.GT: lambda l, r: float(l) > float(r),
+                exp.GTE: lambda l, r: float(l) >= float(r),
+                exp.LT: lambda l, r: float(l) < float(r),
+                exp.LTE: lambda l, r: float(l) <= float(r),
+            }
+            op_type = type(condition)
+            if op_type in _COMPARISON_OPS:
                 left_val = self._get_row_value(condition.left, row)
                 right_val = self._get_row_value(condition.right, row)
                 try:
-                    return float(left_val) >= float(right_val)
-                except (TypeError, ValueError):
-                    return False
-
-            elif isinstance(condition, exp.LT):
-                left_val = self._get_row_value(condition.left, row)
-                right_val = self._get_row_value(condition.right, row)
-                try:
-                    return float(left_val) < float(right_val)
-                except (TypeError, ValueError):
-                    return False
-
-            elif isinstance(condition, exp.LTE):
-                left_val = self._get_row_value(condition.left, row)
-                right_val = self._get_row_value(condition.right, row)
-                try:
-                    return float(left_val) <= float(right_val)
+                    return _COMPARISON_OPS[op_type](left_val, right_val)
                 except (TypeError, ValueError):
                     return False
 
