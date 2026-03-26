@@ -981,6 +981,66 @@ class ExcelOperations:
             return cls._format_error_result(error_msg)
 
     @classmethod
+    def copy_sheet(
+        cls,
+        file_path: str,
+        source_name: str,
+        new_name: Optional[str] = None,
+        index: Optional[int] = None
+    ) -> Dict[str, Any]:
+        """
+        @intention 复制工作表（含数据和格式）
+
+        Args:
+            file_path: Excel文件路径
+            source_name: 源工作表名称
+            new_name: 新工作表名称（为空自动生成 "源表名_副本"）
+            index: 插入位置（None追加到末尾）
+
+        Returns:
+            Dict: 标准化的操作结果
+        """
+        try:
+            manager = ExcelManager(file_path)
+            result = manager.copy_sheet(source_name, new_name, index)
+            return format_operation_result(result)
+        except Exception as e:
+            error_msg = f"复制工作表失败: {str(e)}"
+            logger.error(f"{cls._LOG_PREFIX} {error_msg}")
+            return cls._format_error_result(error_msg)
+
+    @classmethod
+    def rename_column(
+        cls,
+        file_path: str,
+        sheet_name: str,
+        old_header: str,
+        new_header: str,
+        header_row: int = 1
+    ) -> Dict[str, Any]:
+        """
+        @intention 重命名列（修改表头单元格值）
+
+        Args:
+            file_path: Excel文件路径
+            sheet_name: 工作表名称
+            old_header: 当前列名
+            new_header: 新列名
+            header_row: 表头所在行号（默认1）
+
+        Returns:
+            Dict: 标准化的操作结果
+        """
+        try:
+            manager = ExcelManager(file_path)
+            result = manager.rename_column(sheet_name, old_header, new_header, header_row)
+            return format_operation_result(result)
+        except Exception as e:
+            error_msg = f"重命名列失败: {str(e)}"
+            logger.error(f"{cls._LOG_PREFIX} {error_msg}")
+            return cls._format_error_result(error_msg)
+
+    @classmethod
     def delete_rows(
         cls,
         file_path: str,
