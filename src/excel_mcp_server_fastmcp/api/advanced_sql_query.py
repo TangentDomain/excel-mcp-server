@@ -1442,35 +1442,17 @@ class AdvancedSQLQueryEngine:
 
     def _sql_condition_to_pandas(self, condition: exp.Expression, df: pd.DataFrame) -> str:
         """将SQL条件转换为pandas查询字符串"""
-        if isinstance(condition, exp.EQ):
+        # 比较运算符分发表 → pandas查询字符串
+        _PANDAS_OPS = {
+            exp.EQ: '==', exp.NEQ: '!=',
+            exp.GT: '>', exp.GTE: '>=',
+            exp.LT: '<', exp.LTE: '<=',
+        }
+        op_type = type(condition)
+        if op_type in _PANDAS_OPS:
             left = self._expression_to_column_reference(condition.left, df)
             right = self._expression_to_value(condition.right, df)
-            return f"{left} == {right}"
-
-        elif isinstance(condition, exp.NEQ):
-            left = self._expression_to_column_reference(condition.left, df)
-            right = self._expression_to_value(condition.right, df)
-            return f"{left} != {right}"
-
-        elif isinstance(condition, exp.GT):
-            left = self._expression_to_column_reference(condition.left, df)
-            right = self._expression_to_value(condition.right, df)
-            return f"{left} > {right}"
-
-        elif isinstance(condition, exp.GTE):
-            left = self._expression_to_column_reference(condition.left, df)
-            right = self._expression_to_value(condition.right, df)
-            return f"{left} >= {right}"
-
-        elif isinstance(condition, exp.LT):
-            left = self._expression_to_column_reference(condition.left, df)
-            right = self._expression_to_value(condition.right, df)
-            return f"{left} < {right}"
-
-        elif isinstance(condition, exp.LTE):
-            left = self._expression_to_column_reference(condition.left, df)
-            right = self._expression_to_value(condition.right, df)
-            return f"{left} <= {right}"
+            return f"{left} {_PANDAS_OPS[op_type]} {right}"
 
         elif isinstance(condition, exp.And):
             left = self._sql_condition_to_pandas(condition.left, df)
