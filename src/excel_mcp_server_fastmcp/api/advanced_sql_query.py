@@ -1474,30 +1474,35 @@ class AdvancedSQLQueryEngine:
                 return result
             return pd.Series([''] * len(df), index=df.index)
 
-        elif func_name == 'replace':
+        if func_name == 'replace':
             # REPLACE(str, old, new) — sqlglot: this=string, expression=old, replacement=new
             val_series = self._expr_to_series(expr.this, df).astype(str)
             old_val = str(self._literal_value(expr.args.get('expression'))) if expr.args.get('expression') else ''
             new_val = str(self._literal_value(expr.args.get('replacement'))) if expr.args.get('replacement') else ''
             return val_series.str.replace(old_val, new_val, regex=False)
 
-        elif func_name in ('substring', 'left', 'right'):
+        if func_name in ('substring', 'left', 'right'):
             val_series = self._expr_to_series(expr.this, df).astype(str)
             if func_name == 'substring':
-                # sqlglot: this=string, start=1-based, length=count
                 start = int(self._literal_value(expr.args.get('start'))) - 1 if expr.args.get('start') else 0
                 length = int(self._literal_value(expr.args.get('length'))) if expr.args.get('length') else len(val_series.iloc[0])
                 return val_series.str.slice(start, start + length)
-            elif func_name == 'left':
-                # sqlglot: this=string, expression=count
+            if func_name == 'left':
                 n = int(self._literal_value(expr.args.get('expression'))) if expr.args.get('expression') else 1
                 return val_series.str.slice(0, n)
-            elif func_name == 'right':
-                # sqlglot: this=string, expression=count
-                n = int(self._literal_value(expr.args.get('expression'))) if expr.args.get('expression') else 1
-                return val_series.str.slice(-n)
+            # right
+            n = int(self._literal_value(expr.args.get('expression'))) if expr.args.get('expression') else 1
+            return val_series.str.slice(-n)
 
         raise ValueError(f"不支持的字符串函数: {func_name}")
+
+    # 逐行字符串函数分发表：一元操作，统一模式 op(val)
+    _ROW_STR_OPS = {
+        'upper': lambda v: v.upper(),
+        'lower': lambda v: v.lower(),
+        'trim': lambda v: v.strip(),
+        'length': lambda v: len(v),
+    }
 
     def _evaluate_string_function_for_row(self, expr, row: pd.Series) -> Any:
         """逐行评估字符串函数"""
@@ -1507,29 +1512,26 @@ class AdvancedSQLQueryEngine:
             return None
         val = str(val)
 
-        if func_name == 'upper':
-            return val.upper()
-        elif func_name == 'lower':
-            return val.lower()
-        elif func_name == 'trim':
-            return val.strip()
-        elif func_name == 'length':
-            return len(val)
-        elif func_name == 'concat':
+        # 简单函数：分发表处理
+        if func_name in self._ROW_STR_OPS:
+            return self._ROW_STR_OPS[func_name](val)
+
+        # 复杂函数：各自独立处理
+        if func_name == 'concat':
             parts = [str(self._get_row_value(arg, row) or '') for arg in expr.expressions]
             return ''.join(parts)
-        elif func_name == 'replace':
+        if func_name == 'replace':
             old_val = str(self._literal_value(expr.args.get('expression'))) if expr.args.get('expression') else ''
             new_val = str(self._literal_value(expr.args.get('replacement'))) if expr.args.get('replacement') else ''
             return val.replace(old_val, new_val)
-        elif func_name == 'substring':
+        if func_name == 'substring':
             start = int(self._literal_value(expr.args.get('start'))) - 1 if expr.args.get('start') else 0
             length = int(self._literal_value(expr.args.get('length'))) if expr.args.get('length') else len(val)
             return val[start:start + length]
-        elif func_name == 'left':
+        if func_name == 'left':
             n = int(self._literal_value(expr.args.get('expression'))) if expr.args.get('expression') else 1
             return val[:n]
-        elif func_name == 'right':
+        if func_name == 'right':
             n = int(self._literal_value(expr.args.get('expression'))) if expr.args.get('expression') else 1
             return val[-n:] if n > 0 else ''
         return val
@@ -2525,73 +2527,53 @@ class AdvancedSQLQueryEngine:
         distinct_prefix = "distinct_" if is_distinct else ""
         return f"{func_name}_{distinct_prefix}{arg_name}"
 
+    @staticmethod
+    def _extract_agg_column(expr_node, context: str = "表达式") -> str:
+        """从聚合函数参数节点提取列名（消除重复的Column/hasattr提取逻辑）"""
+        if isinstance(expr_node, exp.Column):
+            return expr_node.name
+        if hasattr(expr_node, 'name') and expr_node.name:
+            return expr_node.name
+        raise ValueError(f"{context}参数格式错误: {expr_node}")
+
+    # 聚合函数分发表：sum/avg/max/min 统一为 pd.to_numeric → agg
+    _AGG_OPS = {
+        'sum': lambda g, col: g[col].agg(lambda x: pd.to_numeric(x, errors='coerce').sum()),
+        'avg': lambda g, col: g[col].agg(lambda x: pd.to_numeric(x, errors='coerce').mean()),
+        'max': lambda g, col: g[col].agg(lambda x: pd.to_numeric(x, errors='coerce').max()),
+        'min': lambda g, col: g[col].agg(lambda x: pd.to_numeric(x, errors='coerce').min()),
+    }
+
     def _apply_aggregation_function(self, expr: exp.Expression, grouped) -> pd.Series:
         """应用聚合函数"""
-        if isinstance(expr, exp.AggFunc):
-            # 从聚合函数类型获取函数名
-            func_name = type(expr).__name__.lower()
-
-            # 应用对应的聚合函数
-            if func_name == 'count':
-                if isinstance(expr.this, exp.Star):
-                    # COUNT(*)的情况
-                    return grouped.size()
-                elif isinstance(expr.this, exp.Distinct):
-                    # COUNT(DISTINCT column)的情况
-                    distinct_expr = expr.this.expressions[0]
-                    if isinstance(distinct_expr, exp.Column):
-                        col_name = distinct_expr.name
-                    elif hasattr(distinct_expr, 'name'):
-                        col_name = distinct_expr.name
-                    else:
-                        raise ValueError(f"COUNT(DISTINCT)参数格式错误: {distinct_expr}")
-                    return grouped[col_name].nunique()
-                else:
-                    # COUNT(column)的情况
-                    if isinstance(expr.this, exp.Column):
-                        col_name = expr.this.name
-                    elif hasattr(expr.this, 'name'):
-                        col_name = expr.this.name
-                    else:
-                        raise ValueError(f"COUNT函数参数格式错误: {expr.this}")
-                    return grouped[col_name].count()
-            elif isinstance(expr.this, exp.Star):
-                # 其他函数不支持*
-                raise ValueError(f"函数 {func_name} 不支持 * 参数")
-
-            # 对于其他聚合函数，提取列名
-            if isinstance(expr.this, exp.Column):
-                col_name = expr.this.name
-            elif hasattr(expr.this, 'name'):
-                col_name = expr.this.name
-            else:
-                raise ValueError(f"聚合函数 {func_name} 参数格式错误: {expr.this}")
-
-            # 获取原始列数据并转换为数值类型
-            # 注意：需要从grouped的obj获取原始DataFrame
-            try:
-                original_df = grouped.obj
-            except Exception:
-                original_df = None
-            
-            # 应用对应的聚合函数
-            # 直接使用 groupby agg，避免 apply+func 返回标量的问题
-            if func_name == 'sum':
-                return grouped[col_name].agg(lambda x: pd.to_numeric(x, errors='coerce').sum())
-            elif func_name == 'avg':
-                return grouped[col_name].agg(lambda x: pd.to_numeric(x, errors='coerce').mean())
-            elif func_name == 'max':
-                return grouped[col_name].agg(lambda x: pd.to_numeric(x, errors='coerce').max())
-            elif func_name == 'min':
-                return grouped[col_name].agg(lambda x: pd.to_numeric(x, errors='coerce').min())
-            else:
-                raise ValueError(f"不支持的聚合函数: {func_name}")
-
-        elif isinstance(expr, exp.Alias):
+        if isinstance(expr, exp.Alias):
             return self._apply_aggregation_function(expr.this, grouped)
 
-        else:
+        if not isinstance(expr, exp.AggFunc):
             raise ValueError(f"不是聚合函数: {type(expr)}")
+
+        func_name = type(expr).__name__.lower()
+
+        # COUNT 特殊处理
+        if func_name == 'count':
+            if isinstance(expr.this, exp.Star):
+                return grouped.size()
+            if isinstance(expr.this, exp.Distinct):
+                col_name = self._extract_agg_column(expr.this.expressions[0], "COUNT(DISTINCT)")
+                return grouped[col_name].nunique()
+            col_name = self._extract_agg_column(expr.this, "COUNT")
+            return grouped[col_name].count()
+
+        # 其他聚合函数不支持 *
+        if isinstance(expr.this, exp.Star):
+            raise ValueError(f"函数 {func_name} 不支持 * 参数")
+
+        # 分发表处理 sum/avg/max/min
+        if func_name in self._AGG_OPS:
+            col_name = self._extract_agg_column(expr.this, func_name.upper())
+            return self._AGG_OPS[func_name](grouped, col_name)
+
+        raise ValueError(f"不支持的聚合函数: {func_name}")
 
     def _apply_having_clause(self, parsed_sql: exp.Expression, df: pd.DataFrame) -> pd.DataFrame:
         """应用HAVING条件"""
