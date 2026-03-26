@@ -228,3 +228,42 @@ class TestFileLockProtection:
         )
         assert result['success'] is True
         assert result['affected_rows'] > 0
+
+
+class TestNumpySerialization:
+    """numpy类型JSON序列化测试"""
+
+    def test_dry_run_changes_json_serializable(self, game_config_copy):
+        """dry_run返回的changes列表必须可JSON序列化（numpy→Python原生）"""
+        import json
+        from src.api.advanced_sql_query import execute_advanced_update_query
+
+        result = execute_advanced_update_query(
+            game_config_copy,
+            "UPDATE 技能配置 SET damage = damage * 1.1 WHERE skill_type = '法师'",
+            dry_run=True
+        )
+        assert result['success'] is True
+        assert result['dry_run'] is True
+        # Must be JSON-serializable
+        json_str = json.dumps(result)
+        assert json_str  # No TypeError raised
+        # Verify values are Python native types, not numpy
+        for change in result['changes']:
+            assert isinstance(change['row'], int)
+            assert isinstance(change['new_value'], (int, float, str))
+            assert isinstance(change['old_value'], (int, float, str))
+
+    def test_actual_write_changes_json_serializable(self, game_config_copy):
+        """实际写入返回的changes列表必须可JSON序列化"""
+        import json
+        from src.api.advanced_sql_query import execute_advanced_update_query
+
+        result = execute_advanced_update_query(
+            game_config_copy,
+            "UPDATE 技能配置 SET damage = damage + 10 WHERE level >= 1",
+            dry_run=False
+        )
+        assert result['success'] is True
+        json_str = json.dumps(result)
+        assert json_str
