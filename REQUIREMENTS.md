@@ -234,14 +234,6 @@
 - **实现**：ExcelManager.batch_insert_rows核心层，按列名映射批量写入，未知列自动忽略
 - **状态**：DONE ✅（第54轮，excel_batch_insert_rows第46个工具，6个测试通过）
 
-### REQ-020 [P2→CANCELLED] View（命名查询）
-- **状态**：CANCELLED — SQL查询本身就能保存为文本，不需要额外封装
-
-### REQ-021 [P2→CANCELLED] 写入校验（约束体系）
-- **状态**：CANCELLED — SQL引擎已能覆盖（FK用JOIN查、范围用WHERE、枚举用IN），不需要单独做
-
-### REQ-022 [P2→CANCELLED] Auto Increment
-- **状态**：CANCELLED — 策划手动管理ID更可控，不需要自动分配
 ### REQ-023 [P2→DONE] 复制Sheet
 - **来源**：能力盘点 — 策划经常复制表做变体（如副本版怪物表、活动版装备表）
 - **描述**：复制指定Sheet（含数据和格式）到同文件，支持重命名和位置指定
