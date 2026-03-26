@@ -104,13 +104,37 @@ class OperationLogger:
 
 # ==================== 工具调用追踪器 ====================
 class ToolCallTracker:
-    """工具调用追踪器，记录每个工具的调用次数、耗时和错误率"""
+    """工具调用追踪器，记录每个工具的调用次数、耗时、错误率和错误分类"""
+
+    # 错误分类规则：按优先级匹配（前缀/关键词 → 错误类型）
+    _ERROR_RULES = [
+        ('🔒', 'security'),
+        ('文件不存在', 'file_not_found'),
+        ('无法加载文件', 'file_load'),
+        ('文件路径', 'validation'),
+        ('工作表不存在', 'sheet_not_found'),
+        ('文件格式', 'file_format'),
+        ('文件太大', 'file_too_large'),
+        ('无效的', 'validation'),
+        ('不支持', 'unsupported'),
+        ('列名', 'column'),
+        ('SQL语法', 'sql_syntax'),
+        ('语法错误', 'sql_syntax'),
+        ('engine_error', 'engine'),
+        ('execution_error', 'execution'),
+        ('syntax_error', 'sql_syntax'),
+        ('unsupported_sql', 'unsupported'),
+        ('unsupported_feature', 'unsupported'),
+        ('file_not_found', 'file_not_found'),
+        ('data_load_failed', 'file_load'),
+    ]
 
     def __init__(self):
         self._stats: Dict[str, Dict[str, Any]] = defaultdict(lambda: {
             'call_count': 0,
             'total_time_ms': 0.0,
             'error_count': 0,
+            'error_types': defaultdict(int),
             'last_called': None,
             'min_time_ms': float('inf'),
             'max_time_ms': 0.0,
@@ -118,8 +142,9 @@ class ToolCallTracker:
         self._lock = threading.Lock()
         self._start_time = datetime.now()
 
-    def record(self, tool_name: str, duration_ms: float, success: bool = True):
-        """记录一次工具调用"""
+    def record(self, tool_name: str, duration_ms: float, success: bool = True,
+               error_type: str = None):
+        """记录一次工具调用，可选指定错误类型"""
         with self._lock:
             s = self._stats[tool_name]
             s['call_count'] += 1
@@ -131,11 +156,25 @@ class ToolCallTracker:
                 s['max_time_ms'] = duration_ms
             if not success:
                 s['error_count'] += 1
+                classified = error_type or 'unknown'
+                s['error_types'][classified] += 1
+
+    @staticmethod
+    def classify_error(message: str) -> str:
+        """根据错误消息内容自动分类错误类型"""
+        if not message:
+            return 'unknown'
+        msg_lower = message.lower()
+        for keyword, error_type in ToolCallTracker._ERROR_RULES:
+            if keyword.lower() in msg_lower:
+                return error_type
+        return 'unknown'
 
     def get_stats(self) -> Dict[str, Any]:
         """获取所有工具的调用统计，按调用次数降序排列"""
         with self._lock:
             tools = {}
+            global_error_types: Dict[str, int] = defaultdict(int)
             for name, s in sorted(self._stats.items(), key=lambda x: -x[1]['call_count']):
                 tools[name] = {
                     'call_count': s['call_count'],
@@ -143,12 +182,16 @@ class ToolCallTracker:
                     'min_time_ms': round(s['min_time_ms'], 1) if s['min_time_ms'] != float('inf') else 0,
                     'max_time_ms': round(s['max_time_ms'], 1),
                     'error_count': s['error_count'],
+                    'error_types': dict(sorted(s['error_types'].items())),
                     'last_called': s['last_called'],
                 }
+                for et, count in s['error_types'].items():
+                    global_error_types[et] += count
             return {
                 'uptime_seconds': round((datetime.now() - self._start_time).total_seconds(), 0),
                 'total_calls': sum(s['call_count'] for s in self._stats.values()),
                 'total_errors': sum(s['error_count'] for s in self._stats.values()),
+                'error_types': dict(sorted(global_error_types.items())),
                 'tools': tools,
             }
 
@@ -163,22 +206,39 @@ _tracker = ToolCallTracker()
 
 
 def _track_call(func):
-    """工具调用追踪装饰器，记录每次调用的耗时和结果"""
+    """工具调用追踪装饰器，记录每次调用的耗时和结果，自动检测返回值中的错误"""
     @functools.wraps(func)
     def wrapper(*args, **kwargs):
         start = time.perf_counter()
         try:
             result = func(*args, **kwargs)
             duration_ms = (time.perf_counter() - start) * 1000
-            _tracker.record(func.__name__, duration_ms, success=True)
-            logger.debug(f"[TOOL] {func.__name__}: {duration_ms:.1f}ms",
-                         extra={'tool': func.__name__, 'duration_ms': round(duration_ms, 1)})
+            # 自动检测返回值中的错误（大多数工具返回dict而非抛异常）
+            if isinstance(result, dict) and result.get('success') is False:
+                error_msg = result.get('message', '')
+                error_type = ToolCallTracker.classify_error(error_msg)
+                # 优先使用SQL引擎的错误类型
+                qi = result.get('query_info') or {}
+                if isinstance(qi, dict) and 'error_type' in qi:
+                    error_type = qi['error_type']
+                _tracker.record(func.__name__, duration_ms, success=False,
+                                error_type=error_type)
+                logger.debug(f"[TOOL] {func.__name__}: {duration_ms:.1f}ms ERROR [{error_type}]",
+                             extra={'tool': func.__name__, 'duration_ms': round(duration_ms, 1),
+                                    'error': error_msg})
+            else:
+                _tracker.record(func.__name__, duration_ms, success=True)
+                logger.debug(f"[TOOL] {func.__name__}: {duration_ms:.1f}ms",
+                             extra={'tool': func.__name__, 'duration_ms': round(duration_ms, 1)})
             return result
         except Exception as e:
             duration_ms = (time.perf_counter() - start) * 1000
-            _tracker.record(func.__name__, duration_ms, success=False)
-            logger.debug(f"[TOOL] {func.__name__}: {duration_ms:.1f}ms ERROR: {e}",
-                         extra={'tool': func.__name__, 'duration_ms': round(duration_ms, 1), 'error': str(e)})
+            error_type = ToolCallTracker.classify_error(str(e))
+            _tracker.record(func.__name__, duration_ms, success=False,
+                            error_type=error_type)
+            logger.debug(f"[TOOL] {func.__name__}: {duration_ms:.1f}ms ERROR [{error_type}]: {e}",
+                         extra={'tool': func.__name__, 'duration_ms': round(duration_ms, 1),
+                                'error': str(e)})
             raise
     return wrapper
 
@@ -2138,7 +2198,8 @@ def excel_compare_sheets(
 @_track_call
 def excel_server_stats() -> Dict[str, Any]:
     """
-获取MCP服务器运行统计：每个工具的调用次数、平均耗时、错误率。用于监控和调试。
+获取MCP服务器运行统计：每个工具的调用次数、平均耗时、错误率和错误分类。
+返回全局error_types统计（按错误类型分类的计数），用于监控和调试。
     """
     return _tracker.get_stats()
 
