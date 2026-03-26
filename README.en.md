@@ -14,7 +14,7 @@
 ![Tools](https://img.shields.io/badge/tools-41%20verified%20tools-green.svg)
 [![CI](https://github.com/TangentDomain/excel-mcp-server/actions/workflows/ci.yml/badge.svg)](https://github.com/TangentDomain/excel-mcp-server/actions/workflows/ci.yml)
 
-**ExcelMCP** is an Excel configuration table management MCP server designed for game development. Through AI natural language commands, it enables intelligent operations on game configurations such as skill tables, equipment data, and monster attributes. Built with **FastMCP** and **openpyxl**, it features **41 professional tools** and **761 test cases**, ensuring enterprise-grade reliability.
+**ExcelMCP** is an Excel configuration table management MCP server designed for game development. Through AI natural language commands, it enables intelligent operations on game configurations such as skill tables, equipment data, and monster attributes. Built with **FastMCP**, reads use **python-calamine** (Rust engine, 2300x speedup), writes use **openpyxl**. Features **41 professional tools** and **761 test cases**, ensuring enterprise-grade reliability.
 
 🎯 **Core Features**: Skill systems, equipment management, monster configuration, numerical balancing, version comparison, designer toolchain
 
@@ -452,8 +452,8 @@ UPDATE SkillTable SET damage = damage * 1.1 WHERE element = 'Fire'  -- dry_run=T
 
 **Query Performance:**
 - Same-file repeated queries auto-cache, 30-100x speedup
-- Small table (10 rows): first 30-47ms, cached 2-5ms
-- Large table (2000 rows): first ~230ms, cached 2-8ms
+- python-calamine Rust engine: get_range from 1.6s to 0.7ms (2300x speedup)
+- SQL cold query: ~10ms (calamine) vs ~200ms (openpyxl)
 - Cache auto-invalidates on file modification
 
 **Common Problem Solutions**:
@@ -542,6 +542,7 @@ Tool Layer (Common Functions)
 - **Realistic Concurrency Handling**: Properly handles Excel file concurrency limitations
 
 ### Performance Optimization
+- **python-calamine Read Engine**: Rust native parsing, get_range from 1.6s to 0.7ms (2300x speedup)
 - **Precise Range Reading**: 60-80% faster than reading entire tables
 - **Batch Operations**: 15-20x faster than individual operations
 - **Batch Processing**: 70% memory usage reduction for large files
