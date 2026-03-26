@@ -1472,6 +1472,42 @@ def excel_rename_sheet(
 
 @mcp.tool()
 @_track_call
+def excel_copy_sheet(
+    file_path: str,
+    source_name: str,
+    new_name: Optional[str] = None,
+    index: Optional[int] = None
+) -> Dict[str, Any]:
+    """
+复制工作表（含数据和格式），用于创建配置表变体。不指定new_name时自动生成"源表名_副本"。
+策划场景：复制怪物表做副本版、复制装备表做活动版。
+    """
+    _path_err = _validate_path(file_path)
+    if _path_err:
+        return _path_err
+    return ExcelOperations.copy_sheet(file_path, source_name, new_name, index)
+
+
+@mcp.tool()
+@_track_call
+def excel_rename_column(
+    file_path: str,
+    sheet_name: str,
+    old_header: str,
+    new_header: str,
+    header_row: int = 1
+) -> Dict[str, Any]:
+    """
+重命名列（修改表头单元格值）。双行表头场景设header_row=2修改英文字段名。列名不存在时提示实际列名。
+    """
+    _path_err = _validate_path(file_path)
+    if _path_err:
+        return _path_err
+    return ExcelOperations.rename_column(file_path, sheet_name, old_header, new_header, header_row)
+
+
+@mcp.tool()
+@_track_call
 def excel_delete_rows(
     file_path: str,
     sheet_name: str,
