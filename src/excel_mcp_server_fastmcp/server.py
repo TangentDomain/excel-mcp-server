@@ -17,11 +17,13 @@ Excel MCP Server - 基于 FastMCP 和 openpyxl 实现
 """
 
 import functools
+import glob
 import json
 import logging
 import os
 import re
 import shutil
+import tempfile
 import threading
 import time
 from collections import defaultdict
@@ -87,7 +89,6 @@ class OperationLogger:
             return
 
         try:
-            import json
             with open(self.log_file, 'w', encoding='utf-8') as f:
                 json.dump(self.current_session, f, indent=2, ensure_ascii=False)
         except Exception as e:
@@ -257,7 +258,6 @@ class SecurityValidator:
     @classmethod
     def cleanup_orphan_temp_files(cls, temp_dir: str = None) -> int:
         """清理孤儿临时文件（.xlsx.bak），返回清理数量"""
-        import tempfile, glob, time
         target = temp_dir or tempfile.gettempdir()
         pattern = os.path.join(target, '*.xlsx.bak')
         cleaned = 0
