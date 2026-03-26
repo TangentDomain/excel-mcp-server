@@ -473,6 +473,32 @@ class TestAdvancedSQLFeatures:
         for row in data_rows:
             assert isinstance(row[1], int)
 
+    def test_not_in(self, test_excel_file):
+        """测试NOT IN排除列表值"""
+        from src.api.advanced_sql_query import execute_advanced_sql_query
+        
+        # IN匹配指定部门
+        result_in = execute_advanced_sql_query(
+            file_path=test_excel_file,
+            sql="SELECT Name FROM Employees WHERE Department IN ('Sales', 'HR')"
+        )
+        # NOT IN排除指定部门
+        result_not_in = execute_advanced_sql_query(
+            file_path=test_excel_file,
+            sql="SELECT Name FROM Employees WHERE Department NOT IN ('Sales', 'HR')"
+        )
+        
+        assert result_in['success'] is True
+        assert result_not_in['success'] is True
+        
+        in_names = set(row[0] for row in result_in['data'] if row[0] != 'Name')
+        not_in_names = set(row[0] for row in result_not_in['data'] if row[0] != 'Name')
+        
+        # 两集合不应有交集
+        assert len(in_names & not_in_names) == 0
+        # NOT IN结果应只有IT部门的人
+        assert not_in_names == {'Bob', 'Eve'}
+
     def test_count_distinct_with_alias(self, test_excel_file):
         """测试COUNT(DISTINCT)带别名"""
         from src.api.advanced_sql_query import execute_advanced_sql_query
