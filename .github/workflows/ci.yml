@@ -25,3 +25,8 @@ jobs:
         run: pip install -e ".[test]"
       - name: Run tests
         run: python -m pytest tests/ -q --tb=short -n auto --timeout=30
+        shell: bash
+      - name: Debug on failure
+        if: failure()
+        run: python -c "import pytest; pytest.main(['tests/', '-x', '--tb=long', '-v', '--no-header', '-q'])"
+        shell: bash
