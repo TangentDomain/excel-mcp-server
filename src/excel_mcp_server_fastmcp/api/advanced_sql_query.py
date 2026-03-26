@@ -12,11 +12,11 @@
 - 子查询: WHERE col IN (SELECT ...), 标量子查询, EXISTS
 - CTE: WITH ... AS (SELECT ...)
 - 字符串函数: UPPER, LOWER, TRIM, LENGTH, CONCAT, REPLACE, SUBSTRING, LEFT, RIGHT
+- 窗口函数: ROW_NUMBER, RANK, DENSE_RANK（OVER PARTITION BY ... ORDER BY ...）
+- 合并查询: UNION, UNION ALL
 
 不支持功能：
 - FROM子查询（FROM (SELECT ...)）
-- UNION
-- 窗口函数 (ROW_NUMBER等)
 - RIGHT JOIN, FULL JOIN, CROSS JOIN
 - INSERT/UPDATE/DELETE
 """
@@ -468,12 +468,7 @@ class AdvancedSQLQueryEngine:
             if with_clause:
                 return {'valid': True}  # CTE在_execute_query中处理
             # UNION/UNION ALL 支持已实现
-            # 检查不支持的窗口函数
-            if parsed_sql.find(exp.Window):
-                return {
-                    'valid': False,
-                    'error': '不支持窗口函数(ROW_NUMBER等)。💡 替代方案：使用子查询+GROUP BY'
-                }
+            # 窗口函数支持已实现 (ROW_NUMBER, RANK, DENSE_RANK)
 
             return {'valid': True}
 
@@ -951,6 +946,215 @@ class AdvancedSQLQueryEngine:
 
         return combined
 
+    def _has_window_function(self, parsed_sql: exp.Expression) -> bool:
+        """检查SQL是否包含窗口函数"""
+        return bool(parsed_sql.find(exp.Window))
+
+    def _apply_window_functions(self, parsed_sql: exp.Expression, df: pd.DataFrame) -> pd.DataFrame:
+        """
+        计算窗口函数并将结果添加到DataFrame
+        支持: ROW_NUMBER, RANK, DENSE_RANK
+        语法: func() OVER ([PARTITION BY col ...] ORDER BY col [ASC|DESC] ...)
+        """
+        if not self._has_window_function(parsed_sql):
+            return df
+
+        df = df.copy()
+
+        # 构建SELECT别名映射（用于将聚合表达式映射到别名，如AVG(damage)→avg_dmg）
+        select_alias_map = {}
+        for select_expr in parsed_sql.expressions:
+            if isinstance(select_expr, exp.Alias):
+                alias_name = select_expr.alias
+                original = select_expr.this
+                # 将原始表达式文本作为key
+                expr_key = str(original).strip()
+                select_alias_map[expr_key] = alias_name
+
+        for select_expr in parsed_sql.expressions:
+            # 跳过 SELECT *
+            if isinstance(select_expr, exp.Star):
+                continue
+
+            # 提取别名和原始表达式
+            if isinstance(select_expr, exp.Alias):
+                alias_name = select_expr.alias
+                original_expr = select_expr.this
+            else:
+                alias_name = None
+                original_expr = select_expr
+
+            if not isinstance(original_expr, exp.Window):
+                continue
+
+            # 确定列名
+            col_name = alias_name or f"_window_{len([c for c in df.columns if c.startswith('_window_')])}"
+
+            # 计算窗口函数
+            result = self._compute_window_function(original_expr, df, select_alias_map)
+            df[col_name] = result
+
+        return df
+
+    def _compute_window_function(self, window_expr: exp.Window, df: pd.DataFrame,
+                                  select_alias_map: Optional[Dict] = None) -> pd.Series:
+        """计算单个窗口函数，返回结果Series"""
+        func_type = type(window_expr.this).__name__
+
+        # 支持的窗口函数类型
+        supported_funcs = {'RowNumber', 'Rank', 'DenseRank'}
+        if func_type not in supported_funcs:
+            raise ValueError(f"不支持的窗口函数: {func_type}。支持的: ROW_NUMBER, RANK, DENSE_RANK")
+
+        if select_alias_map is None:
+            select_alias_map = {}
+
+        # 解析 PARTITION BY
+        partition_by = window_expr.args.get('partition_by', [])
+        partition_cols = []
+        for col in partition_by:
+            col_name = col.name if hasattr(col, 'name') and col.name else str(col)
+            partition_cols.append(col_name)
+
+        # 解析 ORDER BY
+        order = window_expr.args.get('order')
+        order_cols = []
+        ascending = []
+        if order:
+            for ordered_expr in order.expressions:
+                col = ordered_expr.this
+                col_name = col.name if hasattr(col, 'name') and col.name else str(col)
+                # 如果列名不在DataFrame中，尝试映射
+                if col_name not in df.columns:
+                    col_name = self._resolve_window_column(col_name, df.columns, select_alias_map)
+                order_cols.append(col_name)
+                ascending.append(not ordered_expr.args.get('desc', False))
+
+        # 验证列存在
+        for col in partition_cols + order_cols:
+            if col not in df.columns:
+                suggestion = self._suggest_column_name(col, list(df.columns))
+                raise ValueError(f"窗口函数中列 '{col}' 不存在。可用列: {list(df.columns)}。{suggestion}")
+
+        if func_type == 'RowNumber':
+            return self._compute_row_number(df, partition_cols, order_cols, ascending)
+        elif func_type == 'Rank':
+            return self._compute_rank(df, partition_cols, order_cols, ascending)
+        elif func_type == 'DenseRank':
+            return self._compute_dense_rank(df, partition_cols, order_cols, ascending)
+
+    def _resolve_window_column(self, col_name: str, df_columns: list,
+                                select_alias_map: Dict[str, str]) -> str:
+        """解析窗口函数中的列名（支持聚合表达式→别名映射）"""
+        # 1. 直接在SELECT别名映射中查找
+        if col_name in select_alias_map:
+            alias = select_alias_map[col_name]
+            if alias in df_columns:
+                return alias
+
+        # 2. 尝试聚合函数名匹配
+        agg_funcs = {'AVG', 'SUM', 'COUNT', 'MAX', 'MIN'}
+        for func in agg_funcs:
+            if col_name.upper().startswith(func):
+                match = re.match(rf'{func}\s*\(\s*(.+?)\s*\)', col_name, re.IGNORECASE)
+                if match:
+                    inner_col = match.group(1).strip()
+                    candidates = [
+                        f"{func.lower()}_{inner_col}",
+                        f"{func.lower()}_{inner_col.lower()}",
+                        inner_col,
+                    ]
+                    for c in candidates:
+                        if c in df_columns:
+                            return c
+
+        return col_name  # 未找到映射，返回原名
+
+    def _compute_row_number(self, df: pd.DataFrame, partition_cols: list,
+                            order_cols: list, ascending: list) -> pd.Series:
+        """ROW_NUMBER: 分区内从1开始的连续编号"""
+        if not partition_cols and not order_cols:
+            # 无PARTITION BY也无ORDER BY: 按原始行顺序编号
+            return pd.Series(range(1, len(df) + 1), index=df.index, dtype=int)
+
+        if partition_cols:
+            grouped = df.groupby(partition_cols, sort=False)
+        else:
+            grouped = None  # 全表作为一个分区
+
+        def assign_row_number(group):
+            if order_cols:
+                sorted_group = group.sort_values(order_cols, ascending=ascending)
+                result = pd.Series(range(1, len(sorted_group) + 1), index=sorted_group.index, dtype=int)
+                return result.reindex(group.index)
+            else:
+                return pd.Series(range(1, len(group) + 1), index=group.index, dtype=int)
+
+        if grouped is not None:
+            result = grouped.apply(assign_row_number, include_groups=False)
+            # groupby.apply可能返回MultiIndex Series，需要展平
+            if isinstance(result.index, pd.MultiIndex):
+                result = result.droplevel(result.index.names[:-1])
+        else:
+            result = assign_row_number(df)
+
+        return result
+
+    def _compute_rank(self, df: pd.DataFrame, partition_cols: list,
+                      order_cols: list, ascending: list) -> pd.Series:
+        """RANK: 相同值相同排名，下一个排名跳过（1,2,2,4）"""
+        if not order_cols:
+            raise ValueError("RANK() 窗口函数需要 ORDER BY 子句")
+
+        if partition_cols:
+            grouped = df.groupby(partition_cols, sort=False)
+        else:
+            grouped = None
+
+        def assign_rank(group):
+            sorted_group = group.sort_values(order_cols, ascending=ascending)
+            # 使用pandas rank(method='first')模拟RANK行为
+            # RANK: 相同值取相同排名，下一个排名跳过
+            rank_series = sorted_group[order_cols[0]].rank(method='min', ascending=ascending[0])
+            rank_series = rank_series.astype(int)
+            return rank_series.reindex(group.index)
+
+        if grouped is not None:
+            result = grouped.apply(assign_rank, include_groups=False)
+            if isinstance(result.index, pd.MultiIndex):
+                result = result.droplevel(result.index.names[:-1])
+        else:
+            result = assign_rank(df)
+
+        return result
+
+    def _compute_dense_rank(self, df: pd.DataFrame, partition_cols: list,
+                            order_cols: list, ascending: list) -> pd.Series:
+        """DENSE_RANK: 相同值相同排名，下一个排名不跳过（1,2,2,3）"""
+        if not order_cols:
+            raise ValueError("DENSE_RANK() 窗口函数需要 ORDER BY 子句")
+
+        if partition_cols:
+            grouped = df.groupby(partition_cols, sort=False)
+        else:
+            grouped = None
+
+        def assign_dense_rank(group):
+            sorted_group = group.sort_values(order_cols, ascending=ascending)
+            # DENSE_RANK: 相同值取相同排名，下一个排名连续
+            rank_series = sorted_group[order_cols[0]].rank(method='dense', ascending=ascending[0])
+            rank_series = rank_series.astype(int)
+            return rank_series.reindex(group.index)
+
+        if grouped is not None:
+            result = grouped.apply(assign_dense_rank, include_groups=False)
+            if isinstance(result.index, pd.MultiIndex):
+                result = result.droplevel(result.index.names[:-1])
+        else:
+            result = assign_dense_rank(df)
+
+        return result
+
     def _execute_query(
         self,
         parsed_sql: exp.Expression,
@@ -1035,6 +1239,11 @@ class AdvancedSQLQueryEngine:
                 self._df_before_having = base_df.copy()
                 base_df = self._apply_having_clause(parsed_sql, base_df)
 
+        # 应用窗口函数（ROW_NUMBER, RANK, DENSE_RANK）
+        # 窗口函数在GROUP BY/HAVING之后、ORDER BY/SELECT之前计算
+        base_df = self._apply_window_functions(parsed_sql, base_df)
+
+        if parsed_sql.args.get('group') or has_aggregate:
             # ORDER BY（聚合查询：在GROUP BY之后）
             if parsed_sql.args.get('order'):
                 base_df = self._apply_order_by(parsed_sql, base_df)
@@ -1148,6 +1357,13 @@ class AdvancedSQLQueryEngine:
                 elif self._is_string_function(original_expr):
                     # 字符串函数: UPPER, LOWER, TRIM, LENGTH, CONCAT, REPLACE, SUBSTRING, LEFT, RIGHT
                     result_data[alias_name] = self._evaluate_string_function(original_expr, df)
+
+                elif isinstance(original_expr, exp.Window):
+                    # 窗口函数: ROW_NUMBER, RANK, DENSE_RANK（已由_apply_window_functions预计算）
+                    if alias_name in df.columns:
+                        result_data[alias_name] = df[alias_name]
+                    else:
+                        raise ValueError(f"窗口函数结果列 '{alias_name}' 未找到")
 
                 elif self._is_mathematical_expression(original_expr):
                     # 数学表达式
