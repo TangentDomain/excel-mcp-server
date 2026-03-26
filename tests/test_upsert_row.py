@@ -220,3 +220,84 @@ class TestUpsertErrors:
             updates={"damage": 100}
         )
         assert result['success'] is False
+
+
+class TestBatchInsertRows:
+    """Tests for batch_insert_rows functionality."""
+
+    @pytest.fixture
+    def batch_workbook(self):
+        """Create a test workbook for batch insert tests."""
+        wb = Workbook()
+        ws = wb.active
+        ws.title = "怪物配置"
+        ws.append(["monster_id", "monster_name", "level", "hp"])
+        ws.append([3001, "哥布林", 5, 100])
+        ws.append([3002, "狼人", 10, 300])
+
+        path = os.path.join(os.path.dirname(__file__), 'test_data', 'batch_insert_test.xlsx')
+        os.makedirs(os.path.dirname(path), exist_ok=True)
+        wb.save(path)
+        yield path
+        if os.path.exists(path):
+            os.remove(path)
+
+    def test_batch_insert_basic(self, batch_workbook):
+        """Batch insert multiple rows."""
+        from src.excel_mcp_server_fastmcp.api.excel_operations import ExcelOperations
+        data = [
+            {"monster_id": 3003, "monster_name": "巨龙", "level": 50, "hp": 5000},
+            {"monster_id": 3004, "monster_name": "骷髅兵", "level": 3, "hp": 50},
+        ]
+        result = ExcelOperations.batch_insert_rows(batch_workbook, "怪物配置", data)
+        assert result['success'] is True
+        assert result['data']['action'] == 'batch_insert'
+        assert result['data']['inserted_count'] == 2
+        assert result['data']['start_row'] == 4
+
+    def test_batch_insert_persists(self, batch_workbook):
+        """Batch inserted rows are persisted."""
+        from src.excel_mcp_server_fastmcp.api.excel_operations import ExcelOperations
+        data = [
+            {"monster_id": 3005, "monster_name": "恶魔", "hp": 800},
+        ]
+        ExcelOperations.batch_insert_rows(batch_workbook, "怪物配置", data)
+        from openpyxl import load_workbook
+        wb = load_workbook(batch_workbook)
+        assert wb["怪物配置"].cell(row=4, column=1).value == 3005
+        assert wb["怪物配置"].cell(row=4, column=2).value == "恶魔"
+        wb.close()
+
+    def test_batch_insert_single_row(self, batch_workbook):
+        """Batch insert with single row."""
+        from src.excel_mcp_server_fastmcp.api.excel_operations import ExcelOperations
+        data = [{"monster_id": 3006, "monster_name": "精灵"}]
+        result = ExcelOperations.batch_insert_rows(batch_workbook, "怪物配置", data)
+        assert result['success'] is True
+        assert result['data']['inserted_count'] == 1
+
+    def test_batch_insert_empty_data(self, batch_workbook):
+        """Error when data is empty."""
+        from src.excel_mcp_server_fastmcp.api.excel_operations import ExcelOperations
+        result = ExcelOperations.batch_insert_rows(batch_workbook, "怪物配置", [])
+        assert result['success'] is False
+
+    def test_batch_insert_nonexistent_sheet(self, batch_workbook):
+        """Error when sheet doesn't exist."""
+        from src.excel_mcp_server_fastmcp.api.excel_operations import ExcelOperations
+        result = ExcelOperations.batch_insert_rows(
+            batch_workbook, "不存在的表",
+            [{"monster_id": 1}]
+        )
+        assert result['success'] is False
+        assert "不存在" in result.get('message', '')
+
+    def test_batch_insert_unknown_columns(self, batch_workbook):
+        """Unknown columns are ignored and reported."""
+        from src.excel_mcp_server_fastmcp.api.excel_operations import ExcelOperations
+        data = [
+            {"monster_id": 3007, "monster_name": "幽灵", "unknown_col": "ignored"},
+        ]
+        result = ExcelOperations.batch_insert_rows(batch_workbook, "怪物配置", data)
+        assert result['success'] is True
+        assert "unknown_col" in result['data']['unknown_columns']

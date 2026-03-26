@@ -1675,3 +1675,32 @@ class ExcelOperations:
             logger.error(f"{cls._LOG_PREFIX} {error_msg}")
             return cls._format_error_result(error_msg)
 
+    @classmethod
+    def batch_insert_rows(
+        cls,
+        file_path: str,
+        sheet_name: str,
+        data: list,
+        header_row: int = 1
+    ) -> Dict[str, Any]:
+        """
+        @intention 批量插入多行数据到工作表末尾
+
+        Args:
+            file_path: Excel文件路径
+            sheet_name: 工作表名称
+            data: 行数据列表，每行为{列名: 值}字典
+            header_row: 表头所在行号（默认1）
+
+        Returns:
+            Dict: 标准化的操作结果
+        """
+        try:
+            manager = ExcelManager(file_path)
+            result = manager.batch_insert_rows(sheet_name, data, header_row)
+            return format_operation_result(result)
+        except Exception as e:
+            error_msg = f"批量插入行失败: {str(e)}"
+            logger.error(f"{cls._LOG_PREFIX} {error_msg}")
+            return cls._format_error_result(error_msg)
+

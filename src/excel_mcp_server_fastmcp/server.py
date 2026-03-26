@@ -1527,6 +1527,23 @@ def excel_upsert_row(
 
 @mcp.tool()
 @_track_call
+def excel_batch_insert_rows(
+    file_path: str,
+    sheet_name: str,
+    data: List[Dict[str, Any]],
+    header_row: int = 1
+) -> Dict[str, Any]:
+    """
+批量插入多行数据到工作表末尾。策划批量导入配置时使用（如一次导入几十条技能/装备数据）。
+    """
+    _path_err = _validate_path(file_path)
+    if _path_err:
+        return _path_err
+    return ExcelOperations.batch_insert_rows(file_path, sheet_name, data, header_row)
+
+
+@mcp.tool()
+@_track_call
 def excel_delete_rows(
     file_path: str,
     sheet_name: str,
