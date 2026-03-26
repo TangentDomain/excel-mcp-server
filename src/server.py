@@ -161,77 +161,17 @@ mcp = FastMCP(
 
 @mcp.tool()
 def excel_list_sheets(file_path: str) -> Dict[str, Any]:
-    """列出所有工作表名称
-    
-Args:
-    file_path: Excel文件路径
-
-Returns:
-    {success, sheets, total_sheets}
-"""
+    """
+列出Excel文件中所有工作表名称。
+    """
     return ExcelOperations.list_sheets(file_path)
 
 
 @mcp.tool()
 def excel_get_sheet_headers(file_path: str) -> Dict[str, Any]:
     """
-    获取Excel文件中所有工作表的双行表头信息（游戏开发专用）
-
-    这是 excel_get_headers 的便捷封装，用于批量获取所有工作表的双行表头。
-    专为游戏配置表设计，同时获取字段描述和字段名。
-
-    Args:
-        file_path: Excel文件路径 (.xlsx/.xlsm)
-
-    Returns:
-        Dict: 包含所有工作表的双行表头信息
-        {
-            'success': bool,
-            'sheets_with_headers': [
-                {
-                    'name': str,
-                    'headers': List[str],       # 字段名（兼容性）
-                    'descriptions': List[str],  # 字段描述（第1行）
-                    'field_names': List[str],   # 字段名（第2行）
-                    'header_count': int
-                }
-            ],
-            'file_path': str,
-            'total_sheets': int
-        }
-
-    游戏配置表批量分析:
-        一次性获取所有配置表的结构信息，包括字段描述和字段名，便于快速了解整个配置文件的结构。
-
-    Example:
-        # 获取游戏配置文件中所有表的双行表头
-        result = excel_get_sheet_headers("game_config.xlsx")
-        for sheet in result['sheets_with_headers']:
-            print(f"表名: {sheet['name']}")
-            print(f"字段描述: {sheet['descriptions']}")
-            print(f"字段名: {sheet['field_names']}")
-            print("---")
-
-        # 返回示例: {
-        #   'success': True,
-        #   'sheets_with_headers': [
-        #     {
-        #       'name': '技能配置表',
-        #       'headers': ['skill_id', 'skill_name', 'skill_type'],
-        #       'descriptions': ['技能ID描述', '技能名称描述', '技能类型描述'],
-        #       'field_names': ['skill_id', 'skill_name', 'skill_type'],
-        #       'header_count': 3
-        #     },
-        #     {
-        #       'name': '装备配置表',
-        #       'headers': ['item_id', 'item_name', 'item_quality'],
-        #       'descriptions': ['装备ID描述', '装备名称描述', '装备品质描述'],
-        #       'field_names': ['item_id', 'item_name', 'item_quality'],
-        #       'header_count': 3
-        #     }
-        #   ],
-        #   'total_sheets': 2
-        # }
+批量获取所有工作表的双行表头（游戏开发专用）。
+返回每个表的字段描述（中文）和字段名（英文）。专为游戏配置表双行表头设计。
     """
     return ExcelOperations.get_sheet_headers(file_path)
 
@@ -248,17 +188,9 @@ def excel_search(
     include_formulas: bool = False,
     range: Optional[str] = None
 ) -> Dict[str, Any]:
-    """文本搜索 - 返回单元格位置信息
-    
-Args:
-    file_path: Excel文件路径
-    pattern: 搜索关键词
-    sheet_name: 工作表名(可选)
-    case_sensitive: 是否区分大小写
-
-Returns:
-    {success, matches, total}
-"""
+    """
+在单个Excel文件中搜索文本。返回匹配的单元格位置和值。支持正则。
+    """
     return ExcelOperations.search(file_path, pattern, sheet_name, case_sensitive, whole_word, use_regex, include_values, include_formulas, range)
 
 
@@ -277,35 +209,7 @@ def excel_search_directory(
     max_files: int = 100
 ) -> Dict[str, Any]:
     """
-    在目录下的所有Excel文件中搜索内容（VSCode风格搜索选项）
-
-    Args:
-        directory_path: 目录路径
-        pattern: 搜索模式。当use_regex=True时为正则表达式，否则为字面字符串
-        case_sensitive: 大小写敏感 (默认False，即忽略大小写)
-        whole_word: 全词匹配 (默认False，即部分匹配)
-        use_regex: 启用正则表达式 (默认False，即字面字符串搜索)
-        include_values: 是否搜索单元格值
-        include_formulas: 是否搜索公式内容
-        recursive: 是否递归搜索子目录
-        file_extensions: 文件扩展名过滤，如[".xlsx", ".xlsm"]
-        file_pattern: 文件名正则模式过滤
-        max_files: 最大搜索文件数限制
-
-    Returns:
-        Dict: 包含 success、matches(List[Dict])、total_matches、searched_files
-
-    Example:
-        # 普通字符串搜索目录
-        result = excel_search_directory("./data", "总计")
-        # 大小写敏感搜索
-        result = excel_search_directory("./data", "Error", case_sensitive=True)
-        # 全词匹配搜索
-        result = excel_search_directory("./data", "sum", whole_word=True)
-        # 正则表达式搜索邮箱格式
-        result = excel_search_directory("./data", r'\\w+@\\w+\\.\\w+', use_regex=True)
-        # 搜索特定文件名模式
-        result = excel_search_directory("./reports", r'\\d+', use_regex=True, file_pattern=r'.*销售.*')
+在目录下所有Excel文件中批量搜索。支持正则、大小写、全词匹配、文件名过滤。
     """
     return ExcelOperations.search_directory(directory_path, pattern, case_sensitive, whole_word, use_regex, include_values, include_formulas, recursive, file_extensions, file_pattern, max_files)
 
@@ -316,16 +220,10 @@ def excel_get_range(
     range: str,
     include_formatting: bool = False
 ) -> Dict[str, Any]:
-    """读取指定范围的单元格数据
-    
-Args:
-    file_path: Excel文件路径
-    range: 范围表达式 (如 "Sheet1!A1:C10")
-    include_formatting: 是否包含格式
-
-Returns:
-    {success, data, range_info}
-"""
+    """
+读取指定范围的原始单元格数据。适合精确读取已知区域（如"Sheet1!A1:C10"）。
+如需查询/筛选/聚合，优先使用excel_query。
+    """
     # 增强参数验证
     from .utils.validators import ExcelValidator, DataValidationError
 
@@ -371,16 +269,9 @@ def excel_get_headers(
     header_row: int = 1,
     max_columns: Optional[int] = None
 ) -> Dict[str, Any]:
-    """获取工作表表头信息
-    
-Args:
-    file_path: Excel文件路径
-    sheet_name: 工作表名
-    header_row: 表头行号
-
-Returns:
-    {success, headers, descriptions}
-"""
+    """
+获取指定工作表的表头信息。支持指定表头行号。
+    """
     return ExcelOperations.get_headers(file_path, sheet_name, header_row, max_columns)
 
 
@@ -392,17 +283,10 @@ def excel_update_range(
     preserve_formulas: bool = True,
     insert_mode: bool = True
 ) -> Dict[str, Any]:
-    """更新指定范围的单元格数据
-    
-Args:
-    file_path: Excel文件路径
-    range: 范围表达式
-    data: 更新的数据(二维数组)
-    insert_mode: 是否插入模式(默认覆盖)
-
-Returns:
-    {success, updated_range, message}
-"""
+    """
+写入数据到指定范围。适合批量写入已知数据（二维数组）。
+如需条件修改（如"火系伤害+10%"），优先使用excel_update_query。
+    """
     # 增强参数验证
     from .utils.validators import ExcelValidator, DataValidationError
 
@@ -479,22 +363,7 @@ def excel_preview_operation(
     data: Optional[List[List[Any]]] = None
 ) -> Dict[str, Any]:
     """
-    预览Excel操作的影响范围和当前数据，确保安全操作
-
-    Args:
-        file_path: Excel文件路径 (.xlsx/.xlsm)
-        range: 范围表达式，必须包含工作表名
-        operation_type: 操作类型 ("update", "delete", "format")
-        data: 对于更新操作，提供将要写入的数据
-
-    Returns:
-        Dict: 包含预览信息、当前数据、影响评估
-
-    Example:
-        # 预览更新操作
-        result = excel_preview_operation("data.xlsx", "Sheet1!A1:C10", "update", new_data)
-        # 预览删除操作
-        result = excel_preview_operation("data.xlsx", "Sheet1!5:10", "delete")
+预览操作影响范围和当前数据，不实际执行。操作前确认用。
     """
     # 读取当前数据
     current_data = ExcelOperations.get_range(file_path, range)
@@ -583,22 +452,7 @@ def excel_assess_data_impact(
     data: Optional[List[List[Any]]] = None
 ) -> Dict[str, Any]:
     """
-    全面评估Excel操作对数据的潜在影响
-
-    Args:
-        file_path: Excel文件路径 (.xlsx/.xlsm)
-        range: 范围表达式，必须包含工作表名
-        operation_type: 操作类型 ("update", "delete", "format")
-        data: 对于更新操作，提供将要写入的数据
-
-    Returns:
-        Dict: 包含详细的数据影响评估报告
-
-    Example:
-        # 评估更新操作的影响
-        result = excel_assess_data_impact("data.xlsx", "Sheet1!A1:C10", "update", new_data)
-        # 评估删除操作的影响
-        result = excel_assess_data_impact("data.xlsx", "Sheet1!5:10", "delete")
+全面评估操作对数据的潜在影响。比preview_operation更详细。
     """
     from .utils.validators import ExcelValidator, DataValidationError
 
@@ -870,20 +724,7 @@ def excel_get_operation_history(
     limit: int = 20
 ) -> Dict[str, Any]:
     """
-    获取Excel操作历史记录
-
-    Args:
-        file_path: 文件路径 (可选，用于过滤特定文件的操作)
-        limit: 返回的操作记录数量 (默认20)
-
-    Returns:
-        Dict: 包含操作历史和统计信息
-
-    Example:
-        # 获取所有操作历史
-        result = excel_get_operation_history()
-        # 获取特定文件的操作历史
-        result = excel_get_operation_history("data.xlsx", 10)
+获取操作历史记录。可按文件过滤。
     """
     try:
         recent_operations = operation_logger.get_recent_operations(limit)
@@ -938,20 +779,7 @@ def excel_create_backup(
     backup_dir: Optional[str] = None
 ) -> Dict[str, Any]:
     """
-    为Excel文件创建自动备份
-
-    Args:
-        file_path: Excel文件路径 (.xlsx/.xlsm)
-        backup_dir: 备份目录 (可选，默认在文件同目录下创建.backup文件夹)
-
-    Returns:
-        Dict: 包含备份结果和备份文件路径
-
-    Example:
-        # 创建备份
-        result = excel_create_backup("data.xlsx")
-        # 指定备份目录
-        result = excel_create_backup("data.xlsx", "./backups")
+创建Excel文件备份。默认存入同目录.backup/文件夹。
     """
     if not os.path.exists(file_path):
         return {
@@ -1009,20 +837,7 @@ def excel_restore_backup(
     target_path: Optional[str] = None
 ) -> Dict[str, Any]:
     """
-    从备份恢复Excel文件
-
-    Args:
-        backup_path: 备份文件路径
-        target_path: 目标文件路径 (可选，默认恢复到原始位置)
-
-    Returns:
-        Dict: 包含恢复结果
-
-    Example:
-        # 恢复备份
-        result = excel_restore_backup("./backups/data_backup_20250117_143022.xlsx")
-        # 恢复到指定位置
-        result = excel_restore_backup("./backups/data_backup_20250117_143022.xlsx", "restored_data.xlsx")
+从备份恢复Excel文件。可恢复到原位置或指定位置。
     """
     if not os.path.exists(backup_path):
         return {
@@ -1076,17 +891,7 @@ def excel_list_backups(
     backup_dir: Optional[str] = None
 ) -> Dict[str, Any]:
     """
-    列出指定文件的所有备份
-
-    Args:
-        file_path: 原始Excel文件路径
-        backup_dir: 备份目录 (可选)
-
-    Returns:
-        Dict: 包含备份文件列表
-
-    Example:
-        result = excel_list_backups("data.xlsx")
+列出指定文件的所有备份版本。
     """
     try:
         # 确定备份目录
@@ -1146,17 +951,9 @@ def excel_insert_rows(
     row_index: int,
     count: int = 1
 ) -> Dict[str, Any]:
-    """插入行
-    
-Args:
-    file_path: Excel文件路径
-    sheet_name: 工作表名
-    row_index: 插入位置
-    count: 插入数量
-
-Returns:
-    {success, inserted_count, message}
-"""
+    """
+在指定位置插入空行。
+    """
     return ExcelOperations.insert_rows(file_path, sheet_name, row_index, count)
 
 
@@ -1168,22 +965,7 @@ def excel_insert_columns(
     count: int = 1
 ) -> Dict[str, Any]:
     """
-    在指定位置插入空列
-
-    Args:
-        file_path: Excel文件路径 (.xlsx/.xlsm)
-        sheet_name: 工作表名称
-        column_index: 插入位置 (1-based，即第1列对应Excel中的A列)
-        count: 插入列数 (默认值: 1，即插入1列)
-
-    Returns:
-        Dict: 包含 success、inserted_columns、message
-
-    Example:
-        # 在第2列插入1列（使用默认count=1，即在B列前插入1列）
-        result = excel_insert_columns("data.xlsx", "Sheet1", 2)
-        # 在第1列插入2列（明确指定count，即在A列前插入2列）
-        result = excel_insert_columns("data.xlsx", "Sheet1", 1, 2)
+在指定位置插入空列（1-based索引，1=A列）。
     """
     return ExcelOperations.insert_columns(file_path, sheet_name, column_index, count)
 
@@ -1194,15 +976,9 @@ def excel_find_last_row(
     sheet_name: str,
     column: Optional[Union[str, int]] = None
 ) -> Dict[str, Any]:
-    """查找最后一行
-    
-Args:
-    file_path: Excel文件路径
-    sheet_name: 工作表名
-
-Returns:
-    {success, last_row}
-"""
+    """
+查找工作表最后一行（有数据的最大行号）。
+    """
     return ExcelOperations.find_last_row(file_path, sheet_name, column)
 
 
@@ -1211,14 +987,9 @@ def excel_create_file(
     file_path: str,
     sheet_names: Optional[List[str]] = None
 ) -> Dict[str, Any]:
-    """创建新的Excel文件
-    
-Args:
-    file_path: 新文件路径
-
-Returns:
-    {success, message}
-"""
+    """
+创建新的Excel文件（默认含1个空工作表）。
+    """
     return ExcelOperations.create_file(file_path, sheet_names)
 
 
@@ -1230,22 +1001,7 @@ def excel_export_to_csv(
     encoding: str = "utf-8"
 ) -> Dict[str, Any]:
     """
-    将Excel工作表导出为CSV文件
-
-    Args:
-        file_path: Excel文件路径 (.xlsx/.xlsm)
-        output_path: 输出CSV文件路径
-        sheet_name: 工作表名称 (默认使用活动工作表)
-        encoding: 文件编码 (默认: utf-8，可选: gbk)
-
-    Returns:
-        Dict: 包含 success、output_path、row_count、message
-
-    Example:
-        # 导出活动工作表为CSV
-        result = excel_export_to_csv("data.xlsx", "output.csv")
-        # 导出指定工作表
-        result = excel_export_to_csv("report.xlsx", "summary.csv", "汇总", "gbk")
+将Excel工作表导出为CSV文件。支持指定编码(utf-8/gbk)。
     """
     return ExcelOperations.export_to_csv(file_path, output_path, sheet_name, encoding)
 
@@ -1259,23 +1015,7 @@ def excel_import_from_csv(
     has_header: bool = True
 ) -> Dict[str, Any]:
     """
-    从CSV文件导入数据创建Excel文件
-
-    Args:
-        csv_path: CSV文件路径
-        output_path: 输出Excel文件路径
-        sheet_name: 工作表名称 (默认: Sheet1)
-        encoding: CSV文件编码 (默认: utf-8，可选: gbk)
-        has_header: 是否包含表头行
-
-    Returns:
-        Dict: 包含 success、output_path、row_count、sheet_name
-
-    Example:
-        # 从CSV创建Excel文件
-        result = excel_import_from_csv("data.csv", "output.xlsx")
-        # 指定编码和工作表名
-        result = excel_import_from_csv("sales.csv", "report.xlsx", "销售数据", "gbk")
+从CSV文件导入数据创建Excel文件。
     """
     return ExcelOperations.import_from_csv(csv_path, output_path, sheet_name, encoding, has_header)
 
@@ -1287,21 +1027,7 @@ def excel_convert_format(
     target_format: str = "xlsx"
 ) -> Dict[str, Any]:
     """
-    转换Excel文件格式
-
-    Args:
-        input_path: 输入文件路径
-        output_path: 输出文件路径
-        target_format: 目标格式，可选值: "xlsx", "xlsm", "csv", "json"
-
-    Returns:
-        Dict: 包含 success、input_format、output_format、file_size
-
-    Example:
-        # 将xlsm转换为xlsx
-        result = excel_convert_format("macro.xlsm", "data.xlsx", "xlsx")
-        # 转换为JSON格式
-        result = excel_convert_format("data.xlsx", "data.json", "json")
+转换Excel文件格式。支持xlsx/xlsm/csv/json互转。
     """
     return ExcelOperations.convert_format(input_path, output_path, target_format)
 
@@ -1313,26 +1039,7 @@ def excel_merge_files(
     merge_mode: str = "sheets"
 ) -> Dict[str, Any]:
     """
-    合并多个Excel文件
-
-    Args:
-        input_files: 输入文件路径列表
-        output_path: 输出文件路径
-        merge_mode: 合并模式，可选值:
-            - "sheets": 将每个文件作为独立工作表
-            - "append": 将数据追加到单个工作表中
-            - "horizontal": 水平合并（按列）
-
-    Returns:
-        Dict: 包含 success、merged_files、total_sheets、output_path
-
-    Example:
-        # 将多个文件合并为多个工作表
-        files = ["file1.xlsx", "file2.xlsx", "file3.xlsx"]
-        result = excel_merge_files(files, "merged.xlsx", "sheets")
-
-        # 将数据追加合并
-        result = excel_merge_files(files, "combined.xlsx", "append")
+合并多个Excel文件。支持三种模式: sheets(各文件独立工作表)/append(追加行)/horizontal(按列拼接)。
     """
     return ExcelOperations.merge_files(input_files, output_path, merge_mode)
 
@@ -1340,26 +1047,7 @@ def excel_merge_files(
 @mcp.tool()
 def excel_get_file_info(file_path: str) -> Dict[str, Any]:
     """
-    获取Excel文件的详细信息
-
-    Args:
-        file_path: Excel文件路径
-
-    Returns:
-        Dict: 包含文件信息，如大小、创建时间、工作表数量、格式等
-
-    Example:
-        # 获取文件详细信息
-        result = excel_get_file_info("data.xlsx")
-        # 返回: {
-        #   'success': True,
-        #   'file_size': 12345,
-        #   'created_time': '2025-01-01 10:00:00',
-        #   'modified_time': '2025-01-02 15:30:00',
-        #   'format': 'xlsx',
-        #   'sheet_count': 3,
-        #   'has_macros': False
-        # }
+获取Excel文件信息：大小、工作表数量、格式、创建/修改时间。
     """
     return ExcelOperations.get_file_info(file_path)
 
@@ -1370,15 +1058,9 @@ def excel_create_sheet(
     sheet_name: str,
     index: Optional[int] = None
 ) -> Dict[str, Any]:
-    """创建新工作表
-    
-Args:
-    file_path: Excel文件路径
-    sheet_name: 新工作表名
-
-Returns:
-    {success, message}
-"""
+    """
+创建新工作表，可指定位置。
+    """
     return ExcelOperations.create_sheet(file_path, sheet_name, index)
 
 
@@ -1387,15 +1069,9 @@ def excel_delete_sheet(
     file_path: str,
     sheet_name: str
 ) -> Dict[str, Any]:
-    """删除工作表
-    
-Args:
-    file_path: Excel文件路径
-    sheet_name: 要删除的工作表名
-
-Returns:
-    {success, message}
-"""
+    """
+删除指定工作表。
+    """
     # 开始操作会话
     operation_logger.start_session(file_path)
 
@@ -1438,19 +1114,7 @@ def excel_rename_sheet(
     new_name: str
 ) -> Dict[str, Any]:
     """
-    重命名工作表
-
-    Args:
-        file_path: Excel文件路径 (.xlsx/.xlsm)
-        old_name: 当前工作表名称
-        new_name: 新工作表名称 (不能与现有重复)
-
-    Returns:
-        Dict: 包含 success、old_name、new_name
-
-    Example:
-        # 重命名工作表
-        result = excel_rename_sheet("data.xlsx", "Sheet1", "主数据")
+重命名工作表。新名称不能与已有工作表重复。
     """
     return ExcelOperations.rename_sheet(file_path, old_name, new_name)
 
@@ -1462,17 +1126,9 @@ def excel_delete_rows(
     row_index: int,
     count: int = 1
 ) -> Dict[str, Any]:
-    """删除行
-    
-Args:
-    file_path: Excel文件路径
-    sheet_name: 工作表名
-    row_index: 删除起始位置
-    count: 删除数量
-
-Returns:
-    {success, deleted_count, message}
-"""
+    """
+删除指定位置的行。
+    """
     # 开始操作会话
     operation_logger.start_session(file_path)
 
@@ -1517,22 +1173,7 @@ def excel_delete_columns(
     count: int = 1
 ) -> Dict[str, Any]:
     """
-    删除指定列
-
-    Args:
-        file_path: Excel文件路径 (.xlsx/.xlsm)
-        sheet_name: 工作表名称
-        column_index: 起始列号 (1-based，即第1列对应Excel中的A列)
-        count: 删除列数 (默认值: 1，即删除1列)
-
-    Returns:
-        Dict: 包含 success、deleted_columns、message
-
-    Example:
-        # 删除第2列（使用默认count=1，即删除B列）
-        result = excel_delete_columns("data.xlsx", "Sheet1", 2)
-        # 删除第1-3列（删除3列，从A列开始删除A、B、C列）
-        result = excel_delete_columns("data.xlsx", "Sheet1", 1, 3)
+删除指定位置的列（1-based索引）。
     """
     # 开始操作会话
     operation_logger.start_session(file_path)
@@ -1577,22 +1218,7 @@ def excel_set_formula(
     formula: str
 ) -> Dict[str, Any]:
     """
-    设置单元格公式
-
-    Args:
-        file_path: Excel文件路径 (.xlsx/.xlsm)
-        sheet_name: 工作表名称
-        cell_address: 单元格地址 (如"A1")
-        formula: Excel公式 (不包含等号)
-
-    Returns:
-        Dict: 包含 success、formula、calculated_value
-
-    Example:
-        # 设置求和公式
-        result = excel_set_formula("data.xlsx", "Sheet1", "D10", "SUM(D1:D9)")
-        # 设置平均值公式
-        result = excel_set_formula("data.xlsx", "Sheet1", "E1", "AVERAGE(A1:A10)")
+设置单元格公式（不含等号）。如"SUM(A1:A10)"。返回计算结果。
     """
     return ExcelOperations.set_formula(file_path, sheet_name, cell_address, formula)
 
@@ -1602,22 +1228,7 @@ def excel_evaluate_formula(
     context_sheet: Optional[str] = None
 ) -> Dict[str, Any]:
     """
-    临时执行Excel公式并返回计算结果，不修改文件
-
-    Args:
-        formula: Excel公式 (不包含等号，如"SUM(A1:A10)")
-        context_sheet: 公式执行的上下文工作表名称 (可选)
-
-    Returns:
-        Dict: 包含 success、formula、result、result_type
-
-    Example:
-        # 计算基本数学运算
-        result = excel_evaluate_formula("SUM(1,2,3,4,5)")
-        # 计算平均值
-        result = excel_evaluate_formula("AVERAGE(10,20,30)")
-        # 在特定工作表上下文中计算
-        result = excel_evaluate_formula("SUM(A1:A10)", "Sheet1")
+临时执行公式并返回结果，不修改文件。可做快速计算器。
     """
     return ExcelOperations.evaluate_formula(formula, context_sheet)
 
@@ -1629,23 +1240,16 @@ def excel_query(
     include_headers: bool = True,
     output_format: str = "table"
 ) -> Dict[str, Any]:
-    """SQL查询 - 优先使用的查询分析工具
-    
-支持: WHERE, GROUP BY, HAVING, ORDER BY, LIMIT, OFFSET, DISTINCT, IN, BETWEEN, IS NULL/NOT NULL, NOT LIKE, NOT IN
-聚合: COUNT, SUM, AVG, MAX, MIN
-中文列名: 自动替换，策划可直接用中文字段名查询
-
-Args:
-    file_path: Excel文件路径
-    query_expression: SQL语句
-    include_headers: 是否包含表头
-    output_format: 输出格式，可选 "table"(默认), "json", "csv"
-
-Returns:
-    {success, data, query_info, message}
-
-示例: excel_query("data.xlsx", "SELECT type, AVG(伤害) FROM 技能表 GROUP BY type")
-"""
+    """
+SQL查询Excel数据。优先使用此工具而非excel_get_range进行数据查询和分析。
+支持中文列名、双行表头自动识别、数学表达式。
+支持: SELECT/WHERE/GROUP BY/HAVING/ORDER BY/LIMIT/OFFSET/DISTINCT/IN/BETWEEN/IS NULL/NOT LIKE/NOT IN/JOIN
+聚合: COUNT/SUM/AVG/MAX/MIN/COUNT(DISTINCT)
+表关联: INNER JOIN / LEFT JOIN（同文件内工作表关联，ON等值连接）
+不支持: 子查询/CASE WHEN/UNION/RIGHT JOIN/CROSS JOIN（会给出替代方案）
+输出格式: table(默认Markdown)/json/csv
+示例: excel_query("技能表.xlsx", "SELECT 类型, AVG(伤害) FROM 技能配置 GROUP BY 类型 HAVING COUNT(*)>2 ORDER BY AVG(伤害) DESC")
+    """
     # 参数验证
     if not file_path or not file_path.strip():
         return {
@@ -1751,23 +1355,12 @@ def excel_update_query(
     query_expression: str,
     dry_run: bool = False
 ) -> Dict[str, Any]:
-    """SQL UPDATE - 基于WHERE条件批量修改Excel数据
-    
-支持: UPDATE ... SET ... WHERE 语法
-SET表达式: 列=常量, 列=列引用, 列=算术表达式(如 伤害*1.1, 攻击力+10)
-WHERE条件: 复用excel_query的全部条件语法(AND/OR/LIKE/IN/BETWEEN/IS NULL等)
-中文列名: 自动替换，策划可直接用中文字段名
-dry_run: 预览模式，只返回影响范围不实际修改
-
-Args:
-    file_path: Excel文件路径
-    query_expression: UPDATE SQL语句
-    dry_run: 预览模式，默认false
-
-Returns:
-    {success, affected_rows, changes: [{row, column, old_value, new_value}], message}
-
-示例: excel_update_query("data.xlsx", "UPDATE 技能表 SET 伤害 = 伤害 * 1.1 WHERE 元素 = '火'")
+    """
+SQL UPDATE批量修改Excel数据。优先使用此工具而非excel_update_range进行条件修改。
+支持: SET 列=常量/列引用/算术表达式(如 伤害*1.1, 攻击力+10)
+WHERE条件复用excel_query全部语法，支持中文列名。
+dry_run=True 可预览影响范围不实际修改。
+示例: excel_update_query("技能表.xlsx", "UPDATE 技能配置 SET 伤害 = 伤害 * 1.1 WHERE 元素 = '火'", dry_run=True)
     """
     if not file_path or not file_path.strip():
         return {'success': False, 'message': '文件路径不能为空',
@@ -1804,21 +1397,11 @@ def excel_describe_table(
     file_path: str,
     sheet_name: str = None
 ) -> Dict[str, Any]:
-    """查看表结构 - 快速了解Excel工作表的列信息、数据类型和统计摘要
-
-无需写SQL即可了解表结构，适合在查询前快速了解数据概况。
-自动识别双行表头（第1行中文描述+第2行英文字段名）。
-
-Args:
-    file_path: Excel文件路径
-    sheet_name: 工作表名（可选，不填则返回第一个工作表）
-
-Returns:
-    {success, columns, row_count, sheet_name, header_type, query_info}
-    columns: [{name, type, description, non_null, sample_values}]
-
-示例: excel_describe_table("技能配置.xlsx", "SkillConfig")
-"""
+    """
+快速查看Excel工作表结构。查询前先用此工具了解有哪些列、什么类型。
+自动识别双行表头（第1行中文描述+第2行英文字段名），输出中英映射。
+返回: 列名、类型、非空数量、示例值、行数。
+    """
     if not file_path or not file_path.strip():
         return {'success': False, 'message': '文件路径不能为空', 'data': []}
 
@@ -1939,17 +1522,9 @@ def excel_format_cells(
     formatting: Optional[Dict[str, Any]] = None,
     preset: Optional[str] = None
 ) -> Dict[str, Any]:
-    """格式化单元格 - 颜色、字体、对齐等
-    
-Args:
-    file_path: Excel文件路径
-    sheet_name: 工作表名
-    range: 范围表达式
-    preset: 预设样式 (highlight/warning/success)
-
-Returns:
-    {success, formatted_count, message}
-"""
+    """
+格式化单元格样式。支持preset(highlight/warning/success)和自定义格式。
+    """
     return ExcelOperations.format_cells(file_path, sheet_name, range, formatting, preset)
 
 
@@ -1960,21 +1535,7 @@ def excel_merge_cells(
     range: str
 ) -> Dict[str, Any]:
     """
-    合并指定范围的单元格
-
-    Args:
-        file_path: Excel文件路径 (.xlsx/.xlsm)
-        sheet_name: 工作表名称
-        range: 要合并的范围 (如"A1:C3")
-
-    Returns:
-        Dict: 包含 success、message、merged_range
-
-    Example:
-        # 合并A1:C3范围的单元格
-        result = excel_merge_cells("data.xlsx", "Sheet1", "A1:C3")
-        # 合并标题行
-        result = excel_merge_cells("report.xlsx", "Summary", "A1:E1")
+合并指定范围的单元格（如"A1:C3"）。
     """
     return ExcelOperations.merge_cells(file_path, sheet_name, range)
 
@@ -1986,19 +1547,7 @@ def excel_unmerge_cells(
     range: str
 ) -> Dict[str, Any]:
     """
-    取消合并指定范围的单元格
-
-    Args:
-        file_path: Excel文件路径 (.xlsx/.xlsm)
-        sheet_name: 工作表名称
-        range: 要取消合并的范围 (如"A1:C3")
-
-    Returns:
-        Dict: 包含 success、message、unmerged_range
-
-    Example:
-        # 取消合并A1:C3范围的单元格
-        result = excel_unmerge_cells("data.xlsx", "Sheet1", "A1:C3")
+取消合并指定范围的单元格。
     """
     return ExcelOperations.unmerge_cells(file_path, sheet_name, range)
 
@@ -2011,22 +1560,7 @@ def excel_set_borders(
     border_style: str = "thin"
 ) -> Dict[str, Any]:
     """
-    为指定范围设置边框样式
-
-    Args:
-        file_path: Excel文件路径 (.xlsx/.xlsm)
-        sheet_name: 工作表名称
-        range: 目标范围 (如"A1:C10")
-        border_style: 边框样式，可选值: "thin", "thick", "medium", "double", "dotted", "dashed"
-
-    Returns:
-        Dict: 包含 success、message、styled_range
-
-    Example:
-        # 为表格添加细边框
-        result = excel_set_borders("data.xlsx", "Sheet1", "A1:E10", "thin")
-        # 为标题添加粗边框
-        result = excel_set_borders("data.xlsx", "Sheet1", "A1:E1", "thick")
+为范围设置边框。样式: thin/thick/medium/double/dotted/dashed。
     """
     return ExcelOperations.set_borders(file_path, sheet_name, range, border_style)
 
@@ -2040,23 +1574,7 @@ def excel_set_row_height(
     count: int = 1
 ) -> Dict[str, Any]:
     """
-    调整指定行的高度
-
-    Args:
-        file_path: Excel文件路径 (.xlsx/.xlsm)
-        sheet_name: 工作表名称
-        row_index: 起始行号 (1-based)
-        height: 行高 (磅值，如15.0)
-        count: 调整行数 (默认值: 1)
-
-    Returns:
-        Dict: 包含 success、message、affected_rows
-
-    Example:
-        # 调整第1行高度为25磅
-        result = excel_set_row_height("data.xlsx", "Sheet1", 1, 25.0)
-        # 调整第2-4行高度为18磅
-        result = excel_set_row_height("data.xlsx", "Sheet1", 2, 18.0, 3)
+调整行高（磅值，如25.0）。可同时调整连续多行。
     """
     return ExcelOperations.set_row_height(file_path, sheet_name, row_index, height, count)
 
@@ -2070,23 +1588,7 @@ def excel_set_column_width(
     count: int = 1
 ) -> Dict[str, Any]:
     """
-    调整指定列的宽度
-
-    Args:
-        file_path: Excel文件路径 (.xlsx/.xlsm)
-        sheet_name: 工作表名称
-        column_index: 起始列号 (1-based，1=A列)
-        width: 列宽 (字符单位，如12.0)
-        count: 调整列数 (默认值: 1)
-
-    Returns:
-        Dict: 包含 success、message、affected_columns
-
-    Example:
-        # 调整A列宽度为15字符
-        result = excel_set_column_width("data.xlsx", "Sheet1", 1, 15.0)
-        # 调整B-D列宽度为12字符
-        result = excel_set_column_width("data.xlsx", "Sheet1", 2, 12.0, 3)
+调整列宽（字符单位，如15.0）。可同时调整连续多列。
     """
     return ExcelOperations.set_column_width(file_path, sheet_name, column_index, width, count)
 
@@ -2099,28 +1601,8 @@ def excel_compare_files(
     file2_path: str
 ) -> Dict[str, Any]:
     """
-    比较两个Excel文件的所有工作表差异
-
-    逐工作表对比两个文件，检测结构差异（增删工作表）和单元格级别的值变化。
-
-    💡 **提示**: 如需按ID列做对象级对比（新增/删除/修改），请使用 excel_compare_sheets 对指定工作表进行精确对比。
-
-    Args:
-        file1_path: 第一个Excel文件路径（基准版本）
-        file2_path: 第二个Excel文件路径（对比版本）
-
-    Returns:
-        Dict: 比较结果
-        - identical: 文件是否完全相同
-        - structural_differences: 工作表增减等结构差异
-        - sheet_comparisons: 各工作表的详细对比结果
-        - summary: 差异统计摘要
-
-    Example:
-        # 对比技能表两个版本
-        result = excel_compare_files("skills_v1.xlsx", "skills_v2.xlsx")
-        # 对比整批配置表
-        result = excel_compare_files("config_old.xlsx", "config_new.xlsx")
+对比两个Excel文件的所有工作表差异（结构差异+单元格值变化）。
+如需按ID做对象级对比（新增/删除/修改），使用excel_compare_sheets。
     """
     return ExcelOperations.compare_files(file1_path, file2_path)
 
@@ -2133,63 +1615,8 @@ def excel_check_duplicate_ids(
     header_row: int = 1
 ) -> Dict[str, Any]:
     """
-    检查Excel工作表中ID列的重复值
-
-    💡 **SQL替代方案**: 对于ID重复检测，可以使用 excel_query 实现更灵活的分析
-
-    专为游戏配置表设计，快速识别ID重复问题，确保配置数据的唯一性。
-
-    🎯 使用场景对比：
-    ```python
-    # ❌ 专用重复检测 - 功能固定
-    result = excel_check_duplicate_ids("skills.xlsx", "技能配置表", "ID")
-
-    # ✅ SQL查询 - 更灵活强大
-    # 找出重复ID及详细信息
-    result = excel_query("skills.xlsx", "SELECT ID, 技能名, COUNT(*) as count FROM 技能配置表 GROUP BY ID HAVING COUNT(*) > 1")
-
-    # 分析ID分布情况
-    result = excel_query("skills.xlsx", "SELECT ID, 技能名, 技能类型 FROM 技能配置表 WHERE ID IN (SELECT ID FROM 技能配置表 GROUP BY ID HAVING COUNT(*) > 1)")
-    ```
-
-    🔍 分析能力对比：
-    • 此API: 快速检测ID重复，提供基础统计
-    • excel_query: 完整SQL分析，支持复杂条件和详细信息查询
-
-    Args:
-        file_path: Excel文件路径 (.xlsx/.xlsm)
-        sheet_name: 工作表名称
-        id_column: ID列位置（1-based数字或列名），默认第一列
-        header_row: 表头行号（1-based），默认第一行
-
-    Returns:
-        Dict: 查重结果
-        {
-            "success": true,
-            "has_duplicates": true,
-            "duplicate_count": 2,
-            "total_ids": 100,
-            "unique_ids": 98,
-            "duplicates": [
-                {
-                    "id_value": "100001",
-                    "count": 3,
-                    "rows": [5, 15, 25]
-                },
-                {
-                    "id_value": "100002",
-                    "count": 2,
-                    "rows": [8, 18]
-                }
-            ],
-            "message": "发现2个重复ID，涉及5行数据"
-        }
-
-    Example:
-        # 检查技能配置表ID重复
-        result = excel_check_duplicate_ids("skills.xlsx", "技能配置表")
-        # 检查装备表第2列ID重复
-        result = excel_check_duplicate_ids("items.xlsx", "装备配置表", id_column=2)
+检查配置表ID列是否有重复值。返回重复ID及其所在行。
+也可用excel_query实现: SELECT ID, COUNT(*) as c FROM 表 GROUP BY ID HAVING c>1
     """
     return ExcelOperations.check_duplicate_ids(file_path, sheet_name, id_column, header_row)
 
@@ -2203,18 +1630,9 @@ def excel_compare_sheets(
     id_column: Union[int, str] = 1,
     header_row: int = 1
 ) -> Dict[str, Any]:
-    """比较两个工作表的差异
-    
-Args:
-    file1_path: 第一个文件
-    sheet1_name: 第一个工作表
-    file2_path: 第二个文件
-    sheet2_name: 第二个工作表
-    id_column: ID列位置
-
-Returns:
-    {success, data: {added, removed, modified}, message}
-"""
+    """
+按ID列精确对比两个工作表，输出新增/删除/修改的记录。
+    """
     return ExcelOperations.compare_sheets(file1_path, sheet1_name, file2_path, sheet2_name, id_column, header_row)
 # ==================== 主程序 ====================
 if __name__ == "__main__":
