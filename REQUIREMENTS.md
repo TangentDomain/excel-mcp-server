@@ -13,6 +13,7 @@
 | 📈 可观测性 | REQ-013 | P2 | 结构化日志/工具频率/错误分类 | 部分完成 |
 | 🌍 兼容性 | REQ-012 | P1 | 多客户端/跨平台/CI矩阵 | 大部分完成 |
 | 🏗️ 基建 | REQ-008 | P2 | git worktree隔离 | OPEN |
+| 🤖 AI体验优化 | REQ-025 | P1 | 返回值统一/错误结构化/大结果截断/重复工具合并 | 持续迭代 |
 
 ## OPEN（待实现）
 
@@ -251,3 +252,13 @@
 - **描述**：重命名指定Sheet的列名
 - **验收标准**：单列重命名 + 批量重命名 + 列名不存在时报错，至少3个测试
 - **状态**：OPEN
+
+### REQ-025 [P1] AI体验优化线（持续迭代，不关闭）
+- **来源**：产品定位复盘 — MCP工具的用户是AI不是人类，需要优化AI使用体验
+- **关注点**：
+  1. **返回值结构统一**：所有工具返回统一的JSON结构（success/error/data/meta），降低AI解析成本
+  2. **错误信息结构化**：SQL报错返回`{error, suggestion, available_columns, original_sql}`，AI能直接用suggestion重试
+  3. **大结果自动截断**：查询结果超过阈值（如200行）时自动截断+提示"建议加WHERE/LIMIT"，保护AI上下文
+  4. **合并重复工具**：`get_headers`和`get_sheet_headers`合并、`preview_operation`和`assess_data_impact`合并，减少AI选择困难
+- **验收标准**：每个子项独立验收，MCP验证中AI选工具准确率作为核心指标
+- **状态**：OPEN（持续迭代，不关闭）
