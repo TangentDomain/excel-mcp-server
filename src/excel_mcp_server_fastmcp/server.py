@@ -854,6 +854,9 @@ def _analyze_current_data(data: List[List[Any]]) -> Dict[str, Any]:
                 elif isinstance(cell, (int, float)):
                     has_numeric_data = True
                     data_types['numeric'] = data_types.get('numeric', 0) + 1
+                elif isinstance(cell, datetime):
+                    has_dates = True
+                    data_types['dates'] = data_types.get('dates', 0) + 1
                 else:
                     data_types['other'] = data_types.get('other', 0) + 1
 
@@ -1612,10 +1615,14 @@ def excel_query(
 SQL查询Excel数据（只读）。优先使用此工具而非excel_get_range进行数据查询和分析。
 参数query_expression只接受SELECT语句。批量修改请用excel_update_query。
 支持中文列名、双行表头自动识别、数学表达式。
-支持: SELECT/WHERE/GROUP BY/HAVING/ORDER BY/LIMIT/OFFSET/DISTINCT/IN/BETWEEN/IS NULL/NOT LIKE/NOT IN/JOIN
-聚合: COUNT/SUM/AVG/MAX/MIN/COUNT(DISTINCT)
-表关联: INNER JOIN / LEFT JOIN（同文件内工作表关联，ON等值连接）
-不支持: 子查询/CASE WHEN/UNION/RIGHT JOIN/CROSS JOIN（会给出替代方案）
+基础: SELECT/DISTINCT/别名(AS)/数学表达式(+-*/%)
+条件: WHERE/AND/OR/LIKE/IN/NOT IN/BETWEEN/IS NULL/NOT
+高级: 子查询(WHERE col IN(SELECT...))/CASE WHEN/COALESCE/EXISTS/CTE(WITH)
+聚合: COUNT/SUM/AVG/MAX/MIN/COUNT(DISTINCT)/GROUP BY/HAVING/TOTAL行
+排序: ORDER BY DESC/ASC/LIMIT/OFFSET
+关联: INNER JOIN/LEFT JOIN（同文件内工作表）
+字符串: UPPER/LOWER/TRIM/LENGTH/CONCAT/REPLACE/SUBSTRING/LEFT/RIGHT
+不支持: UNION/窗口函数/INSERT/DELETE/RIGHT JOIN/CROSS JOIN/FROM子查询
 输出格式: table(默认Markdown)/json/csv
 示例: excel_query("技能表.xlsx", "SELECT 类型, AVG(伤害) FROM 技能配置 GROUP BY 类型 HAVING COUNT(*)>2 ORDER BY AVG(伤害) DESC")
     """
@@ -1692,8 +1699,8 @@ def excel_update_query(
     """
 SQL UPDATE批量修改Excel数据。优先使用此工具而非excel_update_range进行条件修改。
 参数update_expression只接受UPDATE语句（如"UPDATE 表 SET 列=值 WHERE 条件"），查询请用excel_query。
-支持: SET 列=常量/列引用/算术表达式(如 伤害*1.1, 攻击力+10)
-WHERE条件复用excel_query全部语法，支持中文列名。
+SET支持: 列=常量/列引用/算术表达式(如 伤害*1.1, 攻击力+10)
+WHERE支持: 全部excel_query条件语法(=/>/</LIKE/IN/BETWEEN/IS NULL/AND/OR/NOT)，含中文列名。
 事务保护：写入失败自动回滚，不会损坏文件。
 dry_run=True 可预览影响范围不实际修改。
 示例: excel_update_query("技能表.xlsx", "UPDATE 技能配置 SET 伤害 = 伤害 * 1.1 WHERE 元素 = '火'", dry_run=True)
