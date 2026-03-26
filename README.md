@@ -339,7 +339,7 @@ SELECT a.skill_name, b.equip_name FROM SkillConfig a INNER JOIN EquipConfig b ON
 ### 🔍 搜索与分析
 - `excel_search` - 正则表达式搜索
 - `excel_search_directory` - 目录批量搜索
-- `excel_query` - SQL查询（支持双行表头、WHERE/GROUP BY/HAVING/ORDER BY/LIMIT/OFFSET/DISTINCT/JOIN/子查询/CTE/CASE WHEN/COALESCE/字符串函数/数学表达式）
+- `excel_query` - SQL查询（支持双行表头、WHERE/GROUP BY/HAVING/ORDER BY/LIMIT/OFFSET/DISTINCT/JOIN/UNION/子查询/CTE/CASE WHEN/COALESCE/字符串函数/数学表达式）
 - `excel_update_query` - SQL UPDATE批量修改（SET常量/列引用/算术，WHERE条件，dry_run预览）
 - `excel_describe_table` - 查看表结构（列名、类型、描述、样本值，自动识别双行表头）
 - `excel_compare_sheets` - 工作表对比（游戏配置优化）
@@ -459,6 +459,10 @@ SELECT skill_name, CASE WHEN damage > 200 THEN '高伤' WHEN damage > 100 THEN '
 WITH high_dmg AS (SELECT * FROM 技能表 WHERE damage > 150) SELECT * FROM high_dmg ORDER BY damage DESC
 WITH mages AS (SELECT * FROM 技能表 WHERE skill_type='法师'), strong AS (SELECT * FROM mages WHERE damage >= 150) SELECT * FROM strong
 
+-- UNION / UNION ALL 合并查询结果
+SELECT name, damage FROM 技能表 WHERE skill_type='法师' UNION ALL SELECT name, damage FROM 技能表 WHERE skill_type='战士' ORDER BY damage DESC LIMIT 10
+SELECT DISTINCT skill_type FROM 技能表1 UNION SELECT DISTINCT skill_type FROM 技能表2
+
 -- COALESCE / IFNULL 空值替换
 SELECT skill_name, COALESCE(description, '无描述') as desc FROM 技能表
 
@@ -487,7 +491,8 @@ UPDATE 技能表 SET 伤害 = 伤害 * 1.1 WHERE 元素 = '火'  -- dry_run=True
 
 **不支持的语法（有清晰替代方案提示）：**
 - FROM子查询 `FROM (SELECT ...)`（提示：改用WHERE子查询或CTE）
-- UNION / 窗口函数（提示：分别查询或用子查询+GROUP BY）
+- 窗口函数 ROW_NUMBER/RANK/DENSE_RANK（提示：改用子查询+GROUP BY）
+- INSERT/DELETE语句（提示：写入请用excel_upsert_row或excel_update_query）
 - RIGHT JOIN / CROSS JOIN / FULL JOIN（游戏场景极少使用）
 
 **双行表头自动识别：**
