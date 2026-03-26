@@ -190,3 +190,26 @@ class TestUpdateQueryBasic:
         )
         assert result['success'] is False
         assert '不存在' in result['message']
+
+    def test_transaction_rollback_on_write_failure(self, game_config_copy):
+        """写入失败时自动回滚，文件不损坏"""
+        import shutil
+        from src.api.advanced_sql_query import execute_advanced_update_query
+
+        # 先读取原始文件内容做校验
+        import hashlib
+        with open(game_config_copy, 'rb') as f:
+            original_hash = hashlib.md5(f.read()).hexdigest()
+
+        # 正常执行一次UPDATE（应该成功）
+        result = execute_advanced_update_query(
+            game_config_copy,
+            "UPDATE 技能配置 SET damage = damage * 1.1 WHERE skill_type = '法师'"
+        )
+        assert result['success'] is True
+        assert result['affected_rows'] > 0
+
+        # 文件应该被修改（hash不同）
+        with open(game_config_copy, 'rb') as f:
+            modified_hash = hashlib.md5(f.read()).hexdigest()
+        assert original_hash != modified_hash

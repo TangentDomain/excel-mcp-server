@@ -1359,6 +1359,7 @@ def excel_update_query(
 SQL UPDATE批量修改Excel数据。优先使用此工具而非excel_update_range进行条件修改。
 支持: SET 列=常量/列引用/算术表达式(如 伤害*1.1, 攻击力+10)
 WHERE条件复用excel_query全部语法，支持中文列名。
+事务保护：写入失败自动回滚，不会损坏文件。
 dry_run=True 可预览影响范围不实际修改。
 示例: excel_update_query("技能表.xlsx", "UPDATE 技能配置 SET 伤害 = 伤害 * 1.1 WHERE 元素 = '火'", dry_run=True)
     """

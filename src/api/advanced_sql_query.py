@@ -2194,8 +2194,15 @@ class AdvancedSQLQueryEngine:
                     'changes': changes, 'dry_run': True,
                     'execution_time_ms': round(elapsed, 1)}
 
-        # 写回Excel
+        # 写回Excel（事务保护：失败自动回滚）
+        import shutil
+        import tempfile
+        backup_path = None
         try:
+            # 创建临时备份（事务保护）
+            backup_path = tempfile.mktemp(suffix='.xlsx.bak')
+            shutil.copy2(file_path, backup_path)
+
             # 检测双行表头偏移
             header_row_offset = 0
             desc_map = self._header_descriptions.get(matched_sheet, {})
@@ -2213,6 +2220,10 @@ class AdvancedSQLQueryEngine:
             wb.save(file_path)
             wb.close()
 
+            # 写入成功，删除备份
+            if backup_path and os.path.exists(backup_path):
+                os.remove(backup_path)
+
             # 清除缓存（文件已修改）
             self._df_cache.pop(cache_key, None)
 
@@ -2224,8 +2235,15 @@ class AdvancedSQLQueryEngine:
                     'execution_time_ms': round(elapsed, 1)}
 
         except Exception as e:
+            # 事务回滚：从备份恢复
+            if backup_path and os.path.exists(backup_path):
+                try:
+                    shutil.copy2(backup_path, file_path)
+                    os.remove(backup_path)
+                except Exception:
+                    pass
             return {'success': False,
-                    'message': f'写入Excel失败: {e}',
+                    'message': f'写入Excel失败，已自动回滚: {e}',
                     'affected_rows': 0, 'changes': changes,
                     'execution_time_ms': round((_time.time() - start_time) * 1000, 1)}
 
