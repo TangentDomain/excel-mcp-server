@@ -58,7 +58,8 @@ class TestUpsertUpdate:
         result = ExcelOperations.upsert_row(
             workbook, "技能配置",
             key_column="skill_id", key_value=1001,
-            updates={"damage": 180, "cooldown": 2.5}
+            updates={"damage": 180, "cooldown": 2.5},
+            streaming=False  # 测试传统路径，验证updated_count
         )
         assert result['success'] is True
         assert result['data']['action'] == 'update'
@@ -245,7 +246,7 @@ class TestBatchInsertRows:
             {"monster_id": 3003, "monster_name": "巨龙", "level": 50, "hp": 5000},
             {"monster_id": 3004, "monster_name": "骷髅兵", "level": 3, "hp": 50},
         ]
-        result = ExcelOperations.batch_insert_rows(batch_workbook, "怪物配置", data)
+        result = ExcelOperations.batch_insert_rows(batch_workbook, "怪物配置", data, streaming=False)
         assert result['success'] is True
         assert result['data']['action'] == 'batch_insert'
         assert result['data']['inserted_count'] == 2
