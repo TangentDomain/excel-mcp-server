@@ -714,10 +714,16 @@ class ExcelOperations:
                     })
 
             return format_operation_result({
-                'success': True,
-                'sheets_with_headers': sheets_with_headers,
-                'file_path': file_path,
-                'total_sheets': len(sheets)
+                'data': {
+                    'sheets_with_headers': sheets_with_headers,
+                    'total_sheets': len(sheets)
+                },
+                'meta': {
+                    'file_path': file_path,
+                    'header_row': header_row,
+                    'max_columns': max_columns,
+                    'dual_row_mode': True
+                }
             })
 
         except Exception as e:

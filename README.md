@@ -471,7 +471,48 @@ SELECT a.skill_name, b.equip_name FROM SkillConfig a INNER JOIN EquipConfig b ON
 - `excel_search_directory` - 📂 目录批量搜索，跨文件查找目标内容
 - `excel_query` - 🚀 SQL查询引擎，游戏配置表超强分析工具
 - `excel_update_query` - ⚙️ SQL批量修改器，精确控制数据变更
-- `excel_describe_table` - 📊 完整表结构分析，类型+样本+统计信息
+- `excel_get_headers` - 📋 智能表头提取，支持双行表头
+
+**功能说明**：
+专门提取Excel表头信息，支持游戏开发的双行表头模式（第1行中文描述 + 第2行英文字段名），返回结构化的表头信息。
+
+**使用示例**：
+```python
+# 快速查看特定表的表头
+result = excel_get_headers("skills.xlsx", "SkillConfig")
+
+# 返回格式（改进后）：
+{
+    "success": true,
+    "data": {
+        "field_names": ["skill_id", "skill_name", "damage", "cooldown"],
+        "descriptions": ["技能ID描述", "技能名称描述", "伤害值描述", "冷却时间描述"],
+        "dual_rows": true
+    },
+    "meta": {
+        "sheet_name": "SkillConfig",
+        "header_row": 1,
+        "header_count": 4,
+        "dual_row_mode": true
+    },
+    "message": "成功获取4个表头字段（描述+字段名）"
+}
+
+# 批量查看所有表的表头
+result = excel_get_headers("skills.xlsx")  # sheet_name省略
+```
+
+**使用场景**：
+- **快速了解表结构**：在操作前先了解字段名称和描述
+- **确认列名拼写**：避免SQL查询时列名错误
+- **批量检查多个表**：获取Excel文件中所有工作表的表头信息
+- **双行表头支持**：自动识别并分离字段描述和字段名
+
+**与excel_describe_table的区别**：
+- `excel_get_headers`：专注表头信息，快速轻量
+- `excel_describe_table`：完整表结构，包含类型、样本值、统计信息
+
+`excel_describe_table` - 📊 完整表结构分析，类型+样本+统计信息
 - `excel_compare_sheets` - 🆔 工作表对比，发现配置变更和差异
 - `excel_compare_files` - 📋 多工作表文件对比，版本追踪
 - `excel_check_duplicate_ids` - 🔍 ID重复检测，数据质量保障
