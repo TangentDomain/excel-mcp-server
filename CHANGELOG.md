@@ -7,6 +7,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.6.28] - 2026-03-27
+- 修复describe_table行数统计重复计算问题
+
 ## [1.6.27] - 2026-03-27
 
 ### 新功能
