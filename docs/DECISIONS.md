@@ -1,5 +1,13 @@
 # DECISIONS.md - 决策记录
 
+## D008: REQ-029 MCP真实验证通过 (2026-03-28, R124+)
+**需求**: REQ-029 JOIN表别名 + describe_table崩溃验证
+**决策**: 两个P0 bug经验证均已修复，无需额外代码改动
+**Bug 1 (JOIN表别名)**: ✅ `SELECT r.名称, s.名称 as 技能名称 FROM 角色 r JOIN 技能 s ON ...` 正确返回别名列名
+**Bug 2 (streaming describe)**: ✅ streaming写入后describe_table正确识别列名（原测试脚本创建Excel方式有误导致误报）
+**教训**: MCP真实验证时测试文件创建方式必须正确（ws.append(["A","B","C"]) 一行多列），错误创建方式（逐列ws.append(["A"])）会导致误判
+**影响**: REQ-029标记为已验证完成，无需代码修改
+
 ## D004: 发现REQ-030 SQL引擎Bug (2026-03-27, R119)
 **需求**: MCP真实验证 - 每5轮必做
 **决策**: 进行MCP真实验证，发现3个SQL引擎边界问题
