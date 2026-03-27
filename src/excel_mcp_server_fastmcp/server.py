@@ -1537,7 +1537,8 @@ def excel_insert_rows(
     file_path: str,
     sheet_name: str,
     row_index: int,
-    count: int = 1
+    count: int = 1,
+    streaming: bool = True
 ) -> Dict[str, Any]:
     """
 在指定位置插入空行。
@@ -1545,7 +1546,7 @@ def excel_insert_rows(
     _path_err = _validate_path(file_path)
     if _path_err:
         return _path_err
-    return _wrap(ExcelOperations.insert_rows(file_path, sheet_name, row_index, count))
+    return _wrap(ExcelOperations.insert_rows(file_path, sheet_name, row_index, count, streaming))
 
 
 @mcp.tool()
@@ -1554,7 +1555,8 @@ def excel_insert_columns(
     file_path: str,
     sheet_name: str,
     column_index: int,
-    count: int = 1
+    count: int = 1,
+    streaming: bool = True
 ) -> Dict[str, Any]:
     """
 在指定位置插入空列（1-based索引，1=A列）。
@@ -1562,7 +1564,7 @@ def excel_insert_columns(
     _path_err = _validate_path(file_path)
     if _path_err:
         return _path_err
-    return _wrap(ExcelOperations.insert_columns(file_path, sheet_name, column_index, count))
+    return _wrap(ExcelOperations.insert_columns(file_path, sheet_name, column_index, count, streaming))
 
 
 @mcp.tool()
