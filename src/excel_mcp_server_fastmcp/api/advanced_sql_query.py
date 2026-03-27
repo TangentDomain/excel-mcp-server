@@ -107,20 +107,14 @@ def _unsupported_error_hint(err_detail: str) -> str:
         return '此工具仅支持SELECT查询。数据修改请使用excel_update_query（UPDATE语句）。'
     if 'NATURAL JOIN' in err_upper:
         return '不支持NATURAL JOIN，请改用显式ON条件：JOIN 表2 ON 表1.列 = 表2.列'
-    if 'FULL OUTER' in err_upper:
-        return '不支持FULL OUTER JOIN，请改用LEFT JOIN + UNION + RIGHT JOIN，或用INNER JOIN'
-    if 'RIGHT JOIN' in err_upper:
-        return '不支持RIGHT JOIN，请交换JOIN顺序改用LEFT JOIN：... JOIN 左表 ON 右表.列 = 左表.列'
     if 'INTERSECT' in err_upper or 'EXCEPT' in err_upper:
         return '不支持INTERSECT/EXCEPT，请用JOIN或WHERE IN替代'
     if 'FETCH' in err_upper or 'NEXT' in err_upper:
         return '不支持FETCH/NEXT语法，请用LIMIT：SELECT ... LIMIT 10'
-    if 'OFFSET' in err_upper:
-        return '不支持OFFSET语法。分页请用LIMIT：第N页 = LIMIT 每页数 OFFSET (N-1)*每页数'
     if 'RECURSIVE' in err_upper:
         return '不支持递归CTE(WITH RECURSIVE)。请改用普通CTE或子查询。'
     if 'LATERAL' in err_upper:
-        return '不支持LATERAL JOIN。请改用子查询或CET。'
+        return '不支持LATERAL JOIN。请改用子查询或CTE。'
     if 'WINDOW' in err_upper and 'OVER' not in err_upper:
         return 'WINDOW子句请改为直接在窗口函数后写OVER：ROW_NUMBER() OVER (PARTITION BY ... ORDER BY ...)'
     
