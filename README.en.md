@@ -18,7 +18,7 @@
 
 🎯 **Core Features**: Skill systems, equipment management, monster configuration, numerical balancing, version comparison, designer toolchain
 
-📦 **One-line install**: `uvx --force excel-mcp-server-fastmcp` — run from PyPI, auto-updates, zero config
+📦 **One-line install**: `uvx excel-mcp-server-fastmcp` — run from PyPI, auto-updates, zero config
 
 ---
 
@@ -38,15 +38,12 @@ MCP client configuration:
   "mcpServers": {
     "excelmcp": {
       "command": "uvx",
-      "args": ["--force", "excel-mcp-server-fastmcp"]
+      "args": ["excel-mcp-server-fastmcp"]
     }
   }
 }
 ```
 
-> ⚡ **Recommended: add `--force`**: Skips local cache and automatically fetches the latest version from PyPI. Won't re-download when already up-to-date (just 1-2s check). New versions are picked up automatically without manual intervention.
-
-> 💡 **Debug mode**: Set environment variable `EXCEL_MCP_DEBUG=1` to enable verbose logging (default: WARNING level). Set `EXCEL_MCP_JSON_LOG=1` for structured JSON logging (one JSON object per line with ts/level/tool/duration_ms fields).
 
 ### Option 2: Install from Source
 
