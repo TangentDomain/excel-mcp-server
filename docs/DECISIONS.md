@@ -33,3 +33,14 @@
 2. 添加环境变量 FORCE_JAVASCRIPT_ACTIONS_TO_NODE24=true
 **影响**: 解决弃用警告，确保CI在截止日期后继续正常工作，双重保险机制
 **验证**: 测试全通过，PyPI发布v1.6.14
+## D012: REQ-029 修复JOIN表别名和streaming写入崩溃 (2026-03-27, R133)
+**需求**: REQ-029 修复2个P0阻断性bug
+**问题**: 
+1. JOIN查询SELECT r.名称时返回列名丢失别名前缀
+2. streaming写入后openpyxl read_only模式max_row=None导致describe_table崩溃
+**决策**: 最小改动精准修复，不重构
+**方案**: 
+1. _extract_select_alias: 当Column有table_part时保留"table.col"格式
+2. describe_table: try/except包裹total_rows引用，失败时降级到iter_rows
+**影响**: JOIN查询列名正确保留别名前缀，streaming文件describe_table不再崩溃
+**验证**: 1154 tests passed, PyPI v1.6.16
