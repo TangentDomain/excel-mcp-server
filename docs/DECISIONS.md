@@ -33,3 +33,15 @@
 3. excel_batch_insert_rows: 增加实用技巧，明确新增vs更新工具选择
 4. excel_get_headers: 添加"实用技巧"section，增强AI处理能力
 **验证**: 工具导入测试通过，PyPI v1.6.19发布
+
+## D017: REQ-015 streaming写入后读取工具验证 (2026-03-27, R137)
+**需求**: REQ-015 性能优化 - streaming写入后读取工具验证
+**问题**: streaming写入可能导致后续读取工具异常（如max_row=None等问题）
+**根因**: openpyxl流式写入(read_only模式)后，某些属性可能变为None，需要验证兼容性
+**决策**: 创建comprehensive验证测试，确保streaming写入后所有读取工具正常工作
+**方案**:
+1. 创建test_streaming_verification.py测试脚本
+2. 验证5个核心读取工具：get_range, get_headers, find_last_row, get_file_info, list_sheets
+3. 验证3类SQL查询：基础查询、条件查询、JOIN查询
+4. 测试大数据量(1000行)streaming写入场景
+**验证**: 8/8测试全部通过，确认streaming功能完全可用，无兼容性问题

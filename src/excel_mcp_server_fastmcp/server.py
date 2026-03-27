@@ -2838,23 +2838,38 @@ def excel_describe_table(
 
         # 统计行数 - 优先使用max_row，若为None则用iter_rows统计结果
         try:
-            if ws.max_row is not None and ws.max_row > data_start:
+            # 修复：streaming写入后max_row可能为None的问题
+            if hasattr(ws, 'max_row') and ws.max_row is not None and ws.max_row > data_start:
                 row_count = ws.max_row - data_start
             else:
                 # streaming写入后max_row可能为None，使用iter_rows统计结果
-                # 添加安全检查：防止空文件导致的异常
-                try:
+                # 安全检查：确保total_rows有效
+                if total_rows > 0:
                     row_count = total_rows
-                except Exception:
-                    # 如果total_rows获取失败，使用iter_rows重新统计
+                else:
+                    # 如果total_rows无效（可能是0或异常），使用iter_rows重新统计
                     row_count = 0
-                    for idx, row in enumerate(ws.iter_rows(min_row=data_start + 1, values_only=True), start=data_start + 1):
-                        if any(cell is not None for cell in row):
-                            row_count += 1
+                    try:
+                        for idx, row in enumerate(ws.iter_rows(min_row=data_start + 1, values_only=True), start=1):
+                            # 只要行中有一个非空单元格，就计数为有效数据行
+                            if row and any(cell is not None for cell in row):
+                                row_count += 1
+                    except Exception as e:
+                        logger.warning(f"iter_rows统计行数失败: {e}，使用默认值0")
+                        row_count = 0
         except Exception as e:
             # 极端情况处理：如果max_row访问失败，强制使用iter_rows统计
             logger.warning(f"访问ws.max_row失败: {e}，使用iter_rows统计")
-            row_count = total_rows
+            row_count = total_rows if total_rows > 0 else 0
+            # 确保total_rows无效时，使用iter_rows重新统计
+            if row_count == 0:
+                try:
+                    for idx, row in enumerate(ws.iter_rows(min_row=data_start + 1, values_only=True), start=1):
+                        if row and any(cell is not None for cell in row):
+                            row_count += 1
+                except Exception as e2:
+                    logger.warning(f"iter_rows回退统计也失败: {e2}")
+                    row_count = 0
 
         wb.close()
 

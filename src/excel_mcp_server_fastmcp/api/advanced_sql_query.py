@@ -1877,17 +1877,35 @@ class AdvancedSQLQueryEngine:
                             mapped_column = mapped_column.strip('`')
                             result_data[alias_name] = df[mapped_column]
                         except Exception:
-                            # 映射失败，尝试直接使用列名
-                            if column_name in df.columns:
-                                result_data[alias_name] = df[column_name]
+                            # 修复：JOIN表别名映射失败时的回退逻辑
+                            # 尝试查找可能的pandas merge后缀格式 (_x/_y)
+                            possible_columns = [
+                                f"{table_part}.{column_name}",  # 用户原始别名格式
+                                f"{table_part}_{column_name}",  # table_part_列名格式
+                                f"{column_name}_x",             # _x后缀格式
+                                f"{column_name}_y",             # _y后缀格式
+                                f"{table_part}_x",              # table_part_x格式
+                                f"{table_part}_y",              # table_part_y格式
+                                column_name                     # 无表前缀的原始列名
+                            ]
+                            
+                            # 去重并检查存在的列
+                            for possible_col in possible_columns:
+                                if possible_col in df.columns:
+                                    result_data[alias_name] = df[possible_col]
+                                    break
                             else:
-                                suggestion = self._suggest_column_name(column_name, list(df.columns))
-                                raise StructuredSQLError(
-                                    "column_not_found",
-                                    f"列 '{qualified or column_name}' 不存在。可用列: {list(df.columns)}。{suggestion}",
-                                    hint="请检查列名拼写，或用excel_get_headers查看所有可用列名。",
-                                    context={"column_requested": qualified or column_name, "available_columns": list(df.columns)}
-                                )
+                                # 所有可能的映射都失败，尝试直接使用列名
+                                if column_name in df.columns:
+                                    result_data[alias_name] = df[column_name]
+                                else:
+                                    suggestion = self._suggest_column_name(column_name, list(df.columns))
+                                    raise StructuredSQLError(
+                                        "column_not_found",
+                                        f"列 '{qualified or column_name}' 不存在。可用列: {list(df.columns)}。{suggestion}",
+                                        hint="请检查列名拼写，或用excel_get_headers查看所有可用列名。",
+                                        context={"column_requested": qualified or column_name, "available_columns": list(df.columns)}
+                                    )
                     elif column_name in df.columns:
                         result_data[alias_name] = df[column_name]
                     else:
