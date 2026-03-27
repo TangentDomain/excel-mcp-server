@@ -1593,20 +1593,24 @@ class ExcelOperations:
 
             if column is None:
                 # 查找整个工作表的最后一行
-                last_row = sheet.max_row
-                # 从后往前查找真正有数据的最后一行
-                for row_num in range(sheet.max_row, 0, -1):
-                    has_data = False
-                    for col_num in range(1, sheet.max_column + 1):
-                        cell_value = sheet.cell(row=row_num, column=col_num).value
-                        if cell_value is not None and str(cell_value).strip():
-                            has_data = True
+                if sheet.max_row is not None and sheet.max_column is not None:
+                    # 正常路径：有 dimension 元数据
+                    for row_num in range(sheet.max_row, 0, -1):
+                        has_data = False
+                        for col_num in range(1, sheet.max_column + 1):
+                            cell_value = sheet.cell(row=row_num, column=col_num).value
+                            if cell_value is not None and str(cell_value).strip():
+                                has_data = True
+                                break
+                        if has_data:
+                            last_row = row_num
                             break
-                    if has_data:
-                        last_row = row_num
-                        break
                 else:
-                    last_row = 0  # 整个工作表都没有数据
+                    # 降级路径：write_only 写入的文件缺少 dimension 元数据，遍历所有行
+                    # read_only 模式下迭代行是高效的（不加载全部到内存）
+                    for row_num, row in enumerate(sheet.iter_rows(values_only=False), start=1):
+                        if any(cell.value is not None and str(cell.value).strip() for cell in row):
+                            last_row = row_num
                 search_info = "整个工作表"
             else:
                 # 转换列参数为列索引
@@ -1626,11 +1630,18 @@ class ExcelOperations:
                     return cls._format_error_result("列参数必须是字符串或整数")
 
                 # 查找指定列的最后一行有数据
-                for row_num in range(sheet.max_row, 0, -1):
-                    cell_value = sheet.cell(row=row_num, column=col_index).value
-                    if cell_value is not None and str(cell_value).strip():
-                        last_row = row_num
-                        break
+                if sheet.max_row is not None:
+                    for row_num in range(sheet.max_row, 0, -1):
+                        cell_value = sheet.cell(row=row_num, column=col_index).value
+                        if cell_value is not None and str(cell_value).strip():
+                            last_row = row_num
+                            break
+                else:
+                    # 降级路径：遍历所有行
+                    for row_num, row in enumerate(sheet.iter_rows(values_only=False), start=1):
+                        cell_value = row[col_index - 1].value if col_index <= len(row) else None
+                        if cell_value is not None and str(cell_value).strip():
+                            last_row = row_num
 
                 col_letter = get_column_letter(col_index)
                 search_info = f"{col_letter}列"
