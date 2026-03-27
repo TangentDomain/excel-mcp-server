@@ -221,19 +221,27 @@ class TestAdvancedSQLErrors:
         
         assert result['success'] is False
 
-    def test_unsupported_subquery(self, temp_dir):
-        """测试不支持的子查询"""
+    def test_from_subquery_supported(self, temp_dir):
+        """测试FROM子查询已支持"""
         file_path = temp_dir / "test.xlsx"
         
         wb = Workbook()
-        wb.active.title = "Sheet"
+        ws = wb.active
+        ws.title = "Sheet"
+        ws.append(["Name", "Value"])
+        ws.append(["A", 10])
+        ws.append(["B", 20])
+        ws.append(["C", 30])
         wb.save(file_path)
         
         engine = AdvancedSQLQueryEngine()
         result = engine.execute_sql_query(
             file_path=str(file_path),
-            sql="SELECT * FROM (SELECT * FROM Sheet)"
+            sql="SELECT * FROM (SELECT Name, Value FROM Sheet WHERE Value > 15) AS t"
         )
         
-        assert result['success'] is False
-        assert '子查询' in result.get('message', '')
+        assert result['success'] is True
+        # Should return 2 rows (B=20, C=30) plus header
+        data = result['data']
+        rows = [r for r in data[1:] if any(c is not None for c in r)]
+        assert len(rows) == 2

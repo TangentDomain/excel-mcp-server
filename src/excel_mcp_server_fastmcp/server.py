@@ -440,7 +440,7 @@ mcp = FastMCP(
 窗口(3): ROW_NUMBER, RANK, DENSE_RANK（OVER PARTITION BY ... ORDER BY ...）
 
 ## ❌ SQL不支持
-INSERT, DELETE, FROM子查询(用 WHERE col IN (SELECT...) 替代)
+INSERT, DELETE, 嵌套FROM子查询
 
 ## ✅ UNION / UNION ALL
 合并多个SELECT查询结果。支持ORDER BY和LIMIT。
@@ -1671,7 +1671,7 @@ SQL查询Excel数据（只读）。优先使用此工具而非excel_get_range进
 排序: ORDER BY DESC/ASC/LIMIT/OFFSET
 关联: INNER JOIN/LEFT JOIN/RIGHT JOIN/FULL JOIN/CROSS JOIN（同文件内工作表）
 字符串: UPPER/LOWER/TRIM/LENGTH/CONCAT/REPLACE/SUBSTRING/LEFT/RIGHT
-不支持: INSERT/DELETE/FROM子查询
+不支持: INSERT/DELETE/嵌套FROM子查询
 输出格式: table(默认Markdown)/json/csv
 示例: excel_query("技能表.xlsx", "SELECT 类型, AVG(伤害) FROM 技能配置 GROUP BY 类型 HAVING COUNT(*)>2 ORDER BY AVG(伤害) DESC")
     """

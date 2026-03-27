@@ -86,8 +86,8 @@ class TestGenerateValueErrorHint:
         assert "excel_list_sheets" in hint
 
     def test_from_subquery_hint(self):
-        hint = _generate_value_error_hint("不支持FROM子查询")
-        assert "WHERE col IN" in hint
+        hint = _generate_value_error_hint("FROM子查询执行失败")
+        assert "FROM子查询" in hint
 
     def test_join_table_hint(self):
         hint = _generate_value_error_hint("JOIN表 'xxx' 不存在")

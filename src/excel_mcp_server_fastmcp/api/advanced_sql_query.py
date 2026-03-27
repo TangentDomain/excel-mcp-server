@@ -16,8 +16,7 @@
 - 合并查询: UNION, UNION ALL
 
 不支持功能：
-- FROM子查询（FROM (SELECT ...)）
-- FROM子查询（FROM (SELECT ...)）
+- FROM子查询（FROM (SELECT ...) AS alias）
 """
 
 import os
@@ -140,7 +139,7 @@ def _generate_value_error_hint(err_str: str) -> str:
         return "请检查表名拼写，或先用excel_list_sheets查看可用工作表。"
     # FROM子查询
     if "FROM子查询" in err_str:
-        return "不支持FROM (SELECT ...)，请改用子查询作为WHERE条件：WHERE col IN (SELECT ...)。"
+        return "请检查FROM子查询中的SQL语法和表名。FROM子查询需要别名：FROM (SELECT ...) AS alias。"
     # JOIN相关
     if "JOIN表" in err_str and "不存在" in err_str:
         return "请检查JOIN的表名是否正确，先用excel_list_sheets确认可用工作表。"
@@ -1396,11 +1395,24 @@ class AdvancedSQLQueryEngine:
             parsed_sql = parsed_sql.copy()
             parsed_sql.set('with_', None)
 
-        # 获取FROM子句中的表名
-        from_table = self._get_from_table(parsed_sql)
+        # 获取FROM子句中的表名（及可选的子查询）
+        from_table, from_subquery = self._get_from_table(parsed_sql)
 
         # 查找表名时也搜索CTE定义的临时表
         effective_data = cte_data if with_clause else worksheets_data
+
+        # 如果FROM是子查询，先执行子查询并将结果注入effective_data
+        if from_subquery is not None:
+            try:
+                sub_result = self._execute_subquery(from_subquery, effective_data)
+                effective_data[from_table] = sub_result
+            except Exception as e:
+                raise StructuredSQLError(
+                    "from_subquery_error",
+                    f"FROM子查询执行失败: {e}",
+                    hint="请检查FROM子查询中的SQL语法和表名是否正确。",
+                    context={"subquery_alias": from_table, "error": str(e)}
+                )
 
         if from_table not in effective_data:
             raise StructuredSQLError(
@@ -1850,26 +1862,35 @@ class AdvancedSQLQueryEngine:
             return type_fn(val)
         return val
 
-    def _get_from_table(self, parsed_sql: exp.Expression) -> str:
-        """获取FROM子句中的表名"""
+    def _get_from_table(self, parsed_sql: exp.Expression) -> Tuple[str, Optional[exp.Expression]]:
+        """获取FROM子句中的表名。
+
+        Returns:
+            (table_name, subquery_expr): 
+                - 普通表: (表名, None)
+                - FROM子查询: (别名, Subquery/Select表达式)
+        """
         from_clause = parsed_sql.args.get('from')
         if not from_clause:
             # 尝试使用 from_ 键（sqlglot的另一种存储方式）
             from_clause = parsed_sql.args.get('from_')
         if from_clause:
-            # 检查FROM子句是否是子查询（FROM (SELECT ...)）
+            # 检查FROM子句是否是子查询（FROM (SELECT ...) AS alias）
             if hasattr(from_clause, 'this') and isinstance(from_clause.this, (exp.Subquery, exp.Select)):
-                raise StructuredSQLError(
-                    "unsupported_feature",
-                    "不支持FROM子查询（FROM (SELECT ...)）",
-                    hint="请改用子查询作为WHERE条件：WHERE col IN (SELECT ...)，或使用CTE：WITH temp AS (SELECT ...) SELECT ... FROM temp。",
-                    context={"suggestion": "使用WHERE子查询或CTE替代"}
-                )
+                subquery_node = from_clause.this
+                # 获取别名
+                alias = getattr(subquery_node, 'alias', None)
+                if not alias and isinstance(subquery_node, exp.Subquery):
+                    # sqlglot存储别名在alias属性
+                    alias = subquery_node.alias
+                if not alias:
+                    alias = "_subquery"
+                return (alias, subquery_node)
             if hasattr(from_clause, 'this') and hasattr(from_clause.this, 'name'):
-                return from_clause.this.name
+                return (from_clause.this.name, None)
             # 兼容 Table 对象
             if hasattr(from_clause, 'this') and hasattr(from_clause.this, 'this'):
-                return from_clause.this.this
+                return (from_clause.this.this, None)
 
         # 如果没有明确的FROM子句，返回第一个表名
         raise ValueError("无法确定FROM子句中的表名")
@@ -2368,7 +2389,7 @@ class AdvancedSQLQueryEngine:
         if not (hasattr(self, '_current_worksheets') and self._current_worksheets):
             return False
 
-        inner_from = self._get_from_table(inner_select)
+        inner_from, _ = self._get_from_table(inner_select)
         has_correlation = False
         for col in inner_select.find_all(exp.Column):
             col_name = col.name
@@ -2577,7 +2598,9 @@ class AdvancedSQLQueryEngine:
             raise ValueError(f"不支持子查询类型: {type(subquery_expr)}")
 
         # 获取子查询的FROM表
-        from_table = self._get_from_table(inner_select)
+        from_table, from_subquery = self._get_from_table(inner_select)
+        if from_subquery is not None:
+            raise ValueError("不支持嵌套FROM子查询（FROM子查询中不能再包含FROM子查询）")
         if from_table not in worksheets_data:
             raise ValueError(f"子查询中表 '{from_table}' 不存在。可用表: {list(worksheets_data.keys())}")
 
