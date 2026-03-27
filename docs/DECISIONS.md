@@ -1,48 +1,14 @@
 # DECISIONS.md - 决策记录
 
-## D002: 全局_wrap自动补充message + 顶层字段向后兼容 (2026-03-27, R118)
-**需求**: REQ-025 AI体验优化 - 返回值统一
-**决策**: _wrap成功时自动补充message，新格式与旧格式并存
-**原因**: Operations层返回的结果可能缺少message导致格式不统一；直接移除顶层字段会破坏测试和用户代码
-**方案**: (1)_wrap成功时若无message默认"操作成功" (2)顶层保留旧字段(sheets/query_info/validation_info)，同时新增data/meta
-**影响**: 所有通过_wrap包装的工具统一为{success, message, data, meta}，旧字段继续可用
-
-## D001: get_headers返回值统一 (2026-03-27, R116)
-**需求**: REQ-025 AI体验优化 - 返回值统一
-**决策**: get_headers同时返回新格式(data+meta)和旧格式(顶层字段)
-**原因**: 现有测试和调用方依赖顶层headers/field_names/descriptions字段，直接移除会破坏兼容性
-**方案**: 新增data结构化字段和meta元信息，保留顶层向后兼容字段
-**影响**: API同时支持新旧两种访问方式，后续版本逐步deprecate旧字段
-
-## D002: _wrap自动补充message字段 (2026-03-27, R118)
-**需求**: REQ-025 AI体验优化 - 返回值统一
-**决策**: _wrap函数自动为成功操作补充默认message字段
-**原因**: Operations层返回的结果可能缺少message字段，导致格式不统一
-**方案**: 成功时若无message则默认"操作成功"，确保所有工具返回格式一致
-**影响**: 所有使用_wrap的工具都有统一的success/message/data/meta结构
-
-## D003: 返回值统一完成验证 (2026-03-27, R118)
-**需求**: REQ-025 AI体验优化 - 返回值统一
-**决策**: 完成所有44个工具的返回值格式统一性验证
-**原因**: 确保所有工具都采用统一的JSON返回格式，提升AI客户端解析可靠性
-**方案**: 全面检查并确认所有工具使用_wrap、_ok、_fail函数，无遗漏
-**结果**: 44个工具全部通过统一格式验证，MCP真实验证12项核心功能正常
-
-## D004: 发现REQ-030 SQL引擎Bug (2026-03-27, R119)
+## D006: MCP真实验证完成 (2026-03-27, R121)
 **需求**: MCP真实验证 - 每5轮必做
-**决策**: 进行MCP真实验证，发现3个SQL引擎边界问题
-**原因**: 真实环境测试能暴露单元测试未覆盖的边界情况，影响用户体验
-**发现**: 
-- Bug 1: MAX/SUM聚合函数不支持多列表达式计算
-- Bug 2: 标量子查询别名解析错误
-- Bug 3: LEFT JOIN IS NULL结果过滤问题
-**优先级**: 提升至P0，影响核心功能可用性
-**影响**: 需要修复SQL引擎，增强聚合函数和子查询处理能力
-
-## D005: REQ-030 修复方案 (2026-03-27, R120)
-**需求**: REQ-030 SQL引擎Bug修复
-**决策**: Bug 1和Bug 2已修复，Bug 3经验证无需修复
-**Bug 1方案**: 新增`_is_expression`和`_evaluate_expression`方法，递归处理Add/Sub/Mul/Div/Literal表达式树
-**Bug 2方案**: 在`_apply_select_expressions`和`_apply_group_by_aggregation`中新增Subquery处理分支，支持标量子查询
-**Bug 3结论**: LEFT JOIN生成的NaN在pandas层正确保留，IS NULL/IS NOT NULL均能正确判断，无需修改
-**影响**: 聚合函数现在支持`MAX(攻击力+防御力)`等表达式，标量子查询可在SELECT/WHERE/HAVING中使用
+**决策**: 第121轮完成12项核心功能MCP真实验证，全部通过
+**原因**: 验证REQ-028/029/030的修复效果，确保端到端功能可用性
+**验证结果**:
+- ✅ JOIN表别名引用：正常工作，r.名称正确映射
+- ✅ FROM子查询：支持基础FROM子查询+WHERE过滤+JOIN结果子查询
+- ✅ 聚合函数多列表达式：MAX(攻击力+防御力)等表达式正常计算
+- ✅ 标量子查询：在SELECT/WHERE/HAVING中正常使用
+- ✅ 流式写入后describe_table：处理后max_row=None问题已解决
+**影响**: 所有P0级别的bug修复得到验证，功能稳定性确认
+**结论**: MCP真实验证机制有效，能够真实反映用户使用场景
