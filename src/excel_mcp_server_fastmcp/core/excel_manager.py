@@ -42,16 +42,16 @@ class ExcelManager:
             # 验证路径，默认允许覆盖已存在的文件
             validated_path = ExcelValidator.validate_file_for_creation(file_path, overwrite=True)
 
-            # 创建工作簿
-            workbook = Workbook()
+            # 确保目录存在
+            Path(validated_path).parent.mkdir(parents=True, exist_ok=True)
+
+            # 使用 write_only 模式创建工作簿（减少内存占用）
+            # write_only 模式：不维护单元格内存模型，直接流式写入磁盘
+            workbook = Workbook(write_only=True)
 
             # 处理工作表
             if sheet_names:
-                # 删除默认工作表
-                default_sheet = workbook.active
-                workbook.remove(default_sheet)
-
-                # 创建指定的工作表
+                # write_only 模式不创建默认工作表，直接创建指定的工作表
                 created_sheets = []
                 for i, sheet_name in enumerate(sheet_names):
                     if not sheet_name or not sheet_name.strip():
@@ -65,12 +65,9 @@ class ExcelManager:
                         max_column=1,
                         max_column_letter='A'
                     ))
-
-                # 设置第一个工作表为活动工作表
-                if created_sheets:
-                    workbook.active = workbook[created_sheets[0].name]
             else:
-                # 使用默认工作表
+                # write_only 模式需要手动创建默认工作表
+                sheet = workbook.create_sheet(title='Sheet1')
                 created_sheets = [SheetInfo(
                     index=0,
                     name='Sheet1',
@@ -78,9 +75,6 @@ class ExcelManager:
                     max_column=1,
                     max_column_letter='A'
                 )]
-
-            # 确保目录存在
-            Path(validated_path).parent.mkdir(parents=True, exist_ok=True)
 
             # 保存文件
             workbook.save(validated_path)
@@ -846,23 +840,41 @@ class ExcelManager:
 
             sheet_name = sheet_name.strip()
 
-            workbook = load_workbook(self.file_path)
+            # 优先用 calamine 读取表头（比 openpyxl load_workbook 快 10x+）
+            col_map = {}
+            max_row_from_cal = 0
+            try:
+                from python_calamine import CalamineWorkbook
+                cal_wb = CalamineWorkbook.from_path(self.file_path)
+                for sn in cal_wb.sheet_names:
+                    if sn == sheet_name:
+                        rows = cal_wb.get_sheet_by_name(sn).to_python()
+                        if rows and header_row <= len(rows):
+                            max_row_from_cal = len(rows)
+                            for col_idx, cell_val in enumerate(rows[header_row - 1], 1):
+                                if cell_val is not None:
+                                    col_map[str(cell_val).strip()] = col_idx
+                        break
+            except ImportError:
+                pass
 
+            # calamine 未获取到表头时，降级到 openpyxl
+            workbook = load_workbook(self.file_path)
             if sheet_name not in workbook.sheetnames:
                 available = ', '.join(workbook.sheetnames)
+                workbook.close()
                 raise SheetNotFoundError(f"工作表不存在: {sheet_name}（可用: {available}）")
 
             sheet = workbook[sheet_name]
 
-            if header_row < 1 or header_row > sheet.max_row:
-                raise DataValidationError(f"表头行号 {header_row} 超出范围（1-{sheet.max_row}）")
-
-            # 构建列名→列索引映射
-            col_map = {}
-            for col in range(1, sheet.max_column + 1):
-                cell_val = sheet.cell(row=header_row, column=col).value
-                if cell_val is not None:
-                    col_map[str(cell_val).strip()] = col
+            if not col_map:
+                if header_row < 1 or header_row > sheet.max_row:
+                    workbook.close()
+                    raise DataValidationError(f"表头行号 {header_row} 超出范围（1-{sheet.max_row}）")
+                for col in range(1, sheet.max_column + 1):
+                    cell_val = sheet.cell(row=header_row, column=col).value
+                    if cell_val is not None:
+                        col_map[str(cell_val).strip()] = col
 
             if not col_map:
                 raise DataValidationError("未找到表头列名")
