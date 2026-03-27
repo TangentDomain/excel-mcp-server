@@ -1,26 +1,25 @@
-# 第127轮 - REQ-025 AI体验优化 ✅
+# 第128轮 - REQ-012 兼容性验证 + REQ-025 返回值统一 ✅
 
 ## 状态
 版本：v1.6.12 | 工具：44 | 测试：1154
 
 ## 本轮完成
-- **REQ-025 get_headers AI体验优化**：✅
-  - 更新excel_get_headers工具说明，添加excel_assess_data_impact决策路径
-  - 工具选择决策树新增"数据修改影响评估→excel_assess_data_impact"
-  - excel_get_headers配合使用新增"数据修改评估"链接
-  - 选择指南新增"修改前评估→用excel_assess_data_impact"
-- **MCP真实验证**：12/12 核心功能通过
-  - list_sheets/get_range/get_headers/find_last_row/describe_table/search
-  - query WHERE/GROUP BY/JOIN/子查询/FROM子查询/batch_insert+delete
-- **v1.6.12 发布到 PyPI** ✅
+- **REQ-012 兼容性验证**：✅ 100%通过（Cursor/Claude Desktop/VSCode MCP/流式写入）
+- **REQ-025 返回值统一**：
+  - list_sheets：消除顶层重复字段，数据集中在data和meta
+  - get_headers：消除顶层重复字段，保留向后兼容别名
+  - 统一格式：{success, message, data, meta}
+  - 1154测试全通过
+- **REQ-025 get_headers待合并**：✅ 已合并headers到data字段内
 
 ## 下轮待办
-- [ ] REQ-025 继续优化（如有更多合并机会）
+- [ ] REQ-025 docstring持续优化（如有需要）
 - [ ] REQ-031 CI Node.js 20弃用警告（P2，截止2026-09-16）
-- [ ] 下次MCP真实验证（第131轮）
+- [ ] 合并develop→main，发布v1.6.13
+- [ ] 下次MCP真实验证（第133轮）
 
 ## 自我进化评估
 - 📊 测试通过率：1154/1154 (100%)
-- 📊 MCP验证：12/12 (100%)
-- 📊 发布：v1.6.12 ✅
+- 📊 代码改动：src + tests（返回值统一重构）
+- 📊 发布：待合并
 - 📊 新bug：0
