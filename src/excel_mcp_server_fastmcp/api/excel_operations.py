@@ -277,17 +277,20 @@ class ExcelOperations:
             # 步骤3: 解析双行表头信息
             header_info = cls._parse_dual_header_data(result.data, max_columns)
 
-            return {
-                'success': True,
-                'data': header_info['field_names'],  # 兼容性字段，返回字段名
-                'headers': header_info['field_names'],  # 兼容性字段，返回字段名
-                'descriptions': header_info['descriptions'],  # 字段描述（第1行）
-                'field_names': header_info['field_names'],    # 字段名（第2行）
-                'header_count': len(header_info['field_names']),
-                'sheet_name': sheet_name,
-                'header_row': header_row,
-                'message': f"成功获取{len(header_info['field_names'])}个表头字段（描述+字段名）"
-            }
+            return format_operation_result({
+                'data': {
+                    'field_names': header_info['field_names'],    # 字段名（第2行）
+                    'descriptions': header_info['descriptions'],  # 字段描述（第1行）
+                    'dual_rows': True  # 标识使用了双行模式
+                },
+                'meta': {
+                    'sheet_name': sheet_name,
+                    'header_row': header_row,
+                    'header_count': len(header_info['field_names']),
+                    'max_columns': max_columns,
+                    'dual_row_mode': True
+                }
+            })
 
         except Exception as e:
             error_msg = f"获取表头失败: {str(e)}"
