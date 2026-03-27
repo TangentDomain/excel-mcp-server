@@ -1743,10 +1743,27 @@ class ExcelOperations:
 
             # 收集ID数据
             ids_with_rows = []
-            for row in range(header_row + 1, ws.max_row + 1):
-                cell_value = ws.cell(row=row, column=col_idx).value
-                if cell_value is not None:  # 跳过空值
-                    ids_with_rows.append((cell_value, row))
+            # 处理流式写入后 max_row 可能为 None 的情况
+            if ws.max_row is None:
+                # 如果max_row为None，设置合理的搜索上限
+                max_possible_row = max(1000, ws.max_column or 1000)
+                for row in range(header_row + 1, max_possible_row + 1):
+                    try:
+                        cell_value = ws.cell(row=row, column=col_idx).value
+                        if cell_value is not None:  # 跳过空值
+                            ids_with_rows.append((cell_value, row))
+                    except Exception:
+                        # 如果访问失败，继续向前搜索
+                        continue
+                        # 遇到大量错误时停止搜索
+                        if len(ids_with_rows) > 1000:  # 防止无限循环
+                            break
+            else:
+                # 正常情况：max_row 存在
+                for row in range(header_row + 1, ws.max_row + 1):
+                    cell_value = ws.cell(row=row, column=col_idx).value
+                    if cell_value is not None:  # 跳过空值
+                        ids_with_rows.append((cell_value, row))
 
             # 统计ID出现次数
             id_counter = Counter([id_val for id_val, _ in ids_with_rows])
