@@ -30,3 +30,14 @@
   - 项目结构：模块化设计，职责分离清晰
 - **发现**：项目工程质量良好，无明显技术债务
 - **后续**：建立工程健康检查机制，定期评估项目状态
+
+## 2026-03-27 | excel_update_query流式写入优化（第104轮）
+- **决策**：为excel_update_query的_write_changes_to_excel添加流式写入支持
+- **原因**：UPDATE语句在大批量修改时使用传统openpyxl load+save，对大文件性能差
+- **方案**：智能决策 + copy-modify-write + 自动降级
+  - 触发条件：affected_rows≥50 / changes≥100 / 文件>1MB
+  - 高性能路径：StreamingWriter._copy_modify_write（calamine读→内存改→write_only写）
+  - 兼容性路径：传统openpyxl（小批量修改保留格式）
+  - 返回值新增method字段（streaming/traditional）
+- **验证**：1099测试全通过，8项游戏场景验证通过
+- **注意**：流式写入不保留单元格格式，所以只在大批量场景自动触发
