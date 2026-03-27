@@ -1717,10 +1717,25 @@ class AdvancedSQLQueryEngine:
         # 检查FROM子句是否有别名 (FROM 技能表 a)
         from_clause = parsed_sql.args.get('from')
         if from_clause:
-            for alias in from_clause.find_all(exp.Alias):
+            # 优先使用 Table.alias 属性
+            from_table_expr = from_clause.this
+            if hasattr(from_table_expr, 'alias') and from_table_expr.alias:
+                from_alias = from_table_expr.alias
+                if isinstance(from_alias, str) and from_alias != from_table:
+                    self._table_aliases[from_alias] = from_table
+                    self._table_aliases[from_table] = from_table
+            # 备用：遍历 TableAlias 节点
+            found_from_alias = False
+            for alias in from_clause.find_all(exp.TableAlias):
                 parent_table = from_clause.this.name if hasattr(from_clause.this, 'name') else str(from_clause.this)
                 self._table_aliases[alias.alias] = parent_table
                 self._table_aliases[parent_table] = parent_table
+                found_from_alias = True
+            if not found_from_alias:
+                for alias in from_clause.find_all(exp.Alias):
+                    parent_table = from_clause.this.name if hasattr(from_clause.this, 'name') else str(from_clause.this)
+                    self._table_aliases[alias.alias] = parent_table
+                    self._table_aliases[parent_table] = parent_table
 
         # 应用JOIN子句
         joins = parsed_sql.args.get('joins')
@@ -1814,6 +1829,7 @@ class AdvancedSQLQueryEngine:
         """
         result_data = {}
         ordered_columns = []
+        used_aliases = set()  # 跟踪已使用的别名，避免重复
 
         # 按SELECT表达式顺序处理列
         for i, select_expr in enumerate(parsed_sql.expressions):
@@ -1827,6 +1843,19 @@ class AdvancedSQLQueryEngine:
 
             # 处理别名
             alias_name, original_expr = self._extract_select_alias(select_expr, i)
+
+            # 处理重复别名：当多个SELECT列解析为相同名称时，添加表前缀
+            if alias_name in used_aliases and isinstance(original_expr, exp.Column):
+                table_part = original_expr.table if hasattr(original_expr, 'table') and original_expr.table else None
+                if table_part:
+                    qualified_alias = f"{table_part}.{alias_name}"
+                    if qualified_alias not in used_aliases:
+                        alias_name = qualified_alias
+                    else:
+                        alias_name = f"{table_part}_{alias_name}_{i}"
+                else:
+                    alias_name = f"{alias_name}_{i}"
+            used_aliases.add(alias_name)
 
             # 计算表达式值
             try:
@@ -2217,12 +2246,21 @@ class AdvancedSQLQueryEngine:
 
             # 检查右表是否有别名
             right_alias = right_table
-            for alias in join.find_all(exp.Alias):
-                parent = alias.this
-                parent_name = parent.name if hasattr(parent, 'name') else str(parent)
-                if parent_name == right_table or str(parent) == right_table:
-                    right_alias = alias.alias
-                    break
+            # 优先使用 Table.alias 属性（sqlglot 中 Table 的 alias 返回字符串）
+            if hasattr(right_table_expr, 'alias') and right_table_expr.alias:
+                table_alias = right_table_expr.alias
+                if isinstance(table_alias, str) and table_alias != right_table:
+                    right_alias = table_alias
+                elif hasattr(table_alias, 'alias'):
+                    right_alias = table_alias.alias
+            # 备用：遍历 TableAlias 节点
+            if right_alias == right_table:
+                for alias in join.find_all(exp.TableAlias):
+                    parent = alias.this
+                    parent_name = parent.name if hasattr(parent, 'name') else str(parent)
+                    if parent_name == right_table or str(parent) == right_table:
+                        right_alias = alias.alias
+                        break
 
             # 记录别名映射
             self._table_aliases[right_alias] = right_table
@@ -2299,7 +2337,21 @@ class AdvancedSQLQueryEngine:
 
             if join_kind == 'cross':
                 # CROSS JOIN: 笛卡尔积（无需ON列）
-                result_df = result_df.merge(right_df_renamed, how='cross')
+                # 先临时移除冲突列名，合并后再恢复
+                temp_col_mapping = {}
+                right_df_for_cross = right_df_renamed.copy()
+                
+                for col in right_df_for_cross.columns:
+                    if col in result_df.columns:
+                        temp_col = f"{right_alias}_temp_{col}"
+                        temp_col_mapping[col] = temp_col
+                        right_df_for_cross = right_df_for_cross.rename(columns={col: temp_col})
+                
+                result_df = result_df.merge(right_df_for_cross, how='cross')
+                
+                # 恢复原始列名
+                for old_col, new_col in temp_col_mapping.items():
+                    result_df = result_df.rename(columns={new_col: old_col})
             else:
                 result_df = result_df.merge(
                     right_df_renamed,
