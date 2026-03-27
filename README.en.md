@@ -10,11 +10,11 @@
 [![Python Version](https://img.shields.io/badge/python-3.10+-blue.svg)](https://www.python.org/downloads/)
 [![Powered by: FastMCP](https://img.shields.io/badge/Powered%20by-FastMCP-orange)](https://github.com/jlowin/fastmcp)
 ![Status](https://img.shields.io/badge/status-stable-green.svg)
-![Tests](https://img.shields.io/badge/tests-998%20tests-brightgreen.svg)
-![Tools](https://img.shields.io/badge/tools-45%20verified%20tools-green.svg)
+![Tests](https://img.shields.io/badge/tests-1036%20tests-brightgreen.svg)
+![Tools](https://img.shields.io/badge/tools-44%20verified%20tools-green.svg)
 [![CI](https://github.com/TangentDomain/excel-mcp-server/actions/workflows/ci.yml/badge.svg)](https://github.com/TangentDomain/excel-mcp-server/actions/workflows/ci.yml)
 
-**ExcelMCP** is an Excel configuration table management MCP server designed for game development. Through AI natural language commands, it enables intelligent operations on game configurations such as skill tables, equipment data, and monster attributes. Built with **FastMCP**, reads use **python-calamine** (Rust engine, 2300x speedup), writes use **openpyxl**. Features **45 professional tools** and **985 test cases**, ensuring enterprise-grade reliability.
+**ExcelMCP** is an Excel configuration table management MCP server designed for game development. Through AI natural language commands, it enables intelligent operations on game configurations such as skill tables, equipment data, and monster attributes. Built with **FastMCP**, reads use **python-calamine** (Rust engine, 2300x speedup), writes use **openpyxl**. Features **44 professional tools** and **1036 test cases**, ensuring enterprise-grade reliability.
 
 🎯 **Core Features**: Skill systems, equipment management, monster configuration, numerical balancing, version comparison, designer toolchain
 
@@ -297,7 +297,7 @@ SELECT a.skill_name, b.equip_name FROM SkillConfig a INNER JOIN EquipConfig b ON
 
 ---
 
-## 🛠️ Complete Tool List (45 Professional Tools)
+## 🛠️ Complete Tool List (44 Professional Tools)
 
 ### 📁 File & Worksheet Management
 - `excel_create_file` - Create new Excel files with custom worksheets
@@ -307,7 +307,6 @@ SELECT a.skill_name, b.equip_name FROM SkillConfig a INNER JOIN EquipConfig b ON
 - `excel_rename_sheet` - Rename worksheets
 - `excel_copy_sheet` - Copy worksheets (with data and formatting), for creating config table variants
 - `excel_get_file_info` - Get file metadata
-- `excel_get_sheet_headers` - Get all worksheet headers
 - `excel_merge_files` - Merge multiple Excel files
 
 ### 📊 Data Operations
@@ -540,7 +539,7 @@ ExcelMCP includes multi-layer security protections:
 ```
 src/excel_mcp_server_fastmcp/    # Main package (directly importable after pip install)
 ├── __init__.py                   # Package entry point, exposes main()
-├── server.py                     # MCP interface layer (45 tool definitions)
+├── server.py                     # MCP interface layer (44 tool definitions)
 ├── api/                          # API business logic layer
 │   ├── excel_operations.py       # Excel operations unified entry
 │   └── advanced_sql_query.py     # SQL query engine
@@ -595,7 +594,7 @@ Tool Layer (Common Functions)
 - **Test Cases**: 985 (behavior validation, no coverage padding)
 - **Test Files**: 49 test files
 - **Test Code**: 16,496 lines
-- **Tool Count: 45 (@mcp.tool decorator verified)
+- **Tool Count: 44 (@mcp.tool decorator verified)
 - **Architecture Layers**: 4-layer design (MCP→API→Core→Utils)
 
 ### Verification Commands

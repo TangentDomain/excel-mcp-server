@@ -10,17 +10,45 @@
 [![Python 版本](https://img.shields.io/badge/python-3.10+-blue.svg)](https://www.python.org/downloads/)
 [![技术支持: FastMCP](https://img.shields.io/badge/Powered%20by-FastMCP-orange)](https://github.com/jlowin/fastmcp)
 ![状态](https://img.shields.io/badge/status-stable-green.svg)
-![测试覆盖](https://img.shields.io/badge/tests-998%20tests-brightgreen.svg)
-![工具数量](https://img.shields.io/badge/tools-45%20verified%20tools-green.svg)
+![测试覆盖](https://img.shields.io/badge/tests-1036%20tests-brightgreen.svg)
+![工具数量](https://img.shields.io/badge/tools-44%20verified%20tools-green.svg)
 [![CI](https://github.com/TangentDomain/excel-mcp-server/actions/workflows/ci.yml/badge.svg)](https://github.com/TangentDomain/excel-mcp-server/actions/workflows/ci.yml)
 
-**ExcelMCP** 是专为游戏开发设计的Excel配置表管理MCP服务器。通过AI自然语言指令，实现技能配置表、装备数据、怪物属性等游戏配置的智能化操作。基于**FastMCP**构建，读取使用**python-calamine**（Rust引擎，2300x提速），写入使用**openpyxl**，拥有**45个专业工具**和**998个测试用例**，确保企业级可靠性。
+**ExcelMCP** 是专为游戏开发设计的Excel配置表管理MCP服务器。通过AI自然语言指令，实现技能配置表、装备数据、怪物属性等游戏配置的智能化操作。基于**FastMCP**构建，读取使用**python-calamine**（Rust引擎，2300x提速），写入使用**openpyxl**，拥有**44个专业工具**和**1036个测试用例**，确保企业级可靠性。
 
 🎯 **核心功能**: 技能系统、装备管理、怪物配置、数值平衡、版本对比、策划工具链
 
 📦 **一键安装**: `uvx excel-mcp-server-fastmcp` — 从PyPI直接运行，自动更新，零配置
 
 ---
+
+## ⚡ 30秒上手
+
+**1. 安装**（你的 MCP 客户端配置文件加这段）：
+```json
+{
+  "mcpServers": {
+    "excelmcp": {
+      "command": "uvx",
+      "args": ["excel-mcp-server-fastmcp"]
+    }
+  }
+}
+```
+
+**2. 对AI说一句话就行：**
+```
+→ "查看 skills.xlsx 有哪些表"
+→ "搜索所有火系技能"
+→ "查询DPM最高的10个技能"
+→ "把所有火系技能伤害提升20%"
+→ "对比v1和v2版本差异"
+```
+
+**搞定。** 不需要记命令、不需要写SQL（当然你也可以写）。支持中文自然语言 + 标准SQL双模式。
+
+<details>
+<summary>📖 想了解更详细的安装方式？</summary>
 
 ## 🚀 快速入门
 
@@ -90,6 +118,29 @@ python scripts/benchmark.py --quick        # 快速模式（约30秒）
 python scripts/benchmark.py                # 完整模式（含大表测试）
 python scripts/benchmark.py --compare      # 与上次结果对比
 ```
+
+</details>
+
+---
+
+## 📊 为什么选 ExcelMCP？
+
+| 特性 | ExcelMCP | [haris-musa/excel-mcp](https://github.com/haris-musa/excel-mcp) | [excelpython](https://github.com/nicepkg/excelpython) |
+|------|----------|-------|------------|
+| **SQL查询引擎** | ✅ 完整SQL（JOIN/子查询/窗口函数/CTE） | ❌ | ❌ |
+| **读取引擎** | 🦀 python-calamine（Rust，2300x提速） | openpyxl | openpyxl |
+| **工具数量** | 44个专业工具 | ~15个基础工具 | ~10个 |
+| **游戏开发** | ✅ 垂直优化（DPM/数值平衡/配置表） | ❌ 通用 | ❌ 通用 |
+| **双行表头** | ✅ 自动识别中文描述+英文字段 | ❌ | ❌ |
+| **SQL UPDATE** | ✅ 条件批量修改 | ❌ | ❌ |
+| **跨文件JOIN** | ✅ @filepath 语法 | ❌ | ❌ |
+| **测试覆盖** | 1036 tests | ~50 tests | ~30 tests |
+| **错误恢复** | ✅ 结构化错误码+AI可修复提示 | ❌ 纯文本 | ❌ 纯文本 |
+| **中文列名查询** | ✅ | ❌ | ❌ |
+| **备份/恢复** | ✅ | ❌ | ❌ |
+| **版本对比** | ✅ Sheet级diff | ❌ | ❌ |
+
+> 💡 **核心差异**：ExcelMCP 是唯一支持 **完整SQL引擎** 的 Excel MCP 服务器。其他方案只能"读/写单元格"，ExcelMCP 能让你用 SQL 做复杂的数据分析和批量修改——这对游戏配置表管理是质变。
 
 ---
 
@@ -305,7 +356,7 @@ SELECT a.skill_name, b.equip_name FROM SkillConfig a INNER JOIN EquipConfig b ON
 
 ---
 
-## 🛠️ 完整工具列表（45个专业工具）
+## 🛠️ 完整工具列表（44个专业工具）
 
 ### 📁 文件与工作表管理
 - `excel_create_file` - 创建新Excel文件，支持自定义工作表
@@ -315,7 +366,6 @@ SELECT a.skill_name, b.equip_name FROM SkillConfig a INNER JOIN EquipConfig b ON
 - `excel_rename_sheet` - 重命名工作表
 - `excel_copy_sheet` - 复制工作表（含数据和格式），创建配置表变体
 - `excel_get_file_info` - 获取文件元数据
-- `excel_get_sheet_headers` - 获取所有工作表表头
 - `excel_merge_files` - 合并多个Excel文件
 
 ### 📊 数据操作
@@ -523,6 +573,70 @@ SELECT skill_name, damage, RANK() OVER (ORDER BY damage DESC) as r, DENSE_RANK()
 - 大表(2000行)：首次~230ms，缓存后2-8ms
 - 文件修改后缓存自动失效
 
+### 🎮 游戏策划SQL实战
+
+以下是真实的游戏开发场景，直接复制粘贴就能用：
+
+**场景1：技能数值平衡**
+```sql
+-- 找出DPM异常的技能（超过平均值的3倍）
+SELECT skill_name, damage * 1.0 / cooldown as dpm
+FROM SkillConfig
+WHERE damage * 1.0 / cooldown > (SELECT AVG(damage * 1.0 / cooldown) * 3 FROM SkillConfig)
+
+-- 各职业DPM统计，找数值失衡的职业
+SELECT skill_type, AVG(damage * 1.0 / cooldown) as avg_dpm,
+       MAX(damage * 1.0 / cooldown) as max_dpm,
+       MIN(damage * 1.0 / cooldown) as min_dpm
+FROM SkillConfig GROUP BY skill_type
+```
+
+**场景2：装备掉落配置审查**
+```sql
+-- 查找怪物掉落表中重复配置（同一怪物掉同一物品多次）
+SELECT monster_id, item_id, COUNT(*) as dup_count
+FROM DropConfig GROUP BY monster_id, item_id HAVING dup_count > 1
+
+-- 检查掉落概率总和是否合理（不等于100%的怪物）
+SELECT monster_id, SUM(drop_rate) as total_rate
+FROM DropConfig GROUP BY monster_id
+HAVING ABS(total_rate - 100) > 0.01
+```
+
+**场景3：配置表数据质量检查**
+```sql
+-- 找出所有引用了不存在ID的外键（技能引用了不存在的装备ID）
+SELECT s.skill_name, s.equip_id
+FROM SkillConfig s
+LEFT JOIN EquipmentConfig e ON s.equip_id = e.equip_id
+WHERE s.equip_id IS NOT NULL AND e.equip_id IS NULL
+
+-- 找出数值为0或负数的异常配置
+SELECT * FROM SkillConfig WHERE damage <= 0 OR cooldown < 0
+```
+
+**场景4：版本迁移辅助**
+```sql
+-- 找出新版本新增的配置项（用跨文件JOIN）
+SELECT b.skill_name FROM 技能表@'skills_v2.xlsx' b
+LEFT JOIN 技能表@'skills_v1.xlsx' a ON b.skill_id = a.skill_id
+WHERE a.skill_id IS NULL
+
+-- 找出被删除的配置项
+SELECT a.skill_name FROM 技能表@'skills_v1.xlsx' a
+LEFT JOIN 技能表@'skills_v2.xlsx' b ON a.skill_id = b.skill_id
+WHERE b.skill_id IS NULL
+```
+
+**场景5：批量数值调整**
+```sql
+-- 全服平衡性调整：战士技能伤害+15%，冷却-1
+UPDATE SkillConfig SET damage = damage * 1.15, cooldown = cooldown - 1 WHERE skill_type = '战士'
+
+-- 等级压缩：把50级以上怪物的HP统一缩放到新曲线
+UPDATE MonsterConfig SET hp = hp * 0.8 WHERE level > 50
+```
+
 **常见问题解决**:
 - **文件被锁定**: 关闭Excel程序后重试
 - **中文乱码**: 确保UTF-8编码，检查Python环境编码
@@ -567,7 +681,7 @@ ExcelMCP 内置多层安全防护，保护用户数据和系统安全：
 ```
 src/excel_mcp_server_fastmcp/    # 主包（pip install 后可直接 import）
 ├── __init__.py                   # 包入口，暴露 main()
-├── server.py                     # MCP接口层（45个工具定义）
+├── server.py                     # MCP接口层（44个工具定义）
 ├── api/                          # API业务逻辑层
 │   ├── excel_operations.py       # Excel操作统一入口
 │   └── advanced_sql_query.py     # SQL查询引擎
@@ -619,10 +733,10 @@ API业务逻辑层 (集中式处理)
 ## 📊 项目信息
 
 ### 质量验证指标
-- **测试用例**: 998个（行为验证，无覆盖率填充）
+- **测试用例**: 1036个（行为验证，无覆盖率填充）
 - **测试文件**: 49个测试文件
 - **测试代码**: 16,496行
-- **工具数量: 45个 (@mcp.tool装饰器验证)
+- **工具数量: 44个 (@mcp.tool装饰器验证)
 - **架构层次**: 4层分层设计 (MCP→API→Core→Utils)
 
 ### 验证命令
