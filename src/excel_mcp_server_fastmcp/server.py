@@ -398,7 +398,7 @@ if _cleaned:
 # 创建FastMCP服务器实例，开启调试模式和详细日志
 mcp = FastMCP(
     name="excel-mcp",
-    instructions=r"""🎮 游戏开发Excel配置表管理专家 — 45个工具
+    instructions=r"""🎮 游戏开发Excel配置表管理专家 — 44个工具
 
 ## 🔥 核心原则：SQL优先
 
@@ -440,7 +440,13 @@ mcp = FastMCP(
 窗口(3): ROW_NUMBER, RANK, DENSE_RANK（OVER PARTITION BY ... ORDER BY ...）
 
 ## ❌ SQL不支持
-INSERT, DELETE, 嵌套FROM子查询
+INSERT, DELETE, 嵌套FROM子查询（FROM子查询中不能再包含FROM子查询）
+
+## ✅ FROM子查询
+支持单层FROM子查询：`FROM (SELECT ...) AS alias`。不支持嵌套。
+```sql
+SELECT * FROM (SELECT skill_name, damage FROM 技能配置 WHERE damage > 100) AS 高伤技能
+```
 
 ## ✅ UNION / UNION ALL
 合并多个SELECT查询结果。支持ORDER BY和LIMIT。
@@ -503,6 +509,10 @@ def _wrap(result: dict, meta: dict = None) -> dict:
     """包装Operations层返回，metadata→meta，添加上下文meta，统一success字段"""
     if not isinstance(result, dict):
         return result
+    # 统一error→message，确保AI只需检查message键
+    err_val = result.get('error')
+    if isinstance(err_val, str) and not result.get('message'):
+        result['message'] = result.pop('error')
     if "success" not in result:
         result["success"] = True
     if "metadata" in result:
