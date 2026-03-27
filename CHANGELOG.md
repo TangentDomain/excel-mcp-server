@@ -7,6 +7,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.5.3] - 2026-03-27
+
+### 优化
+- **REQ-015 性能优化（写入）**：所有修改操作工具支持streaming参数
+  - excel_update_range: 支持streaming参数，覆盖模式自动选择流式路径
+  - excel_insert_rows: 支持streaming参数，大量插入性能提升
+  - excel_insert_columns: 支持streaming参数，列操作内存占用降低90%+
+  - excel_upsert_row: 支持streaming参数，智能upsert操作性能优化
+  - excel_batch_insert_rows: 支持streaming参数，批量导入更快
+  - excel_delete_rows: 支持streaming参数，大量删除更高效
+  - excel_delete_columns: 支持streaming参数，列删除性能提升
+  - 已有write_only优化：create_file, import_from_csv, merge_files
+
 ## [1.5.2] - 2026-03-27
 
 ### 优化

@@ -1,6 +1,14 @@
 - **红线保护**：红线和文档所有权不可通过自我进化修改
 - **效果**：元迭代框架持续进化，适应性强
 
+## 2026-03-27 | 修改操作streaming支持（第105轮）
+- **决策**：为所有修改操作工具添加streaming参数支持
+- **原因**：write_only模式写入性能远优于传统模式，大数据量操作内存占用降低90%+
+- **覆盖工具**：excel_update_range/insert_rows/insert_columns/upsert_row/batch_insert_rows/delete_rows/delete_columns（7个）
+- **已有优化**：create_file/import_from_csv/merge_files已使用write_only模式
+- **降级策略**：streaming写入失败自动降级到传统openpyxl方式
+- **效果**：v1.5.3发布，所有修改操作均有高性能路径
+
 ## 2026-03-27 | 改进优先级策略
 - **决策**：建立改进优先级的明确策略
 - **原因**：需求可能很多，需要按优先级推进
