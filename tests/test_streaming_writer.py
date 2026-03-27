@@ -306,3 +306,173 @@ class TestPerformanceComparison:
         print(f"  Streaming: {streaming_time:.3f}s")
         print(f"  OpenPyXL:  {openpyxl_time:.3f}s")
         print(f"  比率: {openpyxl_time / max(streaming_time, 0.001):.1f}x")
+
+
+class TestInsertRowsStreaming:
+    """StreamingWriter.insert_rows_streaming 测试"""
+
+    def test_insert_middle(self, tmp_path):
+        """在中间位置插入行，原有数据下移"""
+        fp = str(tmp_path / "test.xlsx")
+        wb = Workbook()
+        ws = wb.active
+        ws.title = "Sheet1"
+        ws.append(["Name", "Age"])
+        ws.append(["Alice", 30])
+        ws.append(["Bob", 25])
+        wb.save(fp)
+        wb.close()
+
+        success, msg, meta = StreamingWriter.insert_rows_streaming(
+            fp, "Sheet1", 2, [["Charlie", 28]]
+        )
+        assert success is True
+        assert "1 行" in msg
+
+        # 验证插入位置正确
+        from python_calamine import CalamineWorkbook
+        cal_wb = CalamineWorkbook.from_path(fp)
+        rows = cal_wb.get_sheet_by_name("Sheet1").to_python()
+        assert rows[0] == ["Name", "Age"]
+        assert rows[1][0] == "Charlie"
+        assert rows[2][0] == "Alice"
+        assert rows[3][0] == "Bob"
+
+    def test_insert_multiple_rows(self, tmp_path):
+        """插入多行数据"""
+        fp = str(tmp_path / "test.xlsx")
+        wb = Workbook()
+        ws = wb.active
+        ws.title = "Sheet1"
+        ws.append(["ID", "Value"])
+        ws.append([1, "A"])
+        wb.save(fp)
+        wb.close()
+
+        success, msg, meta = StreamingWriter.insert_rows_streaming(
+            fp, "Sheet1", 2, [[2, "B"], [3, "C"]]
+        )
+        assert success is True
+        assert "2 行" in msg
+
+        from python_calamine import CalamineWorkbook
+        cal_wb = CalamineWorkbook.from_path(fp)
+        rows = cal_wb.get_sheet_by_name("Sheet1").to_python()
+        assert len(rows) == 4
+        assert rows[1][0] == 2.0
+        assert rows[2][0] == 3.0
+        assert rows[3][0] == 1.0
+
+    def test_insert_at_end(self, tmp_path):
+        """在末尾追加行"""
+        fp = str(tmp_path / "test.xlsx")
+        wb = Workbook()
+        ws = wb.active
+        ws.title = "Sheet1"
+        ws.append(["Name"])
+        ws.append(["Alice"])
+        wb.save(fp)
+        wb.close()
+
+        success, msg, meta = StreamingWriter.insert_rows_streaming(
+            fp, "Sheet1", 3, [["Bob"]]
+        )
+        assert success is True
+
+        from python_calamine import CalamineWorkbook
+        cal_wb = CalamineWorkbook.from_path(fp)
+        rows = cal_wb.get_sheet_by_name("Sheet1").to_python()
+        assert len(rows) == 3
+        assert rows[2][0] == "Bob"
+
+    def test_insert_preserves_other_sheets(self, tmp_path):
+        """插入行不影响其他工作表"""
+        fp = str(tmp_path / "test.xlsx")
+        wb = Workbook()
+        ws1 = wb.active
+        ws1.title = "Main"
+        ws1.append(["A"])
+        ws1.append([1])
+        ws2 = wb.create_sheet("Other")
+        ws2.append(["X"])
+        ws2.append([99])
+        wb.save(fp)
+        wb.close()
+
+        success, msg, meta = StreamingWriter.insert_rows_streaming(
+            fp, "Main", 2, [[2]]
+        )
+        assert success is True
+
+        from python_calamine import CalamineWorkbook
+        cal_wb = CalamineWorkbook.from_path(fp)
+        other_rows = cal_wb.get_sheet_by_name("Other").to_python()
+        assert other_rows[1][0] == 99
+
+    def test_insert_empty_data(self):
+        """空数据应返回失败"""
+        success, msg, meta = StreamingWriter.insert_rows_streaming(
+            "/tmp/nonexistent.xlsx", "Sheet1", 1, []
+        )
+        assert success is False
+        assert "不能为空" in msg
+
+    def test_insert_invalid_row(self):
+        """无效行号应返回失败"""
+        success, msg, meta = StreamingWriter.insert_rows_streaming(
+            "/tmp/nonexistent.xlsx", "Sheet1", 0, [["data"]]
+        )
+        assert success is False
+        assert "必须" in msg
+
+    def test_insert_preserves_col_widths(self, tmp_path):
+        """插入行保留列宽"""
+        fp = str(tmp_path / "test.xlsx")
+        wb = Workbook()
+        ws = wb.active
+        ws.title = "Sheet1"
+        ws.column_dimensions['A'].width = 25
+        ws.column_dimensions['B'].width = 35
+        ws.append(["Name", "Age"])
+        ws.append(["Alice", 30])
+        wb.save(fp)
+        wb.close()
+
+        success, msg, meta = StreamingWriter.insert_rows_streaming(
+            fp, "Sheet1", 2, [["Bob", 25]], preserve_col_widths=True
+        )
+        assert success is True
+
+        wb2 = load_workbook(fp)
+        ws2 = wb2["Sheet1"]
+        assert ws2.column_dimensions['A'].width == 25
+        assert ws2.column_dimensions['B'].width == 35
+        wb2.close()
+
+
+class TestUpdateRangeStreamingExtended:
+    """update_range 扩展后的streaming测试"""
+
+    def test_update_range_with_preserve_formulas_param(self, tmp_path):
+        """update_range接受preserve_formulas参数"""
+        fp = str(tmp_path / "test.xlsx")
+        wb = Workbook()
+        ws = wb.active
+        ws.title = "Sheet1"
+        ws.append(["A", "B", "C"])
+        ws.append([1, 2, 3])
+        ws.append([4, 5, 6])
+        wb.save(fp)
+        wb.close()
+
+        # 调用时传入preserve_formulas参数（streaming模式下暂无效，但不应报错）
+        success, msg, meta = StreamingWriter.update_range(
+            fp, "Sheet1", 2, 1, [[10, 20, 30]], preserve_formulas=True
+        )
+        assert success is True
+
+        from python_calamine import CalamineWorkbook
+        cal_wb = CalamineWorkbook.from_path(fp)
+        rows = cal_wb.get_sheet_by_name("Sheet1").to_python()
+        assert rows[1] == [10, 20, 30]
+        assert rows[2] == [4, 5, 6]

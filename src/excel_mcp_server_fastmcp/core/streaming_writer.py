@@ -582,6 +582,7 @@ class StreamingWriter:
         start_row: int,
         start_col: int,
         data: List[List[Any]],
+        preserve_formulas: bool = True,
         preserve_col_widths: bool = True,
     ) -> Tuple[bool, str, Dict[str, Any]]:
         """流式覆盖范围：calamine读取 → 覆盖指定范围 → write_only写入
@@ -648,4 +649,72 @@ class StreamingWriter:
 
         except Exception as e:
             logger.error(f"流式覆盖范围失败: {e}")
+            return False, f"流式写入失败: {str(e)}", {}
+
+    @classmethod
+    def insert_rows_streaming(
+        cls,
+        file_path: str,
+        sheet_name: str,
+        start_row: int,
+        data: List[List[Any]],
+        preserve_formulas: bool = True,
+        preserve_col_widths: bool = True,
+    ) -> Tuple[bool, str, Dict[str, Any]]:
+        """流式插入行：calamine读取 → 在指定行位置插入 → write_only写入
+
+        支持在任意行位置插入新行，保留原有数据下移。
+        Args:
+            file_path: Excel文件路径
+            sheet_name: 目标工作表名
+            start_row: 插入位置行号（1-based）
+            data: 要插入的二维数组数据
+            preserve_formulas: 是否保留公式（插入模式下此参数暂无效，因为插入的是新行）
+            preserve_col_widths: 是否保留列宽
+
+        Returns:
+            (success, message, metadata)
+        """
+        if not _HAS_CALAMINE:
+            return False, "calamine未安装，无法使用流式写入", {}
+
+        try:
+            if not data:
+                return False, "数据不能为空", {}
+            if start_row < 1:
+                return False, f"起始行号必须>=1，实际: {start_row}", {}
+
+            def _modify(rows, header_row, col_map):
+                # 确保行数足够
+                if len(rows) < start_row - 1:
+                    # 如果目标行不存在，先创建空行到目标位置
+                    max_col = max(len(r) for r in rows) if rows else 0
+                    while len(rows) < start_row - 1:
+                        rows.append([None] * max_col)
+
+                # 在目标行位置插入新行
+                for r_offset, row_data in enumerate(data):
+                    new_row = [None] * len(rows[0]) if rows else []
+                    # 填充新行数据
+                    for c_offset, value in enumerate(row_data):
+                        if c_offset < len(new_row):
+                            new_row[c_offset] = value
+                    # 插入到指定位置
+                    rows.insert(start_row - 1 + r_offset, new_row)
+
+                inserted_count = len(data)
+                return True, (
+                    f"流式插入 {inserted_count} 行到 {sheet_name}!{start_row}，"
+                    f"原有数据自动下移"
+                ), rows, {
+                    'action': 'insert_rows_streaming',
+                    'start_row': start_row,
+                    'rows_inserted': inserted_count,
+                    'total_rows': len(rows),
+                }
+
+            return cls._copy_modify_write(file_path, sheet_name, _modify, preserve_col_widths)
+
+        except Exception as e:
+            logger.error(f"流式插入行失败: {e}")
             return False, f"流式写入失败: {str(e)}", {}

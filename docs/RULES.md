@@ -14,6 +14,10 @@
 - 测试+修复：10分钟
 - MCP验证+README检查+评价+合并+文档更新：10分钟
 
+## MCP验证
+- **开发中MCP验证**：有功能变化时，至少8项游戏场景通过MCP工具调用
+- **MCP真实验证（每5轮至少1次）**：创建真实xlsx测试文件，通过MCP工具实际调用12项核心功能（list_sheets/get_range/query WHERE/query JOIN/query GROUP BY/query子查询/query FROM子查询/get_headers/find_last_row/batch_insert_rows/delete_rows/describe_table），记录通过/失败。发现的bug立即写入REQUIREMENTS.md。测试文件用后清理。 pytest只验证代码逻辑，MCP真实验证验证端到端可用性，两者不可互相替代。
+
 ## 测试策略
 - **开发中**：只跑受影响的测试文件（3-5秒）
 - **全量测试仅两个时机**：第一轮评估基线 + 合并main前

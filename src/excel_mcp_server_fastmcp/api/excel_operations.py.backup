@@ -116,8 +116,8 @@ class ExcelOperations:
             if not validation_result['valid']:
                 return cls._format_error_result(validation_result['error'])
 
-            # 步骤2: 扩展流式写入路径（支持覆盖+插入模式）
-            if streaming:
+            # 步骤2: 流式写入路径（仅覆盖模式）
+            if streaming and not insert_mode and not preserve_formulas:
                 from excel_mcp_server_fastmcp.core.streaming_writer import StreamingWriter
                 if StreamingWriter.is_available():
                     try:
@@ -131,21 +131,9 @@ class ExcelOperations:
                             min_col, min_row, max_col, max_row = range_boundaries(
                                 range_info_parsed.cell_range
                             )
-                            
-                            # 根据模式选择不同的流式写入方法
-                            if not insert_mode:
-                                # 覆盖模式 - 直接使用流式写入
-                                success, message, meta = StreamingWriter.update_range(
-                                    file_path, sheet_name, min_row, min_col, data,
-                                    preserve_formulas=preserve_formulas
-                                )
-                            else:
-                                # 插入模式 - 使用流式插入
-                                success, message, meta = StreamingWriter.insert_rows_streaming(
-                                    file_path, sheet_name, min_row, data, 
-                                    preserve_formulas=preserve_formulas
-                                )
-                            
+                            success, message, meta = StreamingWriter.update_range(
+                                file_path, sheet_name, min_row, min_col, data
+                            )
                             if success:
                                 return {
                                     'success': True,
@@ -155,12 +143,11 @@ class ExcelOperations:
                                         'file_path': file_path,
                                         'sheet_name': sheet_name,
                                         'range': range_expression,
-                                        'streaming_mode': 'insert' if insert_mode else 'overwrite',
                                         **meta
                                     }
                                 }
                             else:
-                                logger.warning(f"流式{ '插入' if insert_mode else '覆盖' }操作失败，降级到openpyxl: {message}")
+                                logger.warning(f"流式update_range失败，降级到openpyxl: {message}")
                     except Exception as parse_err:
                         logger.warning(f"流式update_range范围解析失败，降级到openpyxl: {parse_err}")
 
