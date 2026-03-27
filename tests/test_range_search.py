@@ -132,8 +132,8 @@ class TestRangeExpressionSearch:
 
         assert result['success'] is True
         assert len(result['data']) == 6  # B1-B6中都是邮箱
-        assert result['metadata']['total_matches'] == 6
-        assert result['metadata']['range_expression'] == "A1:C6"
+        assert result['meta']['total_matches'] == 6
+        assert result['meta']['range_expression'] == "A1:C6"
 
         # 验证匹配的单元格位置
         cells = [match['cell'] for match in result['data']]
@@ -150,7 +150,7 @@ class TestRangeExpressionSearch:
 
         assert result['success'] is True
         assert len(result['data']) == 5  # B1-B5中的邮箱
-        assert result['metadata']['total_matches'] == 5
+        assert result['meta']['total_matches'] == 5
 
     # ==================== 行范围测试 ====================
 
@@ -165,8 +165,8 @@ class TestRangeExpressionSearch:
 
         assert result['success'] is True
         assert len(result['data']) == 6  # 第3-5行中的所有邮箱
-        assert result['metadata']['total_matches'] == 6
-        assert result['metadata']['range_expression'] == "3:5"
+        assert result['meta']['total_matches'] == 6
+        assert result['meta']['range_expression'] == "3:5"
 
         # 验证所有匹配都在第3-5行
         for match in result['data']:
@@ -184,7 +184,7 @@ class TestRangeExpressionSearch:
 
         assert result['success'] is True
         assert len(result['data']) == 3  # 第6-8行B列中包含@row的邮箱
-        assert result['metadata']['total_matches'] == 3
+        assert result['meta']['total_matches'] == 3
 
     # ==================== 列范围测试 ====================
 
@@ -199,8 +199,8 @@ class TestRangeExpressionSearch:
 
         assert result['success'] is True
         assert len(result['data']) == 10  # B列中的所有邮箱
-        assert result['metadata']['total_matches'] == 10
-        assert result['metadata']['range_expression'] == "B:B"
+        assert result['meta']['total_matches'] == 10
+        assert result['meta']['range_expression'] == "B:B"
 
         # 验证所有匹配都在B列
         for match in result['data']:
@@ -218,7 +218,7 @@ class TestRangeExpressionSearch:
 
         assert result['success'] is True
         assert len(result['data']) == 10  # D列中包含@col3的邮箱
-        assert result['metadata']['total_matches'] == 10
+        assert result['meta']['total_matches'] == 10
 
         # 验证所有匹配都在D列 (因为只有D列包含@col3)
         for match in result['data']:
@@ -235,7 +235,7 @@ class TestRangeExpressionSearch:
 
         assert result['success'] is True
         assert len(result['data']) == 10  # C列中的所有"数据"
-        assert result['metadata']['total_matches'] == 10
+        assert result['meta']['total_matches'] == 10
 
     # ==================== 单行测试 ====================
 
@@ -250,8 +250,8 @@ class TestRangeExpressionSearch:
 
         assert result['success'] is True
         assert len(result['data']) == 2  # 第7行中的2个邮箱 (B7和D7)
-        assert result['metadata']['total_matches'] == 2
-        assert result['metadata']['range_expression'] == "7"
+        assert result['meta']['total_matches'] == 2
+        assert result['meta']['range_expression'] == "7"
 
         # 验证所有匹配都在第7行
         for match in result['data']:
@@ -268,7 +268,7 @@ class TestRangeExpressionSearch:
 
         assert result['success'] is True
         assert len(result['data']) == 1  # A10中的"第10行"
-        assert result['metadata']['total_matches'] == 1
+        assert result['meta']['total_matches'] == 1
 
     # ==================== 单列测试 ====================
 
@@ -283,8 +283,8 @@ class TestRangeExpressionSearch:
 
         assert result['success'] is True
         assert len(result['data']) == 10  # C列中的所有"数据"
-        assert result['metadata']['total_matches'] == 10
-        assert result['metadata']['range_expression'] == "C"
+        assert result['meta']['total_matches'] == 10
+        assert result['meta']['range_expression'] == "C"
 
         # 验证所有匹配都在C列
         for match in result['data']:
@@ -301,7 +301,7 @@ class TestRangeExpressionSearch:
 
         assert result['success'] is True
         assert len(result['data']) == 10  # E列中的所有"结果"
-        assert result['metadata']['total_matches'] == 10
+        assert result['meta']['total_matches'] == 10
 
     # ==================== 边界条件测试 ====================
 
@@ -362,7 +362,7 @@ class TestRangeExpressionSearch:
         assert range_result['success'] is True
 
         # B列搜索应该找到10个匹配（B列所有邮箱）
-        assert range_result['metadata']['total_matches'] == 10
+        assert range_result['meta']['total_matches'] == 10
 
         # 性能测试（范围搜索通常应该更快，但在小文件中差异可能不明显）
         print(f"全文件搜索时间: {full_search_time:.4f}秒")
@@ -434,7 +434,7 @@ class TestRangeExpressionIntegration:
 
             assert len(matches) >= case['expected_min'], \
                 f"{case['name']} 匹配数量不足: 期望>={case['expected_min']}, 实际={len(matches)}"
-            assert result['metadata']['range_expression'] == case['range_expr'], \
+            assert result['meta']['range_expression'] == case['range_expr'], \
                 f"{case['name']} 范围表达式不匹配"
 
             results.append({

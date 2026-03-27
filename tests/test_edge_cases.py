@@ -32,13 +32,13 @@ class TestExcelBackupRestore:
         result = excel_create_backup(sample_excel_file, backup_dir)
 
         assert result['success'] is True
-        assert 'backup_file' in result
-        assert os.path.exists(result['backup_file'])
+        assert 'backup_file' in result['data']
+        assert os.path.exists(result['data']['backup_file'])
 
         # List backups
         list_result = excel_list_backups(sample_excel_file, backup_dir)
         assert list_result['success'] is True
-        assert list_result['total_backups'] >= 1
+        assert list_result['data']['total_backups'] >= 1
 
     def test_restore_backup_roundtrip(self, sample_excel_file, temp_dir):
         """Test full backup → modify → restore cycle"""
@@ -49,7 +49,7 @@ class TestExcelBackupRestore:
         backup_result = excel_create_backup(sample_excel_file, backup_dir)
         assert backup_result['success'] is True
 
-        backup_path = backup_result['backup_file']
+        backup_path = backup_result['data']['backup_file']
         assert os.path.exists(backup_path)
 
         # Restore backup
@@ -76,7 +76,7 @@ class TestExcelBackupRestore:
         result = excel_list_backups(sample_excel_file, backup_dir)
 
         assert result['success'] is True
-        assert len(result['backups']) == 0
+        assert len(result['data']['backups']) == 0
 
     def test_create_multiple_backups_with_delay(self, sample_excel_file, temp_dir):
         """Test creating multiple backups with time separation"""
@@ -92,7 +92,7 @@ class TestExcelBackupRestore:
         # List all
         list_result = excel_list_backups(sample_excel_file, backup_dir)
         assert list_result['success'] is True
-        assert list_result['total_backups'] == 3
+        assert list_result['data']['total_backups'] == 3
 
 
 class TestExcelFormulas:

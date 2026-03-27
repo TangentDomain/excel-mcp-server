@@ -487,7 +487,7 @@ def excel_list_sheets(file_path: str) -> Dict[str, Any]:
     _path_err = _validate_path(file_path)
     if _path_err:
         return _path_err
-    return ExcelOperations.list_sheets(file_path)
+    return _wrap(ExcelOperations.list_sheets(file_path))
 
 
 @mcp.tool()
@@ -501,7 +501,7 @@ def excel_get_sheet_headers(file_path: str) -> Dict[str, Any]:
     _path_err = _validate_path(file_path)
     if _path_err:
         return _path_err
-    return ExcelOperations.get_sheet_headers(file_path)
+    return _wrap(ExcelOperations.get_sheet_headers(file_path)
 
 
 @mcp.tool()
@@ -524,7 +524,7 @@ def excel_search(
     _path_err = _validate_path(file_path)
     if _path_err:
         return _path_err
-    return ExcelOperations.search(file_path, pattern, sheet_name, case_sensitive, whole_word, use_regex, include_values, include_formulas, range)
+    return _wrap(ExcelOperations.search(file_path, pattern, sheet_name, case_sensitive, whole_word, use_regex, include_values, include_formulas, range)
 
 
 @mcp.tool()
@@ -549,7 +549,7 @@ def excel_search_directory(
     _path_err = _validate_path(directory_path)
     if _path_err:
         return _path_err
-    return ExcelOperations.search_directory(directory_path, pattern, case_sensitive, whole_word, use_regex, include_values, include_formulas, recursive, file_extensions, file_pattern, max_files)
+    return _wrap(ExcelOperations.search_directory(directory_path, pattern, case_sensitive, whole_word, use_regex, include_values, include_formulas, recursive, file_extensions, file_pattern, max_files)
 
 
 @mcp.tool()
@@ -619,7 +619,7 @@ def excel_get_headers(
     _path_err = _validate_path(file_path)
     if _path_err:
         return _path_err
-    return ExcelOperations.get_headers(file_path, sheet_name, header_row, max_columns)
+    return _wrap(ExcelOperations.get_headers(file_path, sheet_name, header_row, max_columns)
 
 
 @mcp.tool()
@@ -1302,7 +1302,7 @@ def excel_insert_rows(
     _path_err = _validate_path(file_path)
     if _path_err:
         return _path_err
-    return ExcelOperations.insert_rows(file_path, sheet_name, row_index, count)
+    return _wrap(ExcelOperations.insert_rows(file_path, sheet_name, row_index, count)
 
 
 @mcp.tool()
@@ -1319,7 +1319,7 @@ def excel_insert_columns(
     _path_err = _validate_path(file_path)
     if _path_err:
         return _path_err
-    return ExcelOperations.insert_columns(file_path, sheet_name, column_index, count)
+    return _wrap(ExcelOperations.insert_columns(file_path, sheet_name, column_index, count)
 
 
 @mcp.tool()
@@ -1336,7 +1336,7 @@ def excel_find_last_row(
     _path_err = _validate_path(file_path)
     if _path_err:
         return _path_err
-    return ExcelOperations.find_last_row(file_path, sheet_name, column)
+    return _wrap(ExcelOperations.find_last_row(file_path, sheet_name, column)
 
 
 @mcp.tool()
@@ -1351,7 +1351,7 @@ def excel_create_file(
     _path_err = _validate_path(file_path)
     if _path_err:
         return _path_err
-    return ExcelOperations.create_file(file_path, sheet_names)
+    return _wrap(ExcelOperations.create_file(file_path, sheet_names)
 
 
 @mcp.tool()
@@ -1368,7 +1368,7 @@ def excel_export_to_csv(
     _path_err = _validate_path(file_path)
     if _path_err:
         return _path_err
-    return ExcelOperations.export_to_csv(file_path, output_path, sheet_name, encoding)
+    return _wrap(ExcelOperations.export_to_csv(file_path, output_path, sheet_name, encoding)
 
 
 @mcp.tool()
@@ -1388,7 +1388,7 @@ def excel_import_from_csv(
         if _err:
             return _err
 
-    return ExcelOperations.import_from_csv(csv_path, output_path, sheet_name, encoding, has_header)
+    return _wrap(ExcelOperations.import_from_csv(csv_path, output_path, sheet_name, encoding, has_header)
 
 
 @mcp.tool()
@@ -1406,7 +1406,7 @@ def excel_convert_format(
         if _err:
             return _err
 
-    return ExcelOperations.convert_format(input_path, output_path, target_format)
+    return _wrap(ExcelOperations.convert_format(input_path, output_path, target_format)
 
 
 @mcp.tool()
@@ -1424,7 +1424,7 @@ def excel_merge_files(
         if _err:
             return _err
 
-    return ExcelOperations.merge_files(input_files, output_path, merge_mode)
+    return _wrap(ExcelOperations.merge_files(input_files, output_path, merge_mode)
 
 
 @mcp.tool()
@@ -1436,7 +1436,7 @@ def excel_get_file_info(file_path: str) -> Dict[str, Any]:
     _path_err = _validate_path(file_path)
     if _path_err:
         return _path_err
-    return ExcelOperations.get_file_info(file_path)
+    return _wrap(ExcelOperations.get_file_info(file_path)
 
 
 @mcp.tool()
@@ -1452,7 +1452,7 @@ def excel_create_sheet(
     _path_err = _validate_path(file_path)
     if _path_err:
         return _path_err
-    return ExcelOperations.create_sheet(file_path, sheet_name, index)
+    return _wrap(ExcelOperations.create_sheet(file_path, sheet_name, index)
 
 
 @mcp.tool()
@@ -1515,7 +1515,7 @@ def excel_rename_sheet(
     _path_err = _validate_path(file_path)
     if _path_err:
         return _path_err
-    return ExcelOperations.rename_sheet(file_path, old_name, new_name)
+    return _wrap(ExcelOperations.rename_sheet(file_path, old_name, new_name)
 
 
 @mcp.tool()
@@ -1533,7 +1533,7 @@ def excel_copy_sheet(
     _path_err = _validate_path(file_path)
     if _path_err:
         return _path_err
-    return ExcelOperations.copy_sheet(file_path, source_name, new_name, index)
+    return _wrap(ExcelOperations.copy_sheet(file_path, source_name, new_name, index)
 
 
 @mcp.tool()
@@ -1551,7 +1551,7 @@ def excel_rename_column(
     _path_err = _validate_path(file_path)
     if _path_err:
         return _path_err
-    return ExcelOperations.rename_column(file_path, sheet_name, old_header, new_header, header_row)
+    return _wrap(ExcelOperations.rename_column(file_path, sheet_name, old_header, new_header, header_row)
 
 
 @mcp.tool()
@@ -1570,7 +1570,7 @@ def excel_upsert_row(
     _path_err = _validate_path(file_path)
     if _path_err:
         return _path_err
-    return ExcelOperations.upsert_row(file_path, sheet_name, key_column, key_value, updates, header_row)
+    return _wrap(ExcelOperations.upsert_row(file_path, sheet_name, key_column, key_value, updates, header_row)
 
 
 @mcp.tool()
@@ -1587,7 +1587,7 @@ def excel_batch_insert_rows(
     _path_err = _validate_path(file_path)
     if _path_err:
         return _path_err
-    return ExcelOperations.batch_insert_rows(file_path, sheet_name, data, header_row)
+    return _wrap(ExcelOperations.batch_insert_rows(file_path, sheet_name, data, header_row)
 
 
 @mcp.tool()
@@ -1706,7 +1706,7 @@ def excel_set_formula(
     _formula_err = SecurityValidator.validate_formula(formula)
     if not _formula_err['valid']:
         return {'success': False, 'message': f'🔒 安全验证失败: {_formula_err["error"]}'}
-    return ExcelOperations.set_formula(file_path, sheet_name, cell_address, formula)
+    return _wrap(ExcelOperations.set_formula(file_path, sheet_name, cell_address, formula)
 
 @mcp.tool()
 @_track_call
@@ -1720,7 +1720,7 @@ def excel_evaluate_formula(
     _formula_err = SecurityValidator.validate_formula(formula)
     if not _formula_err['valid']:
         return {'success': False, 'message': f'🔒 安全验证失败: {_formula_err["error"]}'}
-    return ExcelOperations.evaluate_formula(formula, context_sheet)
+    return _wrap(ExcelOperations.evaluate_formula(formula, context_sheet)
 
 
 @mcp.tool()
@@ -2008,7 +2008,7 @@ def excel_format_cells(
     _path_err = _validate_path(file_path)
     if _path_err:
         return _path_err
-    return ExcelOperations.format_cells(file_path, sheet_name, range, formatting, preset)
+    return _wrap(ExcelOperations.format_cells(file_path, sheet_name, range, formatting, preset)
 
 
 @mcp.tool()
@@ -2025,7 +2025,7 @@ def excel_merge_cells(
     _path_err = _validate_path(file_path)
     if _path_err:
         return _path_err
-    return ExcelOperations.merge_cells(file_path, sheet_name, range)
+    return _wrap(ExcelOperations.merge_cells(file_path, sheet_name, range)
 
 
 @mcp.tool()
@@ -2041,7 +2041,7 @@ def excel_unmerge_cells(
     _path_err = _validate_path(file_path)
     if _path_err:
         return _path_err
-    return ExcelOperations.unmerge_cells(file_path, sheet_name, range)
+    return _wrap(ExcelOperations.unmerge_cells(file_path, sheet_name, range)
 
 
 @mcp.tool()
@@ -2059,7 +2059,7 @@ def excel_set_borders(
     _path_err = _validate_path(file_path)
     if _path_err:
         return _path_err
-    return ExcelOperations.set_borders(file_path, sheet_name, range, border_style)
+    return _wrap(ExcelOperations.set_borders(file_path, sheet_name, range, border_style)
 
 
 @mcp.tool()
@@ -2077,7 +2077,7 @@ def excel_set_row_height(
     _path_err = _validate_path(file_path)
     if _path_err:
         return _path_err
-    return ExcelOperations.set_row_height(file_path, sheet_name, row_index, height, count)
+    return _wrap(ExcelOperations.set_row_height(file_path, sheet_name, row_index, height, count)
 
 
 @mcp.tool()
@@ -2095,7 +2095,7 @@ def excel_set_column_width(
     _path_err = _validate_path(file_path)
     if _path_err:
         return _path_err
-    return ExcelOperations.set_column_width(file_path, sheet_name, column_index, width, count)
+    return _wrap(ExcelOperations.set_column_width(file_path, sheet_name, column_index, width, count)
 
 
 # ==================== Excel比较功能 ====================
@@ -2115,7 +2115,7 @@ def excel_compare_files(
         _err = _validate_path(_p)
         if _err:
             return _err
-    return ExcelOperations.compare_files(file1_path, file2_path)
+    return _wrap(ExcelOperations.compare_files(file1_path, file2_path)
 
 
 @mcp.tool()
@@ -2133,7 +2133,7 @@ def excel_check_duplicate_ids(
     _path_err = _validate_path(file_path)
     if _path_err:
         return _path_err
-    return ExcelOperations.check_duplicate_ids(file_path, sheet_name, id_column, header_row)
+    return _wrap(ExcelOperations.check_duplicate_ids(file_path, sheet_name, id_column, header_row)
 
 
 @mcp.tool()
@@ -2154,7 +2154,7 @@ def excel_compare_sheets(
         _err = _validate_path(_p)
         if _err:
             return _err
-    return ExcelOperations.compare_sheets(file1_path, sheet1_name, file2_path, sheet2_name, id_column, header_row)
+    return _wrap(ExcelOperations.compare_sheets(file1_path, sheet1_name, file2_path, sheet2_name, id_column, header_row)
 
 
 @mcp.tool()
