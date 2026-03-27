@@ -81,6 +81,12 @@ except ImportError:
 import openpyxl
 from pathlib import Path
 
+# 流式写入导入
+try:
+    from ..core.streaming_writer import StreamingWriter
+except ImportError:
+    StreamingWriter = None
+
 
 class StructuredSQLError(Exception):
     """结构化SQL错误，为AI提供可自动修复的错误信息。
@@ -3604,15 +3610,78 @@ class AdvancedSQLQueryEngine:
     def _write_changes_to_excel(self, file_path: str, sheet_name: str,
                                 changes: list, df: pd.DataFrame,
                                 affected_rows: int, start_time: float) -> Dict[str, Any]:
-        """事务保护写入变更到Excel（失败自动回滚）"""
+        """事务保护写入变更到Excel（失败自动回滚）
+        支持流式写入：大文件批量修改时使用write_only模式提升性能
+        """
         backup_path = None
         try:
             with self._file_lock(file_path):
                 backup_path = tempfile.mktemp(suffix='.xlsx.bak')
                 shutil.copy2(file_path, backup_path)
 
+                # 决策：使用流式写入的条件
+                file_size = os.path.getsize(file_path)
+                use_streaming = (
+                    affected_rows >= 50 or  # 影响行数≥50
+                    len(changes) >= 100 or  # 修改单元格数≥100
+                    file_size > 1024 * 1024  # 文件大小>1MB
+                )
+
+                if use_streaming and StreamingWriter.is_available():
+                    # 使用流式写入（高性能路径）
+                    # _copy_modify_write 会传递 (rows, header_row=1, col_map) 给 modify_fn
+                    # col_map: {列名: 列索引(1-based)}
+                    # rows: 包含表头行的所有行数据（0-based索引）
+                    # header_row: 表头行数（固定为1）
+                    # change['row']: 1-based的Excel行号（execute_update_query中 int(idx)+2）
+                    
+                    def modify_fn(rows, header_row, col_map):
+                        """修改函数：应用UPDATE变更到行数据"""
+                        modified_rows = [row[:] for row in rows]  # 深拷贝
+                        
+                        for change in changes:
+                            col_name = change['column']
+                            # 在col_map中查找列索引
+                            col_idx = col_map.get(col_name) or col_map.get(str(col_name))
+                            if col_idx is None:
+                                continue
+                            
+                            # change['row']是1-based的Excel行号
+                            # rows是0-based的列表（rows[0]是表头）
+                            # 所以 Excel行号N → rows[N-1]
+                            list_idx = change['row'] - 1
+                            
+                            if 0 <= list_idx < len(modified_rows):
+                                row = modified_rows[list_idx]
+                                while len(row) < col_idx:
+                                    row.append('')
+                                row[col_idx - 1] = change['new_value']
+                        
+                        return True, "流式写入完成", modified_rows, {}
+                    
+                    success, message, meta = StreamingWriter._copy_modify_write(
+                        file_path, sheet_name, modify_fn, preserve_col_widths=True
+                    )
+                    
+                    if success:
+                        self._df_cache.pop(file_path, None)
+                        elapsed = (time.time() - start_time) * 1000
+                        return {
+                            'success': True,
+                            'message': f'流式更新 {len(changes)} 个单元格（{affected_rows} 行）',
+                            'affected_rows': affected_rows,
+                            'changes': changes,
+                            'execution_time_ms': round(elapsed, 1),
+                            'method': 'streaming'
+                        }
+                    else:
+                        # 流式写入失败，降级到传统方式
+                        logger.warning(f"流式写入失败，降级到传统方式: {message}")
+
+                # 传统写入方式（兼容性路径）
                 header_row_offset = 0
-                if self._header_descriptions.get(sheet_name, {}):
+                header_desc = getattr(self, '_header_descriptions', {})
+                if header_desc.get(sheet_name, {}):
                     header_row_offset = 1
 
                 wb = openpyxl.load_workbook(file_path)
@@ -3636,7 +3705,8 @@ class AdvancedSQLQueryEngine:
                         'message': f'成功更新 {len(changes)} 个单元格（{affected_rows} 行）',
                         'affected_rows': affected_rows,
                         'changes': changes,
-                        'execution_time_ms': round(elapsed, 1)}
+                        'execution_time_ms': round(elapsed, 1),
+                        'method': 'traditional'}
         except Exception:
             if backup_path and os.path.exists(backup_path):
                 try:
