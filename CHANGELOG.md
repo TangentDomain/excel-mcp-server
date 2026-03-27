@@ -7,6 +7,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.6.27] - 2026-03-27
+
+### 新功能
+- **REQ-015 copy_sheet streaming支持**：excel_copy_sheet工具新增streaming参数
+  - streaming=True（默认）使用calamine读取+write_only写入，大文件性能显著提升
+  - streaming=False使用传统openpyxl模式，保留格式更完整
+  - 自动降级：streaming不可用时自动回退到openpyxl
+  - 保留源工作表列宽
+  - 支持名称冲突自动编号
+  - 新增5个专项测试，全量1164测试通过
+
 ## [1.6.24] - 2026-03-27
 
 ### 优化
