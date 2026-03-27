@@ -5,7 +5,6 @@ build-backend = "setuptools.build_meta"
 [project]
 name = "excel-mcp-server-fastmcp"
 version = "1.4.1"
->>>>>>> develop
 description = "Excel MCP Server based on FastMCP and openpyxl"
 readme = "README.md"
 license = "MIT"
