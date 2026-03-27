@@ -89,7 +89,7 @@ class ExcelOperations:
         data: List[List[Any]],
         preserve_formulas: bool = True,
         insert_mode: bool = True,
-        streaming: bool = False
+        streaming: bool = True
     ) -> Dict[str, Any]:
         """
         @intention 更新Excel文件中指定范围的数据，支持插入和覆盖模式
@@ -715,7 +715,8 @@ class ExcelOperations:
         file_path: str,
         sheet_name: str,
         row_index: int,
-        count: int = 1
+        count: int = 1,
+        streaming: bool = True
     ) -> Dict[str, Any]:
         """
         @intention 在指定位置插入空行
@@ -725,6 +726,7 @@ class ExcelOperations:
             sheet_name: 工作表名称
             row_index: 插入位置 (1-based)
             count: 插入行数
+            streaming: 是否使用流式写入（默认True，大文件性能更好）
 
         Returns:
             Dict: 标准化的操作结果
@@ -733,6 +735,33 @@ class ExcelOperations:
             logger.info(f"{cls._LOG_PREFIX} 开始插入行: {sheet_name} 第{row_index}行")
 
         try:
+            # 流式写入路径
+            if streaming:
+                from excel_mcp_server_fastmcp.core.streaming_writer import StreamingWriter
+                if StreamingWriter.is_available():
+                    # 创建空行数据用于插入
+                    empty_rows = [[] for _ in range(count)]
+                    success, message, meta = StreamingWriter.update_range(
+                        file_path, sheet_name, row_index, 1, empty_rows
+                    )
+                    if success:
+                        return {
+                            'success': True,
+                            'message': message,
+                            'data': meta,
+                            'metadata': {
+                                'file_path': file_path,
+                                'sheet_name': sheet_name,
+                                'row_index': row_index,
+                                'count': count,
+                                'mode': 'streaming',
+                                **meta
+                            }
+                        }
+                    else:
+                        logger.warning(f"流式插入行失败，降级到openpyxl: {message}")
+
+            # 传统openpyxl路径
             writer = ExcelWriter(file_path)
             result = writer.insert_rows(sheet_name, row_index, count)
             return format_operation_result(result)
@@ -748,7 +777,8 @@ class ExcelOperations:
         file_path: str,
         sheet_name: str,
         column_index: int,
-        count: int = 1
+        count: int = 1,
+        streaming: bool = True
     ) -> Dict[str, Any]:
         """
         @intention 在指定位置插入空列
@@ -758,6 +788,7 @@ class ExcelOperations:
             sheet_name: 工作表名称
             column_index: 插入位置 (1-based)
             count: 插入列数
+            streaming: 是否使用流式写入（默认True，大文件性能更好）
 
         Returns:
             Dict: 标准化的操作结果
@@ -766,6 +797,33 @@ class ExcelOperations:
             logger.info(f"{cls._LOG_PREFIX} 开始插入列: {sheet_name} 第{column_index}列")
 
         try:
+            # 流式写入路径
+            if streaming:
+                from excel_mcp_server_fastmcp.core.streaming_writer import StreamingWriter
+                if StreamingWriter.is_available():
+                    # 创建空列数据用于插入
+                    empty_cols = [[] for _ in range(count)]
+                    success, message, meta = StreamingWriter.update_range(
+                        file_path, sheet_name, 1, column_index, empty_cols
+                    )
+                    if success:
+                        return {
+                            'success': True,
+                            'message': message,
+                            'data': meta,
+                            'metadata': {
+                                'file_path': file_path,
+                                'sheet_name': sheet_name,
+                                'column_index': column_index,
+                                'count': count,
+                                'mode': 'streaming',
+                                **meta
+                            }
+                        }
+                    else:
+                        logger.warning(f"流式插入列失败，降级到openpyxl: {message}")
+
+            # 传统openpyxl路径
             writer = ExcelWriter(file_path)
             result = writer.insert_columns(sheet_name, column_index, count)
             return format_operation_result(result)
