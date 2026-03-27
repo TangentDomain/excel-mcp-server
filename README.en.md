@@ -916,10 +916,6 @@ from excel_mcp_server_fastmcp import main
 main()
 ```
 
-## Examples
-
-See the examples folder for comprehensive usage scenarios.
-
 ## Installation
 
 ```bash
