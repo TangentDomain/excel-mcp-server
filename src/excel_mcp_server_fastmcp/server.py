@@ -1683,15 +1683,15 @@ SQL查询Excel数据（只读）。优先使用此工具而非excel_get_range进
         return _path_err
     # 参数验证
     if not file_path or not file_path.strip():
-        return _fail('文件路径不能为空')
+        return _fail('文件路径不能为空', meta={"error_code": "MISSING_FILE_PATH"})
 
     if not query_expression or not query_expression.strip():
-        return _fail('SQL查询语句不能为空')
+        return _fail('SQL查询语句不能为空', meta={"error_code": "MISSING_QUERY"})
 
     # 验证 output_format
     valid_formats = ('table', 'json', 'csv')
     if output_format and output_format not in valid_formats:
-        return _fail(f'不支持的输出格式: {output_format}。可选: {", ".join(valid_formats)}')
+        return _fail(f'不支持的输出格式: {output_format}。可选: {", ".join(valid_formats)}', meta={"error_code": "INVALID_FORMAT"})
 
     # 使用高级SQL查询引擎
     try:
@@ -1709,7 +1709,7 @@ SQL查询Excel数据（只读）。优先使用此工具而非excel_get_range进
         return _fail('SQLGlot未安装，无法使用高级SQL功能。请运行: pip install sqlglot\n\n💡 智能降级建议：\n• 对于简单数据读取：尝试使用 excel_get_range("文件路径", "工作表名!A1:Z100")\n• 对于文本搜索：尝试使用 excel_search("文件路径", "关键词", "工作表名")\n• 对于表头信息：尝试使用 excel_get_headers("文件路径", "工作表名")')
     except Exception as e:
         # SQL引擎已处理大部分错误并返回结构化响应，此处仅捕获未预期的异常
-        return _fail(f'SQL查询失败: {str(e)}')
+        return _fail(f'SQL查询失败: {str(e)}', meta={"error_code": "SQL_EXECUTION_FAILED"})
 
 
 @mcp.tool()
@@ -1732,15 +1732,15 @@ dry_run=True 可预览影响范围不实际修改。
     if _path_err:
         return _path_err
     if not file_path or not file_path.strip():
-        return _fail('文件路径不能为空')
+        return _fail('文件路径不能为空', meta={"error_code": "MISSING_FILE_PATH"})
 
     if not update_expression or not update_expression.strip():
-        return _fail('UPDATE语句不能为空')
+        return _fail('UPDATE语句不能为空', meta={"error_code": "MISSING_QUERY"})
 
     # 安全检查：只允许UPDATE语句
     stripped = update_expression.strip().upper()
     if not stripped.startswith('UPDATE'):
-        return _fail('只支持UPDATE语句。查询请使用 excel_query')
+        return _fail('只支持UPDATE语句。查询请使用 excel_query', meta={"error_code": "UNSUPPORTED_SQL"})
 
     try:
         from .api.advanced_sql_query import execute_advanced_update_query
@@ -1771,19 +1771,19 @@ def excel_describe_table(
     if _path_err:
         return _path_err
     if not file_path or not file_path.strip():
-        return _fail('文件路径不能为空')
+        return _fail('文件路径不能为空', meta={"error_code": "MISSING_FILE_PATH"})
 
     try:
         import openpyxl
         wb = openpyxl.load_workbook(file_path, read_only=True, data_only=True)
     except Exception as e:
-        return _fail(f'无法打开文件: {e}')
+        return _fail(f'无法打开文件: {e}', meta={"error_code": "FILE_OPEN_FAILED"})
 
     try:
         # 选择工作表
         if sheet_name:
             if sheet_name not in wb.sheetnames:
-                return _fail(f'工作表 "{sheet_name}" 不存在。可用工作表: {wb.sheetnames}')
+                return _fail(f'工作表 "{sheet_name}" 不存在。可用工作表: {wb.sheetnames}', meta={"error_code": "SHEET_NOT_FOUND"})
             ws = wb[sheet_name]
         else:
             ws = wb.worksheets[0]
