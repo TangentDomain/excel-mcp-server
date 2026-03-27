@@ -1,10 +1,10 @@
-**问题**: 部分工具描述冗长但实用性不足，AI难以快速提取关键信息
-**根因**: 描述偏向"功能罗列"，缺少"使用建议"和"工具间配合指南"
-**决策**: 优化核心工具描述，以"AI可用性"为导向重构描述结构
+## D023: REQ-032 SQL比较None值安全处理 (2026-03-27, R146)
+**需求**: REQ-032 P0 bug修复
+**问题**: SQL WHERE条件比较时，单元格值为None导致`'<=' not supported between instances of 'int' and 'NoneType'` TypeError
+**根因**: `_COMPARISON_OPS`分发表中GT/GTE/LT/LTE lambda直接调用`float(l)`和`float(r)`，未处理None值
+**决策**: 添加模块级`_safe_float_comparison`函数，None值时返回False
 **方案**:
-1. excel_describe_table: 去掉冗余场景，增加"使用建议"和"配合使用"
-2. excel_upsert_row: 精简参数说明，突出"关键参数"
-3. excel_batch_insert_rows: 增加实用技巧，明确新增vs更新工具选择
-4. excel_get_headers: 添加"实用技巧"section，增强AI处理能力
-**验证**: 工具导入测试通过，PyPI v1.6.19发布
+1. 在`advanced_sql_query.py`类定义前添加`_safe_float_comparison(left, right, op)`函数
+2. `_COMPARISON_OPS`中的GT/GTE/LT/LTE改用该函数
+3. 同时修复`excel_delete_rows`和`excel_batch_insert_rows`参数不匹配问题
 
