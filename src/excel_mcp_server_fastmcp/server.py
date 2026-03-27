@@ -337,12 +337,12 @@ def _validate_path(file_path: str) -> Optional[Dict[str, Any]]:
     """统一的文件路径安全验证入口，失败返回错误dict，通过返回None"""
     result = SecurityValidator.validate_file_path(file_path)
     if not result['valid']:
-        return {'success': False, 'message': f'🔒 安全验证失败: {result["error"]}'}
+        return _fail(f'🔒 安全验证失败: {result["error"]}')
     # 文件存在时额外检查大小
     if os.path.exists(file_path):
         size_result = SecurityValidator.validate_file_size(file_path)
         if not size_result['valid']:
-            return {'success': False, 'message': f'🔒 安全验证失败: {size_result["error"]}'}
+            return _fail(f'🔒 安全验证失败: {size_result["error"]}')
     return None
 
 
@@ -476,6 +476,45 @@ UNION: SELECT 技能名 FROM 法师技能 UNION ALL SELECT 技能名 FROM 战士
 )
 
 
+
+# ==================== 统一响应格式 ====================
+
+def _ok(message: str = "", data=None, meta: dict = None) -> dict:
+    """统一成功响应: {success, message, data, meta}"""
+    r: dict = {"success": True}
+    if message:
+        r["message"] = message
+    if data is not None:
+        r["data"] = data
+    if meta:
+        r["meta"] = meta
+    return r
+
+
+def _fail(message: str, meta: dict = None) -> dict:
+    """统一错误响应: {success, message, meta}"""
+    r: dict = {"success": False, "message": message}
+    if meta:
+        r["meta"] = meta
+    return r
+
+
+def _wrap(result: dict, meta: dict = None) -> dict:
+    """包装Operations层返回，metadata→meta，添加上下文meta"""
+    if not isinstance(result, dict):
+        return result
+    if "metadata" in result:
+        m = result.pop("metadata")
+        if isinstance(m, dict) and m:
+            result["meta"] = m
+            if meta:
+                meta = {**m, **meta}
+            else:
+                meta = m
+    if meta and "meta" not in result:
+        result["meta"] = meta
+    return result
+
 # ==================== MCP 工具定义 ====================
 
 @mcp.tool()
@@ -487,7 +526,7 @@ def excel_list_sheets(file_path: str) -> Dict[str, Any]:
     _path_err = _validate_path(file_path)
     if _path_err:
         return _path_err
-    return ExcelOperations.list_sheets(file_path)
+    return _wrap(ExcelOperations.list_sheets(file_path))
 
 
 @mcp.tool()
@@ -501,7 +540,7 @@ def excel_get_sheet_headers(file_path: str) -> Dict[str, Any]:
     _path_err = _validate_path(file_path)
     if _path_err:
         return _path_err
-    return ExcelOperations.get_sheet_headers(file_path)
+    return _wrap(ExcelOperations.get_sheet_headers(file_path))
 
 
 @mcp.tool()
@@ -524,7 +563,7 @@ def excel_search(
     _path_err = _validate_path(file_path)
     if _path_err:
         return _path_err
-    return ExcelOperations.search(file_path, pattern, sheet_name, case_sensitive, whole_word, use_regex, include_values, include_formulas, range)
+    return _wrap(ExcelOperations.search(file_path, pattern, sheet_name, case_sensitive, whole_word, use_regex, include_values, include_formulas, range))
 
 
 @mcp.tool()
@@ -549,7 +588,7 @@ def excel_search_directory(
     _path_err = _validate_path(directory_path)
     if _path_err:
         return _path_err
-    return ExcelOperations.search_directory(directory_path, pattern, case_sensitive, whole_word, use_regex, include_values, include_formulas, recursive, file_extensions, file_pattern, max_files)
+    return _wrap(ExcelOperations.search_directory(directory_path, pattern, case_sensitive, whole_word, use_regex, include_values, include_formulas, recursive, file_extensions, file_pattern, max_files))
 
 
 @mcp.tool()
@@ -582,11 +621,7 @@ def excel_get_range(
         # 记录验证失败
         logger.error(f"范围验证失败: {str(e)}")
 
-        return {
-            'success': False,
-            'error': 'VALIDATION_FAILED',
-            'message': f"范围表达式验证失败: {str(e)}"
-        }
+        return _fail(f"范围表达式验证失败: {str(e)}", meta={"error_code": "VALIDATION_FAILED"})
 
     # 调用原始函数
     result = ExcelOperations.get_range(file_path, range, include_formatting)
@@ -600,7 +635,7 @@ def excel_get_range(
             'scale_assessment': scale_validation
         }
 
-    return result
+    return _wrap(result)
 
 
 @mcp.tool()
@@ -619,7 +654,7 @@ def excel_get_headers(
     _path_err = _validate_path(file_path)
     if _path_err:
         return _path_err
-    return ExcelOperations.get_headers(file_path, sheet_name, header_row, max_columns)
+    return _wrap(ExcelOperations.get_headers(file_path, sheet_name, header_row, max_columns))
 
 
 @mcp.tool()
@@ -661,11 +696,7 @@ def excel_update_range(
             "error": str(e)
         })
 
-        return {
-            'success': False,
-            'error': 'VALIDATION_FAILED',
-            'message': f"参数验证失败: {str(e)}"
-        }
+        return _fail(f"参数验证失败: {str(e)}", meta={"error_code": "VALIDATION_FAILED"})
 
     # 开始操作会话
     operation_logger.start_session(file_path)
@@ -690,7 +721,7 @@ def excel_update_range(
             "message": result.get('message', '')
         })
 
-        return result
+        return _wrap(result)
 
     except Exception as e:
         # 记录错误
@@ -699,11 +730,7 @@ def excel_update_range(
             "message": f"更新操作失败: {str(e)}"
         })
 
-        return {
-            'success': False,
-            'error': 'OPERATION_FAILED',
-            'message': f"更新操作失败: {str(e)}"
-        }
+        return _fail(f"更新操作失败: {str(e)}", meta={"error_code": "OPERATION_FAILED"})
 
 
 
@@ -733,21 +760,13 @@ detailed=True（默认）时返回全面评估（数据类型分析+结果预测
             range_validation = ExcelValidator.validate_range_expression(range)
             range_info = range_validation['range_info']
         except DataValidationError as e:
-            return {
-                'success': False,
-                'error': 'VALIDATION_FAILED',
-                'message': f"参数验证失败: {str(e)}"
-            }
+            return _fail(f"参数验证失败: {str(e)}", meta={"error_code": "VALIDATION_FAILED"})
 
     # 获取当前数据
     current_data_result = ExcelOperations.get_range(file_path, range)
 
     if not current_data_result.get('success'):
-        return {
-            'success': False,
-            'error': 'PREVIEW_FAILED',
-            'message': f"无法预览操作: {current_data_result.get('message', '未知错误')}"
-        }
+        return _fail(f"无法预览操作: {current_data_result.get('message', '未知错误')}", meta={"error_code": "PREVIEW_FAILED"})
 
     current_data = current_data_result.get('data', [])
 
@@ -769,8 +788,7 @@ detailed=True（默认）时返回全面评估（数据类型分析+结果预测
             elif total_cells > 20:
                 risk_level = "MEDIUM"
 
-        return {
-            'success': True,
+        return _ok("数据影响快速评估完成", data={
             'operation_type': operation_type,
             'range': range,
             'current_data': current_data,
@@ -782,7 +800,7 @@ detailed=True（默认）时返回全面评估（数据类型分析+结果预测
                 'risk_level': risk_level
             },
             'safety_warning': _generate_safety_warning(operation_type, has_data, risk_level)
-        }
+        }, meta={"file_path": file_path, "range": range})
 
     # 详细评估模式（原assess_data_impact行为）
     try:
@@ -816,8 +834,7 @@ detailed=True（默认）时返回全面评估（数据类型分析+结果预测
             scale_info
         )
 
-        return {
-            'success': True,
+        return _ok("数据影响详细评估完成", data={
             'operation_type': operation_type,
             'range': range,
             'validation_info': range_validation,
@@ -833,21 +850,13 @@ detailed=True（默认）时返回全面评估（数据类型分析+结果预测
                 'potential_data_loss': data_analysis['non_empty_cell_count'] if operation_type in ['delete', 'update'] else 0,
                 'overall_risk_level': risk_assessment['overall_risk']
             }
-        }
+        }, meta={"file_path": file_path, "range": range})
 
     except DataValidationError as e:
-        return {
-            'success': False,
-            'error': 'VALIDATION_FAILED',
-            'message': f"参数验证失败: {str(e)}"
-        }
+        return _fail(f"参数验证失败: {str(e)}", meta={"error_code": "VALIDATION_FAILED"})
 
     except Exception as e:
-        return {
-            'success': False,
-            'error': 'ASSESSMENT_FAILED',
-            'message': f"数据影响评估失败: {str(e)}"
-        }
+        return _fail(f"数据影响评估失败: {str(e)}", meta={"error_code": "ASSESSMENT_FAILED"})
 
 
 def _generate_safety_warning(operation_type: str, has_data: bool, risk_level: str) -> str:
@@ -1082,26 +1091,10 @@ def excel_get_operation_history(
         error_count = sum(1 for op in recent_operations
                         if op.get('operation') == 'operation_error')
 
-        return {
-            'success': True,
-            'file_path': file_path,
-            'operations': recent_operations,
-            'statistics': {
-                'total_operations': total_operations,
-                'operation_types': operation_types,
-                'success_count': success_count,
-                'error_count': error_count,
-                'success_rate': f"{(success_count / (success_count + error_count) * 100):.1f}%" if (success_count + error_count) > 0 else "0%"
-            },
-            'message': f"找到 {total_operations} 条操作记录"
-        }
+        return _ok(f"找到 {total_operations} 条操作记录", data={'operations': recent_operations, 'statistics': {'total_operations': total_operations, 'operation_types': operation_types, 'success_count': success_count, 'error_count': error_count, 'success_rate': f"{(success_count / (success_count + error_count) * 100):.1f}%" if (success_count + error_count) > 0 else "0%"}}, meta={"file_path": file_path})
 
     except Exception as e:
-        return {
-            'success': False,
-            'error': 'HISTORY_RETRIEVAL_FAILED',
-            'message': f"获取操作历史失败: {str(e)}"
-        }
+        return _fail(f"获取操作历史失败: {str(e)}", meta={"error_code": "HISTORY_RETRIEVAL_FAILED"})
 
 
 @mcp.tool()
@@ -1117,11 +1110,7 @@ def excel_create_backup(
     if _path_err:
         return _path_err
     if not os.path.exists(file_path):
-        return {
-            'success': False,
-            'error': 'FILE_NOT_FOUND',
-            'message': f"源文件不存在: {file_path}"
-        }
+        return _fail(f"源文件不存在: {file_path}", meta={"error_code": "FILE_NOT_FOUND"})
 
     try:
         # 创建备份目录
@@ -1145,25 +1134,10 @@ def excel_create_backup(
         original_size = os.path.getsize(file_path)
         backup_size = os.path.getsize(backup_path)
 
-        return {
-            'success': True,
-            'original_file': file_path,
-            'backup_file': backup_path,
-            'backup_directory': backup_dir,
-            'file_size': {
-                'original': original_size,
-                'backup': backup_size
-            },
-            'timestamp': timestamp,
-            'message': f"备份创建成功: {backup_filename}"
-        }
+        return _ok(f"备份创建成功: {backup_filename}", data={'backup_file': backup_path, 'backup_directory': backup_dir, 'file_size': {'original': original_size, 'backup': backup_size}, 'timestamp': timestamp}, meta={"file_path": file_path})
 
     except Exception as e:
-        return {
-            'success': False,
-            'error': 'BACKUP_FAILED',
-            'message': f"备份创建失败: {str(e)}"
-        }
+        return _fail(f"备份创建失败: {str(e)}", meta={"error_code": "BACKUP_FAILED"})
 
 
 @mcp.tool()
@@ -1180,11 +1154,7 @@ def excel_restore_backup(
         return _path_err
 
     if not os.path.exists(backup_path):
-        return {
-            'success': False,
-            'error': 'BACKUP_NOT_FOUND',
-            'message': f"备份文件不存在: {backup_path}"
-        }
+        return _fail(f"备份文件不存在: {backup_path}", meta={"error_code": "BACKUP_NOT_FOUND"})
 
     try:
         # 确定目标路径
@@ -1209,20 +1179,10 @@ def excel_restore_backup(
         # 执行恢复
         shutil.copy2(backup_path, target_path)
 
-        return {
-            'success': True,
-            'backup_file': backup_path,
-            'target_file': target_path,
-            'target_existed': target_exists,
-            'message': f"文件恢复成功: {os.path.basename(target_path)}"
-        }
+        return _ok(f"文件恢复成功: {os.path.basename(target_path)}", data={'backup_file': backup_path, 'target_file': target_path, 'target_existed': target_exists}, meta={"file_path": backup_path})
 
     except Exception as e:
-        return {
-            'success': False,
-            'error': 'RESTORE_FAILED',
-            'message': f"恢复失败: {str(e)}"
-        }
+        return _fail(f"恢复失败: {str(e)}", meta={"error_code": "RESTORE_FAILED"})
 
 
 @mcp.tool()
@@ -1244,11 +1204,7 @@ def excel_list_backups(
             backup_dir = os.path.join(base_dir, ".excel_mcp_backups")
 
         if not os.path.exists(backup_dir):
-            return {
-                'success': True,
-                'backups': [],
-                'message': "备份目录不存在"
-            }
+            return _ok("备份目录不存在", data={'backups': []}, meta={"file_path": file_path})
 
         # 获取文件名
         filename = os.path.basename(file_path)
@@ -1272,20 +1228,10 @@ def excel_list_backups(
         # 按时间排序
         backup_files.sort(key=lambda x: x['created_time'], reverse=True)
 
-        return {
-            'success': True,
-            'original_file': file_path,
-            'backup_directory': backup_dir,
-            'backups': backup_files,
-            'total_backups': len(backup_files)
-        }
+        return _ok(f"找到 {len(backup_files)} 个备份", data={'backups': backup_files, 'backup_directory': backup_dir, 'total_backups': len(backup_files)}, meta={"file_path": file_path})
 
     except Exception as e:
-        return {
-            'success': False,
-            'error': 'LIST_BACKUPS_FAILED',
-            'message': f"列出备份失败: {str(e)}"
-        }
+        return _fail(f"列出备份失败: {str(e)}", meta={"error_code": "LIST_BACKUPS_FAILED"})
 
 
 @mcp.tool()
@@ -1302,7 +1248,7 @@ def excel_insert_rows(
     _path_err = _validate_path(file_path)
     if _path_err:
         return _path_err
-    return ExcelOperations.insert_rows(file_path, sheet_name, row_index, count)
+    return _wrap(ExcelOperations.insert_rows(file_path, sheet_name, row_index, count))
 
 
 @mcp.tool()
@@ -1319,7 +1265,7 @@ def excel_insert_columns(
     _path_err = _validate_path(file_path)
     if _path_err:
         return _path_err
-    return ExcelOperations.insert_columns(file_path, sheet_name, column_index, count)
+    return _wrap(ExcelOperations.insert_columns(file_path, sheet_name, column_index, count))
 
 
 @mcp.tool()
@@ -1336,7 +1282,7 @@ def excel_find_last_row(
     _path_err = _validate_path(file_path)
     if _path_err:
         return _path_err
-    return ExcelOperations.find_last_row(file_path, sheet_name, column)
+    return _wrap(ExcelOperations.find_last_row(file_path, sheet_name, column))
 
 
 @mcp.tool()
@@ -1351,7 +1297,7 @@ def excel_create_file(
     _path_err = _validate_path(file_path)
     if _path_err:
         return _path_err
-    return ExcelOperations.create_file(file_path, sheet_names)
+    return _wrap(ExcelOperations.create_file(file_path, sheet_names))
 
 
 @mcp.tool()
@@ -1368,7 +1314,7 @@ def excel_export_to_csv(
     _path_err = _validate_path(file_path)
     if _path_err:
         return _path_err
-    return ExcelOperations.export_to_csv(file_path, output_path, sheet_name, encoding)
+    return _wrap(ExcelOperations.export_to_csv(file_path, output_path, sheet_name, encoding))
 
 
 @mcp.tool()
@@ -1388,7 +1334,7 @@ def excel_import_from_csv(
         if _err:
             return _err
 
-    return ExcelOperations.import_from_csv(csv_path, output_path, sheet_name, encoding, has_header)
+    return _wrap(ExcelOperations.import_from_csv(csv_path, output_path, sheet_name, encoding, has_header))
 
 
 @mcp.tool()
@@ -1406,7 +1352,7 @@ def excel_convert_format(
         if _err:
             return _err
 
-    return ExcelOperations.convert_format(input_path, output_path, target_format)
+    return _wrap(ExcelOperations.convert_format(input_path, output_path, target_format))
 
 
 @mcp.tool()
@@ -1424,7 +1370,7 @@ def excel_merge_files(
         if _err:
             return _err
 
-    return ExcelOperations.merge_files(input_files, output_path, merge_mode)
+    return _wrap(ExcelOperations.merge_files(input_files, output_path, merge_mode))
 
 
 @mcp.tool()
@@ -1436,7 +1382,7 @@ def excel_get_file_info(file_path: str) -> Dict[str, Any]:
     _path_err = _validate_path(file_path)
     if _path_err:
         return _path_err
-    return ExcelOperations.get_file_info(file_path)
+    return _wrap(ExcelOperations.get_file_info(file_path))
 
 
 @mcp.tool()
@@ -1452,7 +1398,7 @@ def excel_create_sheet(
     _path_err = _validate_path(file_path)
     if _path_err:
         return _path_err
-    return ExcelOperations.create_sheet(file_path, sheet_name, index)
+    return _wrap(ExcelOperations.create_sheet(file_path, sheet_name, index))
 
 
 @mcp.tool()
@@ -1486,7 +1432,7 @@ def excel_delete_sheet(
             "message": result.get('message', '')
         })
 
-        return result
+        return _wrap(result)
 
     except Exception as e:
         # 记录错误
@@ -1495,11 +1441,7 @@ def excel_delete_sheet(
             "message": f"删除工作表操作失败: {str(e)}"
         })
 
-        return {
-            'success': False,
-            'error': 'DELETE_SHEET_FAILED',
-            'message': f"删除工作表操作失败: {str(e)}"
-        }
+        return _fail(f"删除工作表操作失败: {str(e)}", meta={"error_code": "DELETE_SHEET_FAILED"})
 
 
 @mcp.tool()
@@ -1515,7 +1457,7 @@ def excel_rename_sheet(
     _path_err = _validate_path(file_path)
     if _path_err:
         return _path_err
-    return ExcelOperations.rename_sheet(file_path, old_name, new_name)
+    return _wrap(ExcelOperations.rename_sheet(file_path, old_name, new_name))
 
 
 @mcp.tool()
@@ -1533,7 +1475,7 @@ def excel_copy_sheet(
     _path_err = _validate_path(file_path)
     if _path_err:
         return _path_err
-    return ExcelOperations.copy_sheet(file_path, source_name, new_name, index)
+    return _wrap(ExcelOperations.copy_sheet(file_path, source_name, new_name, index))
 
 
 @mcp.tool()
@@ -1551,7 +1493,7 @@ def excel_rename_column(
     _path_err = _validate_path(file_path)
     if _path_err:
         return _path_err
-    return ExcelOperations.rename_column(file_path, sheet_name, old_header, new_header, header_row)
+    return _wrap(ExcelOperations.rename_column(file_path, sheet_name, old_header, new_header, header_row))
 
 
 @mcp.tool()
@@ -1570,7 +1512,7 @@ def excel_upsert_row(
     _path_err = _validate_path(file_path)
     if _path_err:
         return _path_err
-    return ExcelOperations.upsert_row(file_path, sheet_name, key_column, key_value, updates, header_row)
+    return _wrap(ExcelOperations.upsert_row(file_path, sheet_name, key_column, key_value, updates, header_row))
 
 
 @mcp.tool()
@@ -1587,7 +1529,7 @@ def excel_batch_insert_rows(
     _path_err = _validate_path(file_path)
     if _path_err:
         return _path_err
-    return ExcelOperations.batch_insert_rows(file_path, sheet_name, data, header_row)
+    return _wrap(ExcelOperations.batch_insert_rows(file_path, sheet_name, data, header_row))
 
 
 @mcp.tool()
@@ -1624,7 +1566,7 @@ def excel_delete_rows(
             "message": result.get('message', '')
         })
 
-        return result
+        return _wrap(result)
 
     except Exception as e:
         # 记录错误
@@ -1633,11 +1575,7 @@ def excel_delete_rows(
             "message": f"删除行操作失败: {str(e)}"
         })
 
-        return {
-            'success': False,
-            'error': 'DELETE_ROWS_FAILED',
-            'message': f"删除行操作失败: {str(e)}"
-        }
+        return _fail(f"删除行操作失败: {str(e)}", meta={"error_code": "DELETE_ROWS_FAILED"})
 
 
 @mcp.tool()
@@ -1674,7 +1612,7 @@ def excel_delete_columns(
             "message": result.get('message', '')
         })
 
-        return result
+        return _wrap(result)
 
     except Exception as e:
         # 记录错误
@@ -1683,11 +1621,7 @@ def excel_delete_columns(
             "message": f"删除列操作失败: {str(e)}"
         })
 
-        return {
-            'success': False,
-            'error': 'DELETE_COLUMNS_FAILED',
-            'message': f"删除列操作失败: {str(e)}"
-        }
+        return _fail(f"删除列操作失败: {str(e)}", meta={"error_code": "DELETE_COLUMNS_FAILED"})
 
 @mcp.tool()
 @_track_call
@@ -1705,8 +1639,8 @@ def excel_set_formula(
         return _path_err
     _formula_err = SecurityValidator.validate_formula(formula)
     if not _formula_err['valid']:
-        return {'success': False, 'message': f'🔒 安全验证失败: {_formula_err["error"]}'}
-    return ExcelOperations.set_formula(file_path, sheet_name, cell_address, formula)
+        return _fail(f'🔒 安全验证失败: {_formula_err["error"]}')
+    return _wrap(ExcelOperations.set_formula(file_path, sheet_name, cell_address, formula))
 
 @mcp.tool()
 @_track_call
@@ -1719,8 +1653,8 @@ def excel_evaluate_formula(
     """
     _formula_err = SecurityValidator.validate_formula(formula)
     if not _formula_err['valid']:
-        return {'success': False, 'message': f'🔒 安全验证失败: {_formula_err["error"]}'}
-    return ExcelOperations.evaluate_formula(formula, context_sheet)
+        return _fail(f'🔒 安全验证失败: {_formula_err["error"]}')
+    return _wrap(ExcelOperations.evaluate_formula(formula, context_sheet))
 
 
 @mcp.tool()
@@ -1751,62 +1685,33 @@ SQL查询Excel数据（只读）。优先使用此工具而非excel_get_range进
         return _path_err
     # 参数验证
     if not file_path or not file_path.strip():
-        return {
-            'success': False,
-            'message': '文件路径不能为空',
-            'data': [],
-            'query_info': {'error_type': 'parameter_validation'}
-        }
+        return _fail('文件路径不能为空')
 
     if not query_expression or not query_expression.strip():
-        return {
-            'success': False,
-            'message': 'SQL查询语句不能为空',
-            'data': [],
-            'query_info': {'error_type': 'parameter_validation'}
-        }
+        return _fail('SQL查询语句不能为空')
 
     # 验证 output_format
     valid_formats = ('table', 'json', 'csv')
     if output_format and output_format not in valid_formats:
-        return {
-            'success': False,
-            'message': f'不支持的输出格式: {output_format}。可选: {", ".join(valid_formats)}',
-            'data': [],
-            'query_info': {'error_type': 'parameter_validation'}
-        }
+        return _fail(f'不支持的输出格式: {output_format}。可选: {", ".join(valid_formats)}')
 
     # 使用高级SQL查询引擎
     try:
         from .api.advanced_sql_query import execute_advanced_sql_query
-        return execute_advanced_sql_query(
+        return _wrap(execute_advanced_sql_query(
             file_path=file_path,
             sql=query_expression,
             sheet_name=None,  # 统一使用SQL FROM子句中的表名
             limit=None,  # 统一使用SQL中的LIMIT
             include_headers=include_headers,
             output_format=output_format or 'table'
-        )
+        ))
 
     except ImportError:
-        return {
-            'success': False,
-            'message': 'SQLGlot未安装，无法使用高级SQL功能。请运行: pip install sqlglot\n\n💡 智能降级建议：\n• 对于简单数据读取：尝试使用 excel_get_range("文件路径", "工作表名!A1:Z100")\n• 对于文本搜索：尝试使用 excel_search("文件路径", "关键词", "工作表名")\n• 对于表头信息：尝试使用 excel_get_headers("文件路径", "工作表名")',
-            'data': [],
-            'query_info': {
-                'error_type': 'missing_dependency',
-                'alternatives': ['excel_get_range', 'excel_search', 'excel_get_headers'],
-                'suggestion': '使用基础Excel操作API作为保底方案'
-            }
-        }
+        return _fail('SQLGlot未安装，无法使用高级SQL功能。请运行: pip install sqlglot\n\n💡 智能降级建议：\n• 对于简单数据读取：尝试使用 excel_get_range("文件路径", "工作表名!A1:Z100")\n• 对于文本搜索：尝试使用 excel_search("文件路径", "关键词", "工作表名")\n• 对于表头信息：尝试使用 excel_get_headers("文件路径", "工作表名")')
     except Exception as e:
         # SQL引擎已处理大部分错误并返回结构化响应，此处仅捕获未预期的异常
-        return {
-            'success': False,
-            'message': f'SQL查询失败: {str(e)}',
-            'data': [],
-            'query_info': {'error_type': 'unexpected_error', 'details': str(e)}
-        }
+        return _fail(f'SQL查询失败: {str(e)}')
 
 
 @mcp.tool()
@@ -1829,33 +1734,27 @@ dry_run=True 可预览影响范围不实际修改。
     if _path_err:
         return _path_err
     if not file_path or not file_path.strip():
-        return {'success': False, 'message': '文件路径不能为空',
-                'affected_rows': 0, 'changes': []}
+        return _fail('文件路径不能为空')
 
     if not update_expression or not update_expression.strip():
-        return {'success': False, 'message': 'UPDATE语句不能为空',
-                'affected_rows': 0, 'changes': []}
+        return _fail('UPDATE语句不能为空')
 
     # 安全检查：只允许UPDATE语句
     stripped = update_expression.strip().upper()
     if not stripped.startswith('UPDATE'):
-        return {'success': False,
-                'message': '只支持UPDATE语句。查询请使用 excel_query',
-                'affected_rows': 0, 'changes': []}
+        return _fail('只支持UPDATE语句。查询请使用 excel_query')
 
     try:
         from .api.advanced_sql_query import execute_advanced_update_query
-        return execute_advanced_update_query(
+        return _wrap(execute_advanced_update_query(
             file_path=file_path,
             sql=update_expression,
             dry_run=dry_run
-        )
+        ))
     except ImportError:
-        return {'success': False, 'message': 'SQLGlot未安装，无法使用UPDATE功能',
-                'affected_rows': 0, 'changes': []}
+        return _fail('SQLGlot未安装，无法使用UPDATE功能')
     except Exception as e:
-        return {'success': False, 'message': f'UPDATE执行失败: {str(e)}',
-                'affected_rows': 0, 'changes': []}
+        return _fail(f'UPDATE执行失败: {str(e)}')
 
 
 @mcp.tool()
@@ -1874,23 +1773,19 @@ def excel_describe_table(
     if _path_err:
         return _path_err
     if not file_path or not file_path.strip():
-        return {'success': False, 'message': '文件路径不能为空', 'data': []}
+        return _fail('文件路径不能为空')
 
     try:
         import openpyxl
         wb = openpyxl.load_workbook(file_path, read_only=True, data_only=True)
     except Exception as e:
-        return {'success': False, 'message': f'无法打开文件: {e}', 'data': []}
+        return _fail(f'无法打开文件: {e}')
 
     try:
         # 选择工作表
         if sheet_name:
             if sheet_name not in wb.sheetnames:
-                return {
-                    'success': False,
-                    'message': f'工作表 "{sheet_name}" 不存在。可用工作表: {wb.sheetnames}',
-                    'data': []
-                }
+                return _fail(f'工作表 "{sheet_name}" 不存在。可用工作表: {wb.sheetnames}')
             ws = wb[sheet_name]
         else:
             ws = wb.worksheets[0]
@@ -1899,7 +1794,7 @@ def excel_describe_table(
         # 读取前几行来判断表头类型
         rows = list(ws.iter_rows(max_row=4, values_only=True))
         if not rows:
-            return {'success': False, 'message': '工作表为空', 'data': []}
+            return _fail('工作表为空')
 
         # 检测双行表头：第2行全是合法英文字段名
         is_dual_header = False
@@ -1977,17 +1872,15 @@ def excel_describe_table(
         wb.close()
 
         columns = list(col_stats.values())
-        return {
-            'success': True,
+        return _ok(f"表 '{sheet_name}': {len(columns)}列, {row_count}行数据, {'双行表头' if is_dual_header else '单行表头'}", data={
             'sheet_name': sheet_name,
             'header_type': 'dual' if is_dual_header else 'single',
             'row_count': row_count,
             'column_count': len(columns),
-            'columns': columns,
-            'message': f"表 '{sheet_name}': {len(columns)}列, {row_count}行数据, {'双行表头' if is_dual_header else '单行表头'}"
-        }
+            'columns': columns
+        }, meta={"file_path": file_path, "sheet": sheet_name})
     except Exception as e:
-        return {'success': False, 'message': f'查看表结构失败: {e}', 'data': []}
+        return _fail(f'查看表结构失败: {e}')
     finally:
         wb.close()
 
@@ -2008,7 +1901,7 @@ def excel_format_cells(
     _path_err = _validate_path(file_path)
     if _path_err:
         return _path_err
-    return ExcelOperations.format_cells(file_path, sheet_name, range, formatting, preset)
+    return _wrap(ExcelOperations.format_cells(file_path, sheet_name, range, formatting, preset))
 
 
 @mcp.tool()
@@ -2025,7 +1918,7 @@ def excel_merge_cells(
     _path_err = _validate_path(file_path)
     if _path_err:
         return _path_err
-    return ExcelOperations.merge_cells(file_path, sheet_name, range)
+    return _wrap(ExcelOperations.merge_cells(file_path, sheet_name, range))
 
 
 @mcp.tool()
@@ -2041,7 +1934,7 @@ def excel_unmerge_cells(
     _path_err = _validate_path(file_path)
     if _path_err:
         return _path_err
-    return ExcelOperations.unmerge_cells(file_path, sheet_name, range)
+    return _wrap(ExcelOperations.unmerge_cells(file_path, sheet_name, range))
 
 
 @mcp.tool()
@@ -2059,7 +1952,7 @@ def excel_set_borders(
     _path_err = _validate_path(file_path)
     if _path_err:
         return _path_err
-    return ExcelOperations.set_borders(file_path, sheet_name, range, border_style)
+    return _wrap(ExcelOperations.set_borders(file_path, sheet_name, range, border_style))
 
 
 @mcp.tool()
@@ -2077,7 +1970,7 @@ def excel_set_row_height(
     _path_err = _validate_path(file_path)
     if _path_err:
         return _path_err
-    return ExcelOperations.set_row_height(file_path, sheet_name, row_index, height, count)
+    return _wrap(ExcelOperations.set_row_height(file_path, sheet_name, row_index, height, count))
 
 
 @mcp.tool()
@@ -2095,7 +1988,7 @@ def excel_set_column_width(
     _path_err = _validate_path(file_path)
     if _path_err:
         return _path_err
-    return ExcelOperations.set_column_width(file_path, sheet_name, column_index, width, count)
+    return _wrap(ExcelOperations.set_column_width(file_path, sheet_name, column_index, width, count))
 
 
 # ==================== Excel比较功能 ====================
@@ -2115,7 +2008,7 @@ def excel_compare_files(
         _err = _validate_path(_p)
         if _err:
             return _err
-    return ExcelOperations.compare_files(file1_path, file2_path)
+    return _wrap(ExcelOperations.compare_files(file1_path, file2_path))
 
 
 @mcp.tool()
@@ -2133,7 +2026,7 @@ def excel_check_duplicate_ids(
     _path_err = _validate_path(file_path)
     if _path_err:
         return _path_err
-    return ExcelOperations.check_duplicate_ids(file_path, sheet_name, id_column, header_row)
+    return _wrap(ExcelOperations.check_duplicate_ids(file_path, sheet_name, id_column, header_row))
 
 
 @mcp.tool()
@@ -2154,7 +2047,7 @@ def excel_compare_sheets(
         _err = _validate_path(_p)
         if _err:
             return _err
-    return ExcelOperations.compare_sheets(file1_path, sheet1_name, file2_path, sheet2_name, id_column, header_row)
+    return _wrap(ExcelOperations.compare_sheets(file1_path, sheet1_name, file2_path, sheet2_name, id_column, header_row))
 
 
 @mcp.tool()
@@ -2165,8 +2058,7 @@ def excel_server_stats() -> Dict[str, Any]:
 返回全局error_types统计（按错误类型分类的计数），用于监控和调试。
     """
     stats = _tracker.get_stats()
-    stats['success'] = True
-    return stats
+    return _ok("服务器统计信息", data=stats)
 
 
 # ==================== 主程序 ====================
