@@ -2,6 +2,14 @@
 
 > 只追加，不删改。记录"为什么这么做"。≤50条，超过归档到DECISIONS-ARCHIVED.md。
 
+## 2026-03-27 | 流式写入扩展至修改操作
+- **决策**：将copy-modify-write方案扩展到delete_rows/delete_columns/update_range
+- **原因**：这些操作都需要读取整个文件并重写，大文件场景下openpyxl内存占用高
+- **方案**：提取_copy_modify_write通用方法，接受modify_fn回调；各操作实现自己的修改逻辑
+- **约束**：update_range流式仅覆盖模式生效（insert_mode=False + preserve_formulas=False），插入模式和公式保留必须用openpyxl
+- **自动降级**：streaming失败自动回退openpyxl传统路径；用户可streaming=False强制传统路径
+- **效果**：5个修改操作全部支持streaming（batch_insert/upsert/delete_rows/delete_columns/update_range）
+
 ## 2026-03-27 | StreamingWriter用copy-modify-write方案
 - **决策**：修改操作（batch_insert/upsert）默认用streaming模式（calamine读+write_only写）
 - **原因**：openpyxl load_workbook对大文件内存占用高；calamine读+write_only写内存与文件大小无关
