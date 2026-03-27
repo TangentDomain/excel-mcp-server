@@ -10,13 +10,33 @@
 [![Python 版本](https://img.shields.io/badge/python-3.10+-blue.svg)](https://www.python.org/downloads/)
 [![技术支持: FastMCP](https://img.shields.io/badge/Powered%20by-FastMCP-orange)](https://github.com/jlowin/fastmcp)
 ![状态](https://img.shields.io/badge/status-stable-green.svg)
-![测试覆盖](https://img.shields.io/badge/tests-1059%20tests-brightgreen.svg)
+![测试覆盖](https://img.shields.io/badge/tests-2198%20tests-brightgreen.svg)
 ![工具数量](https://img.shields.io/badge/tools-44%20verified%20tools-green.svg)
 [![CI](https://github.com/TangentDomain/excel-mcp-server/actions/workflows/ci.yml/badge.svg)](https://github.com/TangentDomain/excel-mcp-server/actions/workflows/ci.yml)
 
-**ExcelMCP** 是专为游戏开发设计的Excel配置表管理MCP服务器。通过AI自然语言指令，实现技能配置表、装备数据、怪物属性等游戏配置的智能化操作。基于**FastMCP**构建，读取使用**python-calamine**（Rust引擎，2300x提速），写入使用**openpyxl**，拥有**44个专业工具**和**1041个测试用例**，确保企业级可靠性。
+**ExcelMCP** 是专为游戏开发设计的Excel配置表管理MCP服务器。通过AI自然语言指令，实现技能配置表、装备数据、怪物属性等游戏配置的智能化操作。基于**FastMCP**构建，读取使用**python-calamine**（Rust引擎，2300x提速），写入使用**openpyxl**，拥有**44个专业工具**和**2198个测试用例**，确保企业级可靠性。
 
 🎯 **核心功能**: 技能系统、装备管理、怪物配置、数值平衡、版本对比、策划工具链
+
+## 🏆 竞品对比
+
+| 功能特性 | ExcelMCP | haris-musa/excelpython |
+|---------|----------|----------------------|
+| **架构设计** | MCP服务器模式 | Python库模式 |
+| **AI集成** | ✅ 原生MCP支持 | ❌ 需额外封装 |
+| **性能** | ⚡ Rust引擎(calamine)+2300x提速 | 🐢 纯Python处理 |
+| **SQL引擎** | ✅ 45项SQL功能+安全解析 | ❌ 基础查询支持 |
+| **游戏垂直优化** | ✅ 专用游戏数据结构 | ❌ 通用表格处理 |
+| **跨文件JOIN** | ✅ `@'filepath'`语法 | ❌ 不支持 |
+| **错误处理** | ✅ 结构化错误+AI修复提示 | ❌ 基础异常 |
+| **测试覆盖** | ✅ 2198个测试用例 | ❌ 有限测试 |
+| **安装方式** | ✅ `uvx`一键运行 | ⚠️ 需要pip安装 |
+
+## 🚀 为什么选择 ExcelMCP
+- **专为游戏开发设计**：技能、装备、怪物等游戏数据的智能化管理
+- **AI原生集成**：支持自然语言指令，无需学习复杂API
+- **企业级性能**：Rust引擎读取 + 流式写入，支持超大配置表
+- **零配置运行**：PyPI一键安装，自动更新，开箱即用
 
 📦 **一键安装**: `uvx excel-mcp-server-fastmcp` — 从PyPI直接运行，自动更新，零配置
 
@@ -46,6 +66,48 @@
 ```
 
 **搞定。** 不需要记命令、不需要写SQL（当然你也可以写）。支持中文自然语言 + 标准SQL双模式。
+
+## 🔧 SQL实战场景
+
+### 高级查询
+```sql
+-- 跨文件JOIN查询技能和装备数据
+SELECT s.技能名, s.伤害, e.装备名, e.攻击力 
+FROM skills.xlsx技能表 s
+JOIN equipment.xlsx装备表 e ON s.职业 = e.适用职业
+WHERE s.元素 = '火' AND e.品质 = '史诗'
+```
+
+### 复杂分析
+```sql
+-- 使用窗口函数计算技能排名
+SELECT 技能名, 伤害, 
+       RANK() OVER (ORDER BY 伤害 DESC) as 伤害排名,
+       PERCENT_RANK() OVER (ORDER BY 伤害 DESC) as 伤害百分位
+FROM skills.xlsx技能表
+WHERE 元素 IN ('火', '冰', '雷')
+```
+
+### 数据修改
+```sql
+-- 批量更新技能数值
+UPDATE skills.xlsx技能表 
+SET 伤害 = 伤害 * 1.2, 
+    消耗法力 = 消耗法力 * 1.1
+WHERE 元素 = '火' AND 技能类型 = '主动'
+```
+
+### 子查询和CTE
+```sql
+-- 使用WITH子查询构建复杂分析
+with 高伤害技能 as (
+    SELECT 技能名, 伤害 FROM skills.xlsx技能表 
+    WHERE 伤害 > 1000
+)
+SELECT s.技能名, s.伤害, e.装备名
+FROM 高伤害技能 s
+JOIN equipment.xlsx装备表 e ON s.技能名 = e.推荐技能
+```
 
 <details>
 <summary>📖 想了解更详细的安装方式？</summary>
@@ -134,7 +196,7 @@ python scripts/benchmark.py --compare      # 与上次结果对比
 | **双行表头** | ✅ 自动识别中文描述+英文字段 | ❌ | ❌ |
 | **SQL UPDATE** | ✅ 条件批量修改 | ❌ | ❌ |
 | **跨文件JOIN** | ✅ @filepath 语法 | ❌ | ❌ |
-| **测试覆盖** | 1059 tests | ~50 tests | ~30 tests |
+| **测试覆盖** | 2198 tests | ~50 tests | ~30 tests |
 | **错误恢复** | ✅ 结构化错误码+AI可修复提示 | ❌ 纯文本 | ❌ 纯文本 |
 | **中文列名查询** | ✅ | ❌ | ❌ |
 | **备份/恢复** | ✅ | ❌ | ❌ |
@@ -739,7 +801,7 @@ API业务逻辑层 (集中式处理)
 ## 📊 项目信息
 
 ### 质量验证指标
-- **测试用例**: 1041个（行为验证，无覆盖率填充）
+- **测试用例**: 2198个（行为验证，无覆盖率填充）
 - **测试文件**: 49个测试文件
 - **测试代码**: 16,496行
 - **工具数量: 44个 (@mcp.tool装饰器验证)

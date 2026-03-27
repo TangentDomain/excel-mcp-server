@@ -9,12 +9,14 @@
 - [ ] REQ-012 多客户端兼容性验证（需要人工操作）
 
 ## 上一轮完成
-- 第98轮：REQ-015 完整流式写入支持扩展至所有修改操作
-  - insert_rows/insert_columns 新增流式写入支持
-  - 所有修改操作默认启用流式模式（streaming=True）
-  - StreamingWriter完整支持：insert/delete/update_range全覆盖
-  - calamine读取 + write_only写入，内存占用与文件大小无关
-  - 自动降级机制，保持向后兼容性
+- 第99轮：REQ-026 文档与门面优化
+  - 新增 vs haris-musa/excelpython 竞品对比表，突出SQL引擎+Rust性能+游戏垂直优势
+  - 新增SQL实战场景：高级查询、复杂分析、数据修改、子查询和CTE
+  - 更新测试数量为2198，修正与实际测试数不符的问题
+  - 中英文README同步更新
+
+## 阻塞项
+- REQ-012 需要人工在Cursor/Claude Desktop等客户端测试
 
 ## 阻塞项
 - REQ-012 需要人工在Cursor/Claude Desktop等客户端测试
