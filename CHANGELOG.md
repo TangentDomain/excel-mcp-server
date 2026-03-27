@@ -2,15 +2,16 @@
 
 ## [Unreleased]
 
+### 优化
+- **REQ-025 instructions文档**：新增统一返回格式说明（`{success, message, data, meta}`），帮助AI客户端可靠解析所有工具响应
+
 ### 修复
-- 指令工具数量：45→44（与实际工具数一致）
-- FROM子查询文档：已支持单层FROM子查询，仅不支持嵌套
-- README文档：FROM子查询支持说明同步更新
+- README/README.en测试数修正（1036→1041）
 
 ### 文档
 - README新增FROM子查询示例
 - README.en新增30-Second Setup、竞品对比表、SQL实战场景
-- 修正README/README.en中的测试数(985→1036)、工具数(45→44)、导航链接
+- 修正README/README.en中的测试数(985→1041)、工具数(45→44)、导航链接
 
 ## [v1.1.0] - 2026-03-27
 

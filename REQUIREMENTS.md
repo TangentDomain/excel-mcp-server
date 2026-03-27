@@ -11,9 +11,9 @@
 ### REQ-026 [P1] 文档与门面优化线（持续迭代，不关闭）
 - **关注点**：README 30秒上手教程、GitHub门面、使用示例、竞品对比、Changelog
 
-### REQ-028 [P1] FROM子查询支持
+### REQ-028 [P1] FROM子查询支持 ✅
 - **描述**：支持 `SELECT * FROM (SELECT ...) AS t WHERE ...`
-- **验收**：基础FROM子查询 + WHERE过滤 + JOIN结果子查询 + 嵌套子查询，至少4个测试
+- **验收**：基础FROM子查询 + WHERE过滤 + JOIN结果子查询 + 嵌套子查询拒绝 + 空结果 + DISTINCT + 无别名，12个测试全通过
 
 ### REQ-015 [P1] 性能优化（写入）
 - **描述**：openpyxl write_only模式，减少写入内存和时间

@@ -474,6 +474,15 @@ CTE: WITH 高伤 AS (SELECT * FROM 技能表 WHERE 伤害>100) SELECT COUNT(*) F
 UNION: SELECT 技能名 FROM 法师技能 UNION ALL SELECT 技能名 FROM 战士技能
 窗口函数: SELECT *, ROW_NUMBER() OVER (PARTITION BY 类型 ORDER BY 伤害 DESC) as 排名 FROM 技能配置
 
+## 📦 统一返回格式
+所有工具返回统一JSON结构，AI解析时只需检查 `success` 字段：
+- 成功: `{"success": true, "message": "描述", "data": {...}, "meta": {...}}`
+- 失败: `{"success": false, "message": "错误描述", "meta": {"error_code": "CODE"}}`
+- `data`: 实际数据载荷（查询结果、文件信息等）
+- `meta`: 上下文元数据（行数、列数、执行时间等）
+- `error_code`: 机器可读错误分类（PATH_VALIDATION_FAILED, SQL_EXECUTION_FAILED等）
+- SQL查询额外返回 `query_info`（含execution_time_ms、error_type、hint、suggested_fix）
+
 ## ⚡ 常用流程
 1. excel_list_sheets → 2. excel_describe_table → 3. excel_query → 4. excel_update_query/excel_update_range → 5. excel_compare_sheets
 """,
