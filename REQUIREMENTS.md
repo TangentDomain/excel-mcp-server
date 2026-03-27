@@ -29,11 +29,11 @@
 - **描述**：持续优化工具描述的一致性和完整性
 - **完成**：中英文README文档同步，44个工具游戏场景描述完整，统一返回格式
 
-### REQ-031 [P2] CI Node.js 20弃用警告
+### REQ-031 [P2] CI Node.js 20弃用警告 ✅
 - **来源**：GitHub Actions 通知（2026-03-27）
 - **问题**：actions/checkout@v4 和 actions/setup-python@v5 运行在 Node.js 20，2026年9月16日将被移除
-- **修复**：升级 actions 版本或加 `FORCE_JAVASCRIPT_ACTIONS_TO_NODE24=true`
-- **截止**：2026-09-16
+- **修复**：actions/checkout@v5 + actions/setup-python@v6 + FORCE_JAVASCRIPT_ACTIONS_TO_NODE24=true
+- **完成时间**：2026-03-27，第150轮
 
 ### REQ-030 [P0] SQL引擎边界情况（3项Bug） - ✅ v1.6.8
 - **来源**：MCP真实验证后发现（2026-03-27）

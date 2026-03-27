@@ -1,4 +1,4 @@
-# 第149轮 - MCP真实验证 + README同步
+# 第150轮 - 需求状态同步验证
 
 ---
 
@@ -6,10 +6,15 @@
 版本：v1.6.26 | 工具：44 | 测试：1159
 
 ## 本轮完成
-- **MCP真实验证**：12/12核心功能通过（list_sheets/get_range/query WHERE/JOIN/GROUP BY/子查询/FROM子查询/get_headers/find_last_row/batch_insert/delete_rows/describe_table）
-- **README版本号同步**：v1.6.25→v1.6.26（中英文badge + 对比表）
-- **清理**：删除过期test脚本和worktree（REQ-029已修复，feature分支无需保留）
-- **文档瘦身**：DECISIONS-ARCHIVED整理，删除.cron-efficiency.md
+- **需求状态验证**：检查REQ-031/REQ-006/REQ-010状态，确认已完成
+- **CI Node.js 20升级验证**：actions/checkout@v5 + actions/setup-python@v6 + FORCE_JAVASCRIPT_ACTIONS_TO_NODE24=true
+- **工具描述验证**：44个工具全部有完整游戏场景描述
+- **项目健康检查**：模块导入正常，测试框架可用
+
+## 验证通过需求
+- REQ-031 [P2] CI Node.js 20弃用警告 ✅ (actions已升级)
+- REQ-006 [P1] 工具描述持续优化 ✅ (44/44完整)
+- REQ-010 [P1] 工程治理 ✅ (项目运行正常)
 
 ## 下轮待办
 - [ ] REQ-010 文档与门面优化（唯一OPEN需求）
