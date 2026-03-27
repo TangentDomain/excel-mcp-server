@@ -42,6 +42,22 @@
 - **Bug 3** ✅：LEFT JOIN IS NULL → 经验证已正常工作，无需修复
 - **完成时间**：2026-03-27，第120轮，v1.6.8发布
 
+### REQ-032 [P0] MCP真实验证发现的新bug - 🚧 第145轮发现
+- **Bug 1**：`excel_list_sheets`获取工作表列表失败，返回0个工作表
+  - **现象**：实际文件有3个工作表，但API返回空列表
+  - **错误信息**：`'<=' not supported between instances of 'int' and 'NoneType'`
+  - **来源**：第145轮MCP真实验证（2026-03-27）
+- **Bug 2**：`excel_delete_rows`参数不匹配
+  - **问题**：函数不支持`condition`参数，实际需要`row_index`和`count`参数
+  - **影响**：无法通过SQL条件删除行
+  - **来源**：第145轮MCP真实验证（2026-03-27）
+- **Bug 3**：`excel_batch_insert_rows`参数不匹配
+  - **问题**：函数不支持通过SQL条件定位插入位置，仅支持末尾插入
+  - **影响**：无法在指定位置插入行
+  - **来源**：第145轮MCP真实验证（2026-03-27）
+- **验收标准**：所有12项核心功能100%通过MCP真实验证
+- **优先级**：P0，阻断性问题，第146轮修复
+
 ### REQ-029 [P0] JOIN表别名列引用 + describe_table流式写入后崩溃 - ✅ v1.6.7
 - **Bug 1**：JOIN后SQL表别名不生效，`r.名称`不被识别，pandas JOIN后列名加`_x`/`_y`后缀，SQL别名未映射
 - **Bug 2**：`batch_insert_rows`/`delete_rows` streaming写入后，openpyxl `read_only=True`模式 `ws.max_row`返回None，导致`describe_table`崩溃
