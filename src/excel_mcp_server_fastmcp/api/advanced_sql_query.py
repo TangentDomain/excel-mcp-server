@@ -1077,23 +1077,23 @@ class AdvancedSQLQueryEngine:
     def _collect_condition_types(self, condition, eq, rng, like, in_list, between, null_list):
         """递归收集WHERE条件树中的各类条件"""
         if isinstance(condition, exp.EQ):
-            col = self._extract_column_name(condition.left)
+            col, col_table = self._extract_column_name(condition.left)
             val = self._extract_literal_value(condition.right)
             if col:
                 eq.append((col, val))
         elif isinstance(condition, (exp.GT, exp.GTE, exp.LT, exp.LTE)):
-            col = self._extract_column_name(condition.left)
+            col, col_table = self._extract_column_name(condition.left)
             val = self._extract_literal_value(condition.right)
             op_map = {exp.GT: '>', exp.GTE: '>=', exp.LT: '<', exp.LTE: '<='}
             if col:
                 rng.append((col, op_map.get(type(condition), '?'), val))
         elif isinstance(condition, exp.Like):
-            col = self._extract_column_name(condition.left)
+            col, col_table = self._extract_column_name(condition.left)
             val = self._extract_literal_value(condition.right)
             if col:
                 like.append((col, val))
         elif isinstance(condition, exp.In):
-            col = self._extract_column_name(condition.this)
+            col, col_table = self._extract_column_name(condition.this)
             vals = []
             if hasattr(condition, 'expressions'):
                 for e in condition.expressions:
@@ -1103,19 +1103,19 @@ class AdvancedSQLQueryEngine:
             if col and vals:
                 in_list.append((col, vals))
         elif isinstance(condition, exp.Between):
-            col = self._extract_column_name(condition.this)
+            col, col_table = self._extract_column_name(condition.this)
             low = self._extract_literal_value(condition.args.get('low'))
             high = self._extract_literal_value(condition.args.get('high'))
             if col:
                 between.append((col, low, high))
         elif isinstance(condition, exp.Is):
-            col = self._extract_column_name(condition.this)
+            col, col_table = self._extract_column_name(condition.this)
             if col:
                 null_list.append((col, True))
         elif isinstance(condition, exp.Not):
             inner = condition.this
             if isinstance(inner, exp.Is):
-                col = self._extract_column_name(inner.this)
+                col, col_table = self._extract_column_name(inner.this)
                 if col:
                     null_list.append((col, False))
             else:
@@ -1126,10 +1126,30 @@ class AdvancedSQLQueryEngine:
                     self._collect_condition_types(child, eq, rng, like, in_list, between, null_list)
 
     def _extract_column_name(self, expr):
-        """从表达式中提取列名"""
+        """从表达式中提取列名，支持表别名格式（如 r.名称）"""
         if isinstance(expr, exp.Column):
-            return expr.name
-        return None
+            # 处理表别名格式，如 r.名称 -> 名称, 返回 (列名, 表别名)
+            if hasattr(expr, 'table') and expr.table:
+                return f"{expr.table}.{expr.name}", expr.table
+            else:
+                return expr.name, None
+        return None, None
+
+    def _resolve_column_name(self, col_name: str, df: pd.DataFrame) -> str:
+        """解析列名，支持表别名格式（如 r.名称）"""
+        if '.' in col_name:
+            # 处理表别名格式，如 r.名称
+            table_part, col_part = col_name.split('.', 1)
+            # 从 _table_aliases 获取真实的表名
+            resolved_table = self._table_aliases.get(table_part, table_part)
+            # 检查列名是否存在于结果DataFrame中
+            alias_col = f"{table_part}.{col_part}"
+            if alias_col in df.columns:
+                return alias_col
+            # 如果别名列不存在，尝试原始列名
+            if col_part in df.columns:
+                return col_part
+        return col_name
 
     def _extract_literal_value(self, expr):
         """从表达式中提取字面值（委托_parse_literal_value统一处理）"""
@@ -1148,7 +1168,7 @@ class AdvancedSQLQueryEngine:
         hints.append(f'• GROUP BY聚合后有{len(df_before_having)}组数据')
 
         condition = having_expr.this
-        col = self._extract_column_name(condition.left)
+        col, col_table = self._extract_column_name(condition.left)
         val = self._extract_literal_value(condition.right)
 
         # 策略0：通过_having_agg_alias_map直接查找聚合表达式对应的SELECT别名

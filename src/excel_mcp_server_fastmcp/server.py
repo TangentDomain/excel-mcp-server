@@ -2686,7 +2686,9 @@ def excel_describe_table(
             col_stats[col_name] = {'non_null': 0, 'samples': [], 'type_values': []}
 
         # 单次遍历所有行和列
+        total_rows = 0  # 统计总行数（包括数据行）
         for row in ws.iter_rows(min_row=data_start + 1, values_only=True):
+            total_rows += 1
             for col_idx in range(min(len(row), num_cols)):
                 val = row[col_idx]
                 if val is not None:
@@ -2716,8 +2718,12 @@ def excel_describe_table(
                 'non_null': s['non_null'], 'sample_values': s['samples']
             }
 
-        # 统计行数
-        row_count = ws.max_row - data_start if ws.max_row > data_start else 0
+        # 统计行数 - 优先使用max_row，若为None则用iter_rows统计结果
+        if ws.max_row is not None and ws.max_row > data_start:
+            row_count = ws.max_row - data_start
+        else:
+            # streaming写入后max_row可能为None，使用iter_rows统计结果
+            row_count = total_rows
 
         wb.close()
 
