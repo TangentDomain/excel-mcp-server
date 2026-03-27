@@ -751,13 +751,17 @@ def excel_update_range(
     range: str,
     data: List[List[Any]],
     preserve_formulas: bool = True,
-    insert_mode: bool = True
+    insert_mode: bool = True,
+    streaming: bool = True
 ) -> Dict[str, Any]:
     """
 写入数据到指定范围（二维数组）。适合批量写入已知数据到精确位置。
 如需条件修改（如"火系伤害+10%"），优先使用excel_update_query（SQL UPDATE语法）。
 按ID合并导入（存在更新/不存在插入）请用excel_upsert_row。
 追加数据到末尾请用excel_batch_insert_rows或先excel_find_last_row确定位置。
+streaming=True（默认）覆盖模式使用流式写入，大文件性能更好。
+streaming=False 使用传统openpyxl，保留所有格式但内存占用高。
+注意：插入模式(preserve_formulas=True或insert_mode=True)不使用streaming。
     """
     _path_err = _validate_path(file_path)
     if _path_err:
@@ -799,7 +803,9 @@ def excel_update_range(
     })
 
     try:
-        result = ExcelOperations.update_range(file_path, range, data, preserve_formulas, insert_mode)
+        # 流式路径：仅覆盖模式 + 不保留公式
+        use_streaming = streaming and not insert_mode and not preserve_formulas
+        result = ExcelOperations.update_range(file_path, range, data, preserve_formulas, insert_mode, use_streaming)
 
         # 记录操作结果
         operation_logger.log_operation("operation_result", {
@@ -1629,10 +1635,13 @@ def excel_delete_rows(
     file_path: str,
     sheet_name: str,
     row_index: int,
-    count: int = 1
+    count: int = 1,
+    streaming: bool = True
 ) -> Dict[str, Any]:
     """
 删除指定位置的行。
+streaming=True（默认）使用流式写入，大文件性能更好，但不保留单元格格式。
+streaming=False 使用传统openpyxl，保留所有格式但内存占用高。
     """
     _path_err = _validate_path(file_path)
     if _path_err:
@@ -1648,7 +1657,7 @@ def excel_delete_rows(
     })
 
     try:
-        result = ExcelOperations.delete_rows(file_path, sheet_name, row_index, count)
+        result = ExcelOperations.delete_rows(file_path, sheet_name, row_index, count, streaming)
 
         # 记录操作结果
         operation_logger.log_operation("operation_result", {
@@ -1675,10 +1684,13 @@ def excel_delete_columns(
     file_path: str,
     sheet_name: str,
     column_index: int,
-    count: int = 1
+    count: int = 1,
+    streaming: bool = True
 ) -> Dict[str, Any]:
     """
 删除指定位置的列（1-based索引）。
+streaming=True（默认）使用流式写入，大文件性能更好，但不保留单元格格式。
+streaming=False 使用传统openpyxl，保留所有格式但内存占用高。
     """
     _path_err = _validate_path(file_path)
     if _path_err:
@@ -1694,7 +1706,7 @@ def excel_delete_columns(
     })
 
     try:
-        result = ExcelOperations.delete_columns(file_path, sheet_name, column_index, count)
+        result = ExcelOperations.delete_columns(file_path, sheet_name, column_index, count, streaming)
 
         # 记录操作结果
         operation_logger.log_operation("operation_result", {
