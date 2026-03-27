@@ -6,20 +6,19 @@
 版本：v1.1.0 | 工具：44 | 测试：1036 | 评分：100/100
 
 ## 正在做
-- [ ] REQ-015 写入性能优化（下一步）
+- [ ] REQ-025 错误信息结构化（下一步：SQL报错给AI可自动修复的提示）
 
 ## 待做
-1. REQ-015 写入性能优化（openpyxl write_only模式）
-2. REQ-012 多客户端兼容性验证
+1. REQ-025 错误信息结构化（让AI能自动修复SQL错误）
+2. REQ-015 写入性能优化（openpyxl write_only模式）
+3. REQ-012 多客户端兼容性验证
 
 ## 上一轮完成
-- 第85轮：REQ-026 文档与门面优化
-  - 30秒上手教程（README顶部折叠块）
-  - 竞品对比表（vs haris-musa/excelpython，12项对比）
-  - 游戏策划SQL实战示例（5个真实场景）
-  - CHANGELOG.md版本更新日志
-  - 修复过时数据：44工具/1036测试，移除残留get_sheet_headers
-  - 中英文README同步更新
+- 第86轮：REQ-025 返回值结构统一
+  - _wrap 自动注入 success: True，37个工具统一成功响应格式
+  - 全部36个 _fail 调用补齐 error_code（安全验证/SQL/格式化等）
+  - 统一返回结构: {success, message, data, meta}
+  - AI 可靠判断成败 + error_code 定位问题
 
 ## 阻塞项
 - 无
