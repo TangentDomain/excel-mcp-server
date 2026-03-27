@@ -2227,6 +2227,9 @@ class AdvancedSQLQueryEngine:
         if isinstance(joins, exp.Join):
             joins = [joins]
 
+        # 初始化JOIN列映射（用于别名解析）
+        self._join_column_mapping = {}
+        
         result_df = left_df
 
         for join in joins:
@@ -2324,6 +2327,12 @@ class AdvancedSQLQueryEngine:
                     new_col = f"{right_alias}.{col}"
                     col_mapping[col] = new_col
             right_df_renamed = right_df_renamed.rename(columns=col_mapping)
+            
+            # 更新JOIN列映射，用于别名解析
+            if right_alias not in self._join_column_mapping:
+                self._join_column_mapping[right_alias] = {}
+            for orig_col, new_col in col_mapping.items():
+                self._join_column_mapping[right_alias][orig_col] = new_col
 
             # 调整右表ON列名（如果被重命名了）
             if right_on_col:
@@ -2561,11 +2570,40 @@ class AdvancedSQLQueryEngine:
                 return f"`{qualified}`"
             if col_name in df.columns:
                 return f"`{col_name}`"
-            # 兜底：尝试搜索别名前缀匹配
-            if table_part and hasattr(self, '_table_aliases'):
-                for col in df.columns:
-                    if col == f"{table_part}.{col_name}":
-                        return f"`{col}`"
+            
+            # JOIN别名映射支持
+            if table_part:
+                # 1. 检查用户使用的别名格式是否直接存在
+                alias_col = f"{table_part}.{col_name}"
+                if alias_col in df.columns:
+                    return f"`{alias_col}`"
+                
+                # 2. 检查JOIN后pandas添加的后缀格式（table_part_列名）
+                pandas_suffix_col = f"{table_part}_{col_name}"
+                if pandas_suffix_col in df.columns:
+                    return f"`{pandas_suffix_col}`"
+                
+                # 3. 如果有JOIN映射，检查映射后的列名
+                if hasattr(self, '_join_column_mapping'):
+                    mapped_col = self._join_column_mapping.get(table_part, {}).get(col_name)
+                    if mapped_col and mapped_col in df.columns:
+                        return f"`{mapped_col}`"
+                
+                # 4. 尝试其他可能的别名格式
+                if hasattr(self, '_table_aliases'):
+                    resolved_table = self._table_aliases.get(table_part, table_part)
+                    # 检查原始表名+列名
+                    original_col = f"{resolved_table}_{col_name}"
+                    if original_col in df.columns:
+                        return f"`{original_col}`"
+                    # 如果用户使用的是原始表名，检查原始表名+列名
+                    if table_part == resolved_table and f"{table_part}_{col_name}" in df.columns:
+                        return f"`{table_part}_{col_name}`"
+                
+                # 5. 最后尝试原始列名
+                if col_name in df.columns:
+                    return f"`{col_name}`"
+            
             suggestion = self._suggest_column_name(col_name, list(df.columns))
             raise ValueError(f"列 '{qualified or col_name}' 不存在。可用列: {list(df.columns)}。{suggestion}")
 
