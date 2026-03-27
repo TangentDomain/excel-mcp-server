@@ -795,9 +795,29 @@ def excel_search_directory(
 • **file_pattern**: 文件名过滤（如"*.xlsx"只搜xlsx文件）
 • **max_files**: 最大搜索文件数（防止卡死）
 
-**⚡ 使用建议**:
-• 先用file_pattern缩小范围（如只搜"技能*.xlsx"），再搜内容
-• 大目录搜索较慢，建议缩小范围或设置max_files
+**📊 返回信息**:
+• **matches**: 匹配结果数组，每个包含{file, sheet, row, col, value}
+• **file_count**: 搜索的文件总数
+• **match_count**: 匹配到的单元格总数
+• **search_time_ms**: 搜索耗时（毫秒）
+• **success**: 操作是否成功
+• **message**: 状态消息或错误信息
+
+**💡 使用示例**:
+• **基础搜索**: `excel_search_directory("./config", "攻击力")` - 搜索所有文件中"攻击力"
+• **正则搜索**: `excel_search_directory("./config", "等级[1-5]", use_regex=True)` - 搜索等级1-5
+• **文件过滤**: `excel_search_directory("./config", "技能", file_pattern="技能*.xlsx")` - 只搜索技能表文件
+• **性能控制**: `excel_search_directory("./big_data", "数值", max_files=50)` - 限制搜索文件数
+
+**🔗 配合使用**:
+• 定位后批量修改: 搜索结果→excel_update_query批量修改
+• 深入分析: 对匹配结果用excel_describe_table了解详情
+• 版本对比: 在不同版本目录中搜索相同内容比较差异
+
+**⚡ 性能提示**:
+• 大目录建议先用file_pattern缩小搜索范围
+• 设置合理的max_files避免长时间等待
+• 重复搜索相同目录会自动缓存，第二次更快
     """
     _path_err = _validate_path(directory_path)
     if _path_err:
@@ -849,6 +869,15 @@ def excel_get_range(
 • 同一文件多次读取自动缓存，第二次更快
 • 修改数据后再次读取可确认修改结果
 • 双行表头会自动处理，列名映射在结果中
+
+**📊 返回信息**:
+• **data**: 获取的二维数组数据（行数组，每行是单元格值数组）
+• **headers**: 表头行（如果存在双行表头会自动合并）
+• **range_info**: 范围信息{start_cell, end_cell, rows, cols, sheet_name}
+• **validation_info**: 验证信息{normalized_range, range_type, scale_assessment}
+• **cache_hit**: 是否命中缓存（提升性能优化）
+• **success**: 操作是否成功
+• **message**: 状态消息或错误信息
     """
     _path_err = _validate_path(file_path)
     if _path_err:
@@ -1004,6 +1033,14 @@ def excel_update_range(
 • preserve_formulas=False时性能最佳，插入模式下会自动使用流式插入
 • 大文件强烈建议使用streaming=True，内存占用与文件大小无关
 • 大文件建议使用streaming减少内存占用
+
+**📊 返回信息**:
+• **updated_range**: 实际写入的范围{start_cell, end_cell, rows, cols}
+• **affected_rows**: 受影响的行数
+• **affected_cols**: 受影响的列数
+• **streaming_used**: 是否使用流式写入
+• **success**: 操作是否成功
+• **message**: 状态消息或错误信息（包含操作结果摘要）
     """
     _path_err = _validate_path(file_path)
     if _path_err:
@@ -1108,6 +1145,20 @@ def excel_assess_data_impact(
 2️⃣ 删除前必评估: 避免误删重要数据
 3️⃣ 结合备份: 重要操作前先用excel_create_backup创建备份
 4️⃣ 大操作分段: 影响范围过大时考虑分批操作
+
+**🔧 参数说明**:
+• **operation_type**: 操作类型（"update"、"delete"、"insert"）
+• **data**: 要写入的数据（仅update操作需要）
+• **detailed**: 是否详细评估（True=详细分析，False=快速预览）
+
+**📊 返回信息**:
+• **impact_summary**: 影响摘要{row_count, col_count, cell_count, risk_level}
+• **data_analysis**: 数据分析结果{value_types, empty_ratio, data_distribution}
+• **risk_assessment**: 风险评估{risk_level, risk_factors, confidence_score}
+• **recommendations**: 操作建议{actions_to_take, warnings, best_practices}
+• **preview_data**: 当前数据快照（detailed=True时提供）
+• **success**: 操作是否成功
+• **message**: 状态消息或错误信息
     """
     _path_err = _validate_path(file_path)
     if _path_err:
