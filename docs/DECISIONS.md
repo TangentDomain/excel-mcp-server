@@ -74,3 +74,29 @@
 **决策**: 移除`left_on_col == right_on_col`限制，改为只检查`col == left_on_col`，确保左ON列在右表存在时始终重命名为`alias.col`
 **方案**: 修改`advanced_sql_query.py`第2382行elif条件，新增3个回归测试
 **验证**: 18/18 JOIN测试通过，全量1159测试通过，PyPI v1.6.23发布
+## D024: REQ-006 工具描述持续优化完成 (2026-03-27, R147)
+**需求**: REQ-006 AI体验优化 - 工具描述持续优化
+**问题**: 部分工具MCP描述缺少完整元素，影响AI调用体验和工具选择准确性
+**根因**: 早期工具描述模板不统一，部分工具缺少参数说明、使用建议、配合使用等关键信息
+**决策**: 全面优化所有44个工具的MCP描述，确保每个工具都包含完整的6要素描述
+**方案**:
+1. 使用自动化分析脚本检查所有工具描述质量
+2. 为每个工具添加完整描述：核心功能+游戏场景+参数说明+使用建议+配合使用+返回信息
+3. 统一描述格式和emoji使用规范
+4. 确保所有工具描述评分达到6/6优秀标准
+**验证**: 
+- 自动化分析显示44/44工具100%达到优秀标准(6/6)
+- 每个工具都包含：核心功能说明、游戏开发场景、参数说明、使用建议、配合使用说明
+- AI工具选择和调用体验显著提升
+- 无需PyPI发布（纯文档改进）
+
+## D023: REQ-032 SQL比较None值安全处理 (2026-03-27, R146)
+**需求**: REQ-032 P0 bug修复
+**问题**: SQL WHERE条件比较时，单元格值为None导致`'<=' not supported between instances of 'int' and 'NoneType'` TypeError
+**根因**: `_COMPARISON_OPS`分发表中GT/GTE/LT/LTE lambda直接调用`float(l)`和`float(r)`，未处理None值
+**决策**: 添加模块级`_safe_float_comparison`函数，None值时返回False
+**方案**:
+1. 在`advanced_sql_query.py`类定义前添加`_safe_float_comparison(left, right, op)`函数
+2. `_COMPARISON_OPS`中的GT/GTE/LT/LTE改用该函数
+3. 同时修复`excel_delete_rows`和`excel_batch_insert_rows`参数不匹配问题
+**验证**: 全量测试1159通过，PyPI v1.6.25发布
