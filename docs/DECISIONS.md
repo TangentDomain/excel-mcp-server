@@ -45,3 +45,15 @@
 3. 验证3类SQL查询：基础查询、条件查询、JOIN查询
 4. 测试大数据量(1000行)streaming写入场景
 **验证**: 8/8测试全部通过，确认streaming功能完全可用，无兼容性问题
+
+## D018: REQ-029 describe_table崩溃修复 (2026-03-27, R138)
+**需求**: REQ-029 BUG FIX（Bug 2）
+**问题**: streaming写入后openpyxl read_only模式下`ws.max_row=None`，describe_table崩溃
+**根因**: 原有防御逻辑依赖`total_rows`变量，但该变量可能未正确初始化或在None时未处理
+**决策**: 重构行数统计逻辑，增加多层回退机制（max_row → total_rows → iter_rows → 0）
+**方案**:
+1. 优先使用max_row（正常情况）
+2. max_row无效时使用total_rows（streaming场景）
+3. 两者都无效时使用iter_rows遍历统计（极端场景）
+4. 所有层级都添加异常捕获
+**验证**: describe_table测试通过，PyPI v1.6.20发布
