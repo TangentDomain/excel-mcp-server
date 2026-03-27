@@ -187,3 +187,68 @@ class TestJoinEdgeCases:
         assert result['success'] is True
         rows = _rows(result)
         assert len(rows) <= 2
+
+
+class TestJoinColumnSuffixBug:
+    """REQ-029 Bug Fix: JOIN ON不同列名时_x/_y后缀问题"""
+
+    @pytest.fixture
+    def dual_column_file(self, tmp_path):
+        """创建两个表都有同名列但ON用不同列的测试文件"""
+        import pandas as pd
+        file_path = str(tmp_path / "suffix_test.xlsx")
+        left = pd.DataFrame({
+            'ID': [1, 2, 3],
+            '名称': ['火球', '冰冻', '雷电'],
+            '伤害': [100, 80, 120]
+        })
+        right = pd.DataFrame({
+            'ID': [101, 102, 103],
+            '名称': ['碎片A', '碎片B', '碎片C'],
+            '技能ID': [1, 2, 3],
+            '数量': [5, 3, 7]
+        })
+        with pd.ExcelWriter(file_path, engine='openpyxl') as writer:
+            left.to_excel(writer, sheet_name='左表', index=False)
+            right.to_excel(writer, sheet_name='右表', index=False)
+        return file_path
+
+    def test_no_x_y_suffix_when_on_columns_differ(self, dual_column_file):
+        """ON用不同列名时，不应出现_x/_y后缀"""
+        from src.excel_mcp_server_fastmcp.api.advanced_sql_query import execute_advanced_sql_query
+        result = execute_advanced_sql_query(
+            file_path=dual_column_file,
+            sql="SELECT * FROM 左表 s JOIN 右表 d ON s.ID = d.技能ID"
+        )
+        assert result['success'] is True
+        columns = result.get('query_info', {}).get('returned_columns', [])
+        # 不应有_x/_y后缀
+        for col in columns:
+            assert not col.endswith('_x'), f"列'{col}'不应有_x后缀"
+            assert not col.endswith('_y'), f"列'{col}'不应有_y后缀"
+
+    def test_alias_column_accessible_after_join(self, dual_column_file):
+        """JOIN后表别名列应可正常引用"""
+        from src.excel_mcp_server_fastmcp.api.advanced_sql_query import execute_advanced_sql_query
+        result = execute_advanced_sql_query(
+            file_path=dual_column_file,
+            sql="SELECT s.名称, d.名称 FROM 左表 s JOIN 右表 d ON s.ID = d.技能ID"
+        )
+        assert result['success'] is True
+        rows = _rows(result)
+        assert len(rows) == 3
+        # 验证数据正确性
+        assert rows[0] == ['火球', '碎片A']
+        assert rows[1] == ['冰冻', '碎片B']
+        assert rows[2] == ['雷电', '碎片C']
+
+    def test_where_on_right_alias_column(self, dual_column_file):
+        """JOIN后WHERE引用右表别名列"""
+        from src.excel_mcp_server_fastmcp.api.advanced_sql_query import execute_advanced_sql_query
+        result = execute_advanced_sql_query(
+            file_path=dual_column_file,
+            sql="SELECT s.名称, d.数量 FROM 左表 s JOIN 右表 d ON s.ID = d.技能ID WHERE d.数量 > 3"
+        )
+        assert result['success'] is True
+        rows = _rows(result)
+        assert len(rows) == 2  # 碎片A(5) and 碎片C(7)

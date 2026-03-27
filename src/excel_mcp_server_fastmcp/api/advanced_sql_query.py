@@ -2377,8 +2377,8 @@ class AdvancedSQLQueryEngine:
                 if col in result_df.columns and (left_on_col is None or col != left_on_col):
                     new_col = f"{right_alias}.{col}"
                     col_mapping[col] = new_col
-                elif left_on_col and col == left_on_col and left_on_col == right_on_col:
-                    # ON列同名：右表列重命名避免合并后重复
+                elif left_on_col and col == left_on_col:
+                    # ON列（无论左右列名是否相同）：右表列重命名避免_x/_y后缀
                     new_col = f"{right_alias}.{col}"
                     col_mapping[col] = new_col
             right_df_renamed = right_df_renamed.rename(columns=col_mapping)
