@@ -6,17 +6,14 @@
 版本：v1.1.0 | 工具：44 | 测试：1041 | 评分：100/100
 
 ## 正在做
-- [ ] REQ-015 write_only覆盖更多写入操作
-- [ ] REQ-026 Changelog版本化（Unreleased内容待发布）
+- [ ] REQ-015 write_only覆盖更多写入操作（修改现有文件场景需探索copy-modify-write方案）
 - [ ] REQ-012 多客户端兼容性验证（需要人工操作）
 
 ## 上一轮完成
-- 第93轮：REQ-025 instructions文档更新
-  - instructions新增📦统一返回格式段落（success/data/meta/error_code说明）
-  - SQL查询额外说明query_info（hint/suggested_fix）
-  - README/README.en测试数1036→1041
-  - REQ-028 FROM子查询标记完成（12个测试全通过）
-  - 纯文档改动，合并不发布PyPI
+- 第94轮：REQ-026 CHANGELOG完善
+  - v1.1.0 详细记录（返回值统一、工具合并、FROM子查询、错误码）
+  - README/README.en 添加更新日志链接
+  - 纯文档改动，不发布 PyPI
 
 ## 阻塞项
 - REQ-012 需要人工在Cursor/Claude Desktop等客户端测试
