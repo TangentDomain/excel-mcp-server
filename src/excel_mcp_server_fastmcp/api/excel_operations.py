@@ -588,12 +588,14 @@ class ExcelOperations:
             return cls._format_error_result(error_msg)
 
     @classmethod
-    def get_sheet_headers(cls, file_path: str) -> Dict[str, Any]:
+    def get_all_headers(cls, file_path: str, header_row: int = 1, max_columns: Optional[int] = None) -> Dict[str, Any]:
         """
         @intention 获取Excel文件中所有工作表的双行表头信息（字段描述+字段名）
 
         Args:
             file_path: Excel文件路径 (.xlsx/.xlsm)
+            header_row: 表头起始行号 (1-based，默认1)
+            max_columns: 最大列数限制，None表示自动截取到空列
 
         Returns:
             Dict: 包含所有工作表的双行表头信息
@@ -627,7 +629,7 @@ class ExcelOperations:
 
             for sheet_name in sheets:
                 try:
-                    header_result = cls.get_headers(file_path, sheet_name, header_row=1)
+                    header_result = cls.get_headers(file_path, sheet_name, header_row=header_row, max_columns=max_columns)
 
                     if header_result.get('success'):
                         headers = header_result.get('headers', [])

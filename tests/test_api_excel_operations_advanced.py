@@ -294,8 +294,8 @@ class TestExcelHeadersOperations:
         
         assert result['success'] is True
 
-    def test_get_sheet_headers(self, headers_test_file):
+    def test_get_all_headers(self, headers_test_file):
         """测试获取所有工作表表头"""
-        result = ExcelOperations.get_sheet_headers(headers_test_file)
+        result = ExcelOperations.get_all_headers(headers_test_file)
         
         assert result['success'] is True
