@@ -51,3 +51,9 @@
 - **原因**：返回值已统一为{success, message, data, meta}，但AI客户端不知道，可能用字符串匹配而非结构化解析
 - **内容**：说明成功/失败两种模式、data/meta/error_code字段、SQL查询的query_info额外字段
 - **效果**：AI客户端（Cursor/Claude等）能更可靠地解析工具返回值，减少"找不到数据"误判
+
+## 2026-03-27 第94轮 — REQ-026 CHANGELOG格式化
+- **决策**：CHANGELOG采用 [Keep a Changelog](https://keepachangelog.com/) 格式，分新增/优化/修复/文档四个类别
+- **原因**：版本发布频繁（v1.0.0→v1.1.0共30个版本），需要结构化的变更记录帮助用户和开发者了解每个版本的变化
+- **内容**：Unreleased区段记录未发布改动，每个版本段记录该版本的重要变更
+- **效果**：README中可链接到CHANGELOG.md，用户一目了然
