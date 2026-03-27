@@ -201,12 +201,22 @@ class ExcelOperations:
 
             # 步骤2: 提取和格式化数据
             sheets = [sheet.name for sheet in result.data] if result.data else []
+            total_sheets = result.metadata.get('total_sheets', len(sheets)) if result.metadata else len(sheets)
 
             response = {
                 'success': True,
-                'sheets': sheets,
-                'file_path': file_path,
-                'total_sheets': result.metadata.get('total_sheets', len(sheets)) if result.metadata else len(sheets)
+                'message': f"获取到 {len(sheets)} 个工作表",
+                'sheets': sheets,           # 向后兼容：顶层字段
+                'file_path': file_path,     # 向后兼容：顶层字段
+                'total_sheets': total_sheets, # 向后兼容：顶层字段
+                'data': {                   # 新格式：统一data字段
+                    'sheets': sheets,
+                    'total_sheets': total_sheets
+                },
+                'meta': {                   # 新格式：统一meta字段
+                    'file_path': file_path,
+                    'total_sheets': total_sheets
+                }
             }
 
             return response

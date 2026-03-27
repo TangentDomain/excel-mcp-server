@@ -599,7 +599,13 @@ def _fail(message: str, meta: dict = None) -> dict:
 
 
 def _wrap(result: dict, meta: dict = None) -> dict:
-    """包装Operations层返回，metadata→meta，添加上下文meta，统一success字段"""
+    """包装Operations层返回，metadata→meta，添加上下文meta，统一success字段。
+    
+    统一返回格式：{success, message, data, meta}
+    - 成功时：若缺少message则自动补充默认message
+    - metadata→meta：Operations层的metadata自动映射到meta
+    - error→message：确保AI只需检查message键
+    """
     if not isinstance(result, dict):
         return result
     # 统一error→message，确保AI只需检查message键
@@ -608,6 +614,9 @@ def _wrap(result: dict, meta: dict = None) -> dict:
         result['message'] = result.pop('error')
     if "success" not in result:
         result["success"] = True
+    # 成功时若缺少message，自动补充默认message
+    if result.get('success') is True and 'message' not in result:
+        result['message'] = '操作成功'
     if "metadata" in result:
         m = result.pop("metadata")
         if isinstance(m, dict) and m:
@@ -866,12 +875,18 @@ def excel_get_range(
 
     # 如果成功，添加验证信息到结果中
     if result.get('success'):
-        result['validation_info'] = {
+        validation_info = {
             'normalized_range': range_validation['normalized_range'],
             'sheet_name': range_validation['sheet_name'],
             'range_type': range_validation['range_info']['type'],
             'scale_assessment': scale_validation
         }
+        # 向后兼容：保留顶层validation_info
+        result['validation_info'] = validation_info
+        # 新格式：同时合并到meta中
+        if 'meta' not in result:
+            result['meta'] = {}
+        result['meta']['validation_info'] = validation_info
 
     return _wrap(result)
 
@@ -2476,7 +2491,7 @@ def excel_query(
     # 使用高级SQL查询引擎
     try:
         from .api.advanced_sql_query import execute_advanced_sql_query
-        return _wrap(execute_advanced_sql_query(
+        result = _wrap(execute_advanced_sql_query(
             file_path=file_path,
             sql=query_expression,
             sheet_name=None,  # 统一使用SQL FROM子句中的表名
@@ -2484,6 +2499,10 @@ def excel_query(
             include_headers=include_headers,
             output_format=output_format or 'table'
         ))
+        # 确保meta字段存在（query_info保留在顶层向后兼容）
+        if 'meta' not in result:
+            result['meta'] = {'file_path': file_path}
+        return result
 
     except ImportError:
         return _fail('SQLGlot未安装，无法使用高级SQL功能。请运行: pip install sqlglot\n\n💡 智能降级建议：\n• 对于简单数据读取：尝试使用 excel_get_range("文件路径", "工作表名!A1:Z100")\n• 对于文本搜索：尝试使用 excel_search("文件路径", "关键词", "工作表名")\n• 对于表头信息：尝试使用 excel_get_headers("文件路径", "工作表名")', meta={"error_code": "DEPENDENCY_MISSING"})
