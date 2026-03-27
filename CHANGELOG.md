@@ -7,6 +7,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.3.0] - 2026-03-27
+
+### 新增
+- **REQ-015 StreamingWriter流式写入**：`core/streaming_writer.py`，calamine读取 + write_only流式写入
+- **batch_insert_rows/upsert_row流式模式**：默认`streaming=True`，大文件内存占用大幅降低
+- 15个StreamingWriter新测试
+
+### 优化
+- **calamine浮点数兼容**：整数→浮点数（2→2.0）标准化比较
+- **自动降级**：streaming失败自动回退openpyxl传统路径
+- **列宽保留**：流式写入时保留列宽设置
+
 ### 新增
 - **REQ-015 写入性能优化**：新建文件使用 `write_only` 模式（流式写入），新建和格式转换、文件合并场景内存占用大幅降低
 - **FROM子查询**：`FROM (SELECT ...) AS alias` 语法完整实现，12个测试覆盖（WHERE过滤、JOIN结果子查询、嵌套子查询拒绝、DISTINCT、无别名等）

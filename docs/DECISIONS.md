@@ -2,6 +2,13 @@
 
 > 只追加，不删改。记录"为什么这么做"。≤50条，超过归档到DECISIONS-ARCHIVED.md。
 
+## 2026-03-27 | StreamingWriter用copy-modify-write方案
+- **决策**：修改操作（batch_insert/upsert）默认用streaming模式（calamine读+write_only写）
+- **原因**：openpyxl load_workbook对大文件内存占用高；calamine读+write_only写内存与文件大小无关
+- **权衡**：保留列宽/行高/数据值，不保留单元格格式（字体/填充/边框/合并）
+- **降级**：streaming失败自动回退openpyxl传统路径；用户可streaming=False强制传统路径
+- **关键发现**：calamine把整数读成浮点数（2→2.0），需要数值标准化比较
+
 ## 2026-03-26 | 不做配置导出引擎
 - 原因：构建工具属于CI/CD环节，不是MCP查询工具
 - 影响：聚焦SQL引擎
