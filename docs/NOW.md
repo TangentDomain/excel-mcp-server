@@ -1,18 +1,19 @@
-# 第151轮 - 文档与门面优化完成
+# 第152轮 - copy_sheet streaming支持
 
 ---
 
 ## 状态
-版本：v1.6.26 | 工具：44 | 测试：1159
+版本：v1.6.27 | 工具：44 | 测试：1164
 
 ## 本轮完成
-- **REQ-010 文档与门面优化**：同步版本数据(v1.6.26)并补全CHANGELOG v1.6.4~v1.6.24版本记录
-- **README中英文同步**：版本号、测试数、项目描述完全一致
-- **文档瘦身**：DECISIONS.md归档10条历史记录，NOW.md精简至20行
-- **项目健康检查**：文档完整性验证通过
+- **REQ-015 copy_sheet streaming支持**：excel_copy_sheet新增streaming参数
+  - calamine读取+write_only写入，大文件性能提升
+  - 自动降级到openpyxl、保留列宽、名称冲突自动编号
+  - 新增5个专项测试，全量1164测试通过
+- **文档瘦身**：DECISIONS.md归档8条历史记录到ARCHIVED.md
 
 ## 验证通过需求
-- REQ-010 [P1] 工程治理 ✅ (文档质量提升完成)
+- REQ-015 [P1] 性能优化（copy_sheet streaming） ✅
 
 ## 下轮待办
 - [ ] 每5轮MCP验证（下次第155轮）

@@ -1,9 +1,12 @@
-**需求**: REQ-032 P0 bug修复
-**问题**: SQL WHERE条件比较时，单元格值为None导致`'<=' not supported between instances of 'int' and 'NoneType'` TypeError
-**根因**: `_COMPARISON_OPS`分发表中GT/GTE/LT/LTE lambda直接调用`float(l)`和`float(r)`，未处理None值
-**决策**: 添加模块级`_safe_float_comparison`函数，None值时返回False
+## D025: REQ-015 copy_sheet streaming支持 (2026-03-27, R152)
+**需求**: REQ-015 write_only覆盖修改操作 - copy_sheet streaming
+**问题**: excel_copy_sheet工具缺少streaming参数，大文件复制性能差
+**根因**: 早期streaming改造集中在update/insert/delete操作，copy_sheet遗漏
+**决策**: 为copy_sheet添加streaming参数，使用calamine+write_only实现流式复制
 **方案**:
-1. 在`advanced_sql_query.py`类定义前添加`_safe_float_comparison(left, right, op)`函数
-2. `_COMPARISON_OPS`中的GT/GTE/LT/LTE改用该函数
-3. 同时修复`excel_delete_rows`和`excel_batch_insert_rows`参数不匹配问题
-**验证**: 全量测试1159通过，PyPI v1.6.25发布
+1. server.py: excel_copy_sheet新增streaming参数（默认True）
+2. ExcelOperations.copy_sheet: 透传streaming参数
+3. ExcelManager.copy_sheet: 新增_copy_sheet_streaming方法
+4. 使用calamine读取所有工作表数据 → write_only重建（保留其他工作表）
+5. 保留源工作表列宽、自动降级到openpyxl、名称冲突自动编号
+**验证**: 5个新测试+1159个已有测试全部通过（共1164），PyPI v1.6.27发布
