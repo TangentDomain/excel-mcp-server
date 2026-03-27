@@ -22,6 +22,34 @@
 
 ---
 
+## ⚡ 30-Second Setup
+
+**1. Install** (add this to your MCP client config):
+```json
+{
+  "mcpServers": {
+    "excelmcp": {
+      "command": "uvx",
+      "args": ["excel-mcp-server-fastmcp"]
+    }
+  }
+}
+```
+
+**2. Just talk to your AI:**
+```
+→ "Show me all sheets in skills.xlsx"
+→ "Search for all fire skills"
+→ "Query the top 10 skills by DPM"
+→ "Increase all fire skill damage by 20%"
+→ "Compare v1 and v2 version differences"
+```
+
+**Done.** No commands to memorize, no SQL required (though you can write it). Supports natural language + standard SQL dual mode.
+
+<details>
+<summary>📖 Want more detailed installation options?</summary>
+
 ## 🚀 Quick Start
 
 ### Option 1: uvx One-line Run (Recommended)
@@ -90,6 +118,29 @@ python scripts/benchmark.py --quick        # Quick mode (~30s)
 python scripts/benchmark.py                # Full mode (includes large table tests)
 python scripts/benchmark.py --compare      # Compare with previous results
 ```
+
+</details>
+
+---
+
+## 📊 Why ExcelMCP?
+
+| Feature | ExcelMCP | [haris-musa/excel-mcp](https://github.com/haris-musa/excel-mcp) | [excelpython](https://github.com/nicepkg/excelpython) |
+|---------|----------|-------|------------|
+| **SQL Query Engine** | ✅ Full SQL (JOIN/subquery/window/CTE) | ❌ | ❌ |
+| **Read Engine** | 🦀 python-calamine (Rust, 2300x speedup) | openpyxl | openpyxl |
+| **Tool Count** | 44 professional tools | ~15 basic tools | ~10 |
+| **Game Dev Focus** | ✅ Vertical optimization (DPM/balance/configs) | ❌ General | ❌ General |
+| **Dual-row Headers** | ✅ Auto-detect Chinese desc + English field | ❌ | ❌ |
+| **SQL UPDATE** | ✅ Conditional batch modification | ❌ | ❌ |
+| **Cross-file JOIN** | ✅ @filepath syntax | ❌ | ❌ |
+| **Test Coverage** | 1036 tests | ~50 tests | ~30 tests |
+| **Error Recovery** | ✅ Structured error codes + AI-fixable hints | ❌ Plain text | ❌ Plain text |
+| **Chinese Column Names** | ✅ | ❌ | ❌ |
+| **Backup/Restore** | ✅ | ❌ | ❌ |
+| **Version Comparison** | ✅ Sheet-level diff | ❌ | ❌ |
+
+> 💡 **Key Difference**: ExcelMCP is the only Excel MCP server with a **complete SQL engine**. Other solutions can only "read/write cells" — ExcelMCP lets you do complex data analysis and batch modifications with SQL, which is a game-changer for game config table management.
 
 ---
 
@@ -502,6 +553,70 @@ SELECT skill_name, damage, RANK() OVER (ORDER BY damage DESC) as r, DENSE_RANK()
 - SQL cold query: ~10ms (calamine) vs ~200ms (openpyxl)
 - Cache auto-invalidates on file modification
 
+### 🎮 Game Designer SQL in Action
+
+Real game development scenarios — copy and paste directly:
+
+**Scenario 1: Skill Numerical Balancing**
+```sql
+-- Find skills with abnormal DPM (exceeding 3x the average)
+SELECT skill_name, damage * 1.0 / cooldown as dpm
+FROM SkillConfig
+WHERE damage * 1.0 / cooldown > (SELECT AVG(damage * 1.0 / cooldown) * 3 FROM SkillConfig)
+
+-- DPM statistics by class, find imbalanced classes
+SELECT skill_type, AVG(damage * 1.0 / cooldown) as avg_dpm,
+       MAX(damage * 1.0 / cooldown) as max_dpm,
+       MIN(damage * 1.0 / cooldown) as min_dpm
+FROM SkillConfig GROUP BY skill_type
+```
+
+**Scenario 2: Equipment Drop Config Audit**
+```sql
+-- Find duplicate drop entries (same monster drops same item multiple times)
+SELECT monster_id, item_id, COUNT(*) as dup_count
+FROM DropConfig GROUP BY monster_id, item_id HAVING dup_count > 1
+
+-- Check if drop rate totals are reasonable (not equal to 100%)
+SELECT monster_id, SUM(drop_rate) as total_rate
+FROM DropConfig GROUP BY monster_id
+HAVING ABS(total_rate - 100) > 0.01
+```
+
+**Scenario 3: Config Data Quality Check**
+```sql
+-- Find broken foreign keys (skills referencing non-existent equipment IDs)
+SELECT s.skill_name, s.equip_id
+FROM SkillConfig s
+LEFT JOIN EquipmentConfig e ON s.equip_id = e.equip_id
+WHERE s.equip_id IS NOT NULL AND e.equip_id IS NULL
+
+-- Find abnormal configs with zero or negative values
+SELECT * FROM SkillConfig WHERE damage <= 0 OR cooldown < 0
+```
+
+**Scenario 4: Version Migration Helper**
+```sql
+-- Find new config entries in v2 (using cross-file JOIN)
+SELECT b.skill_name FROM SkillTable@'skills_v2.xlsx' b
+LEFT JOIN SkillTable@'skills_v1.xlsx' a ON b.skill_id = a.skill_id
+WHERE a.skill_id IS NULL
+
+-- Find removed config entries
+SELECT a.skill_name FROM SkillTable@'skills_v1.xlsx' a
+LEFT JOIN SkillTable@'skills_v2.xlsx' b ON a.skill_id = b.skill_id
+WHERE b.skill_id IS NULL
+```
+
+**Scenario 5: Batch Numerical Adjustment**
+```sql
+-- Server-wide balance: warrior skills +15% damage, -1 cooldown
+UPDATE SkillConfig SET damage = damage * 1.15, cooldown = cooldown - 1 WHERE skill_type = 'Warrior'
+
+-- Level compression: scale HP for monsters above level 50
+UPDATE MonsterConfig SET hp = hp * 0.8 WHERE level > 50
+```
+
 **Common Problem Solutions**:
 - **File locked**: Close Excel program and retry
 - **Encoding issues**: Ensure UTF-8 encoding
@@ -598,7 +713,7 @@ Tool Layer (Common Functions)
 ## 📊 Project Information
 
 ### Quality Validation Metrics
-- **Test Cases**: 985 (behavior validation, no coverage padding)
+- **Test Cases**: 1036 (behavior validation, no coverage padding)
 - **Test Files**: 49 test files
 - **Test Code**: 16,496 lines
 - **Tool Count: 44 (@mcp.tool decorator verified)
@@ -610,7 +725,7 @@ Tool Layer (Common Functions)
 python -m pytest tests/ -q --tb=short -n auto --timeout=30
 
 # Verify tool completeness
-grep -c "def excel_" src/excel_mcp_server_fastmcp/server.py  # Should output: 45
+grep -c "def excel_" src/excel_mcp_server_fastmcp/server.py  # Should output: 44
 
 # Generate coverage report
 python -m pytest tests/ --cov=src --cov-report=html
