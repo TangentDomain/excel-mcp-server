@@ -99,6 +99,202 @@ class StructuredSQLError(Exception):
         super().__init__(message)
 
 
+def _unsupported_error_hint(err_detail: str) -> str:
+    """为UnsupportedError提供替代建议。"""
+    err_upper = err_detail.upper()
+    
+    if 'INSERT' in err_upper or 'DELETE' in err_upper or 'DROP' in err_upper or 'ALTER' in err_upper or 'CREATE' in err_upper:
+        return '此工具仅支持SELECT查询。数据修改请使用excel_update_query（UPDATE语句）。'
+    if 'NATURAL JOIN' in err_upper:
+        return '不支持NATURAL JOIN，请改用显式ON条件：JOIN 表2 ON 表1.列 = 表2.列'
+    if 'FULL OUTER' in err_upper:
+        return '不支持FULL OUTER JOIN，请改用LEFT JOIN + UNION + RIGHT JOIN，或用INNER JOIN'
+    if 'RIGHT JOIN' in err_upper:
+        return '不支持RIGHT JOIN，请交换JOIN顺序改用LEFT JOIN：... JOIN 左表 ON 右表.列 = 左表.列'
+    if 'INTERSECT' in err_upper or 'EXCEPT' in err_upper:
+        return '不支持INTERSECT/EXCEPT，请用JOIN或WHERE IN替代'
+    if 'FETCH' in err_upper or 'NEXT' in err_upper:
+        return '不支持FETCH/NEXT语法，请用LIMIT：SELECT ... LIMIT 10'
+    if 'OFFSET' in err_upper:
+        return '不支持OFFSET语法。分页请用LIMIT：第N页 = LIMIT 每页数 OFFSET (N-1)*每页数'
+    if 'RECURSIVE' in err_upper:
+        return '不支持递归CTE(WITH RECURSIVE)。请改用普通CTE或子查询。'
+    if 'LATERAL' in err_upper:
+        return '不支持LATERAL JOIN。请改用子查询或CET。'
+    if 'WINDOW' in err_upper and 'OVER' not in err_upper:
+        return 'WINDOW子句请改为直接在窗口函数后写OVER：ROW_NUMBER() OVER (PARTITION BY ... ORDER BY ...)'
+    
+    return '请参考工具描述中"SQL已支持功能"列表，使用支持的操作。对于复杂计算，可考虑分步查询。'
+
+
+def _parse_error_hint(err_str: str, sql: str) -> str:
+    """根据SQLGlot ParseError和原始SQL，生成AI可自动修复的提示。
+    
+    覆盖常见SQL书写错误：
+    - 关键字拼写错误
+    - 关键字顺序错误
+    - 缺少关键字
+    - 缺少逗号/括号
+    - Excel函数名误用
+    - 中文标点混用
+    - 引号配对错误
+    """
+    sql_upper = sql.strip().upper()
+    hint = ""
+    
+    # === 关键字拼写错误 ===
+    typos = [
+        ('SELEC ', 'SELECT'), ('SELEC$', 'SELECT'),
+        ('FORM ', 'FROM'), ('FORM$', 'FROM'),
+        ('WHER ', 'WHERE'), ('WHER$', 'WHERE'),
+        ('GROUPBY', 'GROUP BY'), ('GROUP  BY', 'GROUP BY'),
+        ('ORDERBY', 'ORDER BY'), ('ORDER  BY', 'ORDER BY'),
+        ('HAVNIG', 'HAVING'), ('HAVIN', 'HAVING'),
+        ('INNTER', 'INNER'), ('LEFR', 'LEFT'), ('RIGTH', 'RIGHT'),
+        ('JOINT', 'JOIN'), ('OUDER', 'OUTER'),
+        ('DISTIN T', 'DISTINCT'), ('DISTNCT', 'DISTINCT'),
+        ('BETWEE N', 'BETWEEN'), ('BETWEN', 'BETWEEN'),
+        ('NOTNULL', 'NOT NULL'), ('ISNUL', 'IS NULL'),
+        ('LIK E', 'LIKE'), ('LIEK', 'LIKE'),
+        ('EXIS TS', 'EXISTS'), ('EXIST ', 'EXISTS'),
+        ('LIMITT', 'LIMIT'), ('OFFEST', 'OFFSET'),
+        ('ASCEND', 'ASC'), ('DSCEND', 'DESC'),
+        ('CROS', 'CROSS'), ('FUL L', 'FULL'),
+        ('UNIO N', 'UNION'), ('UNON', 'UNION'),
+        ('INTERSE CT', 'INTERSECT'), ('EXCEP T', 'EXCEPT'),
+        ('CONCATENATE', 'CONCAT'), ('SUBSTITUE', 'REPLACE'),
+    ]
+    for typo, correct in typos:
+        if typo.rstrip('$') in sql_upper:
+            # 用$匹配行尾
+            if typo.endswith('$') and not sql_upper.rstrip(';').endswith(typo.rstrip('$')):
+                continue
+            hint = f'可能是拼写错误，"{typo.rstrip().rstrip("$")}" 应为 "{correct}"'
+            return hint
+    
+    # === 关键字顺序错误 ===
+    # SELECT ... FROM ... WHERE ... GROUP BY ... HAVING ... ORDER BY ... LIMIT
+    order_keywords = ['SELECT', 'FROM', 'WHERE', 'GROUP BY', 'HAVING', 'ORDER BY', 'LIMIT']
+    found_positions = []
+    for kw in order_keywords:
+        # GROUP BY / ORDER BY 需要特殊处理
+        if ' ' in kw:
+            parts = kw.split()
+            pos = sql_upper.find(parts[0])
+            if pos != -1:
+                # 检查后面是否跟着第二个词
+                after = sql_upper[pos+len(parts[0]):].lstrip()
+                if after.startswith(parts[1]):
+                    found_positions.append((pos, kw))
+        else:
+            pos = sql_upper.find(kw)
+            if pos != -1 and (pos == 0 or not sql_upper[pos-1].isalpha()):
+                found_positions.append((pos, kw))
+    
+    # 按出现位置排序，然后检查顺序是否符合SQL标准
+    found_positions.sort(key=lambda x: x[0])
+    for i in range(len(found_positions) - 1):
+        pos1, kw1 = found_positions[i]
+        pos2, kw2 = found_positions[i + 1]
+        idx1 = order_keywords.index(kw1)
+        idx2 = order_keywords.index(kw2)
+        if idx1 > idx2:
+            hint = f'SQL关键字顺序错误："{kw1}"出现在"{kw2}"之前，但标准顺序要求"{kw1}"在"{kw2}"之后。正确顺序: {" → ".join(order_keywords)}'
+            return hint
+    
+    # === 缺少关键字 ===
+    # 有GROUP BY但没有聚合函数
+    if 'GROUP BY' in sql_upper:
+        agg_funcs = ['COUNT(', 'SUM(', 'AVG(', 'MIN(', 'MAX(', 'COUNT (', 'SUM (', 'AVG (', 'MIN (', 'MAX (']
+        has_agg = any(af in sql_upper for af in agg_funcs)
+        if not has_agg:
+            hint = 'GROUP BY通常与聚合函数一起使用（如COUNT/SUM/AVG/MIN/MAX）。如果只是去重，请用SELECT DISTINCT。'
+            return hint
+    
+    # 有JOIN但缺少ON
+    if re.search(r'\bJOIN\b', sql_upper) and ' ON ' not in sql_upper and not re.search(r'\bCROSS\s+JOIN\b', sql_upper):
+        hint = 'JOIN缺少ON条件。例如：... JOIN 表2 ON 表1.id = 表2.id。如果是笛卡尔积，请用CROSS JOIN。'
+        return hint
+    
+    # UPDATE语句出现在SELECT查询中
+    if 'UPDATE' in sql_upper and 'SET' in sql_upper and 'SELECT' in sql_upper:
+        hint = '不能在SELECT查询中使用UPDATE。批量修改请使用excel_update_query工具。'
+        return hint
+    
+    # === 缺少逗号检测 ===
+    # SELECT a b FROM → SELECT a, b FROM（两个标识符之间只有空格没有逗号）
+    select_match = re.search(r'\bSELECT\s+(.+?)\bFROM\b', sql_upper, re.DOTALL)
+    if select_match:
+        select_raw = sql[select_match.start(1):select_match.end(1)]
+        # 检查原始SQL中两个标识符之间是否缺少逗号
+        # 模式：单词 + 空格（非逗号） + 单词，其中两个都不是SQL关键字
+        keywords_in_select = {'AS', 'DISTINCT', 'CASE', 'WHEN', 'THEN', 'ELSE', 'END', 'AND', 'OR', 'NOT', 'IN', 'BETWEEN', 'LIKE', 'IS', 'NULL', 'TRUE', 'FALSE', 'COUNT', 'SUM', 'AVG', 'MIN', 'MAX', 'UPPER', 'LOWER', 'TRIM', 'LENGTH', 'CONCAT', 'REPLACE', 'SUBSTRING', 'LEFT', 'RIGHT', 'COALESCE', 'IFNULL', 'CAST', 'ROW_NUMBER', 'RANK', 'DENSE_RANK', 'OVER', 'PARTITION', 'ASC', 'DESC', 'ON'}
+        # 匹配：标识符 + 空格 + 标识符（中间无逗号）
+        adjacent_pairs = re.finditer(r'([A-Za-z_]\w*)\s+([A-Za-z_]\w*)', select_raw)
+        for m in adjacent_pairs:
+            t1, t2 = m.group(1), m.group(2)
+            if t1.upper() not in keywords_in_select and t2.upper() not in keywords_in_select:
+                # 检查它们之间没有逗号（finditer已经保证了没有逗号，因为逗号不是\w）
+                hint = f'SELECT子句中"{t1}"和"{t2}"之间可能缺少逗号。列之间用逗号分隔：SELECT {t1}, {t2}'
+                return hint
+    
+    # === 括号配对检测 ===
+    paren_count = sql.count('(') - sql.count(')')
+    if paren_count > 0:
+        hint = f'SQL中有{paren_count}个未闭合的括号。请检查每个左括号"("都有对应的右括号")"。'
+        return hint
+    if paren_count < 0:
+        hint = f'SQL中有多余的{abs(paren_count)}个右括号")"。请删除多余的括号。'
+        return hint
+    
+    # === 引号配对检测 ===
+    single_quotes = len(re.findall(r"(?<!')'(?!')", sql))
+    if single_quotes % 2 != 0:
+        hint = 'SQL中的单引号数量为奇数，可能有未闭合的引号。字符串值需要用单引号包裹，如 \'值\'。'
+        return hint
+    
+    # === 中文标点混用 ===
+    cn_punctuation = {'，': ',', '（': '(', '）': ')', '：': ':', '；': ';'}
+    for cn, en in cn_punctuation.items():
+        if cn in sql:
+            hint = f'SQL中使用了中文标点"{cn}"，应改为英文标点"{en}"。'
+            return hint
+    
+    # === Excel函数名误用 ===
+    excel_funcs = {
+        'SUMIF': '请用 CASE WHEN ... THEN ... END 替代 SUMIF',
+        'COUNTIF': '请用 COUNT(CASE WHEN ... THEN 1 END) 替代 COUNTIF',
+        'VLOOKUP': '请用 JOIN 替代 VLOOKUP',
+        'IF': '请用 CASE WHEN ... THEN ... ELSE ... END 替代 IF 函数',
+        'IFS': '请用 CASE WHEN ... THEN ... ELSE ... END 替代 IFS',
+    }
+    for func, suggestion in excel_funcs.items():
+        if re.search(r'\b' + func + r'\s*\(', sql_upper):
+            hint = f'Excel函数"{func}"不是SQL语法。{suggestion}。'
+            return hint
+    
+    # === 子查询缺少别名 ===
+    subquery_pattern = re.search(r'\(\s*SELECT\b.+?\)\s*$', sql.strip(), re.IGNORECASE | re.DOTALL)
+    if subquery_pattern:
+        end_part = sql.strip()[subquery_pattern.end():].strip()
+        # 如果子查询后没有别名（没有内容，或内容不是 AS/标识符）
+        if not end_part or (not re.match(r'^AS\b', end_part, re.IGNORECASE) and not re.match(r'^[A-Za-z_]\w*$', end_part)):
+            hint = 'FROM子查询或UNION结果需要别名。例如：FROM (SELECT ...) AS subquery'
+            return hint
+    
+    # === 通用建议 ===
+    if 'SUBSTRING' in sql_upper and '(' in sql:
+        # 检查SUBSTRING参数是否正确
+        substr_match = re.search(r'SUBSTRING\s*\((.+?)\)', sql, re.IGNORECASE)
+        if substr_match:
+            args = [a.strip() for a in substr_match.group(1).split(',')]
+            if len(args) == 2:
+                hint = 'SUBSTRING需要3个参数：SUBSTRING(列, 起始位置, 长度)。如果要从位置N取到末尾，请用SUBSTRING(列, N, LENGTH(列)-N+1)。'
+                return hint
+    
+    return hint
+
+
 def _classify_value_error(err_str: str) -> str:
     """将ValueError分类为标准错误码。优先匹配更具体的模式。"""
     err_upper = err_str.upper()
@@ -161,6 +357,33 @@ def _generate_value_error_hint(err_str: str) -> str:
     # 字符串函数
     if "字符串函数" in err_str:
         return "请检查函数名和参数。支持的字符串函数：UPPER/LOWER/TRIM/LENGTH/CONCAT/REPLACE/SUBSTRING/LEFT/RIGHT。"
+    return ""
+
+
+def _generate_value_error_suggested_fix(err_str: str, sql: str) -> str:
+    """根据ValueError内容生成具体的修复SQL建议（如果可能）。"""
+    # 列不存在：尝试提取建议的列名并替换
+    if "列 '" in err_str and "你是否想用" in err_str:
+        import re
+        # 提取建议的列名
+        suggestion_match = re.search(r'你是否想用:\s*(.+?)\?', err_str)
+        if suggestion_match:
+            suggested_col = suggestion_match.group(1).strip().split(',')[0].strip()
+            # 提取错误的列名
+            col_match = re.search(r"列 '(.+?)'", err_str)
+            if col_match:
+                wrong_col = col_match.group(1)
+                return sql.replace(wrong_col, suggested_col)
+    # 表不存在：尝试提取建议的表名
+    if "表 '" in err_str and "你是否想用" in err_str:
+        import re
+        suggestion_match = re.search(r'你是否想用:\s*(.+?)\?', err_str)
+        if suggestion_match:
+            suggested_table = suggestion_match.group(1).strip().split(',')[0].strip()
+            col_match = re.search(r"表 '(.+?)'", err_str)
+            if col_match:
+                wrong_table = col_match.group(1)
+                return sql.replace(wrong_table, suggested_table)
     return ""
 
 
@@ -272,11 +495,16 @@ class AdvancedSQLQueryEngine:
                 # 验证SQL支持范围
                 validation_result = self._validate_sql_support(parsed_sql)
                 if not validation_result['valid']:
+                    error_msg = validation_result.get('error', '不支持的SQL语法')
+                    hint = _unsupported_error_hint(error_msg)
+                    qi = {'error_type': 'unsupported_sql', 'details': validation_result}
+                    if hint:
+                        qi['hint'] = hint
                     return {
                         'success': False,
-                        'message': f'不支持的SQL语法: {validation_result["error"]}',
+                        'message': f'不支持的SQL语法: {error_msg}' + (f'\n💡 {hint}' if hint else ''),
                         'data': [],
-                        'query_info': {'error_type': 'unsupported_sql', 'details': validation_result}
+                        'query_info': qi
                     }
 
                 # 执行查询（UNION/UNION ALL 或普通 SELECT）
@@ -304,61 +532,86 @@ class AdvancedSQLQueryEngine:
                 return result
 
             except StructuredSQLError as e:
+                qi = {
+                    'error_type': e.error_code,
+                    'hint': e.hint,
+                    'context': e.context,
+                    'details': e.message
+                }
+                # 为列名/表名错误生成suggested_fix
+                suggested_fix = ""
+                if e.error_code in ('column_not_found', 'table_not_found') and e.context:
+                    wrong_name = e.context.get('column_requested') or e.context.get('table_requested', '')
+                    available = e.context.get('available_columns') or e.context.get('available_tables') or []
+                    if wrong_name and available:
+                        matches = difflib.get_close_matches(wrong_name, available, n=1, cutoff=0.4)
+                        if matches:
+                            suggested_fix = sql.replace(wrong_name, matches[0], 1)
+                if suggested_fix:
+                    qi['suggested_fix'] = suggested_fix
+                msg = e.message
+                if e.hint:
+                    msg += f'\n💡 {e.hint}'
+                if suggested_fix:
+                    msg += f'\n🔧 建议修复SQL: {suggested_fix}'
                 return {
                     'success': False,
-                    'message': f'{e.message}',
+                    'message': msg,
                     'data': [],
-                    'query_info': {
-                        'error_type': e.error_code,
-                        'hint': e.hint,
-                        'context': e.context,
-                        'details': e.message
-                    }
+                    'query_info': qi
                 }
             except ParseError as e:
                 err_str = str(e)
-                # 提取常见拼写错误的友好提示
-                hint = ''
-                if 'SELEC' in sql.upper() and 'SELECT' not in sql.upper():
-                    hint = '可能是拼写错误，SELECT关键字是否拼对了？'
-                elif 'FORM' in sql.upper() and 'FROM' not in sql.upper():
-                    hint = '可能是拼写错误，FROM关键字是否拼对了？'
-                elif 'WHER' in sql.upper() and 'WHERE' not in sql.upper():
-                    hint = '可能是拼写错误，WHERE关键字是否拼对了？'
+                hint = _parse_error_hint(err_str, sql)
+                qi = {
+                    'error_type': 'syntax_error',
+                    'details': err_str,
+                    'hint': hint
+                }
                 return {
                     'success': False,
-                    'message': f'SQL语法错误: {err_str}',
+                    'message': f'SQL语法错误: {err_str}' + (f'\n💡 {hint}' if hint else ''),
                     'data': [],
-                    'query_info': {
-                        'error_type': 'syntax_error',
-                        'details': err_str,
-                        'hint': hint
-                    }
+                    'query_info': qi
                 }
             except UnsupportedError as e:
+                err_detail = str(e)
+                # 为不支持的SQL功能提供替代建议
+                hint = _unsupported_error_hint(err_detail)
+                qi = {
+                    'error_type': 'unsupported_feature',
+                    'details': err_detail,
+                    'hint': hint
+                }
                 return {
                     'success': False,
-                    'message': f'不支持的SQL功能: {str(e)}',
+                    'message': f'不支持的SQL功能: {err_detail}' + (f'\n💡 {hint}' if hint else ''),
                     'data': [],
-                    'query_info': {
-                        'error_type': 'unsupported_feature',
-                        'details': str(e)
-                    }
+                    'query_info': qi
                 }
             except ValueError as e:
                 err_str = str(e)
                 # 对常见ValueError生成智能修复建议
                 hint = _generate_value_error_hint(err_str)
                 error_code = _classify_value_error(err_str)
+                suggested_fix = _generate_value_error_suggested_fix(err_str, sql)
+                qi = {
+                    'error_type': error_code,
+                    'details': err_str,
+                    'hint': hint
+                }
+                if suggested_fix:
+                    qi['suggested_fix'] = suggested_fix
+                msg = err_str
+                if hint:
+                    msg += f'\n💡 {hint}'
+                if suggested_fix:
+                    msg += f'\n🔧 建议修复SQL: {suggested_fix}'
                 return {
                     'success': False,
-                    'message': err_str,
+                    'message': msg,
                     'data': [],
-                    'query_info': {
-                        'error_type': error_code,
-                        'details': err_str,
-                        'hint': hint
-                    }
+                    'query_info': qi
                 }
             except Exception as e:
                 return {
