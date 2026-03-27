@@ -1745,7 +1745,7 @@ class ExcelOperations:
             ids_with_rows = []
             # 处理流式写入后 max_row 可能为 None 的情况
             if ws.max_row is None:
-                # read_only模式下max_row=None，逐行扫描直到连续N行为空
+# read_only模式下max_row=None，逐行扫描直到连续N行为空
                 max_scan = 10000  # 安全上限
                 consecutive_empty = 0
                 empty_threshold = 10  # 连续N行为空则停止
