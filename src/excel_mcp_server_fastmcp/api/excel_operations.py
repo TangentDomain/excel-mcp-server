@@ -1652,7 +1652,8 @@ class ExcelOperations:
         key_column: str,
         key_value,
         updates: dict,
-        header_row: int = 1
+        header_row: int = 1,
+        streaming: bool = True
     ) -> Dict[str, Any]:
         """
         @intention Upsert行：按键列查找，存在则更新，不存在则插入新行
@@ -1664,13 +1665,14 @@ class ExcelOperations:
             key_value: 用于匹配的值
             updates: 要写入的列值字典
             header_row: 表头所在行号（默认1）
+            streaming: 是否使用流式写入（默认True）
 
         Returns:
             Dict: 标准化的操作结果
         """
         try:
             manager = ExcelManager(file_path)
-            result = manager.upsert_row(sheet_name, key_column, key_value, updates, header_row)
+            result = manager.upsert_row(sheet_name, key_column, key_value, updates, header_row, streaming)
             return format_operation_result(result)
         except Exception as e:
             error_msg = f"Upsert行失败: {str(e)}"
@@ -1683,7 +1685,8 @@ class ExcelOperations:
         file_path: str,
         sheet_name: str,
         data: list,
-        header_row: int = 1
+        header_row: int = 1,
+        streaming: bool = True
     ) -> Dict[str, Any]:
         """
         @intention 批量插入多行数据到工作表末尾
@@ -1693,13 +1696,14 @@ class ExcelOperations:
             sheet_name: 工作表名称
             data: 行数据列表，每行为{列名: 值}字典
             header_row: 表头所在行号（默认1）
+            streaming: 是否使用流式写入（默认True）
 
         Returns:
             Dict: 标准化的操作结果
         """
         try:
             manager = ExcelManager(file_path)
-            result = manager.batch_insert_rows(sheet_name, data, header_row)
+            result = manager.batch_insert_rows(sheet_name, data, header_row, streaming)
             return format_operation_result(result)
         except Exception as e:
             error_msg = f"批量插入行失败: {str(e)}"
