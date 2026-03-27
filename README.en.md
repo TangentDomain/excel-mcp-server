@@ -10,13 +10,33 @@
 [![Python Version](https://img.shields.io/badge/python-3.10+-blue.svg)](https://www.python.org/downloads/)
 [![Powered by: FastMCP](https://img.shields.io/badge/Powered%20by-FastMCP-orange)](https://github.com/jlowin/fastmcp)
 ![Status](https://img.shields.io/badge/status-stable-green.svg)
-![Tests](https://img.shields.io/badge/tests-1059%20tests-brightgreen.svg)
+![Tests](https://img.shields.io/badge/tests-2198%20tests-brightgreen.svg)
 ![Tools](https://img.shields.io/badge/tools-44%20verified%20tools-green.svg)
 [![CI](https://github.com/TangentDomain/excel-mcp-server/actions/workflows/ci.yml/badge.svg)](https://github.com/TangentDomain/excel-mcp-server/actions/workflows/ci.yml)
 
-**ExcelMCP** is an Excel configuration table management MCP server designed for game development. Through AI natural language commands, it enables intelligent operations on game configurations such as skill tables, equipment data, and monster attributes. Built with **FastMCP**, reads use **python-calamine** (Rust engine, 2300x speedup), writes use **openpyxl**. Features **44 professional tools** and **1041 test cases**, ensuring enterprise-grade reliability.
+**ExcelMCP** is an Excel configuration table management MCP server designed for game development. Through AI natural language commands, it enables intelligent operations on game configurations such as skill tables, equipment data, and monster attributes. Built with **FastMCP**, reads use **python-calamine** (Rust engine, 2300x speedup), writes use **openpyxl**. Features **44 professional tools** and **2198 test cases**, ensuring enterprise-grade reliability.
 
 🎯 **Core Features**: Skill systems, equipment management, monster configuration, numerical balancing, version comparison, designer toolchain
+
+## 🏆 Competitor Comparison
+
+| Feature | ExcelMCP | haris-musa/excelpython |
+|---------|----------|----------------------|
+| **Architecture** | MCP Server Mode | Python Library Mode |
+| **AI Integration** | ✅ Native MCP Support | ❌ Requires Wrapper |
+| **Performance** | ⚡ Rust Engine (calamine) + 2300x Speed | 🐢 Pure Python Processing |
+| **SQL Engine** | ✅ 45 SQL Functions + Secure Parsing | ❌ Basic Query Support |
+| **Game Optimization** | ✅ Specialized Game Data Structures | ❌ Generic Spreadsheet Processing |
+| **Cross-file JOIN** | ✅ `@'filepath'` Syntax | ❌ Not Supported |
+| **Error Handling** | ✅ Structured Errors + AI Repair Hints | ❌ Basic Exceptions |
+| **Test Coverage** | ✅ 2198 Test Cases | ❌ Limited Testing |
+| **Installation** | ✅ `uvx` One-line Command | ⚠️ Requires pip Installation |
+
+## 🚀 Why Choose ExcelMCP
+- **Game Development Focused**: Smart management of skills, equipment, monsters, and other game data
+- **AI Native Integration**: Natural language commands, no complex API learning required
+- **Enterprise Performance**: Rust engine reading + streaming write, supports huge configuration tables
+- **Zero Configuration**: PyPI one-click install, auto-updates, ready to use
 
 📦 **One-line install**: `uvx excel-mcp-server-fastmcp` — run from PyPI, auto-updates, zero config
 
@@ -46,6 +66,48 @@
 ```
 
 **Done.** No commands to memorize, no SQL required (though you can write it). Supports natural language + standard SQL dual mode.
+
+## 🔧 SQL Practical Scenarios
+
+### Advanced Queries
+```sql
+-- Cross-file JOIN query for skills and equipment data
+SELECT s.skill_name, s.damage, e.equipment_name, e.attack_power 
+FROM skills.xlsx_skills s
+ JOIN equipment.xlsx_equipment e ON s.class = e.applicable_class
+ WHERE s.element = 'Fire' AND e.quality = 'Epic'
+```
+
+### Complex Analysis
+```sql
+-- Use window functions to calculate skill rankings
+SELECT skill_name, damage,
+       RANK() OVER (ORDER BY damage DESC) as damage_rank,
+       PERCENT_RANK() OVER (ORDER BY damage DESC) as damage_percentile
+FROM skills.xlsx_skills
+WHERE element IN ('Fire', 'Ice', 'Lightning')
+```
+
+### Data Modification
+```sql
+-- Batch update skill values
+UPDATE skills.xlsx_skills 
+SET damage = damage * 1.2, 
+    mana_cost = mana_cost * 1.1
+WHERE element = 'Fire' AND skill_type = 'Active'
+```
+
+### Subqueries and CTEs
+```sql
+-- Use WITH clause for complex analysis
+with high_damage_skills as (
+    SELECT skill_name, damage FROM skills.xlsx_skills 
+    WHERE damage > 1000
+)
+SELECT s.skill_name, s.damage, e.equipment_name
+FROM high_damage_skills s
+JOIN equipment.xlsx_equipment e ON s.skill_name = e.recommended_skill
+```
 
 <details>
 <summary>📖 Want more detailed installation options?</summary>
@@ -134,7 +196,7 @@ python scripts/benchmark.py --compare      # Compare with previous results
 | **Dual-row Headers** | ✅ Auto-detect Chinese desc + English field | ❌ | ❌ |
 | **SQL UPDATE** | ✅ Conditional batch modification | ❌ | ❌ |
 | **Cross-file JOIN** | ✅ @filepath syntax | ❌ | ❌ |
-| **Test Coverage** | 1059 tests | ~50 tests | ~30 tests |
+| **Test Coverage** | 2198 tests | ~50 tests | ~30 tests |
 | **Error Recovery** | ✅ Structured error codes + AI-fixable hints | ❌ Plain text | ❌ Plain text |
 | **Chinese Column Names** | ✅ | ❌ | ❌ |
 | **Backup/Restore** | ✅ | ❌ | ❌ |
@@ -713,7 +775,7 @@ Tool Layer (Common Functions)
 ## 📊 Project Information
 
 ### Quality Validation Metrics
-- **Test Cases**: 1041 (behavior validation, no coverage padding)
+- **Test Cases**: 2198 (behavior validation, no coverage padding)
 - **Test Files**: 49 test files
 - **Test Code**: 16,496 lines
 - **Tool Count: 44 (@mcp.tool decorator verified)
