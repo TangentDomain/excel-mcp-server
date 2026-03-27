@@ -162,7 +162,11 @@ class TestServerInterfaces:
         # Row 2: field_names = ["name", "age", "department", "salary", "total"]
         # headers and data should return the field_names (row 2)
         assert result['headers'] == ["name", "age", "department", "salary", "total"]
-        assert result['data'] == ["name", "age", "department", "salary", "total"]
+        assert result['data'] == {
+            "field_names": ["name", "age", "department", "salary", "total"],
+            "descriptions": ["姓名描述", "年龄描述", "部门描述", "薪资描述", "总计描述"],
+            "dual_rows": True
+        }
         assert result['descriptions'] == ["姓名描述", "年龄描述", "部门描述", "薪资描述", "总计描述"]
         assert result['field_names'] == ["name", "age", "department", "salary", "total"]
         assert result['header_count'] == 5

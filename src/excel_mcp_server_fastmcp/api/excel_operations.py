@@ -277,7 +277,9 @@ class ExcelOperations:
             # 步骤3: 解析双行表头信息
             header_info = cls._parse_dual_header_data(result.data, max_columns)
 
-            return format_operation_result({
+            return {
+                'success': True,
+                # 新格式：结构化数据
                 'data': {
                     'field_names': header_info['field_names'],    # 字段名（第2行）
                     'descriptions': header_info['descriptions'],  # 字段描述（第1行）
@@ -289,8 +291,16 @@ class ExcelOperations:
                     'header_count': len(header_info['field_names']),
                     'max_columns': max_columns,
                     'dual_row_mode': True
-                }
-            })
+                },
+                # 向后兼容字段（保持与现有测试和调用方一致）
+                'headers': header_info['field_names'],
+                'field_names': header_info['field_names'],
+                'descriptions': header_info['descriptions'],
+                'header_count': len(header_info['field_names']),
+                'sheet_name': sheet_name,
+                'header_row': header_row,
+                'message': f"成功获取{len(header_info['field_names'])}个表头字段（描述+字段名）"
+            }
 
         except Exception as e:
             error_msg = f"获取表头失败: {str(e)}"
@@ -714,16 +724,15 @@ class ExcelOperations:
                     })
 
             return format_operation_result({
+                'success': True,
                 'data': {
                     'sheets_with_headers': sheets_with_headers,
                     'total_sheets': len(sheets)
                 },
-                'meta': {
-                    'file_path': file_path,
-                    'header_row': header_row,
-                    'max_columns': max_columns,
-                    'dual_row_mode': True
-                }
+                # 保持顶层兼容性
+                'sheets_with_headers': sheets_with_headers,
+                'file_path': file_path,
+                'total_sheets': len(sheets)
             })
 
         except Exception as e:
