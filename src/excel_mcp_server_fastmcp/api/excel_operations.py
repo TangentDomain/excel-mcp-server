@@ -1131,7 +1131,8 @@ class ExcelOperations:
         file_path: str,
         source_name: str,
         new_name: Optional[str] = None,
-        index: Optional[int] = None
+        index: Optional[int] = None,
+        streaming: bool = True
     ) -> Dict[str, Any]:
         """
         @intention 复制工作表（含数据和格式）
@@ -1141,13 +1142,14 @@ class ExcelOperations:
             source_name: 源工作表名称
             new_name: 新工作表名称（为空自动生成 "源表名_副本"）
             index: 插入位置（None追加到末尾）
+            streaming: 是否使用流式复制（默认True，大文件性能更好）
 
         Returns:
             Dict: 标准化的操作结果
         """
         try:
             manager = ExcelManager(file_path)
-            result = manager.copy_sheet(source_name, new_name, index)
+            result = manager.copy_sheet(source_name, new_name, index, streaming)
             return format_operation_result(result)
         except Exception as e:
             error_msg = f"复制工作表失败: {str(e)}"

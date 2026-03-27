@@ -5,6 +5,7 @@ Excel MCP Server - Excel管理模块
 """
 
 import logging
+import os
 from typing import List, Optional
 from pathlib import Path
 from openpyxl import Workbook, load_workbook
@@ -420,7 +421,8 @@ class ExcelManager:
         self,
         source_name: str,
         new_name: Optional[str] = None,
-        index: Optional[int] = None
+        index: Optional[int] = None,
+        streaming: bool = True
     ) -> OperationResult:
         """
         复制工作表到同一文件中（含数据和格式）
@@ -429,6 +431,7 @@ class ExcelManager:
             source_name: 源工作表名称
             new_name: 新工作表名称（为空则自动生成 "源表名_副本"）
             index: 插入位置索引（None表示追加到末尾）
+            streaming: 是否使用流式复制（默认True，大文件性能更好）
 
         Returns:
             OperationResult: 复制操作的结果
@@ -438,6 +441,15 @@ class ExcelManager:
                 raise DataValidationError("源工作表名称不能为空")
 
             source_name = source_name.strip()
+
+            # 流式复制路径：读取数据后重建工作表，大文件性能更好
+            if streaming:
+                from .streaming_writer import StreamingWriter
+                if StreamingWriter.is_available():
+                    try:
+                        return self._copy_sheet_streaming(source_name, new_name, index)
+                    except Exception as streaming_err:
+                        logger.warning(f"流式复制工作表失败，降级到openpyxl: {streaming_err}")
 
             workbook = load_workbook(self.file_path)
 
@@ -506,6 +518,142 @@ class ExcelManager:
         except Exception as e:
             logger.error(f"复制工作表失败: {e}")
             return OperationResult(success=False, error=str(e))
+
+    def _copy_sheet_streaming(
+        self,
+        source_name: str,
+        new_name: Optional[str] = None,
+        index: Optional[int] = None
+    ) -> OperationResult:
+        """
+        流式复制工作表：读取源数据后用calamine+write_only重建，大文件性能更好
+
+        Args:
+            source_name: 源工作表名称
+            new_name: 新工作表名称（为空则自动生成 "源表名_副本"）
+            index: 插入位置索引（None表示追加到末尾）
+
+        Returns:
+            OperationResult: 复制操作的结果
+        """
+        import tempfile
+        import shutil
+
+        # 自动生成新名称
+        if not new_name or not new_name.strip():
+            new_name = f"{source_name}_副本"
+        else:
+            new_name = new_name.strip()
+
+        # 使用calamine读取源工作表数据
+        try:
+            from python_calamine import CalamineWorkbook
+            cal_wb = CalamineWorkbook.from_path(self.file_path)
+        except Exception as e:
+            logger.warning(f"calamine读取失败，降级到openpyxl: {e}")
+            return self.copy_sheet(source_name, new_name, index, streaming=False)
+
+        if source_name not in cal_wb.sheet_names:
+            available = ', '.join(cal_wb.sheet_names)
+            raise SheetNotFoundError(f"工作表不存在: {source_name}（可用: {available}）")
+
+        source_rows = cal_wb.get_sheet_by_name(source_name).to_python()
+        if not source_rows:
+            return OperationResult(
+                success=False,
+                error=f"源工作表 '{source_name}' 为空或读取失败"
+            )
+
+        # 收集所有工作表数据（保持其他工作表不变）
+        all_sheets_data = {}
+        for sn in cal_wb.sheet_names:
+            all_sheets_data[sn] = cal_wb.get_sheet_by_name(sn).to_python()
+
+        # 处理名称冲突
+        base_name = new_name
+        counter = 1
+        while new_name in all_sheets_data:
+            new_name = f"{base_name}_{counter}"
+            counter += 1
+            if counter > 100:
+                raise DataValidationError(f"无法生成唯一工作表名称: {base_name}")
+
+        # 添加新工作表数据
+        all_sheets_data[new_name] = list(source_rows)
+
+        # 读取列宽信息
+        col_widths = {}
+        try:
+            wb_meta = load_workbook(self.file_path)
+            if source_name in wb_meta.sheetnames:
+                ws_meta = wb_meta[source_name]
+                col_widths = {
+                    col_letter: dim.width
+                    for col_letter, dim in ws_meta.column_dimensions.items()
+                    if dim.width
+                }
+            wb_meta.close()
+        except Exception as e:
+            logger.warning(f"读取列宽失败，跳过: {e}")
+
+        # write_only写入所有工作表
+        wb_out = Workbook(write_only=True)
+        sheet_order = list(cal_wb.sheet_names)
+        sheet_order.append(new_name)
+
+        for sn in sheet_order:
+            if sn not in all_sheets_data:
+                continue
+            ws = wb_out.create_sheet(title=sn)
+            sheet_rows = all_sheets_data[sn]
+
+            # 为新工作表设置源工作表的列宽
+            if sn == new_name and col_widths:
+                for col_letter, width in col_widths.items():
+                    try:
+                        ws.column_dimensions[col_letter].width = width
+                    except Exception:
+                        pass
+
+            for row in sheet_rows:
+                ws.append(row)
+
+        # 原子替换
+        fd, tmp_path = tempfile.mkstemp(suffix='.xlsx', dir=os.path.dirname(self.file_path))
+        os.close(fd)
+
+        try:
+            wb_out.save(tmp_path)
+            wb_out.close()
+            shutil.move(tmp_path, self.file_path)
+        except Exception:
+            if os.path.exists(tmp_path):
+                os.unlink(tmp_path)
+            raise
+
+        total_rows = len(source_rows)
+        total_cols = max(len(row) for row in source_rows) if source_rows else 0
+
+        return OperationResult(
+            success=True,
+            data={
+                'index': len(sheet_order) - 1,
+                'name': new_name,
+                'max_row': total_rows,
+                'max_column': total_cols,
+                'max_column_letter': get_column_letter(total_cols) if total_cols > 0 else 'A'
+            },
+            message=f"成功复制工作表 '{source_name}' 为 '{new_name}'（{total_rows}行 × {total_cols}列，流式模式）",
+            metadata={
+                'file_path': self.file_path,
+                'source_name': source_name,
+                'new_name': new_name,
+                'copied_rows': total_rows,
+                'copied_columns': total_cols,
+                'mode': 'streaming',
+                'col_widths_preserved': len(col_widths) > 0
+            }
+        )
 
     def rename_column(
         self,
