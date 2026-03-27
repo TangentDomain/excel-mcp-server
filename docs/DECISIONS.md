@@ -1,5 +1,16 @@
 - **影响**：所有修改操作默认开启streaming，性能大幅提升
 
+## 2026-06-24 | REQ-015 Phase 3: 扩展streaming写入覆盖范围（第113轮）
+- **决策**：扩展streaming写入支持到插入模式
+- **原因**：原streaming条件`streaming and not insert_mode and not preserve_formulas`过于严格，插入模式被迫走openpyxl路径，大文件性能差
+- **改动**：
+  - StreamingWriter新增`insert_rows_streaming`方法（基于_copy_modify_write）
+  - `update_range`新增`preserve_formulas`参数（接口兼容，streaming模式暂无效）
+  - server.py: `use_streaming = streaming and not preserve_formulas`（去掉insert_mode限制）
+  - excel_operations.py: streaming路径分支覆盖模式和插入模式
+- **权衡**：insert_rows_streaming不保留单元格级格式（字体/填充/边框/合并），但保留列宽
+- **测试**：新增8个测试，全量1107 passed
+
 ## 2026-03-27 | 工具描述优化策略（第104轮）
 - **决策**：为高频工具添加结构化游戏开发场景描述
 - **原因**：AI客户端依赖docstring理解工具用途

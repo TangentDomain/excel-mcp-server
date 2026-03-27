@@ -1,26 +1,24 @@
-# 第112轮 - REQ-006 工具描述持续优化 ✅ 完成
+# 第113轮 - REQ-015 性能优化 Phase 3 ✅ 完成
 
 ## 状态
-版本：v1.6.1 | 工具：44 | 测试：1099 | 游戏场景描述：44/44 ✅
+版本：v1.6.1 | 工具：44 | 测试：1107 | Streaming覆盖：覆盖+插入模式
 
 ## 正在做
-- [ ] REQ-006 工具描述持续优化（持续迭代）
+- [ ] REQ-015 Phase 4: MCP验证 + 发布PyPI
 
-## 上一轮完成
-- 第112轮：REQ-006 工具描述持续优化
-  - 为excel_server_stats添加完整的游戏开发场景描述（4个场景）
-  - 所有44个工具均包含：核心功能描述、4个游戏开发场景、返回信息、参数说明、使用建议
-  - 统一了工具描述格式，提升专业性和易用性
-  - 版本号升级至v1.6.1，发布PyPI验证可用性
-  - MCP兼容性测试通过，8个游戏场景验证功能正常
-  - 合并develop→main，发布PyPI，推送标签v1.6.1
+## 本轮完成
+- 第113轮：REQ-015 Phase 3 - 扩展streaming写入覆盖范围
+  - StreamingWriter新增`insert_rows_streaming`方法，支持流式插入行
+  - `update_range`新增`preserve_formulas`参数（streaming模式下暂无效，但接口兼容）
+  - `excel_operations.py`: streaming路径扩展支持覆盖模式+插入模式
+  - `server.py`: 扩展`use_streaming`条件，从`streaming and not insert_mode and not preserve_formulas`改为`streaming and not preserve_formulas`
+  - 新增8个测试用例（TestInsertRowsStreaming + TestUpdateRangeStreamingExtended）
+  - 全量测试1107 passed（+8）
+  - 合并到develop分支
 
-- 第111轮：REQ-026 文档与门面优化
-  - 完善30秒上手教程，添加详细配置说明
-  - 创建examples/目录，提供8个完整游戏场景示例
-  - 更新README引用examples，增加快速示例代码
-  - 竞品对比表已存在，展示ExcelMCP的优势
-  - CHANGELOG.md已维护，记录版本历史
-  - 新增文档：examples/README.md（15464字节，8个示例）
-  - 合并develop→main，纯文档改动不发布PyPI
-  - 文档瘦身：DECISIONS.md归档最早的10条决策
+## 待办
+- [ ] 合并develop→main
+- [ ] MCP验证（至少8项游戏场景）
+- [ ] 发布PyPI（版本号递增）
+- [ ] 更新DECISIONS.md记录决策
+- [ ] 飞书推送轮次总结
