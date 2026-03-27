@@ -307,17 +307,17 @@ class TestBackupSystem:
         result = excel_create_backup(self.test_file)
 
         assert result['success'] is True
-        assert 'backup_file' in result
-        assert 'timestamp' in result
-        assert os.path.exists(result['backup_file'])
-        assert result['file_size']['original'] == result['file_size']['backup']
+        assert 'backup_file' in result['data']
+        assert 'timestamp' in result['data']
+        assert os.path.exists(result['data']['backup_file'])
+        assert result['data']['file_size']['original'] == result['data']['file_size']['backup']
 
     def test_create_backup_nonexistent_file(self):
         """测试创建不存在文件的备份"""
         result = excel_create_backup("nonexistent.xlsx")
 
         assert result['success'] is False
-        assert result['error'] == 'FILE_NOT_FOUND'
+        assert result['meta']['error_code'] == 'FILE_NOT_FOUND'
         assert "不存在" in result['message']
 
     def test_list_backups(self):
@@ -336,17 +336,17 @@ class TestBackupSystem:
         result = excel_list_backups(self.test_file)
 
         assert result['success'] is True
-        assert result['total_backups'] >= 1  # 至少有一个备份
-        assert len(result['backups']) >= 1
-        assert all('filename' in backup for backup in result['backups'])
+        assert result['data']['total_backups'] >= 1  # 至少有一个备份
+        assert len(result['data']['backups']) >= 1
+        assert all('filename' in backup for backup in result['data']['backups'])
 
     def test_list_backups_no_backups(self):
         """测试列出不存在的备份"""
         result = excel_list_backups(self.test_file)
 
         assert result['success'] is True
-        assert result.get('total_backups', 0) == 0
-        assert result.get('backups', []) == []
+        assert result['data'].get('total_backups', 0) == 0
+        assert result['data'].get('backups', []) == []
 
 
 class TestIntegrationSecurityWorkflow:
@@ -380,8 +380,8 @@ class TestIntegrationSecurityWorkflow:
         )
 
         assert assessment_result['success'] is True
-        assert 'risk_assessment' in assessment_result
-        assert 'safety_recommendations' in assessment_result
+        assert 'risk_assessment' in assessment_result['data']
+        assert 'safety_recommendations' in assessment_result['data']
 
         # 2. 快速预览模式（detailed=False）
         preview_result = excel_assess_data_impact(
@@ -393,13 +393,13 @@ class TestIntegrationSecurityWorkflow:
         )
 
         assert preview_result['success'] is True
-        assert 'impact_assessment' in preview_result
-        assert 'safety_warning' in preview_result
-        assert preview_result['impact_assessment']['rows_affected'] == 2
-        assert preview_result['impact_assessment']['columns_affected'] == 3
+        assert 'impact_assessment' in preview_result['data']
+        assert 'safety_warning' in preview_result['data']
+        assert preview_result['data']['impact_assessment']['rows_affected'] == 2
+        assert preview_result['data']['impact_assessment']['columns_affected'] == 3
 
         # 3. 验证风险评估一致性
-        risk_level = assessment_result['risk_assessment']['overall_risk']
+        risk_level = assessment_result['data']['risk_assessment']['overall_risk']
         assert risk_level in ["LOW", "MEDIUM", "HIGH"]
 
     def test_validation_prevents_dangerous_operations(self):
@@ -411,7 +411,7 @@ class TestIntegrationSecurityWorkflow:
             "update"
         )
         assert result['success'] is False
-        assert result['error'] == 'VALIDATION_FAILED'
+        assert result['meta']['error_code'] == 'VALIDATION_FAILED'
 
         # 测试范围验证 - 这个会抛出异常
         with pytest.raises(DataValidationError):
@@ -435,8 +435,8 @@ class TestIntegrationSecurityWorkflow:
         )
 
         assert assessment_result['success'] is True
-        assert assessment_result['risk_assessment']['overall_risk'] in ["HIGH", "MEDIUM"]
-        assert assessment_result['risk_assessment']['requires_backup'] is True
+        assert assessment_result['data']['risk_assessment']['overall_risk'] in ["HIGH", "MEDIUM"]
+        assert assessment_result['data']['risk_assessment']['requires_backup'] is True
 
     def test_operation_history_tracking(self):
         """测试操作历史跟踪"""
@@ -448,11 +448,11 @@ class TestIntegrationSecurityWorkflow:
         history_result = excel_get_operation_history(self.test_file, 10)
 
         assert history_result['success'] is True
-        assert 'operations' in history_result
-        assert 'statistics' in history_result
+        assert 'operations' in history_result['data']
+        assert 'statistics' in history_result['data']
 
         # 验证统计信息结构
-        stats = history_result['statistics']
+        stats = history_result['data']['statistics']
         assert 'total_operations' in stats
         assert 'operation_types' in stats
         assert 'success_rate' in stats

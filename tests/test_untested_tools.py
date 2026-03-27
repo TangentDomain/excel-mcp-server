@@ -173,7 +173,7 @@ class TestExcelSearchDirectory:
         assert result['success'] is True
         assert 'data' in result
         assert isinstance(result['data'], list)
-        assert result['metadata']['total_matches'] > 0
+        assert result['meta']['total_matches'] > 0
 
     def test_search_directory_case_sensitive(self, temp_dir_with_excel_files):
         """Test case-sensitive search"""
@@ -186,7 +186,7 @@ class TestExcelSearchDirectory:
         result = excel_search_directory(temp_dir_with_excel_files, "ZZZNONEXISTENT123")
 
         assert result['success'] is True
-        assert result['metadata']['total_matches'] == 0
+        assert result['meta']['total_matches'] == 0
 
     def test_search_directory_regex(self, temp_dir_with_excel_files):
         """Test regex search"""
@@ -221,7 +221,7 @@ class TestExcelSearchDirectory:
             file_extensions=[".xlsx"]
         )
         assert result['success'] is True
-        assert result['metadata']['total_matches'] > 0
+        assert result['meta']['total_matches'] > 0
 
 
 class TestExcelCompareFiles:

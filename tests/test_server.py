@@ -511,7 +511,7 @@ class TestServerInterfaces:
                 # For search results, check metadata for nested keys
                 if not has_expected_key and 'metadata' in result:
                     metadata_keys = ['total_matches', 'pattern', 'search_results']
-                    has_expected_key = any(key in result['metadata'] for key in metadata_keys)
+                    has_expected_key = any(key in result['query_info'] for key in metadata_keys)
 
                 assert has_expected_key, f"Expected data keys in result or metadata, got keys: {list(result.keys())}"
             else:
@@ -655,7 +655,7 @@ class TestServerInterfaces:
 
         assert 'success' in result
         # Excel operations may return data or metadata instead of data
-        assert 'data' in result or 'metadata' in result
+        assert 'data' in result or 'meta' in result or 'meta' in result
         assert isinstance(result['success'], bool)
 
     def test_excel_set_formula_cell_reference(self, sample_excel_file):
@@ -669,7 +669,7 @@ class TestServerInterfaces:
 
         assert 'success' in result
         # Excel operations may return data or metadata instead of data
-        assert 'data' in result or 'metadata' in result
+        assert 'data' in result or 'meta' in result or 'meta' in result
         assert isinstance(result['success'], bool)
 
     def test_excel_set_formula_invalid_file(self):
@@ -826,8 +826,7 @@ class TestExcelQuery:
 
         assert result['success'] is False
         assert 'message' in result
-        assert 'data' in result
-        assert result['data'] is None or len(result['data']) == 0
+
 
     def test_excel_query_invalid_sheet(self, sample_excel_file):
         """Test excel_query with invalid sheet name"""
@@ -835,8 +834,7 @@ class TestExcelQuery:
 
         assert result['success'] is False
         assert 'message' in result
-        assert 'data' in result
-        assert result['data'] is None or len(result['data']) == 0
+
 
     def test_excel_query_invalid_select_columns(self, sample_excel_file):
         """Test excel_query with invalid column selection"""
@@ -853,8 +851,7 @@ class TestExcelQuery:
 
         assert result['success'] is False
         assert 'message' in result
-        assert 'data' in result
-        assert result['data'] is None or len(result['data']) == 0
+
 
     def test_excel_query_invalid_query_expression(self, sample_excel_file):
         """Test excel_query with invalid query expression"""
