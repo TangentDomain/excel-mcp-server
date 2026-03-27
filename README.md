@@ -12,6 +12,7 @@
 ![状态](https://img.shields.io/badge/status-stable-green.svg)
 ![测试覆盖](https://img.shields.io/badge/tests-1099%20tests-brightgreen.svg)
 ![工具数量](https://img.shields.io/badge/tools-44%20verified%20tools-green.svg)
+[![PyPI](https://img.shields.io/pypi/v/excel-mcp-server-fastmcp.svg)](https://pypi.org/project/excel-mcp-server-fastmcp/)
 [![CI](https://github.com/TangentDomain/excel-mcp-server/actions/workflows/ci.yml/badge.svg)](https://github.com/TangentDomain/excel-mcp-server/actions/workflows/ci.yml)
 
 **ExcelMCP** 是专为游戏开发设计的Excel配置表管理MCP服务器。通过AI自然语言指令，实现技能配置表、装备数据、怪物属性等游戏配置的智能化操作。基于**FastMCP**构建，读取使用**python-calamine**（Rust引擎，2300x提速），写入使用**openpyxl**，拥有**44个专业工具**和**1099个测试用例**，确保企业级可靠性。
@@ -916,6 +917,34 @@ from excel_mcp_server_fastmcp import main
 main()
 ```
 
-## Examples
+## 🎮 使用示例
 
-See the examples folder for comprehensive usage scenarios.
+查看 `examples/` 目录获取完整的使用场景，包括：
+
+- **基础操作**：技能表创建、装备配置管理、怪物属性设置
+- **进阶操作**：跨文件JOIN查询、批量数据更新、版本对比与回滚
+- **实战案例**：技能系统完整设计、数值平衡调整
+
+每个示例都包含完整的Python代码和详细的注释，帮助您快速上手ExcelMCP的核心功能。
+
+## 快速示例
+```python
+# 创建技能配置表
+await excel_create_worksheet(
+    filepath="skills.xlsx",
+    sheet_name="skills",
+    headers=["skill_id", "skill_name", "damage", "cooldown"]
+)
+
+# 批量插入技能数据
+skills_data = [
+    [1, "火球术", 150, 3.0],
+    [2, "冰冻术", 120, 4.0]
+]
+await excel_write_rows(
+    filepath="skills.xlsx",
+    sheet_name="skills", 
+    data=skills_data,
+    start_cell="A2"
+)
+```
