@@ -675,7 +675,8 @@ class ExcelManager:
         key_column: str,
         key_value,
         updates: dict,
-        header_row: int = 1
+        header_row: int = 1,
+        streaming: bool = True
     ) -> OperationResult:
         """
         Upsert行：按键列查找，存在则更新，不存在则插入新行。
@@ -686,6 +687,7 @@ class ExcelManager:
             key_value: 用于匹配的值
             updates: 要写入的列值字典（含key_column对应的值）
             header_row: 表头所在行号（默认1）
+            streaming: 是否使用流式写入（默认True）
 
         Returns:
             OperationResult: 操作结果，含action(update/insert)、行号等信息
@@ -703,6 +705,31 @@ class ExcelManager:
             key_column = key_column.strip()
             sheet_name = sheet_name.strip()
 
+            # 流式写入路径
+            if streaming:
+                from .streaming_writer import StreamingWriter
+                if StreamingWriter.is_available():
+                    success, message, meta = StreamingWriter.upsert_row(
+                        self.file_path, sheet_name, key_column, key_value,
+                        updates, header_row
+                    )
+                    if success:
+                        return OperationResult(
+                            success=True,
+                            data=meta,
+                            message=message,
+                            metadata={
+                                'file_path': self.file_path,
+                                'sheet_name': sheet_name,
+                                'key_column': key_column,
+                                'key_value': str(key_value),
+                                **meta
+                            }
+                        )
+                    else:
+                        logger.warning(f"流式upsert失败，降级到openpyxl: {message}")
+
+            # openpyxl 传统路径
             workbook = load_workbook(self.file_path)
 
             if sheet_name not in workbook.sheetnames:
@@ -817,7 +844,8 @@ class ExcelManager:
         self,
         sheet_name: str,
         data: list,
-        header_row: int = 1
+        header_row: int = 1,
+        streaming: bool = True
     ) -> OperationResult:
         """
         批量插入多行数据到工作表末尾。
@@ -826,6 +854,10 @@ class ExcelManager:
             sheet_name: 工作表名称
             data: 行数据列表，每行为{列名: 值}字典
             header_row: 表头所在行号（默认1）
+            streaming: 是否使用流式写入（calamine+write_only，内存更低）
+                       默认True，大幅减少大文件操作的内存和时间
+                       注意：流式模式不保留单元格格式（字体/填充/边框/合并），
+                       但保留列宽、行高、数据值
 
         Returns:
             OperationResult: 操作结果
@@ -840,9 +872,30 @@ class ExcelManager:
 
             sheet_name = sheet_name.strip()
 
+            # 流式写入路径（calamine读取 + write_only写入）
+            if streaming:
+                from .streaming_writer import StreamingWriter
+                if StreamingWriter.is_available():
+                    success, message, meta = StreamingWriter.batch_insert_rows(
+                        self.file_path, sheet_name, data, header_row
+                    )
+                    if success:
+                        return OperationResult(
+                            success=True,
+                            data=meta,
+                            message=message,
+                            metadata={
+                                'file_path': self.file_path,
+                                'sheet_name': sheet_name,
+                                **meta
+                            }
+                        )
+                    else:
+                        logger.warning(f"流式写入失败，降级到openpyxl: {message}")
+
+            # openpyxl 传统路径（降级或 streaming=False）
             # 优先用 calamine 读取表头（比 openpyxl load_workbook 快 10x+）
             col_map = {}
-            max_row_from_cal = 0
             try:
                 from python_calamine import CalamineWorkbook
                 cal_wb = CalamineWorkbook.from_path(self.file_path)
@@ -850,7 +903,6 @@ class ExcelManager:
                     if sn == sheet_name:
                         rows = cal_wb.get_sheet_by_name(sn).to_python()
                         if rows and header_row <= len(rows):
-                            max_row_from_cal = len(rows)
                             for col_idx, cell_val in enumerate(rows[header_row - 1], 1):
                                 if cell_val is not None:
                                     col_map[str(cell_val).strip()] = col_idx
