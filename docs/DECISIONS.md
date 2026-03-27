@@ -34,3 +34,9 @@
 - 原因：PyPI token写入docs/RULES.md并提交，GitHub push protection拒绝
 - 影响：git reset清理commit历史，token移到.cron-prompt.md（不入库）
 - 规则：提交前必须grep检查敏感信息，入库文件用引用不写值
+
+## 2026-03-27 | FROM子查询实现方案
+- 原因：REQ-028，AI写复杂查询时FROM子查询比CTE更自然
+- 方案：_get_from_table返回元组(table_name, subquery_expr)，_execute_query中先执行子查询注入effective_data
+- 设计决策：不支持嵌套FROM子查询（防止无限递归），用错误码from_subquery_error区分
+- 影响：44工具不变，SQL引擎新增一个语法支持
