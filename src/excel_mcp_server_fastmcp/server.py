@@ -3411,8 +3411,8 @@ def excel_describe_table(
             col_name_list.append(col_name)
             col_stats[col_name] = {'non_null': 0, 'samples': [], 'type_values': []}
 
-        # 单次遍历所有行和列
-        total_rows = 0  # 统计总行数（包括数据行）
+        # 单次遍历所有行和列，同时统计行数和列数据
+        total_rows = 0  # 统计总行数（数据行）
         for row in ws.iter_rows(min_row=data_start + 1, values_only=True):
             total_rows += 1
             for col_idx in range(min(len(row), num_cols)):
@@ -3444,19 +3444,17 @@ def excel_describe_table(
                 'non_null': s['non_null'], 'sample_values': s['samples']
             }
 
-        # 统计行数 - 优先使用max_row，若为None则用iter_rows统计结果
+        # 统计行数 - 优先使用max_row，为None则使用total_rows（已统计避免重复计算）
         try:
             # 修复：streaming写入后max_row可能为None的问题
             if hasattr(ws, 'max_row') and ws.max_row is not None and ws.max_row > data_start:
                 row_count = ws.max_row - data_start
             else:
-                # streaming写入后max_row可能为None，使用iter_rows统计结果
-                # 安全检查：确保total_rows有效
-                if total_rows > 0:
-                    row_count = total_rows
-                else:
-                    # 如果total_rows无效（可能是0或异常），使用iter_rows重新统计
-                    row_count = 0
+                # streaming写入后max_row可能为None，直接使用已统计的total_rows
+                # total_rows已经在上面的循环中统计完成，避免重复计算
+                row_count = total_rows if total_rows > 0 else 0
+                # 安全检查：如果total_rows为0，回退到iter_rows统计
+                if row_count == 0:
                     try:
                         for idx, row in enumerate(ws.iter_rows(min_row=data_start + 1, values_only=True), start=1):
                             # 只要行中有一个非空单元格，就计数为有效数据行
@@ -3466,8 +3464,8 @@ def excel_describe_table(
                         logger.warning(f"iter_rows统计行数失败: {e}，使用默认值0")
                         row_count = 0
         except Exception as e:
-            # 极端情况处理：如果max_row访问失败，强制使用iter_rows统计
-            logger.warning(f"访问ws.max_row失败: {e}，使用iter_rows统计")
+            # 极端情况处理：如果max_row访问失败，使用已统计的total_rows
+            logger.warning(f"访问ws.max_row失败: {e}，使用已统计的total_rows")
             row_count = total_rows if total_rows > 0 else 0
             # 确保total_rows无效时，使用iter_rows重新统计
             if row_count == 0:
