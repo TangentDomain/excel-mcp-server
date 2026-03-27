@@ -40,3 +40,8 @@
 - 方案：_get_from_table返回元组(table_name, subquery_expr)，_execute_query中先执行子查询注入effective_data
 - 设计决策：不支持嵌套FROM子查询（防止无限递归），用错误码from_subquery_error区分
 - 影响：44工具不变，SQL引擎新增一个语法支持
+
+## 2026-03-27 | SQL错误提示误报修复
+- 原因：_unsupported_error_hint中OFFSET/RIGHT JOIN/FULL OUTER JOIN被标为不支持，但代码实际已支持。AI收到错误提示后会放弃尝试，浪费能力。
+- 影响：移除3个误报，instructions不支持列表与代码实现保持一致
+- 教训：功能新增后必须同步清理"不支持"提示，否则会形成"功能存在但AI不敢用"的隐形bug

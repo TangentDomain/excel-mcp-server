@@ -9,6 +9,8 @@
 
 ### 文档
 - README新增FROM子查询示例
+- README.en新增30-Second Setup、竞品对比表、SQL实战场景
+- 修正README/README.en中的测试数(985→1036)、工具数(45→44)、导航链接
 
 ## [v1.1.0] - 2026-03-27
 
