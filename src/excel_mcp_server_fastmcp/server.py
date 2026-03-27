@@ -337,12 +337,12 @@ def _validate_path(file_path: str) -> Optional[Dict[str, Any]]:
     """统一的文件路径安全验证入口，失败返回错误dict，通过返回None"""
     result = SecurityValidator.validate_file_path(file_path)
     if not result['valid']:
-        return _fail(f'🔒 安全验证失败: {result["error"]}')
+        return _fail(f'🔒 安全验证失败: {result["error"]}', meta={"error_code": "PATH_VALIDATION_FAILED"})
     # 文件存在时额外检查大小
     if os.path.exists(file_path):
         size_result = SecurityValidator.validate_file_size(file_path)
         if not size_result['valid']:
-            return _fail(f'🔒 安全验证失败: {size_result["error"]}')
+            return _fail(f'🔒 安全验证失败: {size_result["error"]}', meta={"error_code": "FILE_SIZE_EXCEEDED"})
     return None
 
 
@@ -500,9 +500,11 @@ def _fail(message: str, meta: dict = None) -> dict:
 
 
 def _wrap(result: dict, meta: dict = None) -> dict:
-    """包装Operations层返回，metadata→meta，添加上下文meta"""
+    """包装Operations层返回，metadata→meta，添加上下文meta，统一success字段"""
     if not isinstance(result, dict):
         return result
+    if "success" not in result:
+        result["success"] = True
     if "metadata" in result:
         m = result.pop("metadata")
         if isinstance(m, dict) and m:
@@ -1634,7 +1636,7 @@ def excel_set_formula(
         return _path_err
     _formula_err = SecurityValidator.validate_formula(formula)
     if not _formula_err['valid']:
-        return _fail(f'🔒 安全验证失败: {_formula_err["error"]}')
+        return _fail(f'🔒 安全验证失败: {_formula_err["error"]}', meta={"error_code": "FORMULA_SECURITY_FAILED"})
     return _wrap(ExcelOperations.set_formula(file_path, sheet_name, cell_address, formula))
 
 @mcp.tool()
@@ -1648,7 +1650,7 @@ def excel_evaluate_formula(
     """
     _formula_err = SecurityValidator.validate_formula(formula)
     if not _formula_err['valid']:
-        return _fail(f'🔒 安全验证失败: {_formula_err["error"]}')
+        return _fail(f'🔒 安全验证失败: {_formula_err["error"]}', meta={"error_code": "FORMULA_SECURITY_FAILED"})
     return _wrap(ExcelOperations.evaluate_formula(formula, context_sheet))
 
 
@@ -1703,7 +1705,7 @@ SQL查询Excel数据（只读）。优先使用此工具而非excel_get_range进
         ))
 
     except ImportError:
-        return _fail('SQLGlot未安装，无法使用高级SQL功能。请运行: pip install sqlglot\n\n💡 智能降级建议：\n• 对于简单数据读取：尝试使用 excel_get_range("文件路径", "工作表名!A1:Z100")\n• 对于文本搜索：尝试使用 excel_search("文件路径", "关键词", "工作表名")\n• 对于表头信息：尝试使用 excel_get_headers("文件路径", "工作表名")')
+        return _fail('SQLGlot未安装，无法使用高级SQL功能。请运行: pip install sqlglot\n\n💡 智能降级建议：\n• 对于简单数据读取：尝试使用 excel_get_range("文件路径", "工作表名!A1:Z100")\n• 对于文本搜索：尝试使用 excel_search("文件路径", "关键词", "工作表名")\n• 对于表头信息：尝试使用 excel_get_headers("文件路径", "工作表名")', meta={"error_code": "DEPENDENCY_MISSING"})
     except Exception as e:
         # SQL引擎已处理大部分错误并返回结构化响应，此处仅捕获未预期的异常
         return _fail(f'SQL查询失败: {str(e)}', meta={"error_code": "SQL_EXECUTION_FAILED"})
@@ -1747,9 +1749,9 @@ dry_run=True 可预览影响范围不实际修改。
             dry_run=dry_run
         ))
     except ImportError:
-        return _fail('SQLGlot未安装，无法使用UPDATE功能')
+        return _fail('SQLGlot未安装，无法使用UPDATE功能', meta={"error_code": "DEPENDENCY_MISSING"})
     except Exception as e:
-        return _fail(f'UPDATE执行失败: {str(e)}')
+        return _fail(f'UPDATE执行失败: {str(e)}', meta={"error_code": "UPDATE_EXECUTION_FAILED"})
 
 
 @mcp.tool()
@@ -1789,7 +1791,7 @@ def excel_describe_table(
         # 读取前几行来判断表头类型
         rows = list(ws.iter_rows(max_row=4, values_only=True))
         if not rows:
-            return _fail('工作表为空')
+            return _fail('工作表为空', meta={"error_code": "EMPTY_SHEET"})
 
         # 检测双行表头：第2行全是合法英文字段名
         is_dual_header = False
@@ -1875,7 +1877,7 @@ def excel_describe_table(
             'columns': columns
         }, meta={"file_path": file_path, "sheet": sheet_name})
     except Exception as e:
-        return _fail(f'查看表结构失败: {e}')
+        return _fail(f'查看表结构失败: {e}', meta={"error_code": "DESCRIBE_FAILED"})
     finally:
         wb.close()
 
