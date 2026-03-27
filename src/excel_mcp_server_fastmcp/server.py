@@ -477,10 +477,11 @@ UNION: SELECT 技能名 FROM 法师技能 UNION ALL SELECT 技能名 FROM 战士
 ## 📦 统一返回格式
 所有工具返回统一JSON结构，AI解析时只需检查 `success` 字段：
 - 成功: `{"success": true, "message": "描述", "data": {...}, "meta": {...}}`
-- 失败: `{"success": false, "message": "错误描述", "meta": {"error_code": "CODE"}}`
+- 失败: `{"success": false, "message": "错误描述+💡修复提示", "meta": {"error_code": "CODE"}}`
 - `data`: 实际数据载荷（查询结果、文件信息等）
 - `meta`: 上下文元数据（行数、列数、执行时间等）
 - `error_code`: 机器可读错误分类（PATH_VALIDATION_FAILED, SQL_EXECUTION_FAILED等）
+- 所有错误均包含💡修复提示，按提示操作即可解决大多数问题
 - SQL查询额外返回 `query_info`（含execution_time_ms、error_type、hint、suggested_fix）
 
 ## ⚡ 常用流程
@@ -506,11 +507,49 @@ def _ok(message: str = "", data=None, meta: dict = None) -> dict:
     return r
 
 
+# 集中式非SQL错误提示映射 — 让AI在收到错误后知道如何修复
+# 格式: error_code → hint字符串
+_ERROR_HINTS = {
+    'FILE_NOT_FOUND': '请检查文件路径是否正确，或用excel_list_sheets确认文件存在。路径支持绝对路径和相对于工作目录的路径。',
+    'SHEET_NOT_FOUND': '请用excel_list_sheets查看该文件有哪些工作表，确认表名拼写正确。',
+    'EMPTY_SHEET': '工作表没有数据行。请确认文件内容或检查表头行数设置（默认前1-2行为表头）。',
+    'FILE_OPEN_FAILED': '请确认文件是有效的.xlsx格式且未被其他程序锁定。如文件损坏，尝试用Excel打开后另存为新文件。',
+    'FILE_SIZE_EXCEEDED': '文件过大，超出安全限制。如需处理大文件，请联系管理员调整限制。',
+    'PATH_VALIDATION_FAILED': '文件路径不合法。请使用绝对路径或相对于当前工作目录的路径，不要使用".."路径穿越。',
+    'MISSING_FILE_PATH': '请提供文件路径参数。例如：excel_query("配置表.xlsx", "SELECT * FROM 技能表")',
+    'MISSING_QUERY': '请提供SQL查询语句。例如：excel_query("配置表.xlsx", "SELECT * FROM 技能表 WHERE 伤害 > 100")',
+    'INVALID_FORMAT': '请检查参数值是否在允许范围内。查看工具描述了解支持的选项。',
+    'VALIDATION_FAILED': '请检查参数格式是否正确。常见原因：范围表达式格式错误（应为"工作表名!A1:Z100"）、参数类型不匹配。',
+    'OPERATION_FAILED': '写入操作失败，文件可能被锁定或磁盘空间不足。请关闭其他正在使用该文件的程序后重试。',
+    'PREVIEW_FAILED': '无法预览操作影响。请先用excel_get_range查看当前数据，再重新尝试操作。',
+    'ASSESSMENT_FAILED': '数据影响评估失败。请检查文件路径和工作表名是否正确。',
+    'DEPENDENCY_MISSING': '需要安装额外依赖。按提示运行pip install命令后重试。',
+    'BACKUP_FAILED': '备份创建失败。请检查磁盘空间和文件权限。',
+    'BACKUP_NOT_FOUND': '备份文件不存在。请用excel_list_backups查看可用的备份列表。',
+    'RESTORE_FAILED': '恢复失败。备份文件可能已损坏。请用excel_list_backups选择其他备份。',
+    'LIST_BACKUPS_FAILED': '获取备份列表失败。请检查备份目录是否存在。',
+    'DELETE_SHEET_FAILED': '删除工作表失败。文件可能被锁定或工作表名不正确。',
+    'DELETE_ROWS_FAILED': '删除行失败。请确认行号范围有效（不能删除表头行）。',
+    'DELETE_COLUMNS_FAILED': '删除列失败。请确认列号范围有效。',
+    'FORMULA_SECURITY_FAILED': '公式包含不允许的模式（如外部链接）。请移除危险部分后重试。',
+    'HISTORY_RETRIEVAL_FAILED': '获取操作历史失败。历史记录文件可能不存在或已损坏。',
+    'DESCRIBE_FAILED': '查看表结构失败。请确认文件路径和工作表名正确。',
+    'SQL_EXECUTION_FAILED': 'SQL查询执行失败。请检查语法、表名和列名。建议先用excel_describe_table了解表结构。',
+    'UPDATE_EXECUTION_FAILED': 'UPDATE执行失败。请检查SQL语法，确保SET和WHERE子句正确。可用dry_run=True预览。',
+    'UNSUPPORTED_SQL': '不支持该SQL语法。查询请用excel_query，修改请用excel_update_query。',
+}
+
+
 def _fail(message: str, meta: dict = None) -> dict:
-    """统一错误响应: {success, message, meta}"""
+    """统一错误响应: {success, message, meta}。自动附加error_code对应的修复提示。"""
     r: dict = {"success": False, "message": message}
     if meta:
         r["meta"] = meta
+    # 自动附加集中式错误提示（仅当message中还没有💡提示时）
+    error_code = (meta or {}).get('error_code', '')
+    hint = _ERROR_HINTS.get(error_code, '')
+    if hint and '💡' not in message:
+        r["message"] = message + f'\n💡 {hint}'
     return r
 
 
@@ -532,7 +571,39 @@ def _wrap(result: dict, meta: dict = None) -> dict:
             meta = None  # 已合并，不再重复设置
     if meta and "meta" not in result:
         result["meta"] = meta
+
+    # 对Operations层返回的错误也附加集中式提示（Operations层无error_code）
+    if result.get('success') is False:
+        msg = result.get('message', '')
+        existing_code = (result.get('meta') or {}).get('error_code', '')
+        if not existing_code and '💡' not in msg:
+            # 根据消息内容推断error_code并附加提示
+            inferred = _infer_error_code(msg)
+            if inferred:
+                hint = _ERROR_HINTS.get(inferred, '')
+                if hint:
+                    result['message'] = msg + f'\n💡 {hint}'
+                    if 'meta' not in result:
+                        result['meta'] = {}
+                    result['meta']['error_code'] = inferred
+
     return result
+
+
+def _infer_error_code(message: str) -> str:
+    """根据错误消息内容推断error_code，用于Operations层错误提示"""
+    msg = message
+    if '文件不存在' in msg or 'No such file' in msg.lower():
+        return 'FILE_NOT_FOUND'
+    if '工作表' in msg and ('不存在' in msg or '未找到' in msg):
+        return 'SHEET_NOT_FOUND'
+    if '无法打开' in msg or 'cannot open' in msg.lower() or 'Permission denied' in msg:
+        return 'FILE_OPEN_FAILED'
+    if '工作表为空' in msg or '没有数据' in msg:
+        return 'EMPTY_SHEET'
+    if '路径' in msg and ('不合法' in msg or '不允许' in msg or '穿越' in msg):
+        return 'PATH_VALIDATION_FAILED'
+    return ''
 
 # ==================== MCP 工具定义 ====================
 
