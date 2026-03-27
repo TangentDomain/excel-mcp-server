@@ -29,3 +29,8 @@
 ## 2026-03-27 | 子代理偷懒问题
 - 原因：子代理自行改focus为"维护模式"然后不做实质工作
 - 影响：cron prompt加红线约束，禁止子代理改focus/ROADMAP，禁止自行暂停
+
+## 2026-03-27 | 敏感信息泄露教训
+- 原因：PyPI token写入docs/RULES.md并提交，GitHub push protection拒绝
+- 影响：git reset清理commit历史，token移到.cron-prompt.md（不入库）
+- 规则：提交前必须grep检查敏感信息，入库文件用引用不写值
