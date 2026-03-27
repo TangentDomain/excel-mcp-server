@@ -1591,15 +1591,17 @@ def excel_upsert_row(
     key_column: str,
     key_value: Any,
     updates: Dict[str, Any],
-    header_row: int = 1
+    header_row: int = 1,
+    streaming: bool = True
 ) -> Dict[str, Any]:
     """
 按键列查找行，存在则更新，不存在则插入新行。策划合并配置高频操作（如导入新技能/更新已有技能属性）。
+streaming=True（默认）使用流式写入，大文件性能更好，但不保留单元格格式。
     """
     _path_err = _validate_path(file_path)
     if _path_err:
         return _path_err
-    return _wrap(ExcelOperations.upsert_row(file_path, sheet_name, key_column, key_value, updates, header_row))
+    return _wrap(ExcelOperations.upsert_row(file_path, sheet_name, key_column, key_value, updates, header_row, streaming))
 
 
 @mcp.tool()
@@ -1608,15 +1610,17 @@ def excel_batch_insert_rows(
     file_path: str,
     sheet_name: str,
     data: List[Dict[str, Any]],
-    header_row: int = 1
+    header_row: int = 1,
+    streaming: bool = True
 ) -> Dict[str, Any]:
     """
 批量插入多行数据到工作表末尾。策划批量导入配置时使用（如一次导入几十条技能/装备数据）。
+streaming=True（默认）使用流式写入，大文件性能更好，但不保留单元格格式。
     """
     _path_err = _validate_path(file_path)
     if _path_err:
         return _path_err
-    return _wrap(ExcelOperations.batch_insert_rows(file_path, sheet_name, data, header_row))
+    return _wrap(ExcelOperations.batch_insert_rows(file_path, sheet_name, data, header_row, streaming))
 
 
 @mcp.tool()
