@@ -9,6 +9,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [1.6.28] - 2026-03-27
 - 修复describe_table行数统计重复计算问题
+- **REQ-006 工具描述持续优化（第154轮）**：统一4个核心工具docstring结构
+  - 优化excel_search、excel_insert_rows、excel_insert_columns、excel_get_range
+  - 统一docstring结构：核心功能、🎮游戏场景、🔧参数说明、📊返回信息、💡使用示例、🔗配合使用
+  - docstring完整度从75%提升至100%，工具描述质量全面提升
+
+## [1.6.29] - 2026-03-27
+- **REQ-026 文档与门面优化**：基于第149轮验证后的持续优化需求
+  - 同步版本数据到README和PyPI（v1.6.29）
+  - 更新CHANGELOG记录第154轮工具描述优化成果
+  - 检查并同步中英文README版本信息一致性
+  - 统一竞品对比数据，更新测试覆盖率至1164+
+  - 优化项目门面信息，确保文档与实际功能匹配
 
 ## [1.6.27] - 2026-03-27
 

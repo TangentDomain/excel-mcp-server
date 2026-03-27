@@ -10,10 +10,10 @@
 [![Python Version](https://img.shields.io/badge/python-3.10+-blue.svg)](https://www.python.org/downloads/)
 [![Powered by: FastMCP](https://img.shields.io/badge/Powered%20by-FastMCP-orange)](https://github.com/jlowin/fastmcp)
 ![Status](https://img.shields.io/badge/status-stable-green.svg)
-![Tests](https://img.shields.io/badge/tests-1159%20tests-brightgreen.svg)
+![Tests](https://img.shields.io/badge/tests-1164%20tests-brightgreen.svg)
 ![Tools](https://img.shields.io/badge/tools-44%20verified%20tools-green.svg)
 [![PyPI](https://img.shields.io/pypi/v/excel-mcp-server-fastmcp.svg)](https://pypi.org/project/excel-mcp-server-fastmcp/)
-[![Version](https://img.shields.io/badge/version-v1.6.28-blue.svg)](https://pypi.org/project/excel-mcp-server-fastmcp/#history)
+[![Version](https://img.shields.io/badge/version-v1.6.29-blue.svg)](https://pypi.org/project/excel-mcp-server-fastmcp/#history)
 [![CI](https://github.com/TangentDomain/excel-mcp-server/actions/workflows/ci.yml/badge.svg)](https://github.com/TangentDomain/excel-mcp-server/actions/workflows/ci.yml)
 
 **ExcelMCP** is an Excel configuration table management MCP server designed for game development. Through AI natural language commands, it enables intelligent operations on game configurations such as skill tables, equipment data, and monster attributes. Built with **FastMCP**, reads use **python-calamine** (Rust engine, 2300x speedup), writes use **openpyxl**. Features **44 professional tools** and **1159 test cases**, ensuring enterprise-grade reliability.
@@ -895,3 +895,9 @@ main()
 ## Examples
 
 See the examples folder for comprehensive usage scenarios.
+
+**Project Status**
+- **Version**: v1.6.29 (Documentation and Facade Optimization Complete)
+- **Tests**: 1164 test cases passed
+- **Tools**: 44 professional tools, all docstrings optimized
+- **Update**: Results from 154th round of tool description optimization documented
