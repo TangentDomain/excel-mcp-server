@@ -744,32 +744,16 @@ def excel_search(
 • **关键字定位**: "CD" 或 "冷却" 找到冷却时间字段
 • **数值搜索**: "100+" 查找大于100的数值配置
 
-**🔧 搜索模式**:
-• **文本搜索**: 直接搜索"火球术"、"治疗"等关键词
-• **正则表达式**: "等级[1-5]" 匹配"等级1"到"等级5"
-• **大小写敏感**: 区分"mage"和"Mage"，适合精确匹配
-• **全词匹配**: "火"只匹配完整单词"火"，不匹配"火星"
-• **公式搜索**: 查找包含特定公式的单元格
-• **范围限制**: 在指定区域"A1:C100"内搜索
-
-**📊 搜索结果**:
-• **位置信息**: 精确的行列位置(row/column)
-• **单元格值**: 匹配的实际内容
-• **工作表**: 来源工作表名称
-• **文件路径**: 文件完整路径（多文件搜索时）
-
-**💡 使用策略**:
-• **模糊查找**: 用"火"搜所有火系技能
-• **精确匹配**: 用"火球术"搜特定技能
-• **模式匹配**: 用"[0-9]+"搜所有数值
-• **批量查找**: 先搜索定位，再批量修改
-• **数据清理**: 用"测试"、"调试"等词查找需要清理的数据
-
-**🔗 配合使用**:
-• 定位后修改: 搜索结果→excel_update_query批量修改
-• 查看详情: excel_describe_table了解字段含义
-• 数据验证: 搜索后检查数据完整性
-• 版本对比: 搜索相同关键字对比版本差异
+**🔧 参数说明**:
+• **file_path**: Excel文件路径
+• **pattern**: 搜索文本（支持正则表达式）
+• **sheet_name**: 工作表名称（可选，默认搜索所有表）
+• **case_sensitive**: 大小写敏感（默认False）
+• **whole_word**: 全词匹配（默认False）
+• **use_regex**: 使用正则表达式（默认False）
+• **include_values**: 包含单元格值（默认True）
+• **include_formulas**: 包含公式搜索（默认False）
+• **range**: 搜索范围（如"A1:C100"，可选）
 
 **📊 返回信息**:
 • **matches**: 匹配结果列表，每个匹配包含row、column、value、sheet_name
@@ -779,10 +763,22 @@ def excel_search(
 • **success**: 操作是否成功
 • **message**: 状态消息或错误信息
 
-**⚡ 性能提示**:
-• 大文件建议指定range缩小搜索范围
-• 正则表达式在大文件中可能较慢
-• 重复搜索会自动缓存，第二次更快
+**💡 使用示例**:
+```python
+# 搜索技能表中的"火"字
+result = excel_search("技能表.xlsx", "火", sheet_name="技能")
+
+# 正则搜索等级1-5的技能  
+result = excel_search("技能表.xlsx", "等级[1-5]", use_regex=True)
+
+# 搜索指定范围
+result = excel_search("配置.xlsx", "攻击力", range="B1:B100")
+```
+
+**🔗 配合使用**:
+• 定位后修改: 搜索结果→excel_update_query批量修改
+• 查看详情: excel_describe_table了解字段含义
+• 大文件搜索: excel_search_directory支持多文件搜索
     """
     _path_err = _validate_path(file_path)
     if _path_err:
@@ -877,32 +873,10 @@ def excel_get_range(
 • **批量导出**: 技能表中指定范围的技能数据
 • **测试验证**: 获取特定单元格的数据进行验证
 
-**📋 使用场景**:
-• ✅ **已知范围精确读取**: 如"A1:C10"、"技能表!B2:D50"  
-• ✅ **批量数据导出**: 获取连续的数值、文本、公式数据
-• ✅ **快速数据验证**: 修改前先读取确认数据正确性
-• ✅ **精确控制**: 需要精确指定单元格位置的操作
-
-**❌ 不适用场景**:
-• ❌ 数据查询分析→用`excel_query`进行筛选和聚合
-• ❌ 条件修改→用`excel_update_query`进行批量修改
-• ❌ 全表统计→用`excel_describe_table`了解结构
-
 **🔧 参数说明**:
+• **file_path**: Excel文件路径
 • **range**: 范围表达式，支持"A1:B10"、"Sheet1!A1:C10"、"技能表!B:D"
-• **include_formatting**: 是否包含字体、颜色、边框等格式信息
-
-**💡 实用技巧**:
-• **小范围精确读取**: 已知范围时比excel_query更快（无SQL解析开销）
-• **缓存加速**: 同一文件多次读取自动缓存，第二次快30-100倍
-• **双行表头**: 自动合并中文描述+英文字段名，返回统一列名
-• **格式可选**: 只需数据用include_formatting=False，需样式设为True
-
-**🔗 配合使用**:
-• + excel_describe_table → 不确定列名时先了解表结构
-• + excel_query → 需要筛选/聚合/排序时用SQL查询
-• + excel_update_range → 读取→修改→写回的标准流程
-• + excel_assess_data_impact → 修改前评估影响范围
+• **include_formatting**: 是否包含字体、颜色、边框等格式信息（默认False）
 
 **📊 返回信息**:
 • **data**: 获取的二维数组数据（行数组，每行是单元格值数组）
@@ -912,6 +886,23 @@ def excel_get_range(
 • **cache_hit**: 是否命中缓存（提升性能优化）
 • **success**: 操作是否成功
 • **message**: 状态消息或错误信息
+
+**💡 使用示例**:
+```python
+# 读取技能表A1:C10范围数据
+result = excel_get_range("技能表.xlsx", "A1:C10", sheet_name="技能")
+
+# 读取整列数据（格式不包含）
+result = excel_get_range("装备表.xlsx", "B:B", include_formatting=False)
+
+# 读取特定工作表范围
+result = excel_get_range("配置.xlsx", "技能!A1:D50")
+```
+
+**🔗 配合使用**:
+• + excel_describe_table → 不确定列名时先了解表结构
+• + excel_query → 需要筛选/聚合/排序时用SQL查询
+• + excel_update_range → 读取→修改→写回的标准流程
     """
     _path_err = _validate_path(file_path)
     if _path_err:
@@ -1902,21 +1893,31 @@ def excel_insert_rows(
 • **排序前置**: 插入行后填充数据再排序
 
 **🔧 参数说明**:
+• **file_path**: Excel文件路径
+• **sheet_name**: 工作表名称
 • **row_index**: 插入位置（在此行之前插入）
 • **count**: 插入行数
 • **streaming**: True=流式写入（快）/ False=传统模式
-**💡 实用技巧**:
-• **预留空间**: 插入空行后用excel_update_range填充数据
-• **行号注意**: 插入后原有行号会自动下移，注意后续操作引用
-• **流式优化**: streaming=True适合大文件，速度更快
+
+**📊 返回信息**:
+• **success**: 操作是否成功
+• **message**: 状态消息或错误信息
+• **rows_inserted**: 实际插入的行数
+• **file_path**: 源文件路径
+
+**💡 使用示例**:
+```python
+# 在第2行插入3个空行
+result = excel_insert_rows("配置.xlsx", "技能", 2, 3)
+
+# 插入一行在表头下方
+result = excel_insert_rows("配置.xlsx", "技能", 1, 1, streaming=False)
+```
 
 **🔗 配合使用**:
 • + excel_update_range → 插入空行后填充数据
 • + excel_find_last_row → 确认插入位置
-
-**⚡ 使用建议**:
-• 批量插入数据行请用excel_batch_insert_rows（按列名匹配，更智能）
-• 插入前建议先用excel_get_range查看当前内容确认位置
+• + excel_batch_insert_rows → 批量插入数据行（更智能）
     """
     _path_err = _validate_path(file_path)
     if _path_err:
@@ -1944,20 +1945,31 @@ def excel_insert_columns(
 • **数据分离**: 插入列后将数据从复合列拆分到独立列
 
 **🔧 参数说明**:
+• **file_path**: Excel文件路径
+• **sheet_name**: 工作表名称
 • **column_index**: 插入位置（1-based，1=A列，在此列之前插入）
 • **count**: 插入列数
-**💡 实用技巧**:
-• **新属性列**: 给装备表添加"强化等级上限"等新属性列
-• **列号注意**: 插入后原有列号会自动右移，注意后续操作引用
-• **从右往左**: 需要在多个位置插入时，从右往左操作避免列号偏移
+• **streaming**: True=流式写入（快）/ False=传统模式
+
+**📊 返回信息**:
+• **success**: 操作是否成功
+• **message**: 状态消息或错误信息
+• **columns_inserted**: 实际插入的列数
+• **file_path**: 源文件路径
+
+**💡 使用示例**:
+```python
+# 在第2列插入2个空列
+result = excel_insert_columns("配置.xlsx", "技能", 2, 2)
+
+# 在A列之前插入1列作为新属性列
+result = excel_insert_columns("配置.xlsx", "技能", 1, 1, streaming=False)
+```
 
 **🔗 配合使用**:
 • + excel_update_range → 插入空列后填充数据
 • + excel_rename_column → 插入后重命名新列
-
-**⚡ 使用建议**:
-• 插入列后记得更新表头（用excel_update_range修改第1行）
-• 插入位置不对不会自动撤销，建议先确认列号
+• + excel_find_last_row → 确认行范围避免数据错位
     """
     _path_err = _validate_path(file_path)
     if _path_err:
@@ -1983,19 +1995,32 @@ def excel_find_last_row(
 • **数据清理**: 确认数据范围后进行清理操作
 • **表格维护**: 定期检查表格数据量
 
+**🔧 参数说明**:
+• **file_path**: Excel文件路径
+• **sheet_name**: 工作表名称
+• **column**: 指定列查找（列字母如"A"或列号1，可选，默认查找所有列）
+
 **📊 返回信息**:
 • **last_row**: 最后有数据的行号（1-based，表头行不计入）
 • **total_rows**: 数据行总数（last_row - header_row + 1）
-• **column_specific**: 按列查找时的列信息和末行号
+• **column_info**: 列信息和末行号（当指定列时）
+• **success**: 操作是否成功
+• **message**: 状态消息或错误信息
 
-**💡 实用技巧**:
-• **精确追加定位**: 
-  ```python
-  last_row = excel_find_last_row("技能表.xlsx", "技能表")["last_row"]
-  # 在last_row + 1位置写入新数据
-  ```
-• **批量导入无需此工具**: `excel_batch_insert_rows`会自动定位末行，无需手动计算
-• **列特定定位**: 用`column="A"`查找A列最后数据，适合有间断数据的列
+**💡 使用示例**:
+```python
+# 查找技能表最后一行
+result = excel_find_last_row("技能表.xlsx", "技能")
+last_row = result["last_row"]
+
+# 按列查找A列最后数据
+result = excel_find_last_row("配置.xlsx", "装备", column="A")
+```
+
+**🔗 配合使用**:
+• + excel_insert_rows → 在定位的行号后插入新数据
+• + excel_batch_insert_rows → 批量导入，无需手动定位
+• + excel_get_range → 获取最后几行数据确认
 • **双行表头支持**: 自动跳过header_row行，不会误判表头为数据
 
 **🎯 配合使用**:
