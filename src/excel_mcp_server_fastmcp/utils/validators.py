@@ -8,7 +8,7 @@ import re
 from pathlib import Path
 from typing import Optional, Tuple, Dict, Any
 
-from .exceptions import ExcelFileNotFoundError, InvalidFormatError, DataValidationError
+from .exceptions import ExcelFileNotFoundError, InvalidFormatError, DataValidationError, OperationLimitError
 
 
 class ExcelValidator:
@@ -69,11 +69,23 @@ class ExcelValidator:
             DataValidationError: 参数无效
         """
         if row_index < 1:
-            raise DataValidationError("行索引必须大于等于1")
+            raise DataValidationError(
+                "行索引无效", 
+                "行索引必须为正整数",
+                "请使用1开始的行号（如第1行、第2行等），不要使用0或负数"
+            )
         if count < 1:
-            raise DataValidationError("操作行数必须大于等于1")
+            raise DataValidationError(
+                "操作行数无效", 
+                "操作行数必须为正整数",
+                "请指定要操作的正数行数（如插入1行、删除5行等）"
+            )
         if count > cls.MAX_ROWS_OPERATION:
-            raise DataValidationError(f"一次最多操作{cls.MAX_ROWS_OPERATION}行")
+            raise OperationLimitError(
+                "批量行操作", 
+                f"单次最多{cls.MAX_ROWS_OPERATION}行",
+                f"建议分批操作，例如每次{cls.MAX_ROWS_OPERATION}行，或减少单次操作的规模"
+            )
 
     @classmethod
     def validate_column_operations(cls, column_index: int, count: int) -> None:
@@ -88,11 +100,23 @@ class ExcelValidator:
             DataValidationError: 参数无效
         """
         if column_index < 1:
-            raise DataValidationError("列索引必须大于等于1")
+            raise DataValidationError(
+                "列索引无效", 
+                "列索引必须为正整数",
+                "请使用1开始的列号（如第1列A、第2列B等），或使用列字母（如'A', 'B'）"
+            )
         if count < 1:
-            raise DataValidationError("操作列数必须大于等于1")
+            raise DataValidationError(
+                "操作列数无效", 
+                "操作列数必须为正整数",
+                "请指定要操作的正数列数（如插入1列、删除3列等）"
+            )
         if count > cls.MAX_COLUMNS_OPERATION:
-            raise DataValidationError(f"一次最多操作{cls.MAX_COLUMNS_OPERATION}列")
+            raise OperationLimitError(
+                "批量列操作", 
+                f"单次最多{cls.MAX_COLUMNS_OPERATION}列",
+                f"建议分批操作，例如每次{cls.MAX_COLUMNS_OPERATION}列，或减少单次操作的规模"
+            )
 
     @classmethod
     def validate_range_data(cls, data: list, range_rows: int, range_cols: int) -> None:
@@ -108,12 +132,18 @@ class ExcelValidator:
             DataValidationError: 数据维度不匹配
         """
         if len(data) > range_rows:
-            raise DataValidationError(f"数据行数({len(data)})超过范围行数({range_rows})")
+            raise DataValidationError(
+                f"数据行数超出范围", 
+                f"数据有{len(data)}行，但目标范围只有{range_rows}行",
+                f"请调整数据行数到{range_rows}行以内，或扩大目标范围（如将A1:C10改为A1:C{len(data)}）"
+            )
 
         for row_idx, row_data in enumerate(data):
             if len(row_data) > range_cols:
                 raise DataValidationError(
-                    f"第{row_idx + 1}行数据列数({len(row_data)})超过范围列数({range_cols})"
+                    f"第{row_idx + 1}行数据列数超出范围", 
+                    f"该行有{len(row_data)}列数据，但目标范围只有{range_cols}列",
+                    f"请检查第{row_idx + 1}行的数据，确保列数不超过{range_cols}列，或扩大目标范围"
                 )
 
     @classmethod
