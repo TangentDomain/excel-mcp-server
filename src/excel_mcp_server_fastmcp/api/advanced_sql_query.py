@@ -1865,8 +1865,29 @@ class AdvancedSQLQueryEngine:
                     table_part = original_expr.table if hasattr(original_expr, 'table') and original_expr.table else None
                     qualified = f"{table_part}.{column_name}" if table_part else None
 
+                    # 先尝试直接使用qualified列名
                     if qualified and qualified in df.columns:
                         result_data[alias_name] = df[qualified]
+                    # 如果qualified不存在，尝试映射
+                    elif table_part:
+                        # 使用_expression_to_column_reference进行映射
+                        try:
+                            mapped_column = self._expression_to_column_reference(original_expr, df)
+                            # 去掉反引号
+                            mapped_column = mapped_column.strip('`')
+                            result_data[alias_name] = df[mapped_column]
+                        except Exception:
+                            # 映射失败，尝试直接使用列名
+                            if column_name in df.columns:
+                                result_data[alias_name] = df[column_name]
+                            else:
+                                suggestion = self._suggest_column_name(column_name, list(df.columns))
+                                raise StructuredSQLError(
+                                    "column_not_found",
+                                    f"列 '{qualified or column_name}' 不存在。可用列: {list(df.columns)}。{suggestion}",
+                                    hint="请检查列名拼写，或用excel_get_headers查看所有可用列名。",
+                                    context={"column_requested": qualified or column_name, "available_columns": list(df.columns)}
+                                )
                     elif column_name in df.columns:
                         result_data[alias_name] = df[column_name]
                     else:
@@ -2600,18 +2621,34 @@ class AdvancedSQLQueryEngine:
                     return f"`{pandas_suffix_col}`"
                 
                 # 2.1 检查pandas merge后的_x/_y后缀映射
+                # 2.1.1 检查列名是否直接是_x/_y后缀格式（pandas自动处理）
                 for col in df.columns:
                     if col.endswith('_x') and col[:-2] == col_name:
-                        # 如果table_part存在，检查table_part_x是否是此列
+                        # 检查是否是JOIN冲突导致的_x后缀
                         if table_part:
+                            # 如果table_part存在，检查是否有对应的x_col
                             x_col = f"{table_part}_x"
                             if x_col in df.columns:
                                 return f"`{x_col}`"
+                            # 如果没有，检查是否是冲突导致的直接_x后缀
+                            return f"`{col}`"
                     elif col.endswith('_y') and col[:-2] == col_name:
                         if table_part:
+                            # 如果table_part存在，检查是否有对应的y_col
                             y_col = f"{table_part}_y"
                             if y_col in df.columns:
                                 return f"`{y_col}`"
+                            # 如果没有，检查是否是冲突导致的直接_y后缀
+                            return f"`{col}`"
+                
+                # 2.1.2 检查表名+_x/_y后缀格式（更智能的匹配）
+                # 处理table_part_x和table_part_y格式
+                table_part_x = f"{table_part}_x"
+                table_part_y = f"{table_part}_y"
+                if table_part_x in df.columns:
+                    return f"`{table_part_x}`"
+                if table_part_y in df.columns:
+                    return f"`{table_part_y}`"
                 
                 # 3. 如果有JOIN映射，检查映射后的列名
                 if hasattr(self, '_join_column_mapping'):
