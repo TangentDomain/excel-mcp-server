@@ -1,24 +1,23 @@
-# 第145轮 - MCP真实验证轮（发现问题）
+# 第146轮 - REQ-032 P0 bug修复轮
 
 ---
 
 ## 状态
-版本：v1.6.24 | 工具：44 | 测试：1159
+版本：v1.6.25 | 工具：44 | 测试：1159
 
 ## 本轮完成
-- **REQ-145 MCP真实验证轮**
-  - 执行12项核心功能MCP真实验证
-  - 发现4个问题（excel_list_sheets获取0个工作表、批量操作参数不匹配等）
-  - 8项功能正常工作（查询、获取数据、表头等）
-  - 创建真实测试文件并验证
+- **REQ-032 P0 bug修复** ✅
+  - Bug 1：SQL WHERE条件比较None值TypeError → 添加`_safe_float_comparison`函数
+  - Bug 2：`excel_delete_rows`新增condition参数，支持SQL条件删除
+  - Bug 3：`excel_batch_insert_rows`新增insert_position/condition参数，支持定位插入
+  - 全量测试1159通过，PyPI v1.6.25已发布
 
-## 发现问题
-- [x] REQ-032 MCP真实验证发现3个新bug（P0）
-  - Bug 1：excel_list_sheets返回空列表，错误：`'<=' not supported between instances of 'int' and 'NoneType'`
-  - Bug 2：excel_delete_rows不支持condition参数，需要row_index/count
-  - Bug 3：excel_batch_insert_rows不支持条件定位插入
-  - 影响：阻断性问题，第146轮必须修复
+## 修复详情
+- `_safe_float_comparison`：模块级函数，处理None值和类型转换异常
+- `excel_delete_rows(condition=...)`：自动查询匹配行号→从后往前删除避免偏移
+- `excel_batch_insert_rows(insert_position=..., condition=...)`：先插入空行→逐行写入数据
+- 新增`ExcelOperations.batch_insert_rows_at`方法
 
 ## 下轮待办
-- [ ] REQ-032 P0 bug修复（第146轮）
+- [ ] MCP真实验证（验证Bug修复效果）
 - [ ] REQ-006 工具描述持续优化
