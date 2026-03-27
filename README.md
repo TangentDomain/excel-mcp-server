@@ -539,8 +539,14 @@ UPDATE 技能表 SET 伤害 = 伤害 * 1.1 WHERE 元素 = '火'  -- dry_run=True
 ```
 
 **不支持的语法（有清晰替代方案提示）：**
-- FROM子查询 `FROM (SELECT ...)`（提示：改用WHERE子查询或CTE）
+- 嵌套FROM子查询 `FROM (SELECT ... FROM (SELECT ...))`（提示：改用单层FROM子查询或CTE）
 - INSERT/DELETE语句（提示：写入请用excel_upsert_row或excel_update_query）
+
+**FROM子查询（支持单层）：**
+```sql
+-- 单层FROM子查询，结果作为临时表
+SELECT * FROM (SELECT skill_name, damage FROM 技能配置 WHERE damage > 100) AS 高伤技能
+```
 
 **窗口函数（ROW_NUMBER/RANK/DENSE_RANK）：**
 ```sql

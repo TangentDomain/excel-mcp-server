@@ -475,7 +475,14 @@ UPDATE SkillTable SET damage = damage * 1.1 WHERE element = 'Fire'  -- dry_run=T
 ```
 
 **Unsupported Syntax (with clear alternative suggestions):**
-- FROM subqueries `FROM (SELECT ...)` (suggest: use WHERE subqueries or CTEs)
+- Nested FROM subqueries `FROM (SELECT ... FROM (SELECT ...))` (suggest: use single-level FROM subquery or CTE)
+- INSERT/DELETE statements (suggest: use excel_upsert_row or excel_update_query)
+
+**FROM Subquery (single-level supported):**
+```sql
+-- Single-level FROM subquery as a temporary table
+SELECT * FROM (SELECT skill_name, damage FROM SkillConfig WHERE damage > 100) AS HighDamageSkills
+```
 
 **Window Functions (ROW_NUMBER/RANK/DENSE_RANK):**
 ```sql
