@@ -11,9 +11,11 @@ from pathlib import Path
 from dataclasses import FrozenInstanceError
 
 from src.excel_mcp_server_fastmcp.utils.exceptions import (
+    ExcelException,
     ExcelFileNotFoundError,
     SheetNotFoundError,
-    DataValidationError
+    DataValidationError,
+    OperationLimitError
 )
 from src.excel_mcp_server_fastmcp.models.types import (
     SheetInfo, RangeInfo, CellInfo, SearchMatch, ModifiedCell,
@@ -25,22 +27,49 @@ class TestExceptions:
     """测试自定义异常类"""
 
     def test_excel_file_not_found_error(self):
-        """Test ExcelFileNotFoundError creation"""
+        """Test ExcelFileNotFoundError creation with enhanced message"""
         error = ExcelFileNotFoundError("test.xlsx")
-        assert str(error) == "test.xlsx"
+        assert isinstance(error, FileNotFoundError)
         assert isinstance(error, Exception)
+        assert "test.xlsx" in str(error)
+        assert error.message is not None
+        assert error.suggested_fix is not None
 
     def test_sheet_not_found_error(self):
-        """Test SheetNotFoundError creation"""
+        """Test SheetNotFoundError creation with enhanced message"""
         error = SheetNotFoundError("Sheet1")
-        assert str(error) == "Sheet1"
         assert isinstance(error, Exception)
+        assert "Sheet1" in str(error)
+        assert error.suggested_fix is not None
+        # Test with available sheets hint
+        error2 = SheetNotFoundError("MissingSheet", ["Sheet1", "Sheet2"])
+        assert "Sheet1" in str(error2)
+        assert "Sheet2" in str(error2)
 
     def test_data_validation_error(self):
-        """Test DataValidationError creation"""
-        error = DataValidationError("Invalid data")
-        assert str(error) == "Invalid data"
+        """Test DataValidationError creation with enhanced message"""
+        error = DataValidationError("Invalid data", "some detail")
         assert isinstance(error, Exception)
+        assert "Invalid data" in str(error)
+        assert error.suggested_fix is not None
+        formatted = error.get_formatted_message()
+        assert "数据验证失败" in formatted
+
+    def test_operation_limit_error(self):
+        """Test OperationLimitError creation"""
+        error = OperationLimitError("批量行操作", "最多1000行", "数据量太大")
+        assert isinstance(error, Exception)
+        assert "批量行操作" in str(error)
+        assert error.suggested_fix is not None
+
+    def test_excel_exception_base(self):
+        """Test base ExcelException with all fields"""
+        exc = ExcelException("test message", hint="test hint", suggested_fix="test fix")
+        assert "test message" in str(exc)
+        assert exc.hint == "test hint"
+        assert exc.suggested_fix == "test fix"
+        formatted = exc.get_formatted_message()
+        assert "Excel操作错误" in formatted
 
     def test_exceptions_inheritance(self):
         """Test that exceptions inherit from Exception"""

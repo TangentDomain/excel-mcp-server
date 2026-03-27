@@ -29,9 +29,10 @@ class ExcelFileNotFoundError(FileNotFoundError):
     """文件不存在异常 - 继承自Python内置FileNotFoundError"""
     
     def __init__(self, file_path: str, hint: str = None):
-        message = f"Excel文件不存在: {file_path}"
-        suggested_fix = f"请检查文件路径是否正确，或使用绝对路径。确保文件确实存在于指定位置。"
-        super().__init__(message, hint, suggested_fix)
+        self.message = f"Excel文件不存在: {file_path}"
+        self.hint = hint
+        self.suggested_fix = "请检查文件路径是否正确，或使用绝对路径。确保文件确实存在于指定位置。"
+        super().__init__(self.message)
 
 
 class InvalidFormatError(ExcelException):
