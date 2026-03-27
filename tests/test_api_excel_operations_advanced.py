@@ -133,7 +133,7 @@ class TestExcelOperationsAdvanced:
         result = ExcelOperations.list_sheets(multi_sheet_file)
         
         assert result['success'] is True
-        assert 'sheets' in result
+        assert 'sheets' in result['data']
 
     # ==================== 数据查找增强测试 ====================
 
