@@ -1960,6 +1960,10 @@ class AdvancedSQLQueryEngine:
             return select_expr.alias, select_expr.this
         # 无别名：优先用列名，否则用聚合别名，最后 col_N
         if isinstance(select_expr, exp.Column):
+            # 保留表别名前缀（如 r.名称 → 别名为 "r.名称"）
+            table_part = select_expr.table if hasattr(select_expr, 'table') and select_expr.table else None
+            if table_part:
+                return f"{table_part}.{select_expr.name}", select_expr
             return select_expr.name, select_expr
         if self._is_aggregate_function(select_expr):
             return self._generate_aggregate_alias(select_expr), select_expr
@@ -2594,6 +2598,20 @@ class AdvancedSQLQueryEngine:
                 pandas_suffix_col = f"{table_part}_{col_name}"
                 if pandas_suffix_col in df.columns:
                     return f"`{pandas_suffix_col}`"
+                
+                # 2.1 检查pandas merge后的_x/_y后缀映射
+                for col in df.columns:
+                    if col.endswith('_x') and col[:-2] == col_name:
+                        # 如果table_part存在，检查table_part_x是否是此列
+                        if table_part:
+                            x_col = f"{table_part}_x"
+                            if x_col in df.columns:
+                                return f"`{x_col}`"
+                    elif col.endswith('_y') and col[:-2] == col_name:
+                        if table_part:
+                            y_col = f"{table_part}_y"
+                            if y_col in df.columns:
+                                return f"`{y_col}`"
                 
                 # 3. 如果有JOIN映射，检查映射后的列名
                 if hasattr(self, '_join_column_mapping'):

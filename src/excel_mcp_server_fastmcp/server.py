@@ -2747,7 +2747,15 @@ def excel_describe_table(
                 row_count = ws.max_row - data_start
             else:
                 # streaming写入后max_row可能为None，使用iter_rows统计结果
-                row_count = total_rows
+                # 添加安全检查：防止空文件导致的异常
+                try:
+                    row_count = total_rows
+                except Exception:
+                    # 如果total_rows获取失败，使用iter_rows重新统计
+                    row_count = 0
+                    for idx, row in enumerate(ws.iter_rows(min_row=data_start + 1, values_only=True), start=data_start + 1):
+                        if any(cell is not None for cell in row):
+                            row_count += 1
         except Exception as e:
             # 极端情况处理：如果max_row访问失败，强制使用iter_rows统计
             logger.warning(f"访问ws.max_row失败: {e}，使用iter_rows统计")
