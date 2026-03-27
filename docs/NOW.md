@@ -1,24 +1,20 @@
-# 第113轮 - REQ-015 性能优化 Phase 3 ✅ 完成
+# 第114轮 - REQ-029 JOIN别名 + describe_table崩溃修复 ✅ 完成
 
 ## 状态
-版本：v1.6.1 | 工具：44 | 测试：1107 | Streaming覆盖：覆盖+插入模式
-
-## 正在做
-- [ ] REQ-015 Phase 4: MCP验证 + 发布PyPI
+版本：v1.6.3 | 工具：44 | 测试：1107
 
 ## 本轮完成
-- 第113轮：REQ-015 Phase 3 - 扩展streaming写入覆盖范围
-  - StreamingWriter新增`insert_rows_streaming`方法，支持流式插入行
-  - `update_range`新增`preserve_formulas`参数（streaming模式下暂无效，但接口兼容）
-  - `excel_operations.py`: streaming路径扩展支持覆盖模式+插入模式
-  - `server.py`: 扩展`use_streaming`条件，从`streaming and not insert_mode and not preserve_formulas`改为`streaming and not preserve_formulas`
-  - 新增8个测试用例（TestInsertRowsStreaming + TestUpdateRangeStreamingExtended）
-  - 全量测试1107 passed（+8）
-  - 合并到develop分支
+- REQ-029 Bug 1修复：JOIN表别名解析增强
+  - FROM表别名优先使用Table.alias属性，备用TableAlias/Alias节点遍历
+  - SELECT重复别名自动添加表前缀避免覆盖
+  - JOIN右表别名解析同样优先Table.alias
+  - CROSS JOIN列冲突用临时重命名保护
+- REQ-029 Bug 2修复：describe_table max_row=None健壮处理
+  - read_only模式下max_row=None时逐行扫描+连续空行检测停止
+  - 修复原有死代码bug（continue后不可达的break）
+- 全量测试1107 passed
+- 合并develop→main，发布PyPI v1.6.3，tag+push完成
 
 ## 待办
-- [ ] 合并develop→main
 - [ ] MCP验证（至少8项游戏场景）
-- [ ] 发布PyPI（版本号递增）
 - [ ] 更新DECISIONS.md记录决策
-- [ ] 飞书推送轮次总结
