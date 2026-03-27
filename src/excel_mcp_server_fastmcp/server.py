@@ -61,6 +61,7 @@ Excel MCP Server - 基于 FastMCP 和 openpyxl 实现
 - openpyxl: 用于Excel文件操作
 """
 
+# 标准库导入
 import functools
 import glob
 import json
@@ -68,6 +69,7 @@ import logging
 import os
 import re
 import shutil
+import sys
 import tempfile
 import threading
 import time
@@ -77,11 +79,19 @@ from enum import Enum
 from pathlib import Path
 from typing import Optional, List, Dict, Any, Union
 
+# 配置logging
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
+    datefmt='%Y-%m-%d %H:%M:%S'
+)
+logger = logging.getLogger(__name__)
+
 try:
     from mcp.server.fastmcp import FastMCP
 except ImportError as e:
-    print(f"Error: 缺少必要的依赖包: {e}")
-    print("请运行: pip install mcp openpyxl")
+    logger.error(f"缺少必要的依赖包: {e}")
+    logger.error("请运行: pip install mcp openpyxl")
     exit(1)
 
 # 导入API模块
@@ -3251,7 +3261,7 @@ def main():
     import sys
     if len(sys.argv) > 1 and sys.argv[1] in ('--version', '-v'):
         from excel_mcp_server_fastmcp import __version__
-        print(f"excel-mcp-server-fastmcp {__version__}", flush=True)
+        logger.info(f"excel-mcp-server-fastmcp {__version__}")
         sys.exit(0)
 
     transport = 'stdio'
