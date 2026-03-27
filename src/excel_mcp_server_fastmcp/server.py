@@ -771,6 +771,14 @@ def excel_search(
 • 数据验证: 搜索后检查数据完整性
 • 版本对比: 搜索相同关键字对比版本差异
 
+**📊 返回信息**:
+• **matches**: 匹配结果列表，每个匹配包含row、column、value、sheet_name
+• **match_count**: 总匹配数量
+• **search_info**: 搜索信息{pattern_used、search_range、search_mode}
+• **file_path**: 源文件路径
+• **success**: 操作是否成功
+• **message**: 状态消息或错误信息
+
 **⚡ 性能提示**:
 • 大文件建议指定range缩小搜索范围
 • 正则表达式在大文件中可能较慢
@@ -965,6 +973,12 @@ def excel_get_headers(
 • **装备表检查**: 获取装备ID、品质、属性、套装、获取方式等字段名
 • **怪物数据审查**: 收集怪物ID、名称、等级、血量、攻击、防御等字段
 • **配置表确认**: 验证技能配置、装备配置、掉落配置的表头结构
+
+**🔧 参数说明**:
+• **file_path**: Excel文件路径（支持相对路径）
+• **sheet_name**: 工作表名称（可选，不传则获取所有工作表表头）
+• **header_row**: 表头行号（默认1，从1开始计数，支持双行表头）
+• **max_columns**: 最大返回列数（可选，避免返回过多字段信息）
 
 **🔍 核心功能**:
 • **双行表头支持**: 自动识别第1行中文描述+第2行英文字段名
@@ -1216,6 +1230,13 @@ def excel_assess_data_impact(
 • **operation_type**: 操作类型（"update"、"delete"、"insert"）
 • **data**: 要写入的数据（仅update操作需要）
 • **detailed**: 是否详细评估（True=详细分析，False=快速预览）
+
+**🔗 配合使用**:
+• **修改前安全链**: excel_assess_data_impact → excel_create_backup → excel_update_range
+• **删除前确认**: excel_assess_data_impact → excel_delete_rows（风险评估后执行）
+• **导入前检查**: excel_assess_data_impact + excel_describe_table（了解表结构后评估）
+• **批量操作分段**: 评估影响过大时→分割操作范围→分段执行
+• **结果验证**: 操作完成后excel_query验证实际修改结果
 
 **📊 返回信息**:
 • **impact_summary**: 影响摘要{row_count, col_count, cell_count, risk_level}
@@ -1655,6 +1676,14 @@ def excel_create_backup(
 • 重要数据建议保留多个历史版本
 • 备份文件占用磁盘空间，注意定期清理
 • 备份文件也应放在安全的位置，避免误删
+
+**📊 返回信息**:
+• **backup_file**: 备份文件完整路径
+• **backup_directory**: 备份存储根目录
+• **file_size**: 文件大小信息{original、backup}
+• **timestamp**: 备份时间戳
+• **success**: 操作是否成功
+• **message**: 状态消息或错误信息
 
 **📈 最佳实践**:
 • 修改前备份→修改→验证→确认成功
@@ -2527,12 +2556,16 @@ def excel_upsert_row(
 3️⃣ **字段映射**: 只更新指定的字段，不会影响表中其他已有数据
 4️⃣ **性能优化**: 一次操作完成查找和更新，比分开执行"查询+更新/插入"快3-5倍
 
-**📋 关键参数**:
+**🔧 参数说明**:
+• **file_path**: Excel文件路径（支持相对路径）
+• **sheet_name**: 工作表名称（不区分大小写，支持双行表头）
 • **key_column**: 唯一匹配列名（建议使用ID类字段，如"skill_id"、"equip_id"、"monster_id"）
-• **key_value**: 精确匹配值（整数、字符串等，必须与表中数据类型一致）
+• **key_value**: 精确匹配值（整数、字符串等，必须与表中对应列的数据类型一致）
 • **updates**: 字段映射字典，只更新指定字段（如{"damage": 200, "cooldown": 3.5}）
 • **header_row**: 表头行号（默认1，支持双行表头，会自动处理列名映射）
 • **streaming**: 流式写入开关（默认True），大文件时性能显著提升
+
+**🔧 关键参数**:
 
 **🔍 执行效果示例**:
 **更新场景**: 找到skill_id=1001的行，只更新damage和cooldown字段，其他属性保持不变
@@ -2582,6 +2615,27 @@ excel_upsert_row("monsters.xlsx", "怪物配置", "monster_id", 500, {
 • **小批量测试**: 先用少量数据测试确认upsert逻辑正确
 • **定期备份**: 大规模数据更新前建议先备份原文件
 • **结果确认**: upsert后用excel_query或excel_list_sheets确认结果
+
+**📊 返回信息**:
+• **affected_rows**: 受影响的行数{updated、inserted、total}
+• **operation_details**: 操作详情{key_column、key_value、streaming_used}
+• **field_mapping**: 字段映射信息{updated_fields、unchanged_fields}
+• **file_path**: 源文件路径
+• **success**: 操作是否成功
+• **message**: 状态消息或错误信息（包含操作结果摘要）
+
+**💡 实用技巧**:
+• **ID字段优先**: 优先使用ID类字段作为key_column（如skill_id、monster_id），确保唯一性
+• **类型匹配**: key_value数据类型必须与表中对应列完全一致（字符串vs数字不匹配）
+• **批量操作**: 同一批数据中部分存在部分不存在，自动智能处理混合场景
+• **双行表头**: 自动识别并映射中英文列名，无需额外处理header_row
+• **缓存优化**: 首次查找后自动缓存，重复操作速度提升80%
+
+**🔗 配合使用**:
+• **数据验证链**: upsert前用excel_query查询 → 确认数据状态 → 执行upsert → 用excel_query验证结果
+• **安全保障**: upsert前excel_create_backup创建备份 → 执行upsert → 确认成功
+• **批量导入**: excel_upsert_row + excel_list_backups（批量导入后的版本管理）
+• **数据一致性**: excel_upsert_row + excel_compare_sheets（验证修改后的数据一致性）
 
 **🚧 使用注意事项**:
 • **键字段要求**: 确保key_column是表中的唯一标识字段（建议使用ID或编码）
@@ -2989,8 +3043,17 @@ def excel_evaluate_formula(
 • 范围统计: `SUM(A1:A10)`, `AVERAGE(B1:B50)`, `MAX(C1:C100)`
 • 高级统计: `MEDIAN`, `STDEV`, `PERCENTILE`, `COUNTIF`, `SUMIF`
 
-**⚡ 使用建议**:
-• 不需要引用文件数据的纯计算直接写公式即可
+**🔧 参数说明**:
+• **formula**: Excel公式表达式（支持函数、范围引用、算术运算）
+• **context_sheet**: 上下文工作表名称（可选，引用文件数据时使用）
+
+**📊 返回信息**:
+• **formula**: 执行的公式表达式
+• **result**: 计算结果（数值、字符串或布尔值）
+• **formula_type**: 公式类型（arithmetic/function/range）
+• **success**: 操作是否成功
+• **message**: 状态消息或错误信息
+
 **💡 实用技巧**:
 • **快速计算器**: 不需要打开文件就能做数值计算，比手动计算快
 • **公式验证**: 写入公式前先用此工具验证公式语法和结果
@@ -3046,6 +3109,21 @@ def excel_query(
 • table: Markdown表格格式（默认）
 • json: 结构化JSON数据
 • csv: CSV逗号分隔格式
+
+**🔧 参数说明**:
+• **file_path**: Excel文件路径（支持相对路径）
+• **query_expression**: SQL查询语句（支持SELECT/JOIN/聚合/子查询等）
+• **include_headers**: 是否包含表头（默认True）
+• **output_format**: 输出格式（table/json/csv，默认table）
+
+**📊 返回信息**:
+• **data**: 查询结果数据（二维数组或格式化字符串）
+• **headers**: 表头列名列表
+• **query_info**: 查询元信息{sql_used、rows_returned、execution_time、cache_hit}
+• **columns**: 列信息列表{name、type}
+• **file_path**: 源文件路径
+• **success**: 操作是否成功
+• **message**: 状态消息或错误信息
 
 **💡 实用技巧**:
 • **表结构先行**: 先调用`excel_describe_table`了解列名和数据类型
@@ -3170,6 +3248,19 @@ def excel_update_query(
 • 复杂修改建议分步骤执行，避免一次修改过多数据
 • 大文件修改可能较慢，建议错峰执行
 
+**🔧 参数说明**:
+• **file_path**: Excel文件路径（支持相对路径）
+• **update_expression**: UPDATE语句（格式：UPDATE 表名 SET 字段=值 WHERE 条件）
+• **dry_run**: 预览模式（默认False；True时只显示影响范围不实际修改）
+
+**📊 返回信息**:
+• **affected_rows**: 受影响的行数
+• **preview_data**: 预览数据（dry_run模式下显示前5行示例）
+• **update_summary**: 更新摘要{total_rows、columns_updated、conditions_used}
+• **file_path**: 源文件路径
+• **success**: 操作是否成功
+• **message**: 状态消息或错误信息
+
 **⚡ 配合使用**:
 • 修改前预览: dry_run=True确认修改范围
 • 修改后验证: excel_query检查修改结果
@@ -3226,27 +3317,30 @@ def excel_describe_table(
 • **non_null_counts**: 每列的非空值数量，用于数据完整性检查
 • **sample_data**: 每列前3个实际值，直观了解数据内容
 • **header_mode**: single（单行表头）或 dual（双行表头中英映射）
+
+**🔧 参数说明**:
+• **file_path**: Excel文件路径（支持相对路径）
+• **sheet_name**: 工作表名称（可选，不传则分析第一个工作表）
+
 **💡 实用技巧**:
 • **操作前必调**: 任何数据操作前先describe，了解表结构和数据类型
 • **空值检查**: 关注non_null_counts，空值率高的列可能是数据质量问题
 • **双行表头**: 自动识别中文描述+英文字段名，返回完整映射关系
 • **性能友好**: 比get_range读取全部数据更轻量，适合初步了解表结构
 
+**📊 返回信息**:
+• **columns**: 列信息列表{name、type、sample_values}
+• **table_stats**: 表统计{total_rows、header_mode、dual_header_detected}
+• **data_quality**: 数据质量分析{null_counts、completeness_rates}
+• **file_path**: 源文件路径
+• **success**: 操作是否成功
+• **message**: 状态消息或错误信息
+
 **🔗 配合使用**:
-• + excel_query → describe确认列名后进行SQL查询
-• + excel_get_range → 需要查看具体数据时用get_range
-• + excel_assess_data_impact → 修改前结合describe评估影响
-
-**💡 使用建议**:
-• 使用excel_query前先调用此工具确认目标列名存在
-• 检查数据类型是否符合预期（数字字段是否被错误识别为文本）
-• 双行表头模式支持中英文混合查询，如技能名 vs skill_name
-• 首次操作新Excel文件时的必用工具，避免列名拼写错误
-
-**🎯 配合使用**:
-• 后续查询: `excel_query`基于此表结构进行数据检索
-• 修改操作: `excel_update_query`根据类型进行安全修改
-• 版本对比: `excel_compare_sheets`对比不同版本的结构变化
+• **后续查询**: `excel_query`基于此表结构进行数据检索
+• **修改操作**: `excel_update_query`根据类型进行安全修改
+• **版本对比**: `excel_compare_sheets`对比不同版本的结构变化
+• **数据评估**: `excel_assess_data_impact`修改前结合describe评估影响
     """
     _path_err = _validate_path(file_path)
     if _path_err:
@@ -3421,6 +3515,21 @@ def excel_format_cells(
 **⚡ 快速预设** (preset参数):
 • **highlight**: 黄色背景，标记待检查的数据
 • **warning**: 红色背景，标记异常或问题数据
+**🔧 参数说明**:
+• **file_path**: Excel文件路径（支持相对路径）
+• **sheet_name**: 工作表名称
+• **range**: 要格式化的单元格范围（如"A1:C10"）
+• **formatting**: 自定义格式字典{bold、italic、size、color、bg_color、alignment等}
+• **preset**: 快速预设名称（highlight/warning/success，优先于formatting）
+
+**📊 返回信息**:
+• **formatted_range**: 实际格式化的范围{start_cell、end_cell、rows、cols}
+• **affected_cells**: 受影响的单元格数
+• **preset_used**: 使用的预设名称（如有）
+• **file_path**: 源文件路径
+• **success**: 操作是否成功
+• **message**: 状态消息或错误信息
+
 **💡 实用技巧**:
 • **快速标记**: preset参数一行代码搞定常用样式，无需逐个设置
 • **异常高亮**: 用"warning"预设标记数据异常（如数值为0或负数）
@@ -3562,6 +3671,23 @@ def excel_set_borders(
 • **thick**: 粗线（强调分隔）
 • **medium**: 中等（介于thin和thick之间）
 • **double**: 双线（标题分隔）
+• **dotted**: 点线（装饰性）
+• **dashed**: 虚线（辅助线）
+
+**🔧 参数说明**:
+• **file_path**: Excel文件路径（支持相对路径）
+• **sheet_name**: 工作表名称
+• **range**: 要添加边框的范围（如"A1:D10"）
+• **border_style**: 边框样式（thin/thick/medium/double/dotted/dashed，默认thin）
+
+**📊 返回信息**:
+• **border_range**: 实际添加边框的范围{start_cell、end_cell}
+• **border_style_used**: 使用的边框样式
+• **affected_cells**: 受影响的单元格数
+• **file_path**: 源文件路径
+• **success**: 操作是否成功
+• **message**: 状态消息或错误信息
+
 **💡 实用技巧**:
 • **汇总分隔**: 给汇总行添加上下边框，区分数据区和汇总区
 • **区域标注**: 给特定区域添加边框（如"需要审核的数据"）
