@@ -1,25 +1,27 @@
-# 第116轮 - REQ-025 返回值统一 + v1.6.5发布 ✅
+# 第117轮 - REQ-029 JOIN别名崩溃修复 + v1.6.6发布 ✅
 
 ## 状态
-版本：v1.6.5 | 工具：44 | 测试：1107
+版本：v1.6.6 | 工具：44 | 测试：1107
 
 ## 本轮完成
-- **REQ-025 返回值统一（get_headers）**：
-  - 改进get_headers返回格式：新增结构化data字段（field_names/descriptions/dual_rows）
-  - 新增meta元信息字段（sheet_name/header_row/header_count/dual_row_mode）
-  - 保留顶层向后兼容字段（headers/field_names/descriptions/header_count/sheet_name/header_row）
-  - 改进get_all_headers返回格式，新增data结构化字段
-  - 更新README添加详细使用示例和返回格式说明
-  - 更新test_server.py适配新data格式
-  - 全量测试1107个全部通过
-- **v1.6.5发布**：PyPI + GitHub推送完成
-- **清理**：4个worktree已清理，/tmp测试文件已清理
+- **REQ-029 JOIN表别名映射 + describe_table崩溃修复**：
+  - Bug1修复：JOIN后SQL表别名`r.名称`不生效问题，增强_expression_to_column_reference的5层回退映射机制
+  - Bug2修复：streaming写入后openpyxl read_only模式max_row=None导致的describe_table崩溃
+  - 修复JOIN列映射：新增_join_column_mapping记录JOIN列映射，支持pandas后缀格式`_x`/`_y`
+  - describe_table异常处理：添加try/except处理max_row=None情况，优先使用max_row，失败时用iter_rows统计
+  - MCP验证：JOIN别名映射正确，streaming写入后describe_table正常统计行数
+  - 全量测试通过：1107个测试全部通过
+- **v1.6.6发布**：PyPI + GitHub推送完成
+- **清理**：worktree已清理，测试文件已清理
 
 ## 待办
-- [ ] REQ-025 继续其他工具返回值统一
-- [ ] MCP真实验证（每5轮1次，当前未做）
+- [ ] REQ-029 继续其他工具返回值统一
+- [ ] MCP真实验证（下一轮需做）
 
 ## 决策
-- **决策**：get_headers返回值同时包含新格式(data+meta)和旧格式(顶层字段)，确保向后兼容
-- **原因**：现有测试和调用方依赖顶层字段，直接移除会导致大面积失败
-- **方案**：新字段(data/meta)供新调用方使用，旧字段保持兼容，后续版本逐步deprecate
+- **决策**：JOIN表别名映射采用5层回退机制，确保别名正确解析
+- **原因**：pandas JOIN后会添加_x/_y后缀，用户期望使用原始别名r.名称
+- **方案**：_expression_to_column_reference新增5层映射逻辑，直接匹配→pandas后缀→JOIN映射→表别名映射→原始列名
+- **决策**：describe_table采用max_row优先、iter_rows备用的统计策略
+- **原因**：streaming写入后openpyxl read_only模式的max_row可能为None
+- **方案**：优先使用max_row统计，访问失败时用iter_rows遍历统计，确保结果准确
