@@ -36,3 +36,10 @@
 **Bug 2方案**: 在`_apply_select_expressions`和`_apply_group_by_aggregation`中新增Subquery处理分支，支持标量子查询
 **Bug 3结论**: LEFT JOIN生成的NaN在pandas层正确保留，IS NULL/IS NOT NULL均能正确判断，无需修改
 **影响**: 聚合函数现在支持`MAX(攻击力+防御力)`等表达式，标量子查询可在SELECT/WHERE/HAVING中使用
+
+## D005: find_last_row降级路径处理dimension=None (2026-03-27, R123)
+**需求**: REQ-015 流式写入后读取工具验证
+**决策**: find_last_row在max_row/max_column为None时使用iter_rows降级遍历
+**原因**: StreamingWriter使用write_only模式，不写<dimension>元数据，read_only模式下max_row返回None导致TypeError崩溃
+**方案**: 检测None后改用sheet.iter_rows逐行遍历（read_only模式下仍为流式读取，内存高效），同时覆盖无column和有column两种路径
+**影响**: 修复后流式写入的文件可正常被find_last_row、describe_table等依赖max_row的工具处理
