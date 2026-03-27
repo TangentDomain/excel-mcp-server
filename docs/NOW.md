@@ -1,33 +1,23 @@
-# 第132轮 - REQ-025 用户体验优化 ✅
+# 第134轮 - REQ-029 JOIN表别名映射修复 ✅
 
 ---
 
 ## 状态
-版本：v1.6.15 | 工具：44 | 测试：1154
+版本：v1.6.17 | 工具：44 | 测试：1156
 
 ## 本轮完成
-- **REQ-025 AI体验优化线**：
-  - 重构异常系统，增强错误处理和用户体验
-  - 改进验证器错误消息，提供具体操作指导
-  - 优化excel_update_range和excel_upsert_row的docstring
-  - 添加详细的使用示例、性能建议和最佳实践
-  - 增强ExcelException基类，支持分级错误提示
+- **REQ-029 BUG FIX**：修复JOIN表别名映射bug
+  - Bug 1: SELECT中使用表限定符(r.名称)时无法正确解析左表列引用 → 已修复
+  - Bug 2: describe_table流式写入后max_row=None崩溃 → 之前已修复，验证确认
+- 全量测试1156 passed
+- PyPI v1.6.17 已发布
 
-### 主要改进
-- **异常系统重构**：ExcelException现在支持message、hint、suggested_fix三级信息
-- **错误消息增强**：DataValidationError、InvalidFormatError等提供具体修复建议
-- **文档优化**：关键函数docstring增加详细示例和性能指南
-- **用户体验**：错误信息包含💡提示和🔧修复建议
-
-## 自我进化评估
-- 📊 测试通过率：1154/1154 (100%)
-- 📊 代码改动：异常系统重构 + 文档优化
-- 📊 发布：v1.6.15 ✅
-- 📊 新bug：0
-- 📊 用户友好度：错误信息质量提升200%
+### 关键改动
+- `_apply_select_expressions`: qualified列名查找失败时回退到`_expression_to_column_reference`映射
+- `_expression_to_column_reference`: 增强_x/_y后缀处理，新增table_part_x/y直接匹配
 
 ## 下轮待办
+- [ ] MCP真实验证（8项游戏场景）
+- [ ] README检查（中英文同步）
 - [ ] REQ-006 工程治理（持续迭代）
 - [ ] REQ-010 文档与门面优化
-- [ ] REQ-025 docstring后续优化（如有需要）
-- [ ] 下次MCP真实验证（第135轮）

@@ -33,3 +33,12 @@
 2. 添加环境变量 FORCE_JAVASCRIPT_ACTIONS_TO_NODE24=true
 **影响**: 解决弃用警告，确保CI在截止日期后继续正常工作，双重保险机制
 **验证**: 测试全通过，PyPI发布v1.6.14
+## D014: REQ-029 JOIN表别名映射修复 (2026-03-27, R134)
+**需求**: REQ-029 BUG FIX
+**问题**: JOIN查询中使用表限定符(r.名称)引用左表列时，_apply_select_expressions无法解析
+**根因**: qualified列名查找失败后直接回退到无限定符列名，没有尝试JOIN映射
+**决策**: 在qualified查找失败时，先调用_expression_to_column_reference进行完整映射
+**方案**:
+1. _apply_select_expressions增加映射回退逻辑
+2. _expression_to_column_reference增强_x/_y后缀处理
+**验证**: 1156 passed, JOIN别名映射测试通过, PyPI v1.6.17
