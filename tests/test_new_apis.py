@@ -40,9 +40,9 @@ class TestNewAPIs:
         assert isinstance(sheets, list)
         assert len(sheets) > 0
 
-    def test_excel_get_sheet_headers_new(self, sample_file):
-        """测试新的excel_get_sheet_headers - 专门获取表头"""
-        result = server.excel_get_sheet_headers(sample_file)
+    def test_excel_get_headers_all_sheets(self, sample_file):
+        """测试excel_get_headers不传sheet_name - 获取所有工作表表头"""
+        result = server.excel_get_headers(sample_file)
 
         assert result['success'] is True
         assert 'sheets_with_headers' in result
@@ -66,7 +66,7 @@ class TestNewAPIs:
         """测试API拆分的完整性 - 新老API功能等价"""
         # 新API的分离调用
         sheets_result = server.excel_list_sheets(sample_file)
-        headers_result = server.excel_get_sheet_headers(sample_file)
+        headers_result = server.excel_get_headers(sample_file)  # 不传sheet_name = 所有表
 
         # 验证功能完整性
         assert sheets_result['success'] is True
@@ -127,10 +127,10 @@ class TestNewAPIs:
         params_list = list(sig_list.parameters.keys())
         assert params_list == ['file_path'], f"excel_list_sheets参数应该只有file_path，实际为: {params_list}"
 
-        # 检查excel_get_sheet_headers参数
-        sig_headers = inspect.signature(server.excel_get_sheet_headers)
+        # 检查excel_get_headers参数（sheet_name可选，不传=所有表）
+        sig_headers = inspect.signature(server.excel_get_headers)
         params_headers = list(sig_headers.parameters.keys())
-        assert params_headers == ['file_path'], f"excel_get_sheet_headers参数应该只有file_path，实际为: {params_headers}"
+        assert params_headers == ['file_path', 'sheet_name', 'header_row', 'max_columns'], f"excel_get_headers参数不符合预期: {params_headers}"
 
         # 跳过检查已合并的excel_format_cells_custom，因为它已经合并到excel_format_cells中
 
@@ -147,8 +147,8 @@ class TestNewAPIs:
         assert 'sheets' in list_result
         assert 'sheets_with_headers' not in list_result
 
-        # excel_get_sheet_headers应该专注于表头信息
-        headers_result = server.excel_get_sheet_headers(sample_file)
+        # excel_get_headers不传sheet_name应该返回所有工作表的表头
+        headers_result = server.excel_get_headers(sample_file)
         assert 'sheets_with_headers' in headers_result
         # 可以包含基础的sheets信息用于上下文，但主要功能是表头
 
