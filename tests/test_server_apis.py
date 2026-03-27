@@ -38,7 +38,7 @@ class TestServerAPIs:
         result = ExcelOperations.list_sheets(test_file)
         
         assert result['success'] is True
-        assert 'sheets' in result['data']
+        assert 'sheets' in result
 
     def test_get_file_info_api(self, test_file):
         """测试获取文件信息API"""

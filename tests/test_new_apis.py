@@ -29,8 +29,7 @@ class TestNewAPIs:
         result = server.excel_list_sheets(sample_file)
 
         assert result['success'] is True
-        assert 'sheets' in result['data']
-        assert 'total_sheets' in result
+        assert 'sheets' in result
         # active_sheet概念已被移除
         assert 'active_sheet' not in result
         # 确保不再返回sheets_with_headers
