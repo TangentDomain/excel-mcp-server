@@ -1756,8 +1756,8 @@ class ExcelOperations:
             else:
                 col_idx = id_column
 
-            # 检查表头行是否存在
-            if header_row < 1 or header_row > ws.max_row:
+            # 检查表头行是否存在（streaming写入后max_row可能为None，跳过检查）
+            if header_row < 1 or (ws.max_row is not None and header_row > ws.max_row):
                 return {
                     'success': False,
                     'message': f'表头行不存在: {header_row}',
@@ -1768,8 +1768,8 @@ class ExcelOperations:
                     'duplicates': []
                 }
 
-            # 检查列是否存在
-            if col_idx < 1 or col_idx > ws.max_column:
+            # 检查列是否存在（streaming写入后max_column可能为None，跳过检查）
+            if col_idx < 1 or (ws.max_column is not None and col_idx > ws.max_column):
                 return {
                     'success': False,
                     'message': f'列不存在或索引超出范围: {col_idx}',

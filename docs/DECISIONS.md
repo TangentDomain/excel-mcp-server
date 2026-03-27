@@ -1,22 +1,4 @@
-**需求**: REQ-025 AI体验优化 - 返回值统一
-**决策**: get_headers同时返回新格式(data+meta)和旧格式(顶层字段)
-**原因**: 现有测试和调用方依赖顶层headers/field_names/descriptions字段，直接移除会破坏兼容性
-**方案**: 新增data结构化字段和meta元信息，保留顶层向后兼容字段
-**影响**: API同时支持新旧两种访问方式，后续版本逐步deprecate旧字段
-
-## D002: _wrap自动补充message字段 (2026-03-27, R118)
-**需求**: REQ-025 AI体验优化 - 返回值统一
-**决策**: _wrap函数自动为成功操作补充默认message字段
-**原因**: Operations层返回的结果可能缺少message字段，导致格式不统一
-**方案**: 成功时若无message则默认"操作成功"，确保所有工具返回格式一致
-**影响**: 所有使用_wrap的工具都有统一的success/message/data/meta结构
-
-## D003: 返回值统一完成验证 (2026-03-27, R118)
-**需求**: REQ-025 AI体验优化 - 返回值统一
-**决策**: 完成所有44个工具的返回值格式统一性验证
-**原因**: 确保所有工具都采用统一的JSON返回格式，提升AI客户端解析可靠性
-**方案**: 全面检查并确认所有工具使用_wrap、_ok、_fail函数，无遗漏
-**结果**: 44个工具全部通过统一格式验证，MCP真实验证12项核心功能正常
+# DECISIONS.md - 决策记录
 
 ## D004: 发现REQ-030 SQL引擎Bug (2026-03-27, R119)
 **需求**: MCP真实验证 - 每5轮必做
@@ -37,7 +19,7 @@
 **Bug 3结论**: LEFT JOIN生成的NaN在pandas层正确保留，IS NULL/IS NOT NULL均能正确判断，无需修改
 **影响**: 聚合函数现在支持`MAX(攻击力+防御力)`等表达式，标量子查询可在SELECT/WHERE/HAVING中使用
 
-## D005: find_last_row降级路径处理dimension=None (2026-03-27, R123)
+## D006: find_last_row降级路径处理dimension=None (2026-03-27, R123)
 **需求**: REQ-015 流式写入后读取工具验证
 **决策**: find_last_row在max_row/max_column为None时使用iter_rows降级遍历
 **原因**: StreamingWriter使用write_only模式，不写<dimension>元数据，read_only模式下max_row返回None导致TypeError崩溃
