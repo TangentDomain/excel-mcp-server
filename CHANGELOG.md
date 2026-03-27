@@ -7,6 +7,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.5.1] - 2026-03-27
+
+### 优化
+- **REQ-006 全部43个工具docstring优化完成**：统一emoji标题+核心功能+游戏开发场景+参数说明+使用建议格式
+- 覆盖所有MCP工具，AI客户端（Cursor/Claude Desktop等）能更好理解工具用途
+- 修复docstring中反斜杠转义导致的SyntaxWarning
+
 ## [1.3.0] - 2026-03-27
 
 ### 新增
