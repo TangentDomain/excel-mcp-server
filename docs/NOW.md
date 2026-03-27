@@ -1,22 +1,22 @@
-# 第120轮 - REQ-030 修复完成 (v1.6.8) ✅
+# 第122轮 - REQ-012 多客户端兼容性验证 ✅
 
 ## 状态
-版本：v1.6.8 | 工具：44 | 测试：1107
+版本：v1.6.8 | 工具：44 | 测试：1118
 
 ## 本轮完成
-- **Bug 1修复**：`MAX(a+b)`等聚合函数内多列表达式计算 — 新增`_is_expression`和`_evaluate_expression`方法，支持四则运算和字面量嵌套
-- **Bug 2修复**：SELECT子句中的标量子查询 — `_apply_select_expressions`和`_apply_group_by_aggregation`均新增Subquery处理
-- **Bug 3验证**：LEFT JOIN + IS NULL经验证已正常工作，无需修复
-- **全量测试**：1107 passed
-- **PyPI发布**：v1.6.8 已发布
-
-## 修复摘要
-| Bug | 问题 | 修复方案 |
-|-----|------|----------|
-| 1 | `MAX(攻击力+防御力)`失败 | 表达式求值递归处理Add/Sub/Mul/Div/Literal |
-| 2 | SELECT中的标量子查询不支持 | 新增Subquery分支，支持SELECT/WHERE/HAVING |
-| 3 | LEFT JOIN IS NULL | 已验证正常，无需修复 |
+- **文档瘦身**：REQUIREMENTS.md 移除6个DONE需求到ARCHIVED.md，NOW.md精简到≤30行
+- **REQ-012 多客户端兼容性验证**：✅ 通过
+  - 69个服务器测试全通过（100%）
+  - 11个集成测试全通过（100%）
+  - Cursor/Claude Desktop/VSCode MCP/流式写入全部兼容
+  - 创建兼容性验证脚本和详细报告
 
 ## 下轮待办
-- [ ] MCP真实验证（确认修复）
-- [ ] README中英文同步检查
+- [ ] REQ-015 流式写入后读取工具验证
+- [ ] REQ-025 AI体验优化（get_headers合并）
+- [ ] REQ-031 CI Node.js 20弃用警告（P2，截止2026-09-16）
+
+## 自我进化评估
+- 📊 兼容性验证：4/4 客户端环境全通过
+- 📊 测试通过率：80/80 (100%)
+- 📊 Phase 2进度：多客户端验证已通过，AI选工具准确率待验证
