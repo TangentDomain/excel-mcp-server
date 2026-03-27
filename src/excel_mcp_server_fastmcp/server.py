@@ -415,7 +415,7 @@ mcp = FastMCP(
 ```
 数据分析/查询/筛选/聚合？ → excel_query (SQL引擎)
 快速了解单表结构？        → excel_describe_table (列名+类型+样本值+行数)
-批量获取所有表的中英表头？ → excel_get_sheet_headers (双行表头专用)
+批量获取所有表的中英表头？ → excel_get_headers("文件", sheet_name省略)
 定位文本位置？            → excel_search (返回row/column)
 跨文件搜索？              → excel_search_directory
 批量条件修改？            → excel_update_query (SQL UPDATE, 支持dry_run)
@@ -529,20 +529,6 @@ def excel_list_sheets(file_path: str) -> Dict[str, Any]:
 
 @mcp.tool()
 @_track_call
-def excel_get_sheet_headers(file_path: str) -> Dict[str, Any]:
-    """
-批量获取所有工作表的双行表头（游戏开发专用）。
-返回每个表的字段描述（中文）和字段名（英文）。专为游戏配置表双行表头设计。
-查看单个表的详细结构（类型+样本值+行数）请用excel_describe_table。
-    """
-    _path_err = _validate_path(file_path)
-    if _path_err:
-        return _path_err
-    return _wrap(ExcelOperations.get_sheet_headers(file_path))
-
-
-@mcp.tool()
-@_track_call
 def excel_search(
     file_path: str,
     pattern: str,
@@ -640,18 +626,29 @@ def excel_get_range(
 @_track_call
 def excel_get_headers(
     file_path: str,
-    sheet_name: str,
+    sheet_name: Optional[str] = None,
     header_row: int = 1,
     max_columns: Optional[int] = None
 ) -> Dict[str, Any]:
     """
-获取单个工作表的表头行。返回指定行的列名列表。
-查看所有工作表的双行表头（中英映射）请用excel_get_sheet_headers。
-快速查看完整表结构（列名+类型+样本值）请用excel_describe_table。
+获取工作表的表头信息。支持游戏开发双行表头（字段描述+字段名）。
+
+参数:
+- file_path: Excel文件路径
+- sheet_name: 工作表名称（可选）。不传则返回所有工作表的表头。
+- header_row: 表头起始行号（1-based，默认1）
+- max_columns: 最大列数限制（可选）
+
+用法:
+- 想看某个表的表头 → excel_get_headers("文件.xlsx", "技能表")
+- 想看所有表的表头 → excel_get_headers("文件.xlsx")
+- 快速查看完整表结构（类型+样本值+行数）请用 excel_describe_table。
     """
     _path_err = _validate_path(file_path)
     if _path_err:
         return _path_err
+    if sheet_name is None:
+        return _wrap(ExcelOperations.get_all_headers(file_path, header_row, max_columns))
     return _wrap(ExcelOperations.get_headers(file_path, sheet_name, header_row, max_columns))
 
 
@@ -1765,7 +1762,7 @@ def excel_describe_table(
 快速查看Excel工作表结构。SQL查询前先用此工具了解有哪些列、什么类型、有多少行数据。
 自动识别双行表头（第1行中文描述+第2行英文字段名），输出中英映射。
 返回: 列名、数据类型(number/text/date/mixed)、非空数量、示例值、总行数。
-批量获取所有工作表的中英表头映射请用excel_get_sheet_headers。
+批量获取所有工作表的表头请用excel_get_headers（不传sheet_name）。
     """
     _path_err = _validate_path(file_path)
     if _path_err:

@@ -5,7 +5,6 @@ Simplified tests for Server MCP interfaces - more flexible to match actual API
 import pytest
 from src.excel_mcp_server_fastmcp.server import (
     excel_list_sheets,
-    excel_get_sheet_headers,
     excel_get_headers,
     excel_get_range,
     excel_update_range,
@@ -41,9 +40,9 @@ class TestServerInterfaces:
         # 已移除active_sheet概念
         assert 'active_sheet' not in result
 
-    def test_excel_get_sheet_headers(self, sample_excel_file):
-        """Test excel_get_sheet_headers interface - 获取工作表表头信息"""
-        result = excel_get_sheet_headers(sample_excel_file)
+    def test_excel_get_headers_all_sheets(self, sample_excel_file):
+        """Test excel_get_headers without sheet_name - 获取所有工作表表头信息"""
+        result = excel_get_headers(sample_excel_file)
 
         assert result['success'] is True
         assert 'sheets_with_headers' in result
@@ -77,9 +76,9 @@ class TestServerInterfaces:
         # 已移除active_sheet概念
         assert 'active_sheet' not in result
 
-    def test_excel_get_sheet_headers_multi_sheet(self, multi_sheet_excel_file):
-        """Test excel_get_sheet_headers with multiple sheets"""
-        result = excel_get_sheet_headers(multi_sheet_excel_file)
+    def test_excel_get_headers_multi_sheet(self, multi_sheet_excel_file):
+        """Test excel_get_headers without sheet_name - multiple sheets"""
+        result = excel_get_headers(multi_sheet_excel_file)
 
         assert result['success'] is True
         assert 'sheets_with_headers' in result
@@ -95,9 +94,9 @@ class TestServerInterfaces:
             assert 'test_data' in sheet_info['headers']  # Field names from row 2
             assert 'value' in sheet_info['headers']
 
-    def test_excel_get_sheet_headers_empty_sheet(self, empty_excel_file):
-        """Test excel_get_sheet_headers with empty sheet"""
-        result = excel_get_sheet_headers(empty_excel_file)
+    def test_excel_get_headers_empty_sheet(self, empty_excel_file):
+        """Test excel_get_headers without sheet_name - empty sheet"""
+        result = excel_get_headers(empty_excel_file)
 
         assert result['success'] is True
         assert 'sheets_with_headers' in result
@@ -108,6 +107,35 @@ class TestServerInterfaces:
         headers = sheet_info.get('headers', [])
         assert headers == []  # 空工作表应该没有表头
         assert sheet_info['header_count'] == 0
+
+    def test_excel_get_headers_single_vs_all_consistency(self, sample_excel_file):
+        """Test that single-sheet and all-sheets modes return consistent data"""
+        # Get all sheets
+        all_result = excel_get_headers(sample_excel_file)
+        assert all_result['success'] is True
+
+        # Get single sheet
+        single_result = excel_get_headers(sample_excel_file, "Sheet1")
+        assert single_result['success'] is True
+
+        # Verify single sheet data matches the corresponding entry in all-sheets
+        sheet1_in_all = next(
+            (s for s in all_result['sheets_with_headers'] if s['name'] == 'Sheet1'),
+            None
+        )
+        assert sheet1_in_all is not None
+        assert sheet1_in_all['headers'] == single_result['headers']
+        assert sheet1_in_all['field_names'] == single_result['field_names']
+        assert sheet1_in_all['descriptions'] == single_result['descriptions']
+        assert sheet1_in_all['header_count'] == single_result['header_count']
+
+    def test_excel_get_headers_all_sheets_has_file_path(self, sample_excel_file):
+        """Test that all-sheets mode includes file_path and total_sheets"""
+        result = excel_get_headers(sample_excel_file)
+        assert result['success'] is True
+        assert 'file_path' in result
+        assert 'total_sheets' in result
+        assert result['total_sheets'] >= 1
 
     def test_excel_list_sheets_invalid_file(self):
         """Test excel_list_sheets with invalid file"""
