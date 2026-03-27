@@ -1932,3 +1932,80 @@ class ExcelOperations:
             logger.error(f"{cls._LOG_PREFIX} {error_msg}")
             return cls._format_error_result(error_msg)
 
+    @classmethod
+    def batch_insert_rows_at(
+        cls,
+        file_path: str,
+        sheet_name: str,
+        data: list,
+        target_row: int,
+        header_row: int = 1,
+        streaming: bool = True
+    ) -> Dict[str, Any]:
+        """
+        @intention 在指定行位置前批量插入多行数据
+
+        策略：先插入空行，再逐行写入数据
+
+        Args:
+            file_path: Excel文件路径
+            sheet_name: 工作表名称
+            data: 行数据列表，每行为{列名: 值}字典
+            target_row: 在此行号前插入（1-based）
+            header_row: 表头所在行号（默认1）
+            streaming: 是否使用流式写入（默认True）
+
+        Returns:
+            Dict: 标准化的操作结果
+        """
+        try:
+            count = len(data)
+            if count == 0:
+                return {'success': False, 'message': '没有数据需要插入', 'data': None}
+
+            # 步骤1：在目标位置插入空行
+            insert_result = cls.insert_rows(file_path, sheet_name, target_row, count, streaming)
+            if not insert_result.get('success', False):
+                return insert_result
+
+            # 步骤2：获取表头列名
+            reader = ExcelReader(file_path)
+            range_expr = f"{sheet_name}!A{header_row}"
+            header_result = reader.get_range(range_expr)
+            reader.close()
+
+            if not header_result.success or not header_result.data:
+                return {'success': False, 'message': f'无法读取表头: 第{header_row}行', 'data': None}
+
+            headers = header_result.data[0] if header_result.data else []
+
+            # 步骤3：逐行写入数据
+            from excel_mcp_server_fastmcp.api.excel_writer import ExcelWriter
+            writer = ExcelWriter(file_path)
+
+            for i, row_data in enumerate(data):
+                if not isinstance(row_data, dict):
+                    continue
+                row_num = target_row + i
+                for col_idx, col_name in enumerate(headers):
+                    if col_name in row_data:
+                        col_letter = get_column_letter(col_idx + 1)
+                        writer.write_cell(sheet_name, f"{col_letter}{row_num}", row_data[col_name])
+
+            writer.save()
+
+            return {
+                'success': True,
+                'message': f"在行{target_row}前插入了{count}行数据",
+                'data': {
+                    'inserted_count': count,
+                    'start_row': target_row,
+                    'end_row': target_row + count - 1,
+                    'mode': 'streaming' if streaming else 'standard'
+                }
+            }
+        except Exception as e:
+            error_msg = f"指定位置批量插入行失败: {str(e)}"
+            logger.error(f"{cls._LOG_PREFIX} {error_msg}")
+            return cls._format_error_result(error_msg)
+

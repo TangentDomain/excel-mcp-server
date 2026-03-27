@@ -387,6 +387,27 @@ def _generate_value_error_suggested_fix(err_str: str, sql: str) -> str:
     return ""
 
 
+def _safe_float_comparison(left, right, op):
+    """安全比较函数，处理None值，避免 '<=' not supported between instances of 'int' and 'NoneType' 错误"""
+    if left is None or right is None:
+        return False
+    try:
+        left_float = float(left)
+        right_float = float(right)
+        if op == '>':
+            return left_float > right_float
+        elif op == '>=':
+            return left_float >= right_float
+        elif op == '<':
+            return left_float < right_float
+        elif op == '<=':
+            return left_float <= right_float
+        else:
+            return False
+    except (TypeError, ValueError):
+        return False
+
+
 class AdvancedSQLQueryEngine:
     """高级SQL查询引擎，支持完整的SQL语法"""
 
@@ -2027,10 +2048,10 @@ class AdvancedSQLQueryEngine:
     _COMPARISON_OPS = {
         exp.EQ: lambda l, r: l == r,
         exp.NEQ: lambda l, r: l != r,
-        exp.GT: lambda l, r: float(l) > float(r),
-        exp.GTE: lambda l, r: float(l) >= float(r),
-        exp.LT: lambda l, r: float(l) < float(r),
-        exp.LTE: lambda l, r: float(l) <= float(r),
+        exp.GT: lambda l, r: _safe_float_comparison(l, r, '>'),
+        exp.GTE: lambda l, r: _safe_float_comparison(l, r, '>='),
+        exp.LT: lambda l, r: _safe_float_comparison(l, r, '<'),
+        exp.LTE: lambda l, r: _safe_float_comparison(l, r, '<='),
     }
 
     # 复杂表达式类型集合：WHERE子句逐行过滤触发条件

@@ -2603,18 +2603,25 @@ def excel_batch_insert_rows(
     sheet_name: str,
     data: List[Dict[str, Any]],
     header_row: int = 1,
-    streaming: bool = True
+    streaming: bool = True,
+    insert_position: str = None,
+    condition: str = None
 ) -> Dict[str, Any]:
     """
-📦 批量插入行 - 将多行数据追加到工作表末尾
+📦 批量插入行 - 将多行数据插入到工作表
 
-**核心功能**: 批量导入数据行，自动按列名匹配写入。streaming=True（默认）使用流式写入，大文件性能更好，但不保留单元格格式。
+**核心功能**: 批量导入数据行，自动按列名匹配写入。支持三种插入模式：
+1. 追加模式（默认）：插入到工作表末尾
+2. 指定位置插入：insert_position指定行号，在指定行前插入
+3. 条件定位插入：condition指定SQL条件，在匹配行前插入
+streaming=True（默认）使用流式写入，大文件性能更好，但不保留单元格格式。
 
 **🎮 游戏开发场景**:
 • **批量配置导入**: 策划一次导入几十条技能/装备/怪物配置数据
 • **活动数据填充**: 批量添加限时活动道具、任务奖励等配置行
 • **版本合并**: 将外包团队的新配置行合入主表
 • **数据迁移**: 从其他系统导出的配置批量导入Excel
+• **有序插入**: 在指定ID或条件位置前插入新数据，保持排序
 
 **📊 返回关键信息**:
 • **inserted_count**: 实际插入的行数
@@ -2637,6 +2644,8 @@ def excel_batch_insert_rows(
 • **data**: 行数据数组，每行为{列名: 值}字典（列名需与表头一致）
 • **header_row**: 表头所在行号（默认1，双行表头设为2）
 • **streaming**: True=流式写入（快，不保留格式）/ False=传统模式（保留格式）
+• **insert_position**: 在指定行号前插入（1-based），如3表示在第3行前插入
+• **condition**: SQL WHERE条件，在第一个匹配行前插入（如"ID=10"）
 
 **💡 使用建议**:
 • 先用excel_get_headers确认列名，避免unknown_columns
@@ -2648,6 +2657,42 @@ def excel_batch_insert_rows(
     _path_err = _validate_path(file_path)
     if _path_err:
         return _path_err
+
+    # 确定插入位置
+    target_row = None
+
+    if condition is not None:
+        # 条件定位：找到第一个匹配条件的行号
+        try:
+            sql = f"SELECT _row_number FROM {sheet_name} WHERE {condition} LIMIT 1"
+            query_result = ExcelOperations.query(file_path, sql)
+            if query_result.get('success', False):
+                qdata = query_result.get('data', [])
+                if isinstance(qdata, list) and len(qdata) > 1:
+                    first_data_row = qdata[1]  # 第一行是表头
+                    if isinstance(first_data_row, (list, tuple)) and len(first_data_row) > 0:
+                        try:
+                            target_row = int(first_data_row[0])
+                        except (ValueError, TypeError):
+                            pass
+        except Exception as e:
+            logger.warning(f"条件定位查询失败: {e}，将使用默认追加模式")
+
+    elif insert_position is not None:
+        try:
+            target_row = int(insert_position)
+        except (ValueError, TypeError):
+            return _fail(f"insert_position必须是整数: {insert_position}",
+                         meta={"error_code": "INVALID_INSERT_POSITION"})
+
+    if target_row is not None:
+        # 指定位置插入模式
+        try:
+            result = ExcelOperations.batch_insert_rows_at(file_path, sheet_name, data, target_row, header_row, streaming)
+            return _wrap(result)
+        except Exception as e:
+            return _fail(f"指定位置插入失败: {str(e)}", meta={"error_code": "INSERT_AT_FAILED"})
+
     return _wrap(ExcelOperations.batch_insert_rows(file_path, sheet_name, data, header_row, streaming))
 
 
@@ -2656,14 +2701,18 @@ def excel_batch_insert_rows(
 def excel_delete_rows(
     file_path: str,
     sheet_name: str,
-    row_index: int,
+    row_index: int = None,
     count: int = 1,
-    streaming: bool = True
+    streaming: bool = True,
+    condition: str = None
 ) -> Dict[str, Any]:
     """
 🗑️ 删除行 - 删除工作表中指定位置的行
 
-**核心功能**: 删除指定行号范围的行，后续行自动上移。streaming=True（默认）使用流式写入。
+**核心功能**: 支持两种删除模式：
+1. 按行号删除：删除指定行号范围的行，后续行自动上移
+2. 按条件删除：根据SQL条件删除符合要求的行
+streaming=True（默认）使用流式写入。
 
 **🎮 游戏开发场景**:
 • **清理废弃配置**: 删除已下线活动的道具/任务配置行
@@ -2673,10 +2722,12 @@ def excel_delete_rows(
 
 **🔧 参数说明**:
 • **row_index**: 起始行号（1-based）
-• **count**: 删除行数（默认1）
+• **count**: 删除行数（默认1），condition模式时忽略
 • **streaming**: True=流式写入（快，不保留格式）/ False=传统模式
+• **condition**: SQL WHERE条件（如"ID > 5"），设置后忽略row_index/count，按条件删除
 **💡 实用技巧**:
-• **条件删除**: 先用excel_query找出需要删除的行号，再批量删除
+• **条件删除**: 直接用condition参数（如"ID > 5"），无需手动查行号
+• **行号删除**: 指定row_index和count精确删除
 • **安全操作**: 删除前先用excel_create_backup备份，防止误删不可恢复
 • **流式优化**: streaming=True适合大文件，删除速度更快
 • **ID重构**: 删除行后行号会变化，注意后续操作的行号引用
@@ -2693,6 +2744,85 @@ def excel_delete_rows(
     _path_err = _validate_path(file_path)
     if _path_err:
         return _path_err
+
+    # condition模式：根据SQL条件查找并删除行
+    if condition is not None:
+        operation_logger.start_session(file_path)
+        operation_logger.log_operation("delete_rows_by_condition", {
+            "sheet_name": sheet_name,
+            "condition": condition
+        })
+        try:
+            # 使用SQL查询找到符合条件的行号
+            sql = f"SELECT _row_number FROM {sheet_name} WHERE {condition}"
+            query_result = ExcelOperations.query(file_path, sql)
+
+            if not query_result.get('success', False):
+                return _fail(f"条件查询失败: {query_result.get('message', '未知错误')}",
+                             meta={"error_code": "CONDITION_QUERY_FAILED"})
+
+            # 获取行号列表
+            data = query_result.get('data', [])
+            if isinstance(data, list) and len(data) > 0:
+                # 第一行是表头，找_row_number列
+                headers = data[0] if isinstance(data[0], list) else []
+                row_num_idx = -1
+                for i, h in enumerate(headers):
+                    if h == '_row_number':
+                        row_num_idx = i
+                        break
+
+                if row_num_idx == -1:
+                    return _fail("条件查询结果中未找到行号列",
+                                 meta={"error_code": "NO_ROW_NUMBER_COLUMN"})
+
+                # 收集行号（从后往前删除，避免行号偏移）
+                row_numbers = []
+                for row in data[1:]:
+                    if isinstance(row, (list, tuple)) and len(row) > row_num_idx:
+                        val = row[row_num_idx]
+                        if val is not None:
+                            try:
+                                row_numbers.append(int(val))
+                            except (ValueError, TypeError):
+                                continue
+
+                row_numbers.sort(reverse=True)  # 从后往前删除
+                total_deleted = 0
+
+                for row_num in row_numbers:
+                    result = ExcelOperations.delete_rows(file_path, sheet_name, row_num, 1, streaming)
+                    if result.get('success', False):
+                        deleted = result.get('data', {}).get('deleted_rows', result.get('metadata', {}).get('deleted_rows', 1))
+                        total_deleted += deleted
+                    else:
+                        logger.warning(f"删除行{row_num}失败: {result.get('message', '')}")
+
+                operation_logger.log_operation("operation_result", {
+                    "success": True,
+                    "deleted_rows": total_deleted,
+                    "message": f"按条件删除完成"
+                })
+
+                return _ok(f"按条件 '{condition}' 删除了 {total_deleted} 行",
+                           data={'deleted_rows': total_deleted, 'condition': condition})
+
+            else:
+                return _ok(f"条件 '{condition}' 未匹配到任何行",
+                           data={'deleted_rows': 0, 'condition': condition})
+
+        except Exception as e:
+            operation_logger.log_operation("operation_error", {
+                "error": str(e),
+                "message": f"条件删除失败: {str(e)}"
+            })
+            return _fail(f"条件删除失败: {str(e)}", meta={"error_code": "CONDITION_DELETE_FAILED"})
+
+    # 行号模式：按row_index和count删除
+    if row_index is None:
+        return _fail("删除行需要指定 row_index 或 condition 参数",
+                     meta={"error_code": "MISSING_ROW_INDEX"})
+
     # 开始操作会话
     operation_logger.start_session(file_path)
 
