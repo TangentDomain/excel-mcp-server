@@ -201,12 +201,22 @@ class ExcelOperations:
 
             # 步骤2: 提取和格式化数据
             sheets = [sheet.name for sheet in result.data] if result.data else []
+            total_sheets = result.metadata.get('total_sheets', len(sheets)) if result.metadata else len(sheets)
 
             response = {
                 'success': True,
-                'sheets': sheets,
-                'file_path': file_path,
-                'total_sheets': result.metadata.get('total_sheets', len(sheets)) if result.metadata else len(sheets)
+                'message': f"获取到 {len(sheets)} 个工作表",
+                'sheets': sheets,           # 向后兼容：顶层字段
+                'file_path': file_path,     # 向后兼容：顶层字段
+                'total_sheets': total_sheets, # 向后兼容：顶层字段
+                'data': {                   # 新格式：统一data字段
+                    'sheets': sheets,
+                    'total_sheets': total_sheets
+                },
+                'meta': {                   # 新格式：统一meta字段
+                    'file_path': file_path,
+                    'total_sheets': total_sheets
+                }
             }
 
             return response
@@ -279,10 +289,23 @@ class ExcelOperations:
 
             return {
                 'success': True,
-                'data': header_info['field_names'],  # 兼容性字段，返回字段名
-                'headers': header_info['field_names'],  # 兼容性字段，返回字段名
-                'descriptions': header_info['descriptions'],  # 字段描述（第1行）
-                'field_names': header_info['field_names'],    # 字段名（第2行）
+                # 新格式：结构化数据
+                'data': {
+                    'field_names': header_info['field_names'],    # 字段名（第2行）
+                    'descriptions': header_info['descriptions'],  # 字段描述（第1行）
+                    'dual_rows': True  # 标识使用了双行模式
+                },
+                'meta': {
+                    'sheet_name': sheet_name,
+                    'header_row': header_row,
+                    'header_count': len(header_info['field_names']),
+                    'max_columns': max_columns,
+                    'dual_row_mode': True
+                },
+                # 向后兼容字段（保持与现有测试和调用方一致）
+                'headers': header_info['field_names'],
+                'field_names': header_info['field_names'],
+                'descriptions': header_info['descriptions'],
                 'header_count': len(header_info['field_names']),
                 'sheet_name': sheet_name,
                 'header_row': header_row,
@@ -712,6 +735,11 @@ class ExcelOperations:
 
             return format_operation_result({
                 'success': True,
+                'data': {
+                    'sheets_with_headers': sheets_with_headers,
+                    'total_sheets': len(sheets)
+                },
+                # 保持顶层兼容性
                 'sheets_with_headers': sheets_with_headers,
                 'file_path': file_path,
                 'total_sheets': len(sheets)
