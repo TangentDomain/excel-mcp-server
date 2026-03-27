@@ -2719,10 +2719,15 @@ def excel_describe_table(
             }
 
         # 统计行数 - 优先使用max_row，若为None则用iter_rows统计结果
-        if ws.max_row is not None and ws.max_row > data_start:
-            row_count = ws.max_row - data_start
-        else:
-            # streaming写入后max_row可能为None，使用iter_rows统计结果
+        try:
+            if ws.max_row is not None and ws.max_row > data_start:
+                row_count = ws.max_row - data_start
+            else:
+                # streaming写入后max_row可能为None，使用iter_rows统计结果
+                row_count = total_rows
+        except Exception as e:
+            # 极端情况处理：如果max_row访问失败，强制使用iter_rows统计
+            logger.warning(f"访问ws.max_row失败: {e}，使用iter_rows统计")
             row_count = total_rows
 
         wb.close()
