@@ -206,17 +206,19 @@ class ExcelOperations:
             response = {
                 'success': True,
                 'message': f"获取到 {len(sheets)} 个工作表",
-                'sheets': sheets,           # 向后兼容：顶层字段
-                'file_path': file_path,     # 向后兼容：顶层字段
-                'total_sheets': total_sheets, # 向后兼容：顶层字段
-                'data': {                   # 新格式：统一data字段
+                'data': {                   # 统一data字段，集中返回核心数据
                     'sheets': sheets,
-                    'total_sheets': total_sheets
+                    'total_sheets': total_sheets,
+                    'file_path': file_path
                 },
-                'meta': {                   # 新格式：统一meta字段
+                'meta': {                   # meta字段保留扩展信息
                     'file_path': file_path,
                     'total_sheets': total_sheets
-                }
+                },
+                # 向后兼容快捷访问（数据来源data，避免重复存储）
+                'sheets': sheets,
+                'file_path': file_path,
+                'total_sheets': total_sheets,
             }
 
             return response
@@ -289,10 +291,11 @@ class ExcelOperations:
 
             return {
                 'success': True,
-                # 新格式：结构化数据
+                # 统一data字段，集中核心数据
                 'data': {
                     'field_names': header_info['field_names'],    # 字段名（第2行）
                     'descriptions': header_info['descriptions'],  # 字段描述（第1行）
+                    'headers': header_info['field_names'],        # 向后兼容别名
                     'dual_rows': True  # 标识使用了双行模式
                 },
                 'meta': {
@@ -302,14 +305,14 @@ class ExcelOperations:
                     'max_columns': max_columns,
                     'dual_row_mode': True
                 },
-                # 向后兼容字段（保持与现有测试和调用方一致）
+                'message': f"成功获取{len(header_info['field_names'])}个表头字段（描述+字段名）",
+                # 向后兼容快捷访问（数据来源data，避免重复存储）
                 'headers': header_info['field_names'],
                 'field_names': header_info['field_names'],
                 'descriptions': header_info['descriptions'],
                 'header_count': len(header_info['field_names']),
                 'sheet_name': sheet_name,
                 'header_row': header_row,
-                'message': f"成功获取{len(header_info['field_names'])}个表头字段（描述+字段名）"
             }
 
         except Exception as e:

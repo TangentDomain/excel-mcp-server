@@ -165,6 +165,7 @@ class TestServerInterfaces:
         assert result['data'] == {
             "field_names": ["name", "age", "department", "salary", "total"],
             "descriptions": ["姓名描述", "年龄描述", "部门描述", "薪资描述", "总计描述"],
+            "headers": ["name", "age", "department", "salary", "total"],
             "dual_rows": True
         }
         assert result['descriptions'] == ["姓名描述", "年龄描述", "部门描述", "薪资描述", "总计描述"]
