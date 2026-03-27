@@ -16,5 +16,7 @@
   - 发布v1.5.4到PyPI，包含安全增强功能
   - 合并develop→main，清理工作区
 
-## 阻塞项
-- REQ-012 需要人工在Cursor/Claude Desktop等客户端测试
+- 第107轮：REQ-006 工具描述持续优化
+  - 清理英文README重复内容，确保中英文版本同步
+  - 验证MCP服务器功能正常，44个工具全部可用
+  - 更新DECISIONS.md记录优化过程

@@ -877,3 +877,20 @@ See [CHANGELOG.md](CHANGELOG.md) for detailed release notes.
 *✨ Making game configuration table management simple and efficient ✨*
 
 </div>
+
+## Installation
+
+```bash
+pip install excel-mcp-server-fastmcp
+```
+
+## Usage
+
+```python
+from excel_mcp_server_fastmcp import main
+main()
+```
+
+## Examples
+
+See the examples folder for comprehensive usage scenarios.
