@@ -83,6 +83,88 @@ import openpyxl
 from pathlib import Path
 
 
+class StructuredSQLError(Exception):
+    """结构化SQL错误，为AI提供可自动修复的错误信息。
+    
+    Attributes:
+        error_code: 机器可读的错误分类码
+        message: 人类可读的错误描述
+        hint: AI修复建议（可选）
+        context: 错误上下文，如可用列名、表名等（可选）
+    """
+    def __init__(self, error_code: str, message: str, hint: str = "", context: dict = None):
+        self.error_code = error_code
+        self.message = message
+        self.hint = hint
+        self.context = context or {}
+        super().__init__(message)
+
+
+def _classify_value_error(err_str: str) -> str:
+    """将ValueError分类为标准错误码。优先匹配更具体的模式。"""
+    err_upper = err_str.upper()
+    # 更具体的模式优先匹配
+    if "列 '" in err_str or "COLUMN" in err_upper:
+        return "column_not_found"
+    if "表 '" in err_str or "TABLE" in err_upper:
+        return "table_not_found"
+    if "窗口函数" in err_str or "WINDOW" in err_upper:
+        return "window_function_error"
+    if "JOIN" in err_upper:
+        return "join_error"
+    if "子查询" in err_str or "SUBQUERY" in err_upper:
+        return "subquery_error"
+    if "UNION" in err_upper:
+        return "union_error"
+    if "CTE" in err_upper or "WITH" in err_upper:
+        return "cte_error"
+    if "GROUP BY" in err_upper:
+        return "group_by_error"
+    if "ORDER BY" in err_upper:
+        return "order_by_error"
+    # 通用模式放后面
+    if "不支持" in err_str or "UNSUPPORTED" in err_upper:
+        return "unsupported_feature"
+    if "表达式" in err_str:
+        return "expression_error"
+    return "execution_error"
+
+
+def _generate_value_error_hint(err_str: str) -> str:
+    """根据ValueError内容生成AI修复建议。"""
+    # 列不存在
+    if "列 '" in err_str and "可用列" in err_str:
+        return "请检查列名拼写，或先用excel_get_headers查看可用列名。"
+    # 表不存在
+    if "表 '" in err_str and "可用表" in err_str:
+        return "请检查表名拼写，或先用excel_list_sheets查看可用工作表。"
+    # FROM子查询
+    if "FROM子查询" in err_str:
+        return "不支持FROM (SELECT ...)，请改用子查询作为WHERE条件：WHERE col IN (SELECT ...)。"
+    # JOIN相关
+    if "JOIN表" in err_str and "不存在" in err_str:
+        return "请检查JOIN的表名是否正确，先用excel_list_sheets确认可用工作表。"
+    if "JOIN缺少ON条件" in err_str:
+        return "JOIN必须包含ON条件，例如：... JOIN 表2 ON 表1.id = 表2.id。"
+    if "没有列 '" in err_str:
+        return "请检查ON条件中的列名，确认列属于哪个表。"
+    # 窗口函数
+    if "不支持的窗口函数" in err_str:
+        return "仅支持 ROW_NUMBER、RANK、DENSE_RANK 窗口函数。"
+    if "需要 ORDER BY" in err_str:
+        return "该窗口函数必须包含 ORDER BY 子句。"
+    # UNION
+    if "UNION" in err_str and "SELECT" in err_str:
+        return "请确保UNION两侧的SELECT列数一致。"
+    # 数学表达式
+    if "数学表达式" in err_str:
+        return "请检查数学运算符和操作数是否正确。"
+    # 字符串函数
+    if "字符串函数" in err_str:
+        return "请检查函数名和参数。支持的字符串函数：UPPER/LOWER/TRIM/LENGTH/CONCAT/REPLACE/SUBSTRING/LEFT/RIGHT。"
+    return ""
+
+
 class AdvancedSQLQueryEngine:
     """高级SQL查询引擎，支持完整的SQL语法"""
 
@@ -222,28 +304,62 @@ class AdvancedSQLQueryEngine:
                 result['query_info']['execution_time_ms'] = round(_query_elapsed, 1)
                 return result
 
+            except StructuredSQLError as e:
+                return {
+                    'success': False,
+                    'message': f'{e.message}',
+                    'data': [],
+                    'query_info': {
+                        'error_type': e.error_code,
+                        'hint': e.hint,
+                        'context': e.context,
+                        'details': e.message
+                    }
+                }
             except ParseError as e:
                 err_str = str(e)
                 # 提取常见拼写错误的友好提示
                 hint = ''
                 if 'SELEC' in sql.upper() and 'SELECT' not in sql.upper():
-                    hint = '\n💡 提示：可能是拼写错误，SELECT关键字是否拼对了？'
+                    hint = '可能是拼写错误，SELECT关键字是否拼对了？'
                 elif 'FORM' in sql.upper() and 'FROM' not in sql.upper():
-                    hint = '\n💡 提示：可能是拼写错误，FROM关键字是否拼对了？'
+                    hint = '可能是拼写错误，FROM关键字是否拼对了？'
                 elif 'WHER' in sql.upper() and 'WHERE' not in sql.upper():
-                    hint = '\n💡 提示：可能是拼写错误，WHERE关键字是否拼对了？'
+                    hint = '可能是拼写错误，WHERE关键字是否拼对了？'
                 return {
                     'success': False,
-                    'message': f'SQL语法错误: {err_str}{hint}',
+                    'message': f'SQL语法错误: {err_str}',
                     'data': [],
-                    'query_info': {'error_type': 'syntax_error', 'details': err_str}
+                    'query_info': {
+                        'error_type': 'syntax_error',
+                        'details': err_str,
+                        'hint': hint
+                    }
                 }
             except UnsupportedError as e:
                 return {
                     'success': False,
                     'message': f'不支持的SQL功能: {str(e)}',
                     'data': [],
-                    'query_info': {'error_type': 'unsupported_feature', 'details': str(e)}
+                    'query_info': {
+                        'error_type': 'unsupported_feature',
+                        'details': str(e)
+                    }
+                }
+            except ValueError as e:
+                err_str = str(e)
+                # 对常见ValueError生成智能修复建议
+                hint = _generate_value_error_hint(err_str)
+                error_code = _classify_value_error(err_str)
+                return {
+                    'success': False,
+                    'message': err_str,
+                    'data': [],
+                    'query_info': {
+                        'error_type': error_code,
+                        'details': err_str,
+                        'hint': hint
+                    }
                 }
             except Exception as e:
                 return {
@@ -1287,7 +1403,12 @@ class AdvancedSQLQueryEngine:
         effective_data = cte_data if with_clause else worksheets_data
 
         if from_table not in effective_data:
-            raise ValueError(f"表 '{from_table}' 不存在。可用表: {list(effective_data.keys())}")
+            raise StructuredSQLError(
+                "table_not_found",
+                f"表 '{from_table}' 不存在。可用表: {list(effective_data.keys())}",
+                hint="请检查表名拼写，或用excel_list_sheets查看可用工作表名。",
+                context={"table_requested": from_table, "available_tables": list(effective_data.keys())}
+            )
 
         base_df = effective_data[from_table].copy()
 
@@ -1422,7 +1543,12 @@ class AdvancedSQLQueryEngine:
                         result_data[alias_name] = df[column_name]
                     else:
                         suggestion = self._suggest_column_name(column_name, list(df.columns))
-                        raise ValueError(f"列 '{qualified or column_name}' 不存在。可用列: {list(df.columns)}。{suggestion}")
+                        raise StructuredSQLError(
+                            "column_not_found",
+                            f"列 '{qualified or column_name}' 不存在。可用列: {list(df.columns)}。{suggestion}",
+                            hint="请检查列名拼写，或用excel_get_headers查看所有可用列名。",
+                            context={"column_requested": qualified or column_name, "available_columns": list(df.columns)}
+                        )
 
                 elif isinstance(original_expr, exp.Case):
                     # CASE WHEN表达式
@@ -1733,7 +1859,12 @@ class AdvancedSQLQueryEngine:
         if from_clause:
             # 检查FROM子句是否是子查询（FROM (SELECT ...)）
             if hasattr(from_clause, 'this') and isinstance(from_clause.this, (exp.Subquery, exp.Select)):
-                raise ValueError("不支持FROM子查询（FROM (SELECT ...)）。请使用子查询作为WHERE条件：WHERE col IN (SELECT ...)")
+                raise StructuredSQLError(
+                    "unsupported_feature",
+                    "不支持FROM子查询（FROM (SELECT ...)）",
+                    hint="请改用子查询作为WHERE条件：WHERE col IN (SELECT ...)，或使用CTE：WITH temp AS (SELECT ...) SELECT ... FROM temp。",
+                    context={"suggestion": "使用WHERE子查询或CTE替代"}
+                )
             if hasattr(from_clause, 'this') and hasattr(from_clause.this, 'name'):
                 return from_clause.this.name
             # 兼容 Table 对象
@@ -1791,7 +1922,12 @@ class AdvancedSQLQueryEngine:
 
             if right_table not in worksheets_data:
                 available = list(worksheets_data.keys())
-                raise ValueError(f"JOIN表 '{right_table}' 不存在。可用表: {available}")
+                raise StructuredSQLError(
+                    "table_not_found",
+                    f"JOIN表 '{right_table}' 不存在。可用表: {available}",
+                    hint="请检查JOIN的表名，或用excel_list_sheets查看可用工作表名。",
+                    context={"table_requested": right_table, "available_tables": available}
+                )
 
             right_df = worksheets_data[right_table].copy()
 
@@ -1805,15 +1941,29 @@ class AdvancedSQLQueryEngine:
                 # CROSS JOIN: 笛卡尔积，不需要ON条件
                 pass
             elif not on_clause:
-                raise ValueError("JOIN缺少ON条件")
+                raise StructuredSQLError(
+                    "join_error",
+                    "JOIN缺少ON条件",
+                    hint="JOIN必须包含ON条件，例如：... JOIN 表2 ON 表1.id = 表2.id。"
+                )
             else:
                 left_on_col, right_on_col = self._parse_join_on_condition(on_clause, left_table, right_table, right_alias)
 
                 # 验证列存在
                 if left_on_col not in result_df.columns:
-                    raise ValueError(f"JOIN ON条件: 左表 '{left_table}' 没有列 '{left_on_col}'。可用列: {list(result_df.columns)}")
+                    raise StructuredSQLError(
+                        "column_not_found",
+                        f"左表 '{left_table}' 没有列 '{left_on_col}'。可用列: {list(result_df.columns)}",
+                        hint="请检查ON条件中左表的列名拼写。",
+                        context={"table": left_table, "column_requested": left_on_col, "available_columns": list(result_df.columns)}
+                    )
                 if right_on_col not in right_df.columns:
-                    raise ValueError(f"JOIN ON条件: 右表 '{right_table}' 没有列 '{right_on_col}'。可用列: {list(right_df.columns)}")
+                    raise StructuredSQLError(
+                        "column_not_found",
+                        f"右表 '{right_table}' 没有列 '{right_on_col}'。可用列: {list(right_df.columns)}",
+                        hint="请检查ON条件中右表的列名拼写。",
+                        context={"table": right_table, "column_requested": right_on_col, "available_columns": list(right_df.columns)}
+                    )
 
             # 执行JOIN
             # 为右表列添加别名前缀避免冲突
