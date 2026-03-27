@@ -7,6 +7,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.5.2] - 2026-03-27
+
+### 优化
+- **REQ-015 excel_update_query流式写入**：UPDATE语句自动选择高性能路径
+  - 智能决策：affected_rows≥50 / changes≥100 / 文件>1MB时使用streaming
+  - copy-modify-write方案：calamine读取 → 内存修改 → write_only写入
+  - 流式写入失败自动降级到传统openpyxl方式
+  - 返回值新增method字段标识写入方式（streaming/traditional）
+  - 1099测试全通过，8项游戏场景验证通过
+
 ## [1.5.1] - 2026-03-27
 
 ### 优化
