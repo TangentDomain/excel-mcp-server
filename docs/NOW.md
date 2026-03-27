@@ -1,21 +1,19 @@
-# 第141轮 - REQ-025 AI体验优化（docstring迭代）
+# 第142轮 - REQ-029 JOIN _x/_y后缀bug修复
 
 ---
 
 ## 状态
-版本：v1.6.22 | 工具：44 | 测试：1168
+版本：v1.6.23 | 工具：44 | 测试：1159
 
 ## 本轮完成
-- **REQ-025 docstring优化**（第4轮，4个核心函数已全部达标）
-  - excel_find_last_row：返回信息+实用技巧+配合使用 ✅
-  - excel_create_file：返回信息+初始化建议+标准流程+配合使用 ✅
-  - excel_query：实用技巧+配合使用 ✅
-  - excel_update_query：实用技巧+安全建议+配合使用 ✅
-- **README同步**：中英文版本号更新至v1.6.22
-- **DECISIONS.md瘦身**：归档最早10条记录
-- **PyPI**：v1.6.22已发布（之前轮次）
+- **REQ-029 Bug 1修复**：JOIN ON不同列名时pandas merge产生_x/_y后缀
+  - 根因：elif条件`left_on_col == right_on_col`限制过严，遗漏左ON列在右表存在的场景
+  - 修复：移除该限制，确保左ON列在右表存在时始终重命名为`alias.col`
+  - 3个回归测试：无后缀/别名列可引用/WHERE正常
+- **REQ-029 Bug 2确认**：describe_table崩溃已在v1.6.20修复（D018），无需再改
+- **PyPI**：v1.6.23已发布
 
 ## 下轮待办
-- [ ] REQ-025 docstring继续优化剩余函数（如有质量未达标的）
-- [ ] REQ-010 文档与门面优化
 - [ ] 每5轮MCP真实验证（下次第145轮）
+- [ ] REQ-025 docstring继续优化剩余函数
+- [ ] REQ-010 文档与门面优化
