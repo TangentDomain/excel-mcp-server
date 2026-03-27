@@ -74,3 +74,4 @@ src/excel_mcp_server_fastmcp/
 📋 需求池：X open / Y in-progress / Z done
 🐛 待修：[列表]
 🔄 自我进化：[有/无]
+📊 效率追踪：[改RULES.md后的5轮内填写：测试耗时 | 有效时间 | 痛点复发]
