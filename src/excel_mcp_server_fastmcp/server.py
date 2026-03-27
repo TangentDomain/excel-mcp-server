@@ -962,9 +962,9 @@ def excel_update_range(
 • **数据迁移**: 从一个表提取数据写入另一个表
 
 **🔧 写入模式**:
-• **覆盖模式**: 直接覆盖目标范围内的所有数据（streaming=True时）
-• **插入模式**: 在目标位置插入新数据，原数据下移（preserve_formulas=True时）
-• **流式写入**: streaming=True（默认）使用calamine引擎，大文件性能更好
+• **覆盖模式**: 直接覆盖目标范围内的所有数据（streaming=True时使用流式覆盖）
+• **插入模式**: 在目标位置插入新数据，原数据下移（streaming=True时使用流式插入）
+• **流式写入**: streaming=True（默认）使用calamine引擎，内存占用低，适合大文件
 • **传统写入**: streaming=False使用openpyxl，保留所有格式但内存占用高
 
 **📋 参数详解**:
@@ -981,8 +981,9 @@ def excel_update_range(
 • 精确位置写入→用本工具（最灵活）
 
 **⚡ 性能提示**:
-• streaming=True覆盖模式性能最佳
-• 插入模式不支持streaming（需要移动行数据）
+• streaming=True时，覆盖模式和插入模式都使用流式写入，内存占用低
+• preserve_formulas=False时性能最佳，插入模式下会自动使用流式插入
+• 大文件强烈建议使用streaming=True，内存占用与文件大小无关
 • 大文件建议使用streaming减少内存占用
     """
     _path_err = _validate_path(file_path)
@@ -1025,8 +1026,9 @@ def excel_update_range(
     })
 
     try:
-        # 流式路径：仅覆盖模式 + 不保留公式
-        use_streaming = streaming and not insert_mode and not preserve_formulas
+        # 扩展流式路径：支持覆盖模式和插入模式
+        use_streaming = streaming and not preserve_formulas
+        # 插入模式会自动使用流式插入，覆盖模式使用流式覆盖
         result = ExcelOperations.update_range(file_path, range, data, preserve_formulas, insert_mode, use_streaming)
 
         # 记录操作结果
@@ -3067,8 +3069,19 @@ def excel_compare_sheets(
 @_track_call
 def excel_server_stats() -> Dict[str, Any]:
     """
-获取MCP服务器运行统计：每个工具的调用次数、平均耗时、错误率和错误分类。
-返回全局error_types统计（按错误类型分类的计数），用于监控和调试。
+📊 服务器性能监控 - Excel MCP的健康守护者
+
+**核心功能**: 获取MCP服务器运行统计：每个工具的调用次数、平均耗时、错误率和错误分类。返回全局error_types统计（按错误类型分类的计数），用于监控和调试。
+
+**🎮 游戏开发场景**:
+• **性能瓶颈分析**: 监控技能表查询、装备表更新等高频工具的性能表现，识别慢操作
+• **错误率监控**: 追踪数据导入、表结构修改等关键操作的错误率，确保数据质量
+• **资源使用追踪**: 监控大文件处理、批量数据操作时的内存和CPU使用情况
+• **API调用统计**: 分析游戏配置管理、数据同步等场景的API调用模式，优化接口设计
+
+**返回信息**: 工具调用统计、错误分类统计、性能指标、API调用频率
+**参数说明**: 无参数，返回全局服务器统计信息
+**使用建议**: 在进行大规模数据处理前检查服务器状态，性能异常时及时干预
     """
     stats = _tracker.get_stats()
     return _ok("服务器统计信息", data=stats)
