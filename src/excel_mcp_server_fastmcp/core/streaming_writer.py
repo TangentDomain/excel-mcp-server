@@ -11,12 +11,13 @@ copy-modify-write 方案：用 calamine 读取 + write_only 模式写入，
 
 import logging
 import os
+import re
 import shutil
 import tempfile
-from typing import List, Dict, Any, Optional, Tuple
+from typing import List, Dict, Any, Optional, Tuple, Callable
 
 from openpyxl import Workbook, load_workbook
-from openpyxl.utils import get_column_letter
+from openpyxl.utils import get_column_letter, column_index_from_string
 
 logger = logging.getLogger(__name__)
 
@@ -352,4 +353,299 @@ class StreamingWriter:
 
         except Exception as e:
             logger.error(f"流式upsert失败: {e}")
+            return False, f"流式写入失败: {str(e)}", {}
+
+    @classmethod
+    def _copy_modify_write(
+        cls,
+        file_path: str,
+        sheet_name: str,
+        modify_fn: Callable[[List[List[Any]]], Tuple[bool, str, List[List[Any]], Dict[str, Any]]],
+        preserve_col_widths: bool = True,
+    ) -> Tuple[bool, str, Dict[str, Any]]:
+        """通用 copy-modify-write：calamine读取 → 修改 → write_only写入
+
+        Args:
+            file_path: Excel文件路径
+            sheet_name: 目标工作表名
+            modify_fn: 修改函数，接收(rows, header_row, col_map)，
+                       返回(success, message, modified_rows, metadata)
+            preserve_col_widths: 是否保留列宽
+
+        Returns:
+            (success, message, metadata)
+        """
+        if not _HAS_CALAMINE:
+            return False, "calamine未安装，无法使用流式写入", {}
+
+        try:
+            # 1. calamine 读取所有工作表数据
+            cal_wb = CalamineWorkbook.from_path(file_path)
+            all_sheets_data = {}
+            target_rows = None
+            col_map = {}
+
+            for sn in cal_wb.sheet_names:
+                rows = cal_wb.get_sheet_by_name(sn).to_python()
+                all_sheets_data[sn] = rows
+                if sn == sheet_name and rows:
+                    target_rows = list(rows)
+                    # 提取表头映射（第1行为表头）
+                    for col_idx, cell_val in enumerate(rows[0], 1):
+                        if cell_val is not None:
+                            col_map[str(cell_val).strip()] = col_idx
+
+            if sheet_name not in all_sheets_data:
+                available = ', '.join(all_sheets_data.keys())
+                return False, f"工作表不存在: {sheet_name}（可用: {available}）", {}
+
+            if target_rows is None:
+                return False, f"工作表 '{sheet_name}' 为空", {}
+
+            # 2. 调用修改函数
+            success, message, modified_rows, extra_meta = modify_fn(
+                target_rows, 1, col_map
+            )
+            if not success:
+                return False, message, extra_meta
+
+            # 3. 更新目标工作表数据
+            all_sheets_data[sheet_name] = modified_rows
+
+            # 4. 读取列宽
+            col_widths = {}
+            if preserve_col_widths:
+                try:
+                    wb_meta = load_workbook(file_path)
+                    if sheet_name in wb_meta.sheetnames:
+                        ws_meta = wb_meta[sheet_name]
+                        col_widths = {
+                            col_letter: dim.width
+                            for col_letter, dim in ws_meta.column_dimensions.items()
+                            if dim.width
+                        }
+                    wb_meta.close()
+                except Exception as e:
+                    logger.warning(f"读取列宽失败，跳过: {e}")
+
+            # 5. write_only 写入
+            wb_out = Workbook(write_only=True)
+            for sn in cal_wb.sheet_names:
+                ws = wb_out.create_sheet(title=sn)
+                sheet_rows = all_sheets_data[sn]
+
+                if not sheet_rows:
+                    continue
+
+                if sn == sheet_name and col_widths:
+                    for col_letter, width in col_widths.items():
+                        try:
+                            ws.column_dimensions[col_letter].width = width
+                        except Exception:
+                            pass
+
+                for row in sheet_rows:
+                    ws.append(row)
+
+            # 6. 原子替换
+            fd, tmp_path = tempfile.mkstemp(suffix='.xlsx', dir=os.path.dirname(file_path))
+            os.close(fd)
+
+            try:
+                wb_out.save(tmp_path)
+                wb_out.close()
+                shutil.move(tmp_path, file_path)
+            except Exception:
+                if os.path.exists(tmp_path):
+                    os.unlink(tmp_path)
+                raise
+
+            meta = {'mode': 'streaming', 'col_widths_preserved': len(col_widths) > 0}
+            meta.update(extra_meta)
+            return True, message, meta
+
+        except Exception as e:
+            logger.error(f"流式copy-modify-write失败: {e}")
+            return False, f"流式写入失败: {str(e)}", {}
+
+    @classmethod
+    def delete_rows(
+        cls,
+        file_path: str,
+        sheet_name: str,
+        start_row: int,
+        count: int = 1,
+        preserve_col_widths: bool = True,
+    ) -> Tuple[bool, str, Dict[str, Any]]:
+        """流式删除行：calamine读取 → 删除行 → write_only写入
+
+        Args:
+            file_path: Excel文件路径
+            sheet_name: 目标工作表名
+            start_row: 起始行号（1-based，含表头）
+            count: 删除行数
+            preserve_col_widths: 是否保留列宽
+
+        Returns:
+            (success, message, metadata)
+        """
+        if not _HAS_CALAMINE:
+            return False, "calamine未安装", {}
+
+        if start_row < 1:
+            return False, f"起始行号必须>=1，实际: {start_row}", {}
+        if count < 1:
+            return False, f"删除行数必须>=1，实际: {count}", {}
+
+        def _modify(rows, header_row, col_map):
+            if start_row > len(rows):
+                return False, f"起始行号({start_row})超过工作表总行数({len(rows)})", rows, {}
+            actual_count = min(count, len(rows) - start_row + 1)
+            new_rows = rows[:start_row - 1] + rows[start_row - 1 + actual_count:]
+            return True, (
+                f"流式删除第{start_row}-{start_row + actual_count - 1}行"
+                f"（共{actual_count}行）"
+            ), new_rows, {
+                'action': 'delete_rows_streaming',
+                'start_row': start_row,
+                'actual_count': actual_count,
+                'original_rows': len(rows),
+                'new_rows': len(new_rows),
+            }
+
+        return cls._copy_modify_write(file_path, sheet_name, _modify, preserve_col_widths)
+
+    @classmethod
+    def delete_columns(
+        cls,
+        file_path: str,
+        sheet_name: str,
+        start_column: int,
+        count: int = 1,
+        preserve_col_widths: bool = True,
+    ) -> Tuple[bool, str, Dict[str, Any]]:
+        """流式删除列：calamine读取 → 删除列 → write_only写入
+
+        Args:
+            file_path: Excel文件路径
+            sheet_name: 目标工作表名
+            start_column: 起始列号（1-based）
+            count: 删除列数
+            preserve_col_widths: 是否保留列宽
+
+        Returns:
+            (success, message, metadata)
+        """
+        if not _HAS_CALAMINE:
+            return False, "calamine未安装", {}
+
+        if start_column < 1:
+            return False, f"起始列号必须>=1，实际: {start_column}", {}
+        if count < 1:
+            return False, f"删除列数必须>=1，实际: {count}", {}
+
+        def _modify(rows, header_row, col_map):
+            if not rows:
+                return False, "工作表为空", rows, {}
+
+            max_col = max(len(r) for r in rows) if rows else 0
+            if start_column > max_col:
+                return False, f"起始列号({start_column})超过工作表最大列数({max_col})", rows, {}
+
+            actual_count = min(count, max_col - start_column + 1)
+            end_col = start_column + actual_count - 1  # inclusive
+
+            new_rows = []
+            for row in rows:
+                # 删除 start_column-1 到 end_col-1 位置的元素
+                new_row = row[:start_column - 1] + row[end_col:]
+                new_rows.append(new_row)
+
+            return True, (
+                f"流式删除第{start_column}-{end_col}列"
+                f"（共{actual_count}列）"
+            ), new_rows, {
+                'action': 'delete_columns_streaming',
+                'start_column': start_column,
+                'actual_count': actual_count,
+                'original_columns': max_col,
+                'new_columns': max_col - actual_count,
+            }
+
+        return cls._copy_modify_write(file_path, sheet_name, _modify, preserve_col_widths)
+
+    @classmethod
+    def update_range(
+        cls,
+        file_path: str,
+        sheet_name: str,
+        start_row: int,
+        start_col: int,
+        data: List[List[Any]],
+        preserve_col_widths: bool = True,
+    ) -> Tuple[bool, str, Dict[str, Any]]:
+        """流式覆盖范围：calamine读取 → 覆盖指定范围 → write_only写入
+
+        仅支持覆盖模式（insert_mode=False），不保留公式。
+        适合批量修改已知位置的数据。
+
+        Args:
+            file_path: Excel文件路径
+            sheet_name: 目标工作表名
+            start_row: 起始行号（1-based）
+            start_col: 起始列号（1-based）
+            data: 二维数组数据
+            preserve_col_widths: 是否保留列宽
+
+        Returns:
+            (success, message, metadata)
+        """
+        if not _HAS_CALAMINE:
+            return False, "calamine未安装", {}
+
+        try:
+            if not data:
+                return False, "数据不能为空", {}
+            if start_row < 1:
+                return False, f"起始行号必须>=1，实际: {start_row}", {}
+            if start_col < 1:
+                return False, f"起始列号必须>=1，实际: {start_col}", {}
+
+            def _modify(rows, header_row, col_map):
+                # 确保行数足够
+                max_needed_row = start_row - 1 + len(data)
+                if max_needed_row > len(rows):
+                    # 追加空行
+                    max_col = max(len(r) for r in rows) if rows else 0
+                    while len(rows) < max_needed_row:
+                        rows.append([None] * max_col)
+
+                updated_cells = 0
+                for r_offset, row_data in enumerate(data):
+                    row_idx = start_row - 1 + r_offset
+                    for c_offset, value in enumerate(row_data):
+                        col_idx = start_col - 1 + c_offset
+                        # 确保列数足够
+                        while len(rows[row_idx]) <= col_idx:
+                            rows[row_idx].append(None)
+                        rows[row_idx][col_idx] = value
+                        updated_cells += 1
+
+                return True, (
+                    f"流式覆盖 {len(data)} 行×{max(len(r) for r in data)} 列"
+                    f"（从{sheet_name}!{get_column_letter(start_col)}{start_row}，"
+                    f"共{updated_cells}个单元格）"
+                ), rows, {
+                    'action': 'update_range_streaming',
+                    'start_row': start_row,
+                    'start_col': start_col,
+                    'rows_written': len(data),
+                    'cols_written': max(len(r) for r in data),
+                    'updated_cells': updated_cells,
+                }
+
+            return cls._copy_modify_write(file_path, sheet_name, _modify, preserve_col_widths)
+
+        except Exception as e:
+            logger.error(f"流式覆盖范围失败: {e}")
             return False, f"流式写入失败: {str(e)}", {}

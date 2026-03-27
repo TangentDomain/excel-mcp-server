@@ -88,7 +88,8 @@ class ExcelOperations:
         range_expression: str,
         data: List[List[Any]],
         preserve_formulas: bool = True,
-        insert_mode: bool = True
+        insert_mode: bool = True,
+        streaming: bool = False
     ) -> Dict[str, Any]:
         """
         @intention 更新Excel文件中指定范围的数据，支持插入和覆盖模式
@@ -101,16 +102,10 @@ class ExcelOperations:
             insert_mode: 数据写入模式 (默认值: True)
                 - True: 插入模式，在指定位置插入新行然后写入数据（更安全）
                 - False: 覆盖模式，直接覆盖目标范围的现有数据
+            streaming: 是否使用流式写入（仅覆盖模式有效）
 
         Returns:
             Dict: 标准化的操作结果
-
-        Example:
-            data = [["姓名", "年龄"], ["张三", 25]]
-            # 插入模式（默认，更安全）
-            result = ExcelOperations.update_range("test.xlsx", "Sheet1!A1:B2", data)
-            # 覆盖模式（显式指定）
-            result = ExcelOperations.update_range("test.xlsx", "Sheet1!A1:B2", data, insert_mode=False)
         """
         if cls.DEBUG_LOG_ENABLED:
             logger.info(f"{cls._LOG_PREFIX} 开始更新范围数据: {range_expression}, 模式: {'插入' if insert_mode else '覆盖'}")
@@ -121,7 +116,42 @@ class ExcelOperations:
             if not validation_result['valid']:
                 return cls._format_error_result(validation_result['error'])
 
-            # 步骤2: 执行数据写入
+            # 步骤2: 流式写入路径（仅覆盖模式）
+            if streaming and not insert_mode and not preserve_formulas:
+                from excel_mcp_server_fastmcp.core.streaming_writer import StreamingWriter
+                if StreamingWriter.is_available():
+                    try:
+                        from excel_mcp_server_fastmcp.utils.parsers import RangeParser
+                        range_info_parsed = RangeParser.parse_range_expression(range_expression)
+                        sheet_name = range_info_parsed.sheet_name
+
+                        if sheet_name:
+                            # 解析起始行列
+                            from openpyxl.utils import range_boundaries
+                            min_col, min_row, max_col, max_row = range_boundaries(
+                                range_info_parsed.cell_range
+                            )
+                            success, message, meta = StreamingWriter.update_range(
+                                file_path, sheet_name, min_row, min_col, data
+                            )
+                            if success:
+                                return {
+                                    'success': True,
+                                    'message': message,
+                                    'data': meta,
+                                    'metadata': {
+                                        'file_path': file_path,
+                                        'sheet_name': sheet_name,
+                                        'range': range_expression,
+                                        **meta
+                                    }
+                                }
+                            else:
+                                logger.warning(f"流式update_range失败，降级到openpyxl: {message}")
+                    except Exception as parse_err:
+                        logger.warning(f"流式update_range范围解析失败，降级到openpyxl: {parse_err}")
+
+            # 步骤3: 传统openpyxl路径
             writer = ExcelWriter(file_path)
             result = writer.update_range(range_expression, data, preserve_formulas, insert_mode)
 
@@ -1048,7 +1078,8 @@ class ExcelOperations:
         file_path: str,
         sheet_name: str,
         row_index: int,
-        count: int = 1
+        count: int = 1,
+        streaming: bool = True
     ) -> Dict[str, Any]:
         """
         @intention 删除指定行
@@ -1058,6 +1089,7 @@ class ExcelOperations:
             sheet_name: 工作表名称
             row_index: 起始行号 (1-based)
             count: 删除行数
+            streaming: 是否使用流式写入（默认True，大文件性能更好）
 
         Returns:
             Dict: 标准化的操作结果
@@ -1066,6 +1098,27 @@ class ExcelOperations:
             logger.info(f"{cls._LOG_PREFIX} 开始删除行: {sheet_name} 第{row_index}行")
 
         try:
+            # 流式写入路径
+            if streaming:
+                from excel_mcp_server_fastmcp.core.streaming_writer import StreamingWriter
+                if StreamingWriter.is_available():
+                    success, message, meta = StreamingWriter.delete_rows(
+                        file_path, sheet_name, row_index, count
+                    )
+                    if success:
+                        return {
+                            'success': True,
+                            'message': message,
+                            'data': meta,
+                            'metadata': {
+                                'file_path': file_path,
+                                'sheet_name': sheet_name,
+                                **meta
+                            }
+                        }
+                    else:
+                        logger.warning(f"流式删除行失败，降级到openpyxl: {message}")
+
             writer = ExcelWriter(file_path)
             result = writer.delete_rows(sheet_name, row_index, count)
             return format_operation_result(result)
@@ -1081,7 +1134,8 @@ class ExcelOperations:
         file_path: str,
         sheet_name: str,
         column_index: int,
-        count: int = 1
+        count: int = 1,
+        streaming: bool = True
     ) -> Dict[str, Any]:
         """
         @intention 删除指定列
@@ -1091,6 +1145,7 @@ class ExcelOperations:
             sheet_name: 工作表名称
             column_index: 起始列号 (1-based)
             count: 删除列数
+            streaming: 是否使用流式写入（默认True，大文件性能更好）
 
         Returns:
             Dict: 标准化的操作结果
@@ -1099,6 +1154,27 @@ class ExcelOperations:
             logger.info(f"{cls._LOG_PREFIX} 开始删除列: {sheet_name} 第{column_index}列")
 
         try:
+            # 流式写入路径
+            if streaming:
+                from excel_mcp_server_fastmcp.core.streaming_writer import StreamingWriter
+                if StreamingWriter.is_available():
+                    success, message, meta = StreamingWriter.delete_columns(
+                        file_path, sheet_name, column_index, count
+                    )
+                    if success:
+                        return {
+                            'success': True,
+                            'message': message,
+                            'data': meta,
+                            'metadata': {
+                                'file_path': file_path,
+                                'sheet_name': sheet_name,
+                                **meta
+                            }
+                        }
+                    else:
+                        logger.warning(f"流式删除列失败，降级到openpyxl: {message}")
+
             writer = ExcelWriter(file_path)
             result = writer.delete_columns(sheet_name, column_index, count)
             return format_operation_result(result)
