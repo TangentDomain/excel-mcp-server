@@ -4,6 +4,10 @@
 
 ## DONE
 
+### REQ-028 [P1] FROM子查询支持 ✅
+- **描述**：支持 `SELECT * FROM (SELECT ...) AS t WHERE ...`
+- **验收**：基础FROM子查询 + WHERE过滤 + JOIN结果子查询 + 嵌套子查询拒绝 + 空结果 + DISTINCT + 无别名，12个测试全通过
+
 - REQ-000 SQL查询引擎 ✅（第3-13轮）
 - REQ-000 双行表头自动识别 ✅（第3轮）
 - REQ-001 游戏领域函数 ✅（README DPM数学表达式示例满足）
