@@ -1142,13 +1142,27 @@ class AdvancedSQLQueryEngine:
             table_part, col_part = col_name.split('.', 1)
             # 从 _table_aliases 获取真实的表名
             resolved_table = self._table_aliases.get(table_part, table_part)
-            # 检查列名是否存在于结果DataFrame中
+            
+            # 优先检查用户使用的别名格式是否直接存在
             alias_col = f"{table_part}.{col_part}"
             if alias_col in df.columns:
                 return alias_col
-            # 如果别名列不存在，尝试原始列名
+            
+            # 检查JOIN后pandas添加的后缀格式（table_part_列名）
+            pandas_suffix_col = f"{table_part}_{col_part}"
+            if pandas_suffix_col in df.columns:
+                return pandas_suffix_col
+            
+            # 尝试其他可能的别名格式
+            # 如果用户使用的是原始表名，检查原始表名+列名
+            original_col = f"{resolved_table}_{col_part}"
+            if original_col in df.columns:
+                return original_col
+                
+            # 最后尝试原始列名
             if col_part in df.columns:
                 return col_part
+                
         return col_name
 
     def _extract_literal_value(self, expr):
