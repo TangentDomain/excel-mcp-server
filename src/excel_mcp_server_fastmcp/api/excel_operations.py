@@ -1743,10 +1743,32 @@ class ExcelOperations:
 
             # 收集ID数据
             ids_with_rows = []
-            for row in range(header_row + 1, ws.max_row + 1):
-                cell_value = ws.cell(row=row, column=col_idx).value
-                if cell_value is not None:  # 跳过空值
-                    ids_with_rows.append((cell_value, row))
+            # 处理流式写入后 max_row 可能为 None 的情况
+            if ws.max_row is None:
+                # read_only模式下max_row=None，逐行扫描直到连续N行为空
+                max_scan = 10000  # 安全上限
+                consecutive_empty = 0
+                empty_threshold = 10  # 连续N行为空则停止
+                for row in range(header_row + 1, header_row + 1 + max_scan):
+                    try:
+                        cell_value = ws.cell(row=row, column=col_idx).value
+                        if cell_value is not None:
+                            ids_with_rows.append((cell_value, row))
+                            consecutive_empty = 0
+                        else:
+                            consecutive_empty += 1
+                            if consecutive_empty >= empty_threshold:
+                                break
+                    except Exception:
+                        consecutive_empty += 1
+                        if consecutive_empty >= empty_threshold:
+                            break
+            else:
+                # 正常情况：max_row 存在
+                for row in range(header_row + 1, ws.max_row + 1):
+                    cell_value = ws.cell(row=row, column=col_idx).value
+                    if cell_value is not None:  # 跳过空值
+                        ids_with_rows.append((cell_value, row))
 
             # 统计ID出现次数
             id_counter = Counter([id_val for id_val, _ in ids_with_rows])
