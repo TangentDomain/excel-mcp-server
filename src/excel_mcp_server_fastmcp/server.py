@@ -506,11 +506,9 @@ def _wrap(result: dict, meta: dict = None) -> dict:
     if "metadata" in result:
         m = result.pop("metadata")
         if isinstance(m, dict) and m:
-            result["meta"] = m
-            if meta:
-                meta = {**m, **meta}
-            else:
-                meta = m
+            merged = {**m, **(meta or {})}
+            result["meta"] = merged
+            meta = None  # 已合并，不再重复设置
     if meta and "meta" not in result:
         result["meta"] = meta
     return result
