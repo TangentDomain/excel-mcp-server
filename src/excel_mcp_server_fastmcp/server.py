@@ -1835,10 +1835,26 @@ def excel_find_last_row(
 • **数据清理**: 确认数据范围后进行清理操作
 • **表格维护**: 定期检查表格数据量
 
-**💡 使用建议**:
-• 追加单行: `excel_find_last_row("技能表.xlsx", "技能表")` → 返回末行号 → 在末行+1写入
-• 按列定位: `column="A"` 查找A列最后有数据的行
-• 批量追加: 直接用`excel_batch_insert_rows`自动定位末行
+**📊 返回信息**:
+• **last_row**: 最后有数据的行号（1-based，表头行不计入）
+• **total_rows**: 数据行总数（last_row - header_row + 1）
+• **column_specific**: 按列查找时的列信息和末行号
+
+**💡 实用技巧**:
+• **精确追加定位**: 
+  ```python
+  last_row = excel_find_last_row("技能表.xlsx", "技能表")["last_row"]
+  # 在last_row + 1位置写入新数据
+  ```
+• **批量导入无需此工具**: `excel_batch_insert_rows`会自动定位末行，无需手动计算
+• **列特定定位**: 用`column="A"`查找A列最后数据，适合有间断数据的列
+• **双行表头支持**: 自动跳过header_row行，不会误判表头为数据
+
+**🎯 配合使用**:
+• 新增单行: + `excel_upsert_row` / `excel_insert_rows` 
+• 批量新增: + `excel_batch_insert_rows`（推荐，自动处理末行）
+• 数据验证: + `excel_describe_table`确认数据完整性
+• 版本对比: + `excel_compare_sheets`对比末行数据变化
     """
     _path_err = _validate_path(file_path)
     if _path_err:
@@ -1865,9 +1881,28 @@ def excel_create_file(
 **🔧 参数说明**:
 • **sheet_names**: 工作表名称列表（如["技能表","装备表"]），默认创建"Sheet"
 
-**⚡ 使用建议**:
-• 创建后用excel_update_range写入表头和数据
-• 需要多工作表可在创建时指定sheet_names
+**📊 返回信息**:
+• **file_path**: 创建的文件完整路径
+• **sheets**: 创建的工作表名称列表
+• **initial_rows**: 初始行数（创建为空文件，通常为0）
+
+**💡 初始化建议**:
+• **标准配置表**: 创建后立即用`excel_update_range`写入表头
+• **多表架构**: 一次性创建所有工作表：`["技能表","装备表","怪物表"]`
+• **模板制作**: 创建空文件后添加格式模板，再复制为基准模板
+• **项目规范**: 建议文件名格式：`项目名_配置类型_版本.xlsx`
+
+**🎯 标准初始化流程**:
+1️⃣ **创建文件**: `excel_create_file("技能表_v2.1.xlsx", ["技能配置"])`
+2️⃣ **写入表头**: `excel_update_range("技能表_v2.1.xlsx", "A1:D1", [["技能ID", "名称", "伤害", "冷却"]])`
+3️⃣ **验证结构**: `excel_describe_table("技能表_v2.1.xlsx", "技能配置")`
+4️⃣ **批量导入**: `excel_batch_insert_rows`填充初始数据
+
+**⚡ 配合使用**:
+• 文件创建后立即: + `excel_update_range`写入表头
+• 数据导入前: + `excel_describe_table`确认结构
+• 版本管理: + `excel_create_backup`保存初始版本
+• 批量初始化: + 循环调用创建多个配置文件
     """
     _path_err = _validate_path(file_path)
     if _path_err:
@@ -2584,11 +2619,26 @@ def excel_query(
 • json: 结构化JSON数据
 • csv: CSV逗号分隔格式
 
-**💡 使用建议**:
-• 新手: 先用excel_describe_table了解表结构
-• 复杂分析: 使用GROUP BY和HAVING进行统计
-• 大表查询: 利用缓存提升后续查询速度
-• 中文查询: 直接使用双行表头的中文描述
+**💡 实用技巧**:
+• **表结构先行**: 先调用`excel_describe_table`了解列名和数据类型
+• **中英文混合**: 支持双行表头的`技能名称`/`skill_name`混用
+• **性能优化**: 重复查询相同文件有缓存，第二次快30-100倍
+• **错误恢复**: 列名错误时自动推荐相似列名，减少拼写错误
+
+**🎯 配合使用**:
+• **数据分析链**:
+  1. `excel_describe_table` → 了解结构
+  2. `excel_query` → 检索数据
+  3. `excel_assess_data_impact` → 评估修改风险
+• **版本对比**: `excel_query` + `excel_compare_sheets`
+• **数据导出**: `excel_query(..., output_format="csv")` + 导出处理
+• **重复查询**: 利用缓存优势，连续查询相同文件更快
+
+**⚡ 性能策略**:
+• 小批量(100行以内): 直接查询，无需特殊处理
+• 大批量(1000行以上): 分页查询 + LIMIT子句避免内存溢出
+• 复杂聚合: 先预筛选再聚合，减少计算量
+• 重复使用: 保持连接复用，不要频繁开关文件
     """
     _path_err = _validate_path(file_path)
     if _path_err:
@@ -2666,11 +2716,24 @@ def excel_update_query(
 • **备份机制**: 修改前自动创建备份
 • **错误提示**: 详细错误信息，AI可自动修复
 
+**🔒 安全建议**:
+• **必须预览**: 重要修改先用`dry_run=True`预览影响
+• **条件精确**: 避免`UPDATE 技能 SET 伤害 = 1000`这种无条件更新
+• **数据范围**: 一次修改1000行以内，避免大范围风险
+• **备份策略**: 关键配置表修改前手动备份一次
+• **分步操作**: 大量数据分批修改，不要一次性全表更新
+
 **💡 最佳实践**:
-1️⃣ **先预览后执行**: `dry_run=True` 预览修改范围和数据影响
-2️⃣ **精准条件**: 用明确的WHERE条件避免误修改
-3️⃣ **小批量测试**: 先测试小范围数据验证修改逻辑
-4️⃣ **备份确认**: 重要修改前确认文件已备份
+1️⃣ **预览验证**: `dry_run=True` → 查看影响行数和示例数据
+2️⃣ **条件测试**: 先用`excel_query`测试WHERE条件，确保筛选正确
+3️⃣ **渐进修改**: 从小数据量开始，验证无误后再扩大范围
+4️⃣ **版本对比**: 复杂修改后用`excel_compare_sheets`验证结果
+
+**🎯 配合使用**:
+• **修改前**: + `excel_describe_table`了解结构 + `excel_query`测试条件
+• **修改中**: + `dry_run=True`预览 + 小批量测试
+• **修改后**: + `excel_query`验证结果 + `excel_compare_sheets`对比版本
+• **紧急恢复**: + `excel_restore_backup`恢复到修改前状态
 5️⃣ **验证结果**: 修改后用excel_query确认修改成功
 
 **🚫 注意事项**:
