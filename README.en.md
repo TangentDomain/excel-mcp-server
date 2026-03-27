@@ -10,13 +10,13 @@
 [![Python Version](https://img.shields.io/badge/python-3.10+-blue.svg)](https://www.python.org/downloads/)
 [![Powered by: FastMCP](https://img.shields.io/badge/Powered%20by-FastMCP-orange)](https://github.com/jlowin/fastmcp)
 ![Status](https://img.shields.io/badge/status-stable-green.svg)
-![Tests](https://img.shields.io/badge/tests-1168%20tests-brightgreen.svg)
+![Tests](https://img.shields.io/badge/tests-1159%20tests-brightgreen.svg)
 ![Tools](https://img.shields.io/badge/tools-44%20verified%20tools-green.svg)
 [![PyPI](https://img.shields.io/pypi/v/excel-mcp-server-fastmcp.svg)](https://pypi.org/project/excel-mcp-server-fastmcp/)
-[![Version](https://img.shields.io/badge/version-v1.6.23-blue.svg)](https://pypi.org/project/excel-mcp-server-fastmcp/#history)
+[![Version](https://img.shields.io/badge/version-v1.6.24-blue.svg)](https://pypi.org/project/excel-mcp-server-fastmcp/#history)
 [![CI](https://github.com/TangentDomain/excel-mcp-server/actions/workflows/ci.yml/badge.svg)](https://github.com/TangentDomain/excel-mcp-server/actions/workflows/ci.yml)
 
-**ExcelMCP** is an Excel configuration table management MCP server designed for game development. Through AI natural language commands, it enables intelligent operations on game configurations such as skill tables, equipment data, and monster attributes. Built with **FastMCP**, reads use **python-calamine** (Rust engine, 2300x speedup), writes use **openpyxl**. Features **44 professional tools** and **1168 test cases**, ensuring enterprise-grade reliability.
+**ExcelMCP** is an Excel configuration table management MCP server designed for game development. Through AI natural language commands, it enables intelligent operations on game configurations such as skill tables, equipment data, and monster attributes. Built with **FastMCP**, reads use **python-calamine** (Rust engine, 2300x speedup), writes use **openpyxl**. Features **44 professional tools** and **1159 test cases**, ensuring enterprise-grade reliability.
 
 🎯 **Core Features**: Skill systems, equipment management, monster configuration, numerical balancing, version comparison, designer toolchain
 
@@ -31,7 +31,7 @@
 | **Game Optimization** | ✅ Specialized Game Data Structures | ❌ Generic Spreadsheet Processing |
 | **Cross-file JOIN** | ✅ `@'filepath'` Syntax | ❌ Not Supported |
 | **Error Handling** | ✅ Structured Errors + AI Repair Hints | ❌ Basic Exceptions |
-| **Test Coverage** | ✅ 1168 Test Cases | ❌ Limited Testing |
+| **Test Coverage** | ✅ 1159 Test Cases | ❌ Limited Testing |
 | **Installation** | ✅ `uvx` One-line Command | ⚠️ Requires pip Installation |
 
 ## 🚀 Why Choose ExcelMCP
@@ -218,7 +218,7 @@ python scripts/benchmark.py --compare      # Compare with previous results
 | **Dual-row Headers** | ✅ Auto-detect Chinese desc + English field | ❌ | ❌ |
 | **SQL UPDATE** | ✅ Conditional batch modification | ❌ | ❌ |
 | **Cross-file JOIN** | ✅ @filepath syntax | ❌ | ❌ |
-| **Test Coverage** | 1168 tests | ~50 tests | ~30 tests |
+| **Test Coverage** | 1159 tests | ~50 tests | ~30 tests |
 | **Error Recovery** | ✅ Structured error codes + AI-fixable hints | ❌ Plain text | ❌ Plain text |
 | **Chinese Column Names** | ✅ | ❌ | ❌ |
 | **Backup/Restore** | ✅ | ❌ | ❌ |
@@ -797,7 +797,7 @@ Tool Layer (Common Functions)
 ## 📊 Project Information
 
 ### Quality Validation Metrics
-- **Test Cases**: 1168 (behavior validation, no coverage padding)
+- **Test Cases**: 1159 (behavior validation, no coverage padding)
 - **Test Files**: 49 test files
 - **Test Code**: 16,496 lines
 - **Tool Count: 44 (@mcp.tool decorator verified)

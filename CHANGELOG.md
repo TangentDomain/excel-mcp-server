@@ -7,6 +7,174 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.6.24] - 2026-03-27
+
+### 优化
+- **REQ-025 docstring优化（第6轮）**：8个函数docstring质量提升
+  - excel_compare_files: 参数说明+返回信息+使用技巧+注意事项
+  - excel_delete_sheet: 参数说明+返回信息+重要提醒
+  - excel_get_file_info: 参数说明+返回信息+最佳实践
+  - excel_get_operation_history: 参数说明+返回信息+最佳实践
+  - excel_restore_backup: 参数说明+返回信息+重要提醒
+  - excel_list_backups: 参数说明+返回信息+最佳实践
+  - excel_rename_sheet: 参数说明+返回信息+重要提醒
+  - excel_unmerge_cells: 参数说明+返回信息+重要提醒
+- 修复3处反斜杠转义SyntaxWarning
+- 44/44函数docstring质量100%达标
+
+### 文档
+- 创建REQUIREMENTS.md需求文档
+- DECISIONS.md归档早期决策
+
+## [1.6.23] - 2026-03-27
+
+### 修复
+- **REQ-029 JOIN _x/_y后缀bug**：JOIN的ON条件使用不同列名时，pandas merge产生的_x/_y后缀导致表别名引用失败
+- 新增3个回归测试验证修复
+
+## [1.6.22] - 2026-03-27
+
+### 优化
+- **REQ-025 docstring优化（第4轮）**：4个核心函数docstring完全优化
+  - excel_find_last_row: AI元素+结构化+示例+使用建议四维达标
+  - excel_create_file: 完整参数说明+返回信息+使用场景
+  - excel_query: SQL功能列表+使用示例+最佳实践
+  - excel_update_query: UPDATE语法+参数说明+注意事项
+
+### 文档
+- DECISIONS.md归档最早的10条记录
+- README版本号同步更新
+
+## [1.6.21] - 2026-03-27
+
+### 优化
+- **REQ-010 工程治理**：代码质量优化
+  - 移除3处print语句，改为logging.error
+  - 优化import组织（标准库/第三方库/本地模块分组排序）
+  - 添加统一logging配置
+  - 统一错误信息格式
+
+## [1.6.20] - 2026-03-27
+
+### 修复
+- **REQ-029 describe_table崩溃修复**：streaming写入后openpyxl read_only模式下`ws.max_row=None`导致崩溃
+- 多层回退机制：max_row → total_rows → iter_rows → 0
+
+### 验证
+- **REQ-015 streaming写入后读取验证**：验证streaming写入后所有读取工具正常
+- describe_table测试通过
+
+## [1.6.19] - 2026-03-27
+
+### 优化
+- **REQ-006 工具描述优化**：改进4个核心工具的AI使用体验
+- 工具描述质量提升，AI客户端（Cursor/Claude Desktop等）理解更准确
+
+## [1.6.18] - 2026-03-27
+
+### 修复
+- **REQ-029 JOIN表别名映射**：修复SELECT中使用表限定符时列引用解析失败
+
+### 验证
+- MCP真实验证完成（19/19通过）
+
+## [1.6.17] - 2026-03-27
+
+### 修复
+- **REQ-029 JOIN表别名映射**：SELECT中使用表限定符时正确解析列引用
+- 新增JOIN回归测试
+
+## [1.6.16] - 2026-03-27
+
+### 修复
+- **REQ-029 两个P0 bug修复**：
+  - Bug 1: JOIN表别名映射失败（WHERE/ORDER BY中表限定符不生效）
+  - Bug 2: streaming写入后describe_table崩溃（max_row=None）
+
+## [1.6.15] - 2026-03-27
+
+### 新增
+- **增强错误处理**：结构化错误码系统，27个error_code→中文修复建议映射
+- **SQL错误精准提示**：ParseError/UnsupportedError自动生成AI可修复的hint和suggested_fix
+
+### 优化
+- 所有工具错误响应自动附加修复提示
+- SQL语法错误智能分析（拼写/顺序/缺关键字/中文标点等）
+
+## [1.6.14] - 2026-03-27
+
+### 优化
+- docstring质量优化（部分函数）
+- GitHub Actions Node.js版本升级
+
+## [1.6.13] - 2026-03-27
+
+### 重构
+- **REQ-025 返回值统一**：消除data/meta重复，统一`{success, message, data, meta}`格式
+
+## [1.6.12] - 2026-03-27
+
+### 优化
+- **REQ-025 AI体验优化**：更新excel_get_headers工具说明，添加excel_assess_data_impact决策路径
+
+## [1.6.11] - 2026-03-27
+
+### 修复
+- **REQ-015 insert_rows streaming**：修复insert_rows流式写入后读取异常
+- 新增21个读取验证测试
+
+## [1.6.10] - 2026-03-27
+
+### 修复
+- **REQ-015 check_duplicate_ids崩溃**：streaming写入后max_row/max_column=None导致崩溃
+
+## [1.6.9] - 2026-03-27
+
+### 修复
+- **REQ-015 find_last_row崩溃**：streaming写入后dimension=None导致崩溃
+- 新增REQ-015验证测试
+
+## [1.6.8] - 2026-03-27
+
+### 新增
+- **REQ-030 聚合函数多列表达式**：支持`SUM(攻击力+防御力)`等复杂聚合参数
+- **SELECT标量子查询**：`SELECT (SELECT MAX(col) FROM t)` 语法支持
+
+## [1.6.7] - 2026-03-27
+
+### 优化
+- 工程治理改进
+
+## [1.6.6] - 2026-03-27
+
+### 优化
+- 工程治理改进
+
+## [1.6.4] - 2026-03-27
+
+### 修复
+- **REQ-029 JOIN别名映射初始修复**：修复JOIN表别名映射和describe_table流式写入崩溃
+
+## [1.6.3] - 2026-03-27
+
+### 修复
+- Bugfix
+
+## [1.6.2] - 2026-03-27
+
+### 修复
+- Bugfix
+
+## [1.6.1] - 2026-03-27
+
+### 修复
+- Bugfix
+
+## [1.6.0] - 2026-03-27
+
+### 新增
+- **REQ-015 性能优化完成**：StreamingWriter流式写入，全部修改操作支持streaming参数
+
 ## [1.5.3] - 2026-03-27
 
 ### 优化
