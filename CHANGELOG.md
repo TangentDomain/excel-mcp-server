@@ -10,6 +10,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### 新增
 - **REQ-015 写入性能优化**：新建文件使用 `write_only` 模式（流式写入），新建和格式转换、文件合并场景内存占用大幅降低
 - **FROM子查询**：`FROM (SELECT ...) AS alias` 语法完整实现，12个测试覆盖（WHERE过滤、JOIN结果子查询、嵌套子查询拒绝、DISTINCT、无别名等）
+- **集中式错误提示系统**：27个error_code→中文💡修复建议映射，所有工具（含Operations层）错误响应自动附加修复提示
 
 ### 优化
 - **REQ-025 返回值结构统一**：全部44个工具统一 `{success, message, data, meta}` 格式，AI客户端只需检查 `success` 字段

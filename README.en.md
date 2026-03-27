@@ -10,7 +10,7 @@
 [![Python Version](https://img.shields.io/badge/python-3.10+-blue.svg)](https://www.python.org/downloads/)
 [![Powered by: FastMCP](https://img.shields.io/badge/Powered%20by-FastMCP-orange)](https://github.com/jlowin/fastmcp)
 ![Status](https://img.shields.io/badge/status-stable-green.svg)
-![Tests](https://img.shields.io/badge/tests-1041%20tests-brightgreen.svg)
+![Tests](https://img.shields.io/badge/tests-1059%20tests-brightgreen.svg)
 ![Tools](https://img.shields.io/badge/tools-44%20verified%20tools-green.svg)
 [![CI](https://github.com/TangentDomain/excel-mcp-server/actions/workflows/ci.yml/badge.svg)](https://github.com/TangentDomain/excel-mcp-server/actions/workflows/ci.yml)
 
@@ -134,7 +134,7 @@ python scripts/benchmark.py --compare      # Compare with previous results
 | **Dual-row Headers** | ✅ Auto-detect Chinese desc + English field | ❌ | ❌ |
 | **SQL UPDATE** | ✅ Conditional batch modification | ❌ | ❌ |
 | **Cross-file JOIN** | ✅ @filepath syntax | ❌ | ❌ |
-| **Test Coverage** | 1041 tests | ~50 tests | ~30 tests |
+| **Test Coverage** | 1059 tests | ~50 tests | ~30 tests |
 | **Error Recovery** | ✅ Structured error codes + AI-fixable hints | ❌ Plain text | ❌ Plain text |
 | **Chinese Column Names** | ✅ | ❌ | ❌ |
 | **Backup/Restore** | ✅ | ❌ | ❌ |

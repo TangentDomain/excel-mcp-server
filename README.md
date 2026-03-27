@@ -10,7 +10,7 @@
 [![Python 版本](https://img.shields.io/badge/python-3.10+-blue.svg)](https://www.python.org/downloads/)
 [![技术支持: FastMCP](https://img.shields.io/badge/Powered%20by-FastMCP-orange)](https://github.com/jlowin/fastmcp)
 ![状态](https://img.shields.io/badge/status-stable-green.svg)
-![测试覆盖](https://img.shields.io/badge/tests-1041%20tests-brightgreen.svg)
+![测试覆盖](https://img.shields.io/badge/tests-1059%20tests-brightgreen.svg)
 ![工具数量](https://img.shields.io/badge/tools-44%20verified%20tools-green.svg)
 [![CI](https://github.com/TangentDomain/excel-mcp-server/actions/workflows/ci.yml/badge.svg)](https://github.com/TangentDomain/excel-mcp-server/actions/workflows/ci.yml)
 
@@ -134,7 +134,7 @@ python scripts/benchmark.py --compare      # 与上次结果对比
 | **双行表头** | ✅ 自动识别中文描述+英文字段 | ❌ | ❌ |
 | **SQL UPDATE** | ✅ 条件批量修改 | ❌ | ❌ |
 | **跨文件JOIN** | ✅ @filepath 语法 | ❌ | ❌ |
-| **测试覆盖** | 1041 tests | ~50 tests | ~30 tests |
+| **测试覆盖** | 1059 tests | ~50 tests | ~30 tests |
 | **错误恢复** | ✅ 结构化错误码+AI可修复提示 | ❌ 纯文本 | ❌ 纯文本 |
 | **中文列名查询** | ✅ | ❌ | ❌ |
 | **备份/恢复** | ✅ | ❌ | ❌ |
