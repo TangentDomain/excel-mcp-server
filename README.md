@@ -444,16 +444,16 @@ SELECT a.skill_name, b.equip_name FROM SkillConfig a INNER JOIN EquipConfig b ON
 - `excel_create_file` - 创建新Excel文件，支持自定义工作表
 - `excel_create_sheet` - 添加新工作表
 - `excel_delete_sheet` - 删除工作表
-- `excel_list_sheets` - 列出工作表名称
+- `excel_list_sheets` - 📋 智能工作表扫描，查询前必用工具
 - `excel_rename_sheet` - 重命名工作表
 - `excel_copy_sheet` - 复制工作表（含数据和格式），创建配置表变体
 - `excel_get_file_info` - 获取文件元数据
 - `excel_merge_files` - 合并多个Excel文件
 
 ### 📊 数据操作
-- `excel_get_range` - 读取单元格/行/列范围
-- `excel_update_range` - 写入/更新数据范围，支持公式保留
-- `excel_get_headers` - 从任意行提取表头
+- `excel_get_range` - 🔍 精确范围读取，支持格式保持
+- `excel_update_range` - ✏️ 批量数据写入，支持流式模式
+- `excel_get_headers` - 📋 智能表头提取，支持双行表头
 - `excel_insert_rows` - 插入空行
 - `excel_delete_rows` - 删除行范围
 - `excel_insert_columns` - 插入空列
@@ -467,14 +467,14 @@ SELECT a.skill_name, b.equip_name FROM SkillConfig a INNER JOIN EquipConfig b ON
 
 ### 🔍 搜索与分析
 - `excel_search` - 正则表达式搜索
-- `excel_search_directory` - 目录批量搜索
-- `excel_query` - SQL查询（支持双行表头、WHERE/GROUP BY/HAVING/ORDER BY/LIMIT/OFFSET/DISTINCT/JOIN/UNION/子查询/CTE/CASE WHEN/COALESCE/字符串函数/数学表达式/窗口函数）
-- `excel_update_query` - SQL UPDATE批量修改（SET常量/列引用/算术，WHERE条件，dry_run预览）
-- `excel_describe_table` - 查看表结构（列名、类型、描述、样本值，自动识别双行表头）
-- `excel_compare_sheets` - 工作表对比（游戏配置优化）
-- `excel_compare_files` - 多工作表文件对比
-- `excel_check_duplicate_ids` - ID重复检测
-- `excel_server_stats` - 服务器运行统计（工具调用次数、耗时、错误率、错误分类）
+- `excel_search_directory` - 📂 目录批量搜索，跨文件查找目标内容
+- `excel_query` - 🚀 SQL查询引擎，游戏配置表超强分析工具
+- `excel_update_query` - ⚙️ SQL批量修改器，精确控制数据变更
+- `excel_describe_table` - 📊 完整表结构分析，类型+样本+统计信息
+- `excel_compare_sheets` - 🆔 工作表对比，发现配置变更和差异
+- `excel_compare_files` - 📋 多工作表文件对比，版本追踪
+- `excel_check_duplicate_ids` - 🔍 ID重复检测，数据质量保障
+- `excel_server_stats` - 📈 服务器运行统计，性能监控与错误分析
 
 ### 🛡️ 安全与备份
 - `excel_create_backup` - 创建文件自动备份
