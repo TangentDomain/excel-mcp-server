@@ -775,6 +775,10 @@ A: Use specialized config table comparison tools with ID object tracking
 
 ---
 
+## 📋 Changelog
+
+See [CHANGELOG.md](CHANGELOG.md) for detailed release notes.
+
 <div align="center">
 
 ## 🔝 Quick Navigation

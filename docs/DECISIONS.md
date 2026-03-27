@@ -45,3 +45,9 @@
 - 原因：_unsupported_error_hint中OFFSET/RIGHT JOIN/FULL OUTER JOIN被标为不支持，但代码实际已支持。AI收到错误提示后会放弃尝试，浪费能力。
 - 影响：移除3个误报，instructions不支持列表与代码实现保持一致
 - 教训：功能新增后必须同步清理"不支持"提示，否则会形成"功能存在但AI不敢用"的隐形bug
+
+## 2026-03-27 第93轮 — REQ-025 instructions统一返回格式说明
+- **决策**：在MCP instructions中新增📦统一返回格式段落，告知AI客户端所有工具的JSON结构
+- **原因**：返回值已统一为{success, message, data, meta}，但AI客户端不知道，可能用字符串匹配而非结构化解析
+- **内容**：说明成功/失败两种模式、data/meta/error_code字段、SQL查询的query_info额外字段
+- **效果**：AI客户端（Cursor/Claude等）能更可靠地解析工具返回值，减少"找不到数据"误判
