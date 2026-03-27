@@ -86,17 +86,17 @@ class TestIntegrationComprehensive:
         # 步骤1: 分析现有配置结构
         sheets_result = ExcelOperations.list_sheets(complex_game_config)
         assert sheets_result['success'] is True
-        assert len(sheets_result['sheets']) == 3
-        assert 'TrSkill' in sheets_result['sheets']
-        assert 'TrItem' in sheets_result['sheets']
-        assert 'TrMonster' in sheets_result['sheets']
+        assert len(sheets_result['data']['sheets']) == 3
+        assert 'TrSkill' in sheets_result['data']['sheets']
+        assert 'TrItem' in sheets_result['data']['sheets']
+        assert 'TrMonster' in sheets_result['data']['sheets']
 
         # 步骤2: 获取技能配置表头信息
         skill_headers = ExcelOperations.get_headers(complex_game_config, "TrSkill")
         assert skill_headers['success'] is True
-        assert len(skill_headers['field_names']) == 8
-        assert 'skill_id' in skill_headers['field_names']
-        assert 'skill_damage' in skill_headers['field_names']
+        assert len(skill_headers['data']['field_names']) == 8
+        assert 'skill_id' in skill_headers['data']['field_names']
+        assert 'skill_damage' in skill_headers['data']['field_names']
 
         # 步骤3: 查找高伤害技能
         high_damage_skills = ExcelOperations.search(
@@ -245,11 +245,11 @@ class TestIntegrationComprehensive:
         # 步骤3: 验证导入数据的完整性
         new_sheets = ExcelOperations.list_sheets(new_skills_file)
         assert new_sheets['success'] is True
-        assert "技能配置" in new_sheets['sheets']
+        assert "技能配置" in new_sheets['data']['sheets']
 
         new_headers = ExcelOperations.get_headers(new_skills_file, "技能配置")
         assert new_headers['success'] is True
-        assert len(new_headers['headers']) == 8
+        assert len(new_headers['data']['headers']) == 8
 
         new_data = ExcelOperations.get_range(new_skills_file, "技能配置!A1:H6")
         assert new_data['success'] is True
@@ -517,7 +517,7 @@ class TestIntegrationComprehensive:
 
         assert original_headers['success'] is True
         assert imported_headers['success'] is True
-        assert len(original_headers['headers']) == len(imported_headers['headers'])
+        assert len(original_headers['data']['headers']) == len(imported_headers['data']['headers'])
 
         # 4. Excel -> 格式转换（如果支持）
         converted_file = temp_dir / "skills_converted.xlsx"
@@ -531,7 +531,7 @@ class TestIntegrationComprehensive:
         # 5. 验证转换后的文件
         converted_sheets = ExcelOperations.list_sheets(converted_file)
         assert converted_sheets['success'] is True
-        assert "导入技能" in converted_sheets['sheets']
+        assert "导入技能" in converted_sheets['data']['sheets']
 
     def test_concurrent_multi_file_operations(self, complex_game_config, temp_dir):
         """测试并发多文件操作"""
@@ -670,7 +670,7 @@ class TestIntegrationComprehensive:
             id_column=1
         )
         assert duplicate_check['success'] is True
-        assert duplicate_check['has_duplicates'] is False  # 不应该有重复ID
+        assert duplicate_check['data']['has_duplicates'] is False  # 不应该有重复ID
 
         # 2. 验证装备表ID重复
         item_duplicate_check = ExcelOperations.check_duplicate_ids(
@@ -679,7 +679,7 @@ class TestIntegrationComprehensive:
             id_column=1
         )
         assert item_duplicate_check['success'] is True
-        assert item_duplicate_check['has_duplicates'] is False
+        assert item_duplicate_check['data']['has_duplicates'] is False
 
         # 3. 验证怪物表ID重复
         monster_duplicate_check = ExcelOperations.check_duplicate_ids(
@@ -688,7 +688,7 @@ class TestIntegrationComprehensive:
             id_column=1
         )
         assert monster_duplicate_check['success'] is True
-        assert monster_duplicate_check['has_duplicates'] is False
+        assert monster_duplicate_check['data']['has_duplicates'] is False
 
         # 4. 测试跨表ID冲突检查
         all_ids = set()

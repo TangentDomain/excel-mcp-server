@@ -197,11 +197,11 @@ class TestExcelCheckDuplicateIds:
         )
 
         assert result['success'] is True
-        assert result['has_duplicates'] is False
-        assert result['duplicate_count'] == 0
-        assert result['total_ids'] == 5
-        assert result['unique_ids'] == 5
-        assert len(result['duplicates']) == 0
+        assert result['data']['has_duplicates'] is False
+        assert result['data']['duplicate_count'] == 0
+        assert result['data']['total_ids'] == 5
+        assert result['data']['unique_ids'] == 5
+        assert len(result['data']['duplicates']) == 0
         assert "无重复ID" in result['message']
 
     def test_duplicates_detection(self, duplicate_file):
@@ -214,14 +214,14 @@ class TestExcelCheckDuplicateIds:
         )
 
         assert result['success'] is True
-        assert result['has_duplicates'] is True
-        assert result['duplicate_count'] == 2  # 2001和2002两个重复ID
-        assert result['total_ids'] == 7
-        assert result['unique_ids'] == 4  # 2001, 2002, 2003, 2004
-        assert len(result['duplicates']) == 2
+        assert result['data']['has_duplicates'] is True
+        assert result['data']['duplicate_count'] == 2  # 2001和2002两个重复ID
+        assert result['data']['total_ids'] == 7
+        assert result['data']['unique_ids'] == 4  # 2001, 2002, 2003, 2004
+        assert len(result['data']['duplicates']) == 2
 
         # 验证重复详情
-        duplicates = result['duplicates']
+        duplicates = result['data']['duplicates']
 
         # 查找ID 2001的重复信息
         id_2001 = next(d for d in duplicates if d['id_value'] == 2001)
@@ -245,11 +245,11 @@ class TestExcelCheckDuplicateIds:
         )
 
         assert result['success'] is True
-        assert result['has_duplicates'] is True
-        assert result['duplicate_count'] == 1
+        assert result['data']['has_duplicates'] is True
+        assert result['data']['duplicate_count'] == 1
 
         # 验证字符串ID重复
-        duplicate = result['duplicates'][0]
+        duplicate = result['data']['duplicates'][0]
         assert duplicate['id_value'] == "SKILL_FIREBALL"
         assert duplicate['count'] == 2
         assert sorted(duplicate['rows']) == [2, 4]
@@ -266,11 +266,11 @@ class TestExcelCheckDuplicateIds:
         )
 
         assert result['success'] is True
-        assert result['has_duplicates'] is False
-        assert result['duplicate_count'] == 0
-        assert result['total_ids'] == 0
-        assert result['unique_ids'] == 0
-        assert len(result['duplicates']) == 0
+        assert result['data']['has_duplicates'] is False
+        assert result['data']['duplicate_count'] == 0
+        assert result['data']['total_ids'] == 0
+        assert result['data']['unique_ids'] == 0
+        assert len(result['data']['duplicates']) == 0
 
     def test_single_row_handling(self, single_row_file):
         """测试单行数据的处理"""
@@ -282,11 +282,11 @@ class TestExcelCheckDuplicateIds:
         )
 
         assert result['success'] is True
-        assert result['has_duplicates'] is False
-        assert result['duplicate_count'] == 0
-        assert result['total_ids'] == 1
-        assert result['unique_ids'] == 1
-        assert len(result['duplicates']) == 0
+        assert result['data']['has_duplicates'] is False
+        assert result['data']['duplicate_count'] == 0
+        assert result['data']['total_ids'] == 1
+        assert result['data']['unique_ids'] == 1
+        assert len(result['data']['duplicates']) == 0
 
     # ==================== 参数验证测试 ====================
 
@@ -313,7 +313,7 @@ class TestExcelCheckDuplicateIds:
         )
 
         assert result['success'] is True
-        assert result['has_duplicates'] is False
+        assert result['data']['has_duplicates'] is False
 
     def test_different_header_row(self, temp_dir):
         """测试不同的表头行设置"""
@@ -346,8 +346,8 @@ class TestExcelCheckDuplicateIds:
         )
 
         assert result['success'] is True
-        assert result['has_duplicates'] is True
-        assert result['duplicate_count'] == 1
+        assert result['data']['has_duplicates'] is True
+        assert result['data']['duplicate_count'] == 1
 
     # ==================== 错误处理测试 ====================
 
@@ -429,10 +429,10 @@ class TestExcelCheckDuplicateIds:
         )
 
         assert result['success'] is True
-        assert result['total_ids'] == 999
-        assert result['has_duplicates'] is True
+        assert result['data']['total_ids'] == 999
+        assert result['data']['has_duplicates'] is True
         # 验证重复检测的正确性
-        assert result['duplicate_count'] > 0
+        assert result['data']['duplicate_count'] > 0
 
     # ==================== 综合集成测试 ====================
 
@@ -470,10 +470,10 @@ class TestExcelCheckDuplicateIds:
         )
 
         assert result['success'] is True
-        assert result['has_duplicates'] is True
+        assert result['data']['has_duplicates'] is True
 
         # 验证综合结果的合理性
-        assert result['total_ids'] >= 0
-        assert result['unique_ids'] <= result['total_ids']
-        assert result['duplicate_count'] >= 0
-        assert len(result['duplicates']) == result['duplicate_count']
+        assert result['data']['total_ids'] >= 0
+        assert result['data']['unique_ids'] <= result['data']['total_ids']
+        assert result['data']['duplicate_count'] >= 0
+        assert len(result['data']['duplicates']) == result['data']['duplicate_count']

@@ -133,7 +133,7 @@ class TestExcelOperationsAdvanced:
         result = ExcelOperations.list_sheets(multi_sheet_file)
         
         assert result['success'] is True
-        assert 'sheets' in result
+        assert 'sheets' in result['data']
 
     # ==================== 数据查找增强测试 ====================
 
@@ -281,7 +281,7 @@ class TestExcelHeadersOperations:
         )
         
         assert result['success'] is True
-        assert 'descriptions' in result or 'headers' in result
+        assert 'descriptions' in result['data'] or 'field_names' in result['data']
 
     def test_get_headers_custom_row(self, headers_test_file):
         """测试获取自定义行表头"""

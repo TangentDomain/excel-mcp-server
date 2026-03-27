@@ -159,14 +159,15 @@ class ExcelOperations:
             # 步骤2: 提取和格式化数据
             sheets = [sheet.name for sheet in result.data] if result.data else []
 
-            response = {
+            return {
                 'success': True,
-                'sheets': sheets,
-                'file_path': file_path,
-                'total_sheets': result.metadata.get('total_sheets', len(sheets)) if result.metadata else len(sheets)
+                'message': f'找到 {len(sheets)} 个工作表',
+                'data': {
+                    'sheets': sheets,
+                    'file_path': file_path,
+                    'total_sheets': result.metadata.get('total_sheets', len(sheets)) if result.metadata else len(sheets)
+                }
             }
-
-            return response
 
         except Exception as e:
             error_msg = f"获取工作表列表失败: {str(e)}"
@@ -236,14 +237,15 @@ class ExcelOperations:
 
             return {
                 'success': True,
-                'data': header_info['field_names'],  # 兼容性字段，返回字段名
-                'headers': header_info['field_names'],  # 兼容性字段，返回字段名
-                'descriptions': header_info['descriptions'],  # 字段描述（第1行）
-                'field_names': header_info['field_names'],    # 字段名（第2行）
-                'header_count': len(header_info['field_names']),
-                'sheet_name': sheet_name,
-                'header_row': header_row,
-                'message': f"成功获取{len(header_info['field_names'])}个表头字段（描述+字段名）"
+                'message': f"成功获取{len(header_info['field_names'])}个表头字段（描述+字段名）",
+                'data': {
+                    'headers': header_info['field_names'],
+                    'field_names': header_info['field_names'],
+                    'descriptions': header_info['descriptions'],
+                    'header_count': len(header_info['field_names']),
+                    'sheet_name': sheet_name,
+                    'header_row': header_row
+                }
             }
 
         except Exception as e:
@@ -625,16 +627,17 @@ class ExcelOperations:
 
             # 步骤2: 获取每个工作表的双行表头
             sheets_with_headers = []
-            sheets = sheets_result.get('sheets', [])
+            sheets = sheets_result.get('data', {}).get('sheets', []) if isinstance(sheets_result.get('data'), dict) else sheets_result.get('sheets', [])
 
             for sheet_name in sheets:
                 try:
                     header_result = cls.get_headers(file_path, sheet_name, header_row=header_row, max_columns=max_columns)
 
                     if header_result.get('success'):
-                        headers = header_result.get('headers', [])
-                        descriptions = header_result.get('descriptions', [])
-                        field_names = header_result.get('field_names', [])
+                        hdr_data = header_result.get('data', {}) if isinstance(header_result.get('data'), dict) else {}
+                        headers = hdr_data.get('headers', [])
+                        descriptions = hdr_data.get('descriptions', [])
+                        field_names = hdr_data.get('field_names', [])
 
                         # 如果没有获取到field_names，使用headers作为fallback
                         if not field_names and headers:
@@ -667,12 +670,15 @@ class ExcelOperations:
                         'error': str(e)
                     })
 
-            return format_operation_result({
+            return {
                 'success': True,
-                'sheets_with_headers': sheets_with_headers,
-                'file_path': file_path,
-                'total_sheets': len(sheets)
-            })
+                'message': f'找到 {len(sheets)} 个工作表的表头',
+                'data': {
+                    'sheets_with_headers': sheets_with_headers,
+                    'file_path': file_path,
+                    'total_sheets': len(sheets)
+                }
+            }
 
         except Exception as e:
             error_msg = f"获取工作表表头失败: {str(e)}"
@@ -1464,14 +1470,13 @@ class ExcelOperations:
 
             return {
                 'success': True,
+                'message': f"成功查找{search_info}最后一行: 第{last_row}行" if last_row > 0 else f"{search_info}没有数据",
                 'data': {
                     'last_row': last_row,
                     'sheet_name': sheet_name,
                     'column': column,
                     'search_scope': search_info
-                },
-                'last_row': last_row,  # 兼容性字段
-                'message': f"成功查找{search_info}最后一行: 第{last_row}行" if last_row > 0 else f"{search_info}没有数据"
+                }
             }
 
         except Exception as e:
@@ -1631,12 +1636,14 @@ class ExcelOperations:
 
             return {
                 'success': True,
-                'has_duplicates': has_duplicates,
-                'duplicate_count': duplicate_count,
-                'total_ids': total_ids,
-                'unique_ids': unique_ids,
-                'duplicates': duplicates,
-                'message': message
+                'message': message,
+                'data': {
+                    'has_duplicates': has_duplicates,
+                    'duplicate_count': duplicate_count,
+                    'total_ids': total_ids,
+                    'unique_ids': unique_ids,
+                    'duplicates': duplicates
+                }
             }
 
         except Exception as e:

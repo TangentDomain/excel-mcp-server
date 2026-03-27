@@ -505,8 +505,21 @@ def _fail(message: str, meta: dict = None) -> dict:
     return r
 
 
+# 允许保留在返回值顶层的标准键（其余一律移入data）
+_STANDARD_TOP_KEYS = frozenset({
+    'success', 'message', 'data', 'metadata', 'meta',
+    'error', 'error_code', 'error_type', 'query_info',
+    'validation_info',  # get_range 范围验证信息
+    'formatted_output',  # SQL JSON/CSV格式化输出
+})
+
+
 def _wrap(result: dict, meta: dict = None) -> dict:
-    """包装Operations层返回，metadata→meta，添加上下文meta，统一success字段"""
+    """包装Operations层返回，确保统一的 {success, message, data, meta} 结构。
+
+    AI客户端只需检查 result.data 获取数据载荷，result.message 获取描述。
+    非标准顶层键自动移入 data，避免AI猜测该去哪里找数据。
+    """
     if not isinstance(result, dict):
         return result
     # 统一error→message，确保AI只需检查message键
@@ -515,6 +528,26 @@ def _wrap(result: dict, meta: dict = None) -> dict:
         result['message'] = result.pop('error')
     if "success" not in result:
         result["success"] = True
+    # 统一结构：成功响应的非标准键移入data
+    if result.get('success') is True:
+        extra = {k: v for k, v in result.items() if k not in _STANDARD_TOP_KEYS}
+        if extra:
+            existing_data = result.get('data')
+            keys_to_remove = list(extra.keys())  # 在修改前保存键列表
+            if isinstance(existing_data, dict):
+                # 合并到已有data dict（不覆盖已有键）
+                for k, v in extra.items():
+                    existing_data.setdefault(k, v)
+                result['data'] = existing_data
+            else:
+                # data为None/list/其他 → 创建新dict包裹
+                new_data = dict(extra)  # 避免修改原始extra
+                if existing_data is not None:
+                    new_data['values'] = existing_data
+                result['data'] = new_data
+            for k in keys_to_remove:
+                result.pop(k, None)
+    # metadata → meta
     if "metadata" in result:
         m = result.pop("metadata")
         if isinstance(m, dict) and m:

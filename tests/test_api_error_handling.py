@@ -167,8 +167,8 @@ class TestExcelOperationsAdvanced:
         result = ExcelOperations.list_sheets(multi_sheet_file)
         
         assert result['success'] is True
-        assert 'Data' in result['sheets']
-        assert 'Config' in result['sheets']
+        assert 'Data' in result['data']['sheets']
+        assert 'Config' in result['data']['sheets']
 
     def test_get_file_info(self, multi_sheet_file):
         """测试获取文件信息"""

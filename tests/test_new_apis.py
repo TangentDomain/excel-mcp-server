@@ -29,14 +29,14 @@ class TestNewAPIs:
         result = server.excel_list_sheets(sample_file)
 
         assert result['success'] is True
-        assert 'sheets' in result
+        assert 'sheets' in result['data']
         # active_sheet概念已被移除
         assert 'active_sheet' not in result
         # 确保不再返回sheets_with_headers
         assert 'sheets_with_headers' not in result
 
         # 检查返回的工作表列表
-        sheets = result['sheets']
+        sheets = result['data']['sheets']
         assert isinstance(sheets, list)
         assert len(sheets) > 0
 
@@ -45,13 +45,13 @@ class TestNewAPIs:
         result = server.excel_get_headers(sample_file)
 
         assert result['success'] is True
-        assert 'sheets_with_headers' in result
-        assert 'total_sheets' in result
+        assert 'sheets_with_headers' in result['data']
+        assert 'total_sheets' in result['data']
         # 确保返回表头信息
-        assert 'file_path' in result
+        assert 'file_path' in result['data']
 
         # 检查表头信息结构
-        sheets_with_headers = result['sheets_with_headers']
+        sheets_with_headers = result['data']['sheets_with_headers']
         assert isinstance(sheets_with_headers, list)
 
         for sheet_info in sheets_with_headers:
@@ -73,8 +73,8 @@ class TestNewAPIs:
         assert headers_result['success'] is True
 
         # 工作表列表应该一致
-        sheets_from_list = set(sheets_result['sheets'])
-        sheets_from_headers = set([s['name'] for s in headers_result['sheets_with_headers']])
+        sheets_from_list = set(sheets_result['data']['sheets'])
+        sheets_from_headers = set([s['name'] for s in headers_result['data']['sheets_with_headers']])
         assert sheets_from_list == sheets_from_headers
 
     def test_excel_format_cells_custom(self):
@@ -144,16 +144,16 @@ class TestNewAPIs:
         """测试单一职责原则的实现"""
         # excel_list_sheets应该只返回工作表相关信息，不包含表头
         list_result = server.excel_list_sheets(sample_file)
-        assert 'sheets' in list_result
-        assert 'sheets_with_headers' not in list_result
+        assert 'sheets' in list_result['data']
+        assert 'sheets_with_headers' not in list_result['data']
 
         # excel_get_headers不传sheet_name应该返回所有工作表的表头
         headers_result = server.excel_get_headers(sample_file)
-        assert 'sheets_with_headers' in headers_result
+        assert 'sheets_with_headers' in headers_result['data']
         # 可以包含基础的sheets信息用于上下文，但主要功能是表头
 
         # 两个API返回的数据结构应该不同，体现不同职责
-        assert set(list_result.keys()) != set(headers_result.keys())
+        assert set(list_result['data'].keys()) != set(headers_result['data'].keys())
 
 
 if __name__ == "__main__":
