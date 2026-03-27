@@ -26,6 +26,8 @@ jobs:
           cache-dependency-path: pyproject.toml
       - name: Install dependencies
         run: pip install -e ".[test]"
+      env:
+        FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
       - name: Run tests
         run: python -m pytest tests/ -q --tb=short -n auto --timeout=30
         shell: bash

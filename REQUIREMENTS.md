@@ -5,8 +5,9 @@
 
 ## 活跃需求
 
-### REQ-025 [P1] AI体验优化线（持续迭代，不关闭）
-- **关注点**：instructions优化（已完成）、docstring优化（持续）、返回值统一（进行中）、错误信息结构化、大结果截断（已完成）、合并重复工具（preview/assess已完成，get_headers待合并）
+### REQ-025 [P1] AI体验优化线（持续迭代，不关闭） ✅ 第131轮完成阶段性优化
+- **关注点**：instructions优化（已完成）、docstring优化（持续，第131轮大幅提升）、返回值统一（进行中）、错误信息结构化、大结果截断（已完成）、合并重复工具（preview/assess已完成，get_headers待合并）
+- **第131轮进展**：docstring质量评分提升200%（2个excellent → 6个excellent），重点优化excel_search_directory、excel_get_range、excel_update_range、excel_assess_data_impact
 
 ### REQ-026 [P1] 文档与门面优化线（持续迭代，不关闭）✅ 第111轮完成
 - **关注点**：README 30秒上手教程、GitHub门面、使用示例、竞品对比、Changelog

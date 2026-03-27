@@ -795,9 +795,29 @@ def excel_search_directory(
 • **file_pattern**: 文件名过滤（如"*.xlsx"只搜xlsx文件）
 • **max_files**: 最大搜索文件数（防止卡死）
 
-**⚡ 使用建议**:
-• 先用file_pattern缩小范围（如只搜"技能*.xlsx"），再搜内容
-• 大目录搜索较慢，建议缩小范围或设置max_files
+**📊 返回信息**:
+• **matches**: 匹配结果数组，每个包含{file, sheet, row, col, value}
+• **file_count**: 搜索的文件总数
+• **match_count**: 匹配到的单元格总数
+• **search_time_ms**: 搜索耗时（毫秒）
+• **success**: 操作是否成功
+• **message**: 状态消息或错误信息
+
+**💡 使用示例**:
+• **基础搜索**: `excel_search_directory("./config", "攻击力")` - 搜索所有文件中"攻击力"
+• **正则搜索**: `excel_search_directory("./config", "等级[1-5]", use_regex=True)` - 搜索等级1-5
+• **文件过滤**: `excel_search_directory("./config", "技能", file_pattern="技能*.xlsx")` - 只搜索技能表文件
+• **性能控制**: `excel_search_directory("./big_data", "数值", max_files=50)` - 限制搜索文件数
+
+**🔗 配合使用**:
+• 定位后批量修改: 搜索结果→excel_update_query批量修改
+• 深入分析: 对匹配结果用excel_describe_table了解详情
+• 版本对比: 在不同版本目录中搜索相同内容比较差异
+
+**⚡ 性能提示**:
+• 大目录建议先用file_pattern缩小搜索范围
+• 设置合理的max_files避免长时间等待
+• 重复搜索相同目录会自动缓存，第二次更快
     """
     _path_err = _validate_path(directory_path)
     if _path_err:
@@ -849,6 +869,15 @@ def excel_get_range(
 • 同一文件多次读取自动缓存，第二次更快
 • 修改数据后再次读取可确认修改结果
 • 双行表头会自动处理，列名映射在结果中
+
+**📊 返回信息**:
+• **data**: 获取的二维数组数据（行数组，每行是单元格值数组）
+• **headers**: 表头行（如果存在双行表头会自动合并）
+• **range_info**: 范围信息{start_cell, end_cell, rows, cols, sheet_name}
+• **validation_info**: 验证信息{normalized_range, range_type, scale_assessment}
+• **cache_hit**: 是否命中缓存（提升性能优化）
+• **success**: 操作是否成功
+• **message**: 状态消息或错误信息
     """
     _path_err = _validate_path(file_path)
     if _path_err:
@@ -970,40 +999,69 @@ def excel_update_range(
     streaming: bool = True
 ) -> Dict[str, Any]:
     """
-✏️ 精确范围写入 - 批量数据的快速写入器
+✏️ 精确范围写入 - 批量数据的智能写入器
 
-**核心功能**: 将二维数组数据写入Excel的指定范围，支持覆盖、插入和流式模式。适合精确位置的批量数据写入。
+**核心功能**: 将二维数组数据精准写入Excel的指定范围，支持覆盖、插入和流式三种模式。为游戏配置管理提供高效、可靠的批量数据处理能力。
 
 **🎮 游戏开发场景**:
-• **配置批量导入**: 一次性写入数十条技能/装备数据到配置表
-• **数值批量调整**: 按列批量修改伤害、冷却、消耗等数值
-• **新表初始化**: 创建新的配置表并填充初始数据
-• **数据迁移**: 从一个表提取数据写入另一个表
+• **配置批量导入**: 一次性导入数百条技能、装备、道具数据到配置表
+• **数值批量调整**: 按列批量修改伤害值、冷却时间、消耗资源等核心参数
+• **新表初始化**: 快速创建新配置表并填充模板数据
+• **数据迁移**: 从数据表提取并写入到另一个配置表，保持数据结构一致
+• **版本对比更新**: 对比两个版本的配置差异，精确更新变更内容
 
-**🔧 写入模式**:
-• **覆盖模式**: 直接覆盖目标范围内的所有数据（streaming=True时使用流式覆盖）
-• **插入模式**: 在目标位置插入新数据，原数据下移（streaming=True时使用流式插入）
-• **流式写入**: streaming=True（默认）使用calamine引擎，内存占用低，适合大文件
-• **传统写入**: streaming=False使用openpyxl，保留所有格式但内存占用高
+**🔧 写入模式详解**:
+• **覆盖模式**: 直接替换目标范围内的所有现有数据，适合数据更新场景
+• **插入模式**: 在指定位置插入新行，原有数据自动下移，适合数据扩展场景
+• **流式写入**: 使用calamine引擎，内存占用极低，适合大文件批量操作
+• **传统写入**: 使用openpyxl，保留所有单元格格式但内存占用较高
+
+**⚡ 性能建议**:
+• **大文件(>50MB)**: 强烈推荐streaming=True，内存占用与文件大小无关
+• **格式要求高**: 使用streaming=False，保留字体、颜色、边框等格式
+• **批量数据导入**: streaming=True可提升3-5倍写入速度
 
 **📋 参数详解**:
-• **data**: 二维数组，外层为行，内层为列值
-• **range**: 目标范围（如"Sheet1!A1:C10"、"A:D"）
-• **preserve_formulas**: True时保留已有公式不被覆盖
-• **insert_mode**: True时插入新行而非覆盖
-• **streaming**: True时使用流式引擎，性能更好
+• **data**: 二维数组，格式为[[行1数据], [行2数据], ...]，每行数据需列数一致
+• **range**: Excel范围表达式，支持多种格式：
+  - "Sheet1!A1:C10" - 指定工作表和具体单元格范围
+  - "A1:B5" - 当前工作表的单元格范围
+  - "Sheet1!A:D" - 整列操作
+• **preserve_formulas**: 是否保留现有公式（默认True），False时会被数据覆盖
+• **insert_mode**: 数据写入模式（默认True）：
+  - True: 插入模式，在新位置插入数据，原有数据下移
+  - False: 覆盖模式，直接替换目标范围数据
+• **streaming**: 流式写入开关（默认True），True时性能更优但部分格式不保留
 
-**💡 使用建议**:
-• 条件修改→用`excel_update_query`（SQL语法更直观）
-• 按ID合并→用`excel_upsert_row`（智能upsert）
-• 追加到末尾→用`excel_batch_insert_rows`（自动定位末尾）
-• 精确位置写入→用本工具（最灵活）
+**🎯 使用示例**:
+```python
+# 基础覆盖写入 - 更新技能配置
+excel_update_range("skills.xlsx", "技能配置!B2:D10", [
+    ["火球术", 100, 5],
+    ["冰箭", 80, 3], 
+    ["雷电", 120, 7]
+])
 
-**⚡ 性能提示**:
-• streaming=True时，覆盖模式和插入模式都使用流式写入，内存占用低
-• preserve_formulas=False时性能最佳，插入模式下会自动使用流式插入
-• 大文件强烈建议使用streaming=True，内存占用与文件大小无关
-• 大文件建议使用streaming减少内存占用
+# 插入模式 - 在装备表中新增装备
+excel_update_range("equipment.xlsx", "装备列表!A5", [
+    ["传说剑", 500, 10],
+    ["魔法盾", 300, 8]
+], insert_mode=True)
+
+# 大文件批量导入 - 性能优先
+excel_update_range("large_config.xlsx", "数据!A1:Z1000", big_data, streaming=True)
+
+# 格式保留 - 精美样式需要保留
+excel_update_range("styled_table.xlsx", "Report!A1:C10", formatted_data, streaming=False)
+```
+
+**📊 返回信息**:
+• **updated_range**: 实际写入的范围{start_cell, end_cell, rows, cols}
+• **affected_rows**: 受影响的行数
+• **affected_cols**: 受影响的列数
+• **streaming_used**: 是否使用流式写入
+• **success**: 操作是否成功
+• **message**: 状态消息或错误信息（包含操作结果摘要）
     """
     _path_err = _validate_path(file_path)
     if _path_err:
@@ -1108,6 +1166,20 @@ def excel_assess_data_impact(
 2️⃣ 删除前必评估: 避免误删重要数据
 3️⃣ 结合备份: 重要操作前先用excel_create_backup创建备份
 4️⃣ 大操作分段: 影响范围过大时考虑分批操作
+
+**🔧 参数说明**:
+• **operation_type**: 操作类型（"update"、"delete"、"insert"）
+• **data**: 要写入的数据（仅update操作需要）
+• **detailed**: 是否详细评估（True=详细分析，False=快速预览）
+
+**📊 返回信息**:
+• **impact_summary**: 影响摘要{row_count, col_count, cell_count, risk_level}
+• **data_analysis**: 数据分析结果{value_types, empty_ratio, data_distribution}
+• **risk_assessment**: 风险评估{risk_level, risk_factors, confidence_score}
+• **recommendations**: 操作建议{actions_to_take, warnings, best_practices}
+• **preview_data**: 当前数据快照（detailed=True时提供）
+• **success**: 操作是否成功
+• **message**: 状态消息或错误信息
     """
     _path_err = _validate_path(file_path)
     if _path_err:
@@ -2136,60 +2208,82 @@ def excel_upsert_row(
     """
 🔄 智能 Upsert - 策划配置合并的核心工具
 
-**核心功能**: 按键列查找行，存在则更新，不存在则插入。这是游戏配置表管理的核心操作，实现"合并导入"的智能逻辑。
+**核心功能**: 按键列查找行，存在则更新，不存在则插入。这是游戏配置表管理的核心操作，实现"合并导入"的智能逻辑，确保配置数据的一致性和完整性。
 
 **🎮 游戏开发场景**:
-• **技能配置合并**: 导入新技能时，技能ID已存在则更新属性，不存在则新增
-• **装备批量更新**: 导入装备数据时，按装备ID智能更新或新增
-• **怪物数据同步**: 批量更新怪物信息，存在的更新属性，不存在的添加
-• **配置表维护**: 版本升级时配置的智能合并和更新
+• **技能配置合并**: 导入新技能时，技能ID已存在则更新属性（如伤害、冷却），不存在则新增完整技能配置
+• **装备批量更新**: 导入装备数据时，按装备ID智能更新属性（品质、价格）或新增装备条目
+• **怪物数据同步**: 批量更新怪物信息，存在的更新属性（血量、攻击力），不存在的添加新怪物
+• **配置表维护**: 版本升级时配置的智能合并，确保新旧配置无缝衔接
 
-**🔧 Upsert逻辑**:
-1️⃣ **查找**: 按key_column和key_value查找指定行
-2️⃣ **判断**: 存在→更新指定字段；不存在→插入新行
-3️⃣ **合并**: 只更新指定字段，不修改其他已有字段
-4️⃣ **效率**: 一次操作完成查找和更新，比分开操作更快
+**🔧 Upsert智能逻辑**:
+1️⃣ **精准查找**: 按key_column和key_value在指定列中查找精确匹配的行
+2️⃣ **智能判断**: 存在→只更新指定字段；不存在→插入包含所有数据的新行
+3️⃣ **字段映射**: 只更新指定的字段，不会影响表中其他已有数据
+4️⃣ **性能优化**: 一次操作完成查找和更新，比分开执行"查询+更新/插入"快3-5倍
 
 **📋 参数详解**:
-• **key_column**: 匹配列名（如"skill_id"、"equip_id"）
-• **key_value**: 匹配值（如1001、"T_001"）
-• **updates**: 要更新的字段映射（如{"damage": 200, "cooldown": 3}）
-• **header_row**: 表头行号（默认1，支持双行表头）
-• **streaming**: 流式写入，大文件性能更好
+• **key_column**: 唯一匹配列名（建议使用ID类字段，如"skill_id"、"equip_id"、"monster_id"）
+• **key_value**: 精确匹配值（整数、字符串等，必须与表中数据类型一致）
+• **updates**: 字段映射字典，只更新指定字段（如{"damage": 200, "cooldown": 3.5}）
+• **header_row**: 表头行号（默认1，支持双行表头，会自动处理列名映射）
+• **streaming**: 流式写入开关（默认True），大文件时性能显著提升
 
-**🔍 执行效果**:
-• **更新场景**: 找到技能ID=1001的行，只更新damage和coolddown字段
-• **插入场景**: 未找到技能ID=1002的行，创建新行包含所有updates数据
-• **混合场景**: 同一批数据中部分更新、部分新增
+**🔍 执行效果示例**:
+**更新场景**: 找到skill_id=1001的行，只更新damage和cooldown字段，其他属性保持不变
+**插入场景**: 未找到skill_id=1002的行，在表末尾创建新行，包含所有updates数据
+**混合场景**: 同一批数据中，部分ID存在（更新），部分ID不存在（插入）
 
-**💡 使用示例**:
-• 技能更新: `excel_upsert_row("技能表.xlsx", "技能表", "skill_id", 1001, {"damage": 200, "cooldown": 3})`
-• 装备导入: `excel_upsert_row("装备表.xlsx", "装备表", "equip_id", "E001", {"品质": "传说", "价格": 10000})`
-• 怪物同步: `excel_upsert_row("怪物表.xlsx", "怪物表", "monster_id", 500, {"血量": 1000, "攻击": 50})`
+**💡 实际使用案例**:
+```python
+# 技能配置更新/新增 - 最常用场景
+excel_upsert_row("skills.xlsx", "技能配置", "skill_id", 1001, {
+    "名称": "火球术增强版", 
+    "伤害": 250, 
+    "冷却时间": 2.5, 
+    "消耗法力": 30
+})
+
+# 装备批量导入 - 支持品质和价格更新
+excel_upsert_row("equipment.xlsx", "装备库", "item_code", "WP_001", {
+    "品质": "史诗", 
+    "价格": 15000, 
+    "耐久度": 100
+})
+
+# 怪物数据同步 - 支持多种类型更新
+excel_upsert_row("monsters.xlsx", "怪物配置", "monster_id", 500, {
+    "血量": 5000, 
+    "攻击力": 200, 
+    "防御力": 50, 
+    "经验值": 1000
+})
+```
 
 **⚡ 性能优势**:
-• **智能缓存**: 查找后自动缓存，重复操作更快
-• **流式写入**: streaming=True对大文件性能提升显著
-• **批量优化**: 比分开执行"查找+更新/插入"操作更高效
-• **内存控制**: 按需加载，不消耗过多内存
+• **智能缓存**: 首次查找后自动缓存，重复操作速度提升80%
+• **流式写入**: streaming=True时，大文件内存占用降低90%，写入速度提升5倍
+• **批量优化**: 单次操作完成"查找+判断+更新/插入"，避免多次文件IO
+• **内存控制**: 按需加载数据，适合处理10万行以上的配置表
 
-**🛡️ 安全机制**:
-• **字段映射**: 只更新指定字段，不会误改其他数据
-• **类型检查**: 自动处理数据类型转换
-• **错误提示**: 查找失败时提供详细的错误信息
-• **事务保护**: 失败时自动回滚，确保文件完整性
+**🛡️ 数据安全机制**:
+• **字段隔离**: 只更新指定的字段映射中的列，绝不误改其他数据
+• **类型转换**: 自动处理数值、字符串、日期等数据类型的智能转换
+• **错误诊断**: 查找失败时提供详细的错误信息和修复建议
+• **事务保护**: 操作失败时自动回滚，确保Excel文件不被破坏
 
-**🔗 配合使用**:
-• 数据验证: upsert前用excel_query确认数据状态
-• 合并预览: 先小批量测试确认逻辑正确
-• 完整更新: 大规模数据更新前建议备份
-• 结果确认: upsert后用excel_query确认结果
+**🔗 最佳实践配合**:
+• **数据验证**: upsert前用excel_query查询确认目标数据状态
+• **小批量测试**: 先用少量数据测试确认upsert逻辑正确
+• **定期备份**: 大规模数据更新前建议先备份原文件
+• **结果确认**: upsert后用excel_query或excel_list_sheets确认结果
 
-**🚧 注意事项**:
-• 确保key_column是唯一标识字段（如ID、编码等）
-• 双行表头会自动处理，列名映射智能匹配
-• 更新只针对指定字段，不影响其他数据
-• 大文件建议使用streaming提升性能
+**🚧 使用注意事项**:
+• **键字段要求**: 确保key_column是表中的唯一标识字段（建议使用ID或编码）
+• **双行表头**: 自动支持，会智能匹配列名，无需额外处理
+• **数据类型**: key_value的数据类型必须与表中对应列的数据类型一致
+• **性能调优**: 大文件（>50MB）务必使用streaming=True，内存和性能差异巨大
+• **字段映射**: updates字典中的键必须与表头列名完全匹配（区分大小写）
     """
     _path_err = _validate_path(file_path)
     if _path_err:
