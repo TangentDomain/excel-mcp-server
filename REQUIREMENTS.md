@@ -27,12 +27,13 @@
 - **描述**：持续优化工具描述的一致性和完整性
 - **完成**：中英文README文档同步，44个工具游戏场景描述完整，统一返回格式
 
-### REQ-029 [P0] JOIN表别名列引用 + describe_table流式写入后崩溃 - ✅ v1.6.4
+### REQ-029 [P0] JOIN表别名列引用 + describe_table流式写入后崩溃 - ✅ v1.6.6
 - **Bug 1**：JOIN后SQL表别名不生效，`r.名称`不被识别，pandas JOIN后列名加`_x`/`_y`后缀，SQL别名未映射
 - **Bug 2**：`batch_insert_rows`/`delete_rows` streaming写入后，openpyxl `read_only=True`模式 `ws.max_row`返回None，导致`describe_table`崩溃
 - **验收**：`SELECT r.名称 FROM 角色 r JOIN 技能 s ON r.职业 = s.职业限制` 返回正确列名；streaming写入后 describe_table 正常返回
 - **来源**：主会话MCP真实调用验证（2026-03-27）
 - **修复**：增强`_expression_to_column_reference`别名映射（5层回退），添加`_join_column_mapping`记录JOIN列映射；`describe_table`添加try/except处理`max_row=None`
+- **完成时间**：2026-03-27，第117轮，v1.6.6发布
 
 ### REQ-010 [P1] 工程治理（持续迭代，不关闭）- ✅ 第106轮完成
 - **描述**：代码质量、测试覆盖、文档完整性、项目结构、安全性优化
