@@ -1906,6 +1906,18 @@ class AdvancedSQLQueryEngine:
                     val = self._parse_literal_value(original_expr)
                     result_data[alias_name] = pd.Series([val] * len(df), index=df.index)
 
+                elif isinstance(original_expr, exp.Subquery):
+                    # 标量子查询（如 SELECT (SELECT MAX(col) FROM t)）
+                    try:
+                        sub_result = self._execute_subquery(original_expr, self._current_worksheets)
+                        if len(sub_result) > 0 and len(sub_result.columns) > 0:
+                            scalar_val = sub_result.iloc[0, 0]
+                            result_data[alias_name] = pd.Series([scalar_val] * len(df), index=df.index)
+                        else:
+                            result_data[alias_name] = pd.Series([None] * len(df), index=df.index)
+                    except Exception as sub_e:
+                        raise ValueError(f"标量子查询执行失败: {sub_e}")
+
                 else:
                     # 其他表达式，尝试作为列处理
                     if hasattr(original_expr, 'name') and original_expr.name in df.columns:
@@ -2886,13 +2898,23 @@ class AdvancedSQLQueryEngine:
             else:
                 return df
 
-        # 预计算CASE WHEN/COALESCE表达式，添加到df副本，使grouped可访问
+        # 预计算CASE WHEN/COALESCE/标量子查询表达式，添加到df副本，使grouped可访问
         df = df.copy()
         for alias_name, expr in select_exprs.items():
             if isinstance(expr, exp.Case) and alias_name not in df.columns:
                 df[alias_name] = self._evaluate_case_expression(expr, df)
             elif isinstance(expr, exp.Coalesce) and alias_name not in df.columns:
                 df[alias_name] = self._evaluate_coalesce_vectorized(expr, df)
+            elif isinstance(expr, exp.Subquery) and alias_name not in df.columns:
+                try:
+                    sub_result = self._execute_subquery(expr, self._current_worksheets)
+                    if len(sub_result) > 0 and len(sub_result.columns) > 0:
+                        scalar_val = sub_result.iloc[0, 0]
+                        df[alias_name] = pd.Series([scalar_val] * len(df), index=df.index)
+                    else:
+                        df[alias_name] = pd.Series([None] * len(df), index=df.index)
+                except Exception:
+                    df[alias_name] = pd.Series([None] * len(df), index=df.index)
 
         # 应用聚合
         if group_by_columns:
@@ -2916,7 +2938,7 @@ class AdvancedSQLQueryEngine:
             
             if is_agg:
                 agg_expr = original_expr if isinstance(select_expr, exp.Alias) else select_expr
-                agg_result = self._apply_aggregation_function(agg_expr, grouped)
+                agg_result = self._apply_aggregation_function(agg_expr, grouped, df)
                 if isinstance(agg_result, (int, float, np.integer, np.floating)):
                     result_data[alias_name] = pd.Series([agg_result])
                 else:
@@ -2926,6 +2948,9 @@ class AdvancedSQLQueryEngine:
                 result_data[alias_name] = grouped[alias_name].first()
             # 处理COALESCE表达式（已预计算到df，直接从grouped取first）
             elif isinstance(original_expr, exp.Coalesce):
+                result_data[alias_name] = grouped[alias_name].first()
+            # 处理标量子查询（已预计算到df，直接从grouped取first）
+            elif isinstance(original_expr, exp.Subquery):
                 result_data[alias_name] = grouped[alias_name].first()
             # 处理普通列（GROUP BY列）
             elif hasattr(original_expr, 'name'):
@@ -3133,10 +3158,10 @@ class AdvancedSQLQueryEngine:
         'min': lambda g, col: g[col].agg(lambda x: pd.to_numeric(x, errors='coerce').min()),
     }
 
-    def _apply_aggregation_function(self, expr: exp.Expression, grouped) -> pd.Series:
+    def _apply_aggregation_function(self, expr: exp.Expression, grouped, df: pd.DataFrame = None) -> pd.Series:
         """应用聚合函数"""
         if isinstance(expr, exp.Alias):
-            return self._apply_aggregation_function(expr.this, grouped)
+            return self._apply_aggregation_function(expr.this, grouped, df)
 
         if not isinstance(expr, exp.AggFunc):
             raise ValueError(f"不是聚合函数: {type(expr)}")
@@ -3159,10 +3184,64 @@ class AdvancedSQLQueryEngine:
 
         # 分发表处理 sum/avg/max/min
         if func_name in self._AGG_OPS:
-            col_name = self._extract_agg_column(expr.this, func_name.upper())
-            return self._AGG_OPS[func_name](grouped, col_name)
+            # 检查是否为表达式（如 攻击力+防御力）
+            if self._is_expression(expr.this):
+                # 对于表达式，先计算表达式列，再聚合
+                expr_col = self._evaluate_expression(expr.this, df if df is not None else grouped)
+                return self._AGG_OPS[func_name](grouped, expr_col)
+            else:
+                # 单列处理
+                col_name = self._extract_agg_column(expr.this, func_name.upper())
+                return self._AGG_OPS[func_name](grouped, col_name)
 
         raise ValueError(f"不支持的聚合函数: {func_name}")
+
+    def _is_expression(self, node) -> bool:
+        """检查是否为表达式（非单列）"""
+        return not isinstance(node, exp.Column)
+
+    def _evaluate_expression(self, expr_node, df: pd.DataFrame) -> str:
+        """计算表达式，返回临时列名"""
+        if isinstance(expr_node, exp.Column):
+            return expr_node.name
+        
+        # 处理字面量（数字）
+        if isinstance(expr_node, exp.Literal):
+            temp_col = f"_temp_literal_{id(expr_node)}"
+            df[temp_col] = float(expr_node.this) if expr_node.this is not None else 0
+            return temp_col
+        
+        # 生成临时列名
+        temp_col = f"_temp_expr_{id(expr_node)}"
+        
+        # 处理加法表达式
+        if isinstance(expr_node, exp.Add):
+            left_col = self._evaluate_expression(expr_node.this, df)
+            right_col = self._evaluate_expression(expr_node.expression, df)
+            df[temp_col] = pd.to_numeric(df[left_col], errors='coerce') + pd.to_numeric(df[right_col], errors='coerce')
+        
+        # 处理减法表达式
+        elif isinstance(expr_node, exp.Sub):
+            left_col = self._evaluate_expression(expr_node.this, df)
+            right_col = self._evaluate_expression(expr_node.expression, df)
+            df[temp_col] = pd.to_numeric(df[left_col], errors='coerce') - pd.to_numeric(df[right_col], errors='coerce')
+        
+        # 处理乘法表达式
+        elif isinstance(expr_node, exp.Mul):
+            left_col = self._evaluate_expression(expr_node.this, df)
+            right_col = self._evaluate_expression(expr_node.expression, df)
+            df[temp_col] = pd.to_numeric(df[left_col], errors='coerce') * pd.to_numeric(df[right_col], errors='coerce')
+        
+        # 处理除法表达式
+        elif isinstance(expr_node, exp.Div):
+            left_col = self._evaluate_expression(expr_node.this, df)
+            right_col = self._evaluate_expression(expr_node.expression, df)
+            df[temp_col] = pd.to_numeric(df[left_col], errors='coerce') / pd.to_numeric(df[right_col], errors='coerce')
+        
+        else:
+            raise ValueError(f"不支持的表达式类型: {type(expr_node)}")
+        
+        return temp_col
 
     def _apply_having_clause(self, parsed_sql: exp.Expression, df: pd.DataFrame) -> pd.DataFrame:
         """应用HAVING条件"""
