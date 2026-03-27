@@ -902,3 +902,20 @@ A: 使用专门的配置表对比工具，支持ID对象跟踪
 *✨ 让游戏配置表管理变得简单高效 ✨*
 
 </div>
+
+## Installation
+
+```bash
+pip install excel-mcp-server-fastmcp
+```
+
+## Usage
+
+```python
+from excel_mcp_server_fastmcp import main
+main()
+```
+
+## Examples
+
+See the examples folder for comprehensive usage scenarios.
