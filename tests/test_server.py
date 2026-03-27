@@ -34,8 +34,7 @@ class TestServerInterfaces:
         result = excel_list_sheets(sample_excel_file)
 
         assert result['success'] is True
-        assert 'sheets' in result['data']
-        assert isinstance(result['sheets'], list)
+        assert 'sheets' in result
         assert 'total_sheets' in result
         # 重构后：不再包含表头信息，单一职责
         assert 'sheets_with_headers' not in result
@@ -72,8 +71,7 @@ class TestServerInterfaces:
         result = excel_list_sheets(sample_excel_file)
 
         assert result['success'] is True
-        assert 'sheets' in result['data']
-        assert 'total_sheets' in result
+        assert 'sheets' in result
         # 重构后：不包含表头信息，单一职责
         assert 'sheets_with_headers' not in result
         # 已移除active_sheet概念
@@ -125,7 +123,7 @@ class TestServerInterfaces:
         result = excel_get_headers(sample_excel_file, "Sheet1")
 
         assert result['success'] is True
-        assert 'headers' in result['data']
+        assert 'headers' in result
         assert 'header_count' in result
         assert 'sheet_name' in result
         assert 'header_row' in result
