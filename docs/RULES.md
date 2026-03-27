@@ -3,6 +3,12 @@
 > 子代理可进化：发现更好的做法→更新本文件→记录到DECISIONS.md。
 > 但红线（.cron-prompt.md）和文档所有权不可通过自我进化修改。
 
+## 文档瘦身（每轮第0步，不消耗改进时间）
+- DECISIONS.md > 40条 → 最早的10条归档到 docs/DECISIONS-ARCHIVED.md
+- REQUIREMENTS.md DONE项 → 移入 ARCHIVED.md
+- NOW.md > 30行 → 精简历史记录，只保留最近3轮
+- 超限时不瘦身，本轮产出无效
+
 ## 时间分配（每轮45分钟）
 - 需求实现：25分钟
 - 测试+修复：10分钟
@@ -60,18 +66,27 @@ src/excel_mcp_server_fastmcp/
 - 源码：`pip install -e .`
 - MCP配置：`{"command": "uvx", "args": ["excel-mcp-server-fastmcp"]}`
 
-## 产出格式
+## 产出格式（客观指标版）
 📊 第X轮完成（共Y轮）
 • 需求：[REQ-XXX] 简述 → [状态]
 • README：[已同步/无需更新]
 🧪 MCP：[内容] → 结果 | 准确性 X/Y
-📋 评分：XX/100
 🔀 合并：[状态]
-💡 评价：
-  功能：策划[?] AI[?] | 准确性[?]
-  工程：复杂度[?] 重复[?] 测试质量[?] 性能[?] 架构[?]
-  方向：短板→[?] 瓶颈→[?]
+📊 本轮指标：
+  - 改动：{files} 文件 / +{added} -{removed} 行
+  - 测试：{total} 通过 / +{new} 新增
+  - 需求：{done} 完成 / {moved} 推进
+  - 发布：[vX.Y.Z / 无]
+  - 文档：{docs} 文件更新
 📋 需求池：X open / Y in-progress / Z done
 🐛 待修：[列表]
 🔄 自我进化：[有/无]
 📊 效率追踪：[改RULES.md后的5轮内填写：测试耗时 | 有效时间 | 痛点复发]
+
+## 指标计算方法（子代理每轮必须执行）
+- 开工前：`git rev-parse HEAD` 记录起始commit
+- 完工后：`git diff --stat <start>..HEAD` → 文件数/行数
+- `git log --oneline <start>..HEAD` → commit数
+- `python3 -m pytest tests/ -q --tb=no -n auto --timeout=30 2>&1 | tail -1` → 测试总数
+- 对比REQUIREMENTS.md修改前后 → 需求完成/推进数
+- `git tag --points-at HEAD` → 是否有发布tag
