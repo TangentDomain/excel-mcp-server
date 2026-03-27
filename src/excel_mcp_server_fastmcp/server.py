@@ -1690,7 +1690,22 @@ def excel_export_to_csv(
     encoding: str = "utf-8"
 ) -> Dict[str, Any]:
     """
-将Excel工作表导出为CSV文件。支持指定编码(utf-8/gbk)。
+📤 导出CSV - 将Excel工作表导出为CSV文件
+
+**核心功能**: 将指定工作表导出为CSV格式，支持utf-8/gbk编码选择。
+
+**🎮 游戏开发场景**:
+• **版本控制**: 导出CSV后用git diff追踪配置变更（xlsx是二进制，diff不可读）
+• **程序对接**: 导出CSV供游戏引擎或构建工具读取
+• **数据分析**: 导出后用Python脚本做批量数值分析
+• **配置备份**: 导出为纯文本格式做快照备份
+
+**🔧 参数说明**:
+• **encoding**: utf-8（默认）/ gbk（兼容旧版Excel中文）
+
+**⚡ 使用建议**:
+• 需要导出多个工作表请分别调用，或用excel_convert_format(json)一次导出全部
+• 中文Excel导出有时需要gbk编码才能正常显示
     """
     _path_err = _validate_path(file_path)
     if _path_err:
@@ -1708,7 +1723,26 @@ def excel_import_from_csv(
     has_header: bool = True
 ) -> Dict[str, Any]:
     """
-从CSV文件导入数据创建Excel文件。
+📥 CSV导入 - 从CSV文件创建Excel文件
+
+**核心功能**: 将CSV文件转换为Excel格式，支持自定义编码和表头处理。使用流式写入，大文件性能好。
+
+**🎮 游戏开发场景**:
+• **配置迁移**: 从其他工具（如Google Sheets导出、数据库导出）的CSV转换为Excel配置表
+• **策划数据导入**: 策划用Excel编辑数据后导出CSV，再导入为标准格式
+• **本地化导入**: 翻译团队提交的CSV多语言文件转为Excel配置
+• **数据管线对接**: 自动化脚本生成的CSV报表转为Excel供策划查看
+
+**🔧 参数说明**:
+• **csv_path**: CSV文件路径
+• **output_path**: 输出Excel文件路径
+• **encoding**: 文件编码（中文CSV常用gbk，默认utf-8）
+• **has_header**: CSV是否有表头行（默认True）
+
+**⚡ 使用建议**:
+• 中文CSV乱码时尝试encoding="gbk"
+• 导入后建议用excel_describe_table检查表结构
+• 需要追加到已有Excel请用excel_merge_files(append模式)
     """
     for _p in [csv_path, output_path]:
         _err = _validate_path(_p)
@@ -1726,7 +1760,23 @@ def excel_convert_format(
     target_format: str = "xlsx"
 ) -> Dict[str, Any]:
     """
-转换Excel文件格式。支持xlsx/xlsm/csv/json互转。
+🔄 格式转换 - Excel/CSV/JSON格式互转
+
+**核心功能**: 将Excel文件转换为其他格式（xlsx/xlsm/csv/json），支持双向转换。
+
+**🎮 游戏开发场景**:
+• **xlsx→csv**: 导出配置表供版本控制diff（CSV比xlsx更易做文本对比）
+• **xlsx→json**: 导出为JSON供程序直接读取或前端展示
+• **csv→xlsx**: 将策划导出的CSV配置转为标准Excel格式
+• **版本对比准备**: 将xlsx转为csv后用git diff检查配置变更
+
+**🔧 参数说明**:
+• **target_format**: 目标格式 xlsx/xlsm/csv/json
+
+**⚡ 使用建议**:
+• xlsx→csv适合版本管理（文本diff友好）
+• 复杂格式（合并单元格、公式）转csv/json可能丢失信息
+• json输出为行列二维数组格式
     """
     for _p in [input_path, output_path]:
         _err = _validate_path(_p)
@@ -1744,7 +1794,28 @@ def excel_merge_files(
     merge_mode: str = "sheets"
 ) -> Dict[str, Any]:
     """
-合并多个Excel文件。支持三种模式: sheets(各文件独立工作表)/append(追加行)/horizontal(按列拼接)。
+🔗 合并文件 - 将多个Excel文件合并为一个
+
+**核心功能**: 合并多个Excel文件，支持三种模式。适合将分散的配置表整合。
+
+**🎮 游戏开发场景**:
+• **sheets模式**: 将多个配置文件（技能表、装备表、怪物表）合并到一个文件，方便统一管理
+• **append模式**: 合并外包团队分批提交的同类型配置（如多个版本的怪物表追加合并）
+• **horizontal模式**: 将不同维度的数据横向拼接（如基础属性表+附加属性表按行对齐合并）
+
+**📊 三种合并模式**:
+• **sheets**: 每个输入文件作为独立工作表（适合不同类型的配置表）
+• **append**: 纵向追加行（适合同结构配置表，如多个版本的道具表）
+• **horizontal**: 横向拼接列（适合不同维度的数据合并）
+
+**🔧 参数说明**:
+• **input_files**: 输入文件路径数组（2个及以上）
+• **merge_mode**: sheets/append/horizontal
+
+**⚡ 使用建议**:
+• append模式要求文件结构（列名）一致，否则数据会错位
+• 合并前可用excel_compare_sheets检查结构差异
+• 合并后建议用excel_check_duplicate_ids检查ID重复
     """
     for _f in input_files:
         _err = _validate_path(_f)
@@ -1962,8 +2033,31 @@ def excel_batch_insert_rows(
     streaming: bool = True
 ) -> Dict[str, Any]:
     """
-批量插入多行数据到工作表末尾。策划批量导入配置时使用（如一次导入几十条技能/装备数据）。
-streaming=True（默认）使用流式写入，大文件性能更好，但不保留单元格格式。
+📦 批量插入行 - 将多行数据追加到工作表末尾
+
+**核心功能**: 批量导入数据行，自动按列名匹配写入。streaming=True（默认）使用流式写入，大文件性能更好，但不保留单元格格式。
+
+**🎮 游戏开发场景**:
+• **批量配置导入**: 策划一次导入几十条技能/装备/怪物配置数据
+• **活动数据填充**: 批量添加限时活动道具、任务奖励等配置行
+• **版本合并**: 将外包团队的新配置行合入主表
+• **数据迁移**: 从其他系统导出的配置批量导入Excel
+
+**📊 返回信息**:
+• **inserted_count**: 实际插入的行数
+• **start_row/end_row**: 插入的起始/结束行号
+• **unknown_columns**: 表中不存在的列名（数据被忽略）
+• **mode**: streaming（流式）或 standard（传统）
+
+**🔧 参数说明**:
+• **data**: 行数据数组，每行为{列名: 值}字典（列名需与表头一致）
+• **header_row**: 表头所在行号（默认1，双行表头设为2）
+• **streaming**: True=流式写入（快，不保留格式）/ False=传统模式（保留格式）
+
+**⚡ 使用建议**:
+• 先用excel_get_headers确认列名，避免unknown_columns
+• 超过100行数据时streaming模式优势明显（内存降低90%+）
+• 需要按ID更新已有行请用excel_upsert_row
     """
     _path_err = _validate_path(file_path)
     if _path_err:
@@ -1981,9 +2075,24 @@ def excel_delete_rows(
     streaming: bool = True
 ) -> Dict[str, Any]:
     """
-删除指定位置的行。
-streaming=True（默认）使用流式写入，大文件性能更好，但不保留单元格格式。
-streaming=False 使用传统openpyxl，保留所有格式但内存占用高。
+🗑️ 删除行 - 删除工作表中指定位置的行
+
+**核心功能**: 删除指定行号范围的行，后续行自动上移。streaming=True（默认）使用流式写入。
+
+**🎮 游戏开发场景**:
+• **清理废弃配置**: 删除已下线活动的道具/任务配置行
+• **版本裁剪**: 删除测试用的临时配置数据
+• **批量清理**: 配合excel_query找出不需要的行号后批量删除
+• **ID重构**: 删除重复ID行（配合excel_check_duplicate_ids使用）
+
+**🔧 参数说明**:
+• **row_index**: 起始行号（1-based）
+• **count**: 删除行数（默认1）
+• **streaming**: True=流式写入（快，不保留格式）/ False=传统模式
+
+**⚡ 使用建议**:
+• 删除前建议先用excel_get_range查看目标行的内容，避免误删
+• 大量删除（>100行）时streaming模式优势明显
     """
     _path_err = _validate_path(file_path)
     if _path_err:
@@ -2563,9 +2672,25 @@ def excel_compare_files(
     file2_path: str
 ) -> Dict[str, Any]:
     """
-对比两个Excel文件的所有工作表差异（结构差异+逐单元格值变化）。
-输出每个单元格的旧值→新值对比。适合检查配置表整体改动。
-按ID列做对象级对比（新增/删除/修改的记录行）请用excel_compare_sheets。
+🔍 文件对比 - 逐单元格比较两个Excel文件的所有工作表差异
+
+**核心功能**: 深度对比两个文件的所有工作表，输出结构差异和逐单元格值变化（旧值→新值）。适合检查配置表整体改动。
+
+**🎮 游戏开发场景**:
+• **版本diff**: 对比新旧版本配置表，快速了解策划改了哪些数值
+• **外包验收**: 对比外包交付的配置表与原始模板的差异
+• **回归检查**: 更新配置后对比前后版本，确认只改了预期内容
+• **多语言校验**: 对比中文和英文配置表的结构一致性
+
+**📊 返回信息**:
+• **结构差异**: 新增/删除的工作表、新增/删除的列
+• **值变化**: 每个单元格的旧值→新值（按工作表分组）
+• **统计**: 总差异单元格数
+
+**⚡ 使用建议**:
+• 只关心记录级变化（新增/删除/修改的行）→ 用excel_compare_sheets
+• 本工具是单元格级对比，适合精确检查每个数值变化
+• 文件较大时对比可能较慢，建议只对比特定工作表
     """
     for _p in [file1_path, file2_path]:
         _err = _validate_path(_p)
@@ -2583,8 +2708,29 @@ def excel_check_duplicate_ids(
     header_row: int = 1
 ) -> Dict[str, Any]:
     """
-检查配置表ID列是否有重复值。返回重复ID及其所在行号。
-也可用excel_query: SELECT ID, COUNT(*) as c FROM 表 GROUP BY ID HAVING c>1
+🔍 检查重复ID - 扫描配置表ID列，返回重复值及所在行号
+
+**核心功能**: 快速检测指定列的重复值，返回每个重复值出现的行号。数据质量检查必备。
+
+**🎮 游戏开发场景**:
+• **配置入库前校验**: 导入新配置前检查技能ID/装备ID是否重复（重复会导致游戏运行时覆盖）
+• **合并后验证**: 合并多个配置表后检查ID冲突
+• **外包交付验收**: 验证外包提交的配置表是否有ID重复（常见低级错误）
+• **策划自查工具**: 策划批量编辑后快速发现重复配置
+
+**📊 返回信息**:
+• **duplicates**: 重复值列表（值→行号数组）
+• **total_duplicates**: 重复值总数
+• **affected_rows**: 受影响的行数
+
+**🔧 参数说明**:
+• **id_column**: 列号（数字）或列名（字符串），默认第1列
+• **header_row**: 表头行号（双行表头设为2）
+
+**⚡ 使用建议**:
+• 也可用SQL: SELECT ID, COUNT(*) as c FROM 表 GROUP BY ID HAVING c>1
+• 建议在每次配置表修改后执行，防止重复ID进入版本库
+• 检查多列组合唯一性可用excel_query的GROUP BY多列
     """
     _path_err = _validate_path(file_path)
     if _path_err:
