@@ -471,6 +471,7 @@ mcp = FastMCP(
 按ID对比两表差异？        → excel_compare_sheets (对象级: 新增/删除/修改)
 逐单元格对比差异？        → excel_compare_files (单元格级)
 格式调整？                → excel_format_cells (preset: highlight/warning/success)
+数据修改影响评估？        → excel_assess_data_impact (修改前的安全网)
 ```
 
 ## ✅ SQL已支持功能
@@ -935,17 +936,20 @@ def excel_get_headers(
 • 数据查询: 基于字段名进行excel_query数据检索
 • 批量修改: 使用字段名进行excel_update_query条件修改
 • 版本对比: excel_compare_sheets对比不同版本的表头变化
+• 数据修改评估: 修改前先用excel_assess_data_impact评估影响
 
-**⚡ 性能提示**:
+**⚡ 性能优化**:
 • 比excel_describe_table更快，专门针对表头信息
 • 大文件建议指定max_columns减少数据量
 • 重复读取相同文件有缓存，第二次更快
+• **AI体验优化**: 返回结构化数据，便于AI直接处理
 
 **🎯 选择指南**:
 • • 看表头结构→用excel_get_headers
 • • 看完整结构(类型+样本)→用excel_describe_table  
 • • 看数据详情→用excel_get_range
 • • 看分析统计→用excel_query
+• • 修改前评估→用excel_assess_data_impact
     """
     _path_err = _validate_path(file_path)
     if _path_err:
