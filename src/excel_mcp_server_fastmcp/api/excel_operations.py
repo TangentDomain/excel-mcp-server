@@ -780,10 +780,21 @@ class ExcelOperations:
             if streaming:
                 from excel_mcp_server_fastmcp.core.streaming_writer import StreamingWriter
                 if StreamingWriter.is_available():
+                    # 需要先知道列数来创建空行
+                    reader = ExcelReader(file_path)
+                    range_expr = f"{sheet_name}!A1"
+                    header_result = reader.get_range(range_expr)
+                    reader.close()
+                    # 获取工作表列数
+                    col_count = 0
+                    if header_result.success and header_result.data:
+                        col_count = max(len(row) for row in header_result.data)
+                    if col_count == 0:
+                        col_count = 1  # fallback
                     # 创建空行数据用于插入
-                    empty_rows = [[] for _ in range(count)]
-                    success, message, meta = StreamingWriter.update_range(
-                        file_path, sheet_name, row_index, 1, empty_rows
+                    empty_rows = [[None] * col_count for _ in range(count)]
+                    success, message, meta = StreamingWriter.insert_rows_streaming(
+                        file_path, sheet_name, row_index, empty_rows
                     )
                     if success:
                         return {
