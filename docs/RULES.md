@@ -19,6 +19,18 @@
 - 测试+修复：10分钟
 - MCP验证+README检查+评价+合并+文档更新：10分钟
 
+## 项目健康度自检（每20轮至少1次）
+- **目的**：自己发现代码质量问题，自己解决，不等CEO指示
+- **检查项**：
+  1. **根目录垃圾文件**：是否有临时脚本、测试文件散落在根目录（应在tests/内）
+  2. **测试冗余**：多个测试文件测同一功能（如安全测试3个文件测同一件事）
+  3. **轮次编号测试**：test_req010_r67.py这类带轮次编号的文件，应合并到功能文件后删除
+  4. **文档膨胀**：DECISIONS/NOW/REQUIREMENTS是否超限（已有瘦身规则）
+  5. **废弃分支**：git branch | grep feature/ 是否有过期worktree未清理
+  6. **依赖变化**：pyproject.toml是否有不该引入的新依赖
+- **发现问题时**：立即修复，不需要等CEO批准。修复后记入DECISIONS.md
+- **产出**：本轮指标里加一行"健康度自检：发现X项，修复X项"
+
 ## MCP验证
 - **开发中MCP验证**：有功能变化时，至少8项游戏场景通过MCP工具调用
 - **MCP真实验证（每5轮至少1次）**：创建真实xlsx测试文件，通过MCP工具实际调用12项核心功能（list_sheets/get_range/query WHERE/query JOIN/query GROUP BY/query子查询/query FROM子查询/get_headers/find_last_row/batch_insert_rows/delete_rows/describe_table），记录通过/失败。发现的bug立即写入REQUIREMENTS.md。测试文件用后清理。 pytest只验证代码逻辑，MCP真实验证验证端到端可用性，两者不可互相替代。
