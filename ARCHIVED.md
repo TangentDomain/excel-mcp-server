@@ -80,6 +80,31 @@
 - REQ-020 View（命名查询）— SQL查询本身就能保存为文本
 - REQ-021 写入校验（约束体系）— SQL引擎已覆盖
 - REQ-022 Auto Increment — 策划手动管理ID更可控
+### REQ-035 [P1] MCP真实验证发现问题修复 ✅
+**完成轮次**：第189轮（2026-03-28）
+**来源**：第185轮MCP真实验证发现
+**问题描述**：MCP真实验证发现7项核心功能存在严重问题，影响游戏开发场景的可用性
+**具体问题**：
+1. **get_range格式错误**：范围表达式要求必须包含工作表名和感叹号（格式：'Sheet1!A1:C10'），但API文档未明确说明
+2. **SQL解析器编码问题**：query系列功能无法正确解析中文表名，出现乱码`\u001b[4m[\u001b[0m`，导致SQL语法错误
+3. **batch_insert_rows验证错误**：数据验证逻辑过于严格，拒绝有效的行数据列表，提示"数据不能为空"
+4. **delete_rows类型错误**：行删除操作中存在类型比较错误，'<'操作符不支持str和int类型比较
+5. **query WHERE功能异常**：无法执行基本的条件查询，表名解析失败
+6. **query JOIN功能异常**：无法执行跨表关联查询，同样受SQL解析器问题影响
+7. **query GROUP BY/子查询功能异常**：所有SQL相关功能都受到解析器问题影响
+**解决方案**：
+1. ANSI转义序列清理（sqlglot解析前），支持残余方括号伪影检测
+2. get_range单工作表自动推断，多工作表友好提示
+3. batch_insert_rows接受dict自动包装和tuple类型
+4. 重写condition模式（原_row_number不存在），使用pandas query+SQL引擎降级
+5. 新增ExcelOperations.query方法委托AdvancedSQLQueryEngine
+**验收标准**：
+- ✅ 19项新增测试全部通过
+- ✅ 全量1175测试无回归
+- ✅ v1.6.35发布PyPI
+- ✅ 支持中文表名的SQL查询（含ANSI转义清理）
+- ✅ 数据验证逻辑正确且用户友好
+
 ### REQ-028 [P1] FROM子查询支持 ✅
 - **描述**：支持 `SELECT * FROM (SELECT ...) AS t WHERE ...`
 - **验收**：基础FROM子查询 + WHERE过滤 + JOIN结果子查询 + 嵌套子查询拒绝 + 空结果 + DISTINCT + 无别名，12个测试全通过

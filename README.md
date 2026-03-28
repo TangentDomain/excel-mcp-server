@@ -13,7 +13,7 @@
 ![测试覆盖](https://img.shields.io/badge/tests-1156%20tests-brightgreen.svg)
 ![工具数量](https://img.shields.io/badge/tools-53%20verified%20tools-green.svg)
 [![PyPI](https://img.shields.io/pypi/v/excel-mcp-server-fastmcp.svg)](https://pypi.org/project/excel-mcp-server-fastmcp/)
-[![版本](https://img.shields.io/badge/version-v1.6.34-blue.svg)](https://pypi.org/project/excel-mcp-server-fastmcp/#history)
+[![版本](https://img.shields.io/badge/version-v1.6.35-blue.svg)](https://pypi.org/project/excel-mcp-server-fastmcp/#history)
 [![CI](https://github.com/TangentDomain/excel-mcp-server/actions/workflows/ci.yml/badge.svg)](https://github.com/TangentDomain/excel-mcp-server/actions/workflows/ci.yml)
 
 **ExcelMCP** 是专为游戏开发设计的Excel配置表管理MCP服务器。通过AI自然语言指令，实现技能配置表、装备数据、怪物属性等游戏配置的智能化操作。基于**FastMCP**构建，读取使用**python-calamine**（Rust引擎，2300x提速），写入使用**openpyxl**，拥有**53个专业工具**和**1156个测试用例**，确保企业级可靠性。
