@@ -1,4 +1,4 @@
-[简体中文](README.md) ｜ [English](README.en.md)
+[简体中文](README.md) | [English](README.en.md)
 
 # 🎮 ExcelMCP: Game Development Specific Excel Configuration Table Manager
 
