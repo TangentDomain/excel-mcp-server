@@ -16,7 +16,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [1.6.33] - 2026-03-28
 - **REQ-027 工具实用性提升（第181轮）**：用户体验和界面优化
-  - 新增12个专业工具，总数达到52个
+  - 新增工具，总数达到53个
   - 优化工具描述和参数说明结构
   - 完善MCP验证框架，确保端到端可用性
   - 更新文档同步，确保中英文版本一致性
@@ -25,7 +25,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **REQ-026 文档与门面优化**：项目健康度和文档一致性提升
   - 统一版本号到1.6.32，同步所有文档和PyPI
   - 清理轮次编号测试文件，优化项目结构
-  - 更新竞品对比数据，工具数量修正为52个
+  - 更新竞品对比数据，工具数量修正为53个
   - 完善CHANGELOG，记录版本发布历史
 
 ## [1.6.31] - 2026-03-28
@@ -33,7 +33,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - 修复查询结果缓存变量引用错误
   - 优化JOIN查询性能，添加执行计划缓存
   - 改进边界值处理，修复精度损失问题
-  - 全量测试1168通过，确保稳定性
+  - 全量测试1156通过，确保稳定性
 
 ## [1.6.30] - 2026-03-28
 - **REQ-034 边界值和性能优化 + 代码整洁度清理**
@@ -47,7 +47,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - 同步版本数据到README和PyPI（v1.6.29）
   - 更新CHANGELOG记录第154轮工具描述优化成果
   - 检查并同步中英文README版本信息一致性
-  - 统一竞品对比数据，更新测试覆盖率至1164+
+  - 统一竞品对比数据，更新测试覆盖率至1156
 
 ## [1.6.28] - 2026-03-27
 - 修复describe_table行数统计重复计算问题
@@ -55,14 +55,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - 优化excel_search、excel_insert_rows、excel_insert_columns、excel_get_range
   - 统一docstring结构：核心功能、🎮游戏场景、🔧参数说明、📊返回信息、💡使用示例、🔗配合使用
   - docstring完整度从75%提升至100%，工具描述质量全面提升
-
-## [1.6.29] - 2026-03-27
-- **REQ-026 文档与门面优化**：基于第149轮验证后的持续优化需求
-  - 同步版本数据到README和PyPI（v1.6.29）
-  - 更新CHANGELOG记录第154轮工具描述优化成果
-  - 检查并同步中英文README版本信息一致性
-  - 统一竞品对比数据，更新测试覆盖率至1164+
-  - 优化项目门面信息，确保文档与实际功能匹配
 
 ## [1.6.27] - 2026-03-27
 
@@ -73,7 +65,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - 自动降级：streaming不可用时自动回退到openpyxl
   - 保留源工作表列宽
   - 支持名称冲突自动编号
-  - 新增5个专项测试，全量1164测试通过
+  - 新增5个专项测试，全量测试通过
 
 ## [1.6.24] - 2026-03-27
 
