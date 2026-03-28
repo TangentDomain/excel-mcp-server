@@ -17,6 +17,8 @@ jobs:
           - os: windows-latest
             python-version: "3.13"
     runs-on: ${{ matrix.os }}
+    env:
+      FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
     steps:
       - uses: actions/checkout@v5
       - uses: actions/setup-python@v6
@@ -26,8 +28,6 @@ jobs:
           cache-dependency-path: pyproject.toml
       - name: Install dependencies
         run: pip install -e ".[test]"
-      env:
-        FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
       - name: Run tests
         run: python -m pytest tests/ -q --tb=short -n auto --timeout=30
         shell: bash
