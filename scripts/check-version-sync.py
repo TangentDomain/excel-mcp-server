@@ -15,7 +15,7 @@ def get_version_from_pyproject():
         return None
     
     content = pyproject_path.read_text(encoding='utf-8')
-    match = re.search(r'version\s*=\s*["\']([^"\']+)["\']', content)
+    match = re.search(r'^\s*version\s*=\s*["\']([^"\']+)["\']', content, re.MULTILINE)
     return match.group(1) if match else None
 
 def get_version_from_init():
@@ -55,11 +55,11 @@ def get_version_from_changelog():
     
     content = changelog_path.read_text(encoding='utf-8')
     
-    # 查找最新版本条目
+    # 查找最新版本条目（支持 v1.0.0 或 1.0.0 格式）
     lines = content.split('\n')
     for line in lines:
-        if line.strip().startswith('## [') and 'v' in line:
-            match = re.search(r'v([0-9]+\.[0-9]+\.[0-9]+)', line)
+        if line.strip().startswith('## [') and ('v' in line or '[1.' in line):
+            match = re.search(r'v?([0-9]+\.[0-9]+\.[0-9]+)', line)
             if match:
                 return match.group(1)
     
@@ -94,17 +94,6 @@ def check_version_consistency():
             print(f"  {file}: v{version}")
         return False
 
-def get_latest_version():
-    """获取最新版本号"""
-    global versions
-    versions = [v for v in versions.values() if v]
-    if not versions:
-        return None
-    
-    # 简单的版本号比较
-    versions.sort(reverse=True)
-    return versions[0]
-
 def get_latest_version_from_files():
     """从文件获取最新版本号"""
     # 从pyproject.toml获取版本作为基准
@@ -120,11 +109,27 @@ def auto_fix_versions():
     print(f"🔄 自动修复版本到: v{latest_version}")
     files_updated = []
     
-    # 更新 pyproject.toml
+    # 更新 pyproject.toml - 只修改 version 字段
     pyproject_path = Path("pyproject.toml")
     if pyproject_path.exists():
         content = pyproject_path.read_text(encoding='utf-8')
-        new_content = re.sub(r'version\s*=\s*["\'][^"\']+["\']', f'version = "{latest_version}"', content)
+        
+        # 只修改 version 字段，使用更精确的正则表达式
+        new_content = re.sub(
+            r'^(\s*version\s*=\s*["\'])[^"\']+(["\'])$', 
+            fr'\1{latest_version}\2', 
+            content, 
+            flags=re.MULTILINE
+        )
+        
+        # 确保不要误修改 python_version
+        new_content = re.sub(
+            r'^(\s*python_version\s*=\s*["\'])[^"\']+(["\'])$', 
+            r'\1python3.10\2', 
+            new_content, 
+            flags=re.MULTILINE
+        )
+        
         pyproject_path.write_text(new_content, encoding='utf-8')
         files_updated.append("pyproject.toml")
     
