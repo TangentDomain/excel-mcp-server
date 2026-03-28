@@ -2,9 +2,9 @@
 
 # 🎮 ExcelMCP: 游戏开发专用 Excel 配置表管理器
 
-[![PyPI](https://img.shields.io/pypi/v/excel-mcp-server-fastmcp.svg)](https://pypi.org/project/excel-mcp-server-fastmcp/v1.6.44)
+[![PyPI](https://img.shields.io/pypi/v/excel-mcp-server-fastmcp.svg)](https://pypi.org/project/excel-mcp-server-fastmcp/v1.6.45)
 [![CI](https://github.com/TangentDomain/excel-mcp-server/actions/workflows/ci.yml/badge.svg)](https://github.com/TangentDomain/excel-mcp-server/actions/workflows/ci.yml)
-![Tests](https://img.shields.io/badge/tests-1161-brightgreen.svg)
+![Tests](https://img.shields.io/badge/tests-1171-brightgreen.svg)
 ![Tools](https://img.shields.io/badge/tools-53-green.svg)
 ![GitHub stars](https://img.shields.io/github/stars/TangentDomain/excel-mcp-server?style=social&label=Stars)
 
@@ -135,6 +135,7 @@ Successfully see Excel file content? 🎉 **Congratulations, setup complete!**
 - **SQL Queries**: `SELECT * FROM skills WHERE attack_power > 100`
 - **Batch Operations**: `Batch modify data in multiple files`
 - **Version Comparison**: `Compare differences between two Excel versions`
+- **AI-Enhanced Error Handling**: `Intelligent error detection with AI-powered suggestions and recovery guidance`
 
 ---
 
