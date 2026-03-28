@@ -7,6 +7,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.6.37] - 2026-03-28
+- **REQ-026 文档与门面优化（第196轮）**：版本一致性优化
+  - 修复pyproject.toml/__init__.py/README.md/README.en.md版本不一致问题
+  - 统一版本号至1.6.37，确保所有文档和代码文件版本同步
+  - 更新CHANGELOG.md记录版本修正
+  - 执行自动化版本检查脚本，验证所有文件版本一致性
+
 ## [1.6.36] - 2026-03-28
 - **自我进化（第192轮）**：文档同步流程优化自动化
   - 新增自动化版本检查脚本 `scripts/check-version-sync.py`
