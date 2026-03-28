@@ -1,6 +1,6 @@
 [简体中文](README.md) ｜ [English](README.en.md)
 
-# 🎮 ExcelMCP: Game Dev Excel Configuration Table Manager
+# 🎮 ExcelMCP: Game Development Specific Excel Configuration Table Manager
 
 [![PyPI](https://img.shields.io/pypi/v/excel-mcp-server-fastmcp.svg)](https://pypi.org/project/excel-mcp-server-fastmcp/)
 [![CI](https://github.com/TangentDomain/excel-mcp-server/actions/workflows/ci.yml/badge.svg)](https://github.com/TangentDomain/excel-mcp-server/actions/workflows/ci.yml)

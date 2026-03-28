@@ -1,4 +1,4 @@
-[中文](README.md) ｜ [English](README.en.md)
+[简体中文](README.md) ｜ [English](README.en.md)
 
 # 🎮 ExcelMCP: 游戏开发专用 Excel 配置表管理器
 
