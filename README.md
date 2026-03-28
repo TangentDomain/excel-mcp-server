@@ -124,10 +124,6 @@ pip install excel-mcp-server-fastmcp
 
 ### 📊 数据分析场景
 
-<<<<<<< HEAD
-```bash
-uvx excel-mcp-server-fastmcp@1.6.41 --help
-=======
 **数据处理**：
 - "读取销售数据，计算每个月的总额"
 - "找出销售额超过1000的客户"
@@ -208,11 +204,11 @@ uvx excel-mcp-server-fastmcp@1.6.41 --help
 
 **❌ Python版本过低**
 ```bash
-# 检查Python版本
+# Check Python version
 python --version
 # 需要3.10+，否则升级
 # Mac/Linux: 使用brew install python
-# Windows: 下载最新版本
+# Windows: Download latest version
 ```
 
 **❌ 网络连接问题**

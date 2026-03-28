@@ -1,4 +1,4 @@
-[简体中文](README.md) ｜ [English](README.en.md)
+[简体中文](README.md) | [English](README.en.md)
 
 # 🎮 ExcelMCP: Game Development Specific Excel Configuration Table Manager
 
@@ -124,11 +124,7 @@ Successfully see Excel file content? 🎉 **Congratulations, setup complete!**
 
 ### 📊 Data Analysis Scenarios
 
-<<<<<<< HEAD
-```bash
-uvx excel-mcp-server-fastmcp@1.6.41 --help
-=======
-**Data Processing**:
+**Data Processing**：
 - "Read sales data, calculate total for each month"
 - "Find customers with sales over 1000"
 - "Merge data from multiple Excel files"
