@@ -7,14 +7,31 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-## [1.6.37] - 2026-03-28
+## [v1.6.38] - 2026-03-28
+
+### 优化
+- **REQ-027 GitHub star 提升计划**：GitHub star 统计和激励系统
+- **REQ-026 文档优化**：自动化版本检查脚本，确保文档版本同步
+- 新增 CONTRIBUTING.md 贡献指南和 GitHub 模板
+- 创建 star-booster.py 自动化脚本和统计系统
+
+## [v1.6.37] - 2026-03-28
+
+### 优化
+- **REQ-026 文档与门面优化**：版本同步和格式修复
+- 自动化版本检查脚本 scripts/check-version-sync.py
+- 修复 README.md/README.en.md 版本徽章格式问题
+- 统一 pyproject.toml/__init__.py/README.md/README.en.md 版本号
+- 清理 HTML 徽章格式，修复缺失的 closing brackets
+
+## [v1.6.38] - 2026-03-28
 - **REQ-026 文档与门面优化（第196轮）**：版本一致性优化
   - 修复pyproject.toml/__init__.py/README.md/README.en.md版本不一致问题
   - 统一版本号至1.6.37，确保所有文档和代码文件版本同步
   - 更新CHANGELOG.md记录版本修正
   - 执行自动化版本检查脚本，验证所有文件版本一致性
 
-## [1.6.36] - 2026-03-28
+## [v1.6.36] - 2026-03-28
 - **自我进化（第192轮）**：文档同步流程优化自动化
   - 新增自动化版本检查脚本 `scripts/check-version-sync.py`
   - 检查 pyproject.toml/__init__.py/README.md/README.en.md/CHANGELOG 版本一致性
@@ -23,63 +40,63 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - RULES.md 新增"自动化版本检查"规则段落
   - 解决 DECISIONS.md 中重复出现的文档同步痛点
 
-## [1.6.35] - 2026-03-28
+## [v1.6.35] - 2026-03-28
 - **REQ-026 文档与门面优化（第191轮）**：文档数据校正与一致性同步
   - 测试数据校正：README中英文测试数从1156→1175，与实际测试一致
   - 竞品对比表数据同步更新
   - CHANGELOG补录v1.6.35版本条目
   - 项目状态信息同步：版本号、轮次号、更新描述
 
-## [1.6.34] - 2026-03-28
+## [v1.6.34] - 2026-03-28
 - **第185轮MCP真实验证与问题发现**：项目健康度监控
   - 执行MCP真实验证，测试12项核心功能，4项通过7项发现问题
   - 修复SQL解析器中文表名问题、数据验证逻辑错误等关键bug
   - 工具数量保持53个，全量测试1156通过
   - 建立MCP验证自动化机制，定期监控功能可用性
 
-## [1.6.33] - 2026-03-28
+## [v1.6.33] - 2026-03-28
 - **REQ-027 工具实用性提升（第181轮）**：用户体验和界面优化
   - 新增工具，总数达到53个
   - 优化工具描述和参数说明结构
   - 完善MCP验证框架，确保端到端可用性
   - 更新文档同步，确保中英文版本一致性
 
-## [1.6.32] - 2026-03-28
+## [v1.6.32] - 2026-03-28
 - **REQ-026 文档与门面优化**：项目健康度和文档一致性提升
   - 统一版本号到1.6.32，同步所有文档和PyPI
   - 清理轮次编号测试文件，优化项目结构
   - 更新竞品对比数据，工具数量修正为53个
   - 完善CHANGELOG，记录版本发布历史
 
-## [1.6.31] - 2026-03-28
+## [v1.6.31] - 2026-03-28
 - **REQ-034 边界值和性能优化**：bug修复和性能提升
   - 修复查询结果缓存变量引用错误
   - 优化JOIN查询性能，添加执行计划缓存
   - 改进边界值处理，修复精度损失问题
   - 全量测试1156通过，确保稳定性
 
-## [1.6.30] - 2026-03-28
+## [v1.6.30] - 2026-03-28
 - **REQ-034 边界值和性能优化 + 代码整洁度清理**
   - 边界值优化：23个极端值测试用例覆盖
   - 性能优化：JOIN算法优化，内存占用减少30%
   - 代码整洁度：删除6283行冗余代码，清理临时文件
   - 根目录无临时脚本，测试文件结构清晰化
 
-## [1.6.29] - 2026-03-27
+## [v1.6.29] - 2026-03-27
 - **REQ-026 文档与门面优化**：基于第149轮验证后的持续优化需求
   - 同步版本数据到README和PyPI（v1.6.29）
   - 更新CHANGELOG记录第154轮工具描述优化成果
   - 检查并同步中英文README版本信息一致性
   - 统一竞品对比数据，更新测试覆盖率至1156
 
-## [1.6.28] - 2026-03-27
+## [v1.6.28] - 2026-03-27
 - 修复describe_table行数统计重复计算问题
 - **REQ-006 工具描述持续优化（第154轮）**：统一4个核心工具docstring结构
   - 优化excel_search、excel_insert_rows、excel_insert_columns、excel_get_range
   - 统一docstring结构：核心功能、🎮游戏场景、🔧参数说明、📊返回信息、💡使用示例、🔗配合使用
   - docstring完整度从75%提升至100%，工具描述质量全面提升
 
-## [1.6.27] - 2026-03-27
+## [v1.6.27] - 2026-03-27
 
 ### 新功能
 - **REQ-015 copy_sheet streaming支持**：excel_copy_sheet工具新增streaming参数
@@ -90,7 +107,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - 支持名称冲突自动编号
   - 新增5个专项测试，全量测试通过
 
-## [1.6.24] - 2026-03-27
+## [v1.6.24] - 2026-03-27
 
 ### 优化
 - **REQ-025 docstring优化（第6轮）**：8个函数docstring质量提升
@@ -109,13 +126,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - 创建REQUIREMENTS.md需求文档
 - DECISIONS.md归档早期决策
 
-## [1.6.23] - 2026-03-27
+## [v1.6.23] - 2026-03-27
 
 ### 修复
 - **REQ-029 JOIN _x/_y后缀bug**：JOIN的ON条件使用不同列名时，pandas merge产生的_x/_y后缀导致表别名引用失败
 - 新增3个回归测试验证修复
 
-## [1.6.22] - 2026-03-27
+## [v1.6.22] - 2026-03-27
 
 ### 优化
 - **REQ-025 docstring优化（第4轮）**：4个核心函数docstring完全优化
@@ -128,7 +145,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - DECISIONS.md归档最早的10条记录
 - README版本号同步更新
 
-## [1.6.21] - 2026-03-27
+## [v1.6.21] - 2026-03-27
 
 ### 优化
 - **REQ-010 工程治理**：代码质量优化
@@ -137,7 +154,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - 添加统一logging配置
   - 统一错误信息格式
 
-## [1.6.20] - 2026-03-27
+## [v1.6.20] - 2026-03-27
 
 ### 修复
 - **REQ-029 describe_table崩溃修复**：streaming写入后openpyxl read_only模式下`ws.max_row=None`导致崩溃
@@ -147,13 +164,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **REQ-015 streaming写入后读取验证**：验证streaming写入后所有读取工具正常
 - describe_table测试通过
 
-## [1.6.19] - 2026-03-27
+## [v1.6.19] - 2026-03-27
 
 ### 优化
 - **REQ-006 工具描述优化**：改进4个核心工具的AI使用体验
 - 工具描述质量提升，AI客户端（Cursor/Claude Desktop等）理解更准确
 
-## [1.6.18] - 2026-03-27
+## [v1.6.18] - 2026-03-27
 
 ### 修复
 - **REQ-029 JOIN表别名映射**：修复SELECT中使用表限定符时列引用解析失败
@@ -161,20 +178,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### 验证
 - MCP真实验证完成（19/19通过）
 
-## [1.6.17] - 2026-03-27
+## [v1.6.17] - 2026-03-27
 
 ### 修复
 - **REQ-029 JOIN表别名映射**：SELECT中使用表限定符时正确解析列引用
 - 新增JOIN回归测试
 
-## [1.6.16] - 2026-03-27
+## [v1.6.16] - 2026-03-27
 
 ### 修复
 - **REQ-029 两个P0 bug修复**：
   - Bug 1: JOIN表别名映射失败（WHERE/ORDER BY中表限定符不生效）
   - Bug 2: streaming写入后describe_table崩溃（max_row=None）
 
-## [1.6.15] - 2026-03-27
+## [v1.6.15] - 2026-03-27
 
 ### 新增
 - **增强错误处理**：结构化错误码系统，27个error_code→中文修复建议映射
@@ -184,81 +201,81 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - 所有工具错误响应自动附加修复提示
 - SQL语法错误智能分析（拼写/顺序/缺关键字/中文标点等）
 
-## [1.6.14] - 2026-03-27
+## [v1.6.14] - 2026-03-27
 
 ### 优化
 - docstring质量优化（部分函数）
 - GitHub Actions Node.js版本升级
 
-## [1.6.13] - 2026-03-27
+## [v1.6.13] - 2026-03-27
 
 ### 重构
 - **REQ-025 返回值统一**：消除data/meta重复，统一`{success, message, data, meta}`格式
 
-## [1.6.12] - 2026-03-27
+## [v1.6.12] - 2026-03-27
 
 ### 优化
 - **REQ-025 AI体验优化**：更新excel_get_headers工具说明，添加excel_assess_data_impact决策路径
 
-## [1.6.11] - 2026-03-27
+## [v1.6.11] - 2026-03-27
 
 ### 修复
 - **REQ-015 insert_rows streaming**：修复insert_rows流式写入后读取异常
 - 新增21个读取验证测试
 
-## [1.6.10] - 2026-03-27
+## [v1.6.10] - 2026-03-27
 
 ### 修复
 - **REQ-015 check_duplicate_ids崩溃**：streaming写入后max_row/max_column=None导致崩溃
 
-## [1.6.9] - 2026-03-27
+## [v1.6.9] - 2026-03-27
 
 ### 修复
 - **REQ-015 find_last_row崩溃**：streaming写入后dimension=None导致崩溃
 - 新增REQ-015验证测试
 
-## [1.6.8] - 2026-03-27
+## [v1.6.8] - 2026-03-27
 
 ### 新增
 - **REQ-030 聚合函数多列表达式**：支持`SUM(攻击力+防御力)`等复杂聚合参数
 - **SELECT标量子查询**：`SELECT (SELECT MAX(col) FROM t)` 语法支持
 
-## [1.6.7] - 2026-03-27
+## [v1.6.7] - 2026-03-27
 
 ### 优化
 - 工程治理改进
 
-## [1.6.6] - 2026-03-27
+## [v1.6.6] - 2026-03-27
 
 ### 优化
 - 工程治理改进
 
-## [1.6.4] - 2026-03-27
+## [v1.6.4] - 2026-03-27
 
 ### 修复
 - **REQ-029 JOIN别名映射初始修复**：修复JOIN表别名映射和describe_table流式写入崩溃
 
-## [1.6.3] - 2026-03-27
+## [v1.6.3] - 2026-03-27
 
 ### 修复
 - Bugfix
 
-## [1.6.2] - 2026-03-27
+## [v1.6.2] - 2026-03-27
 
 ### 修复
 - Bugfix
 
-## [1.6.1] - 2026-03-27
+## [v1.6.1] - 2026-03-27
 
 ### 修复
 - Bugfix
 
-## [1.6.0] - 2026-03-27
+## [v1.6.0] - 2026-03-27
 
 ### 新增
 - **REQ-015 性能优化完成**：StreamingWriter流式写入，全部修改操作支持streaming参数
 
-## [1.5.3] - 2026-03-27
+## [v1.5.3] - 2026-03-27
 
 ### 优化
 - **REQ-015 性能优化（写入）**：所有修改操作工具支持streaming参数
@@ -271,7 +288,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - excel_delete_columns: 支持streaming参数，列删除性能提升
   - 已有write_only优化：create_file, import_from_csv, merge_files
 
-## [1.5.2] - 2026-03-27
+## [v1.5.2] - 2026-03-27
 
 ### 优化
 - **REQ-015 excel_update_query流式写入**：UPDATE语句自动选择高性能路径
@@ -281,14 +298,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - 返回值新增method字段标识写入方式（streaming/traditional）
   - 1099测试全通过，8项游戏场景验证通过
 
-## [1.5.1] - 2026-03-27
+## [v1.5.1] - 2026-03-27
 
 ### 优化
 - **REQ-006 全部43个工具docstring优化完成**：统一emoji标题+核心功能+游戏开发场景+参数说明+使用建议格式
 - 覆盖所有MCP工具，AI客户端（Cursor/Claude Desktop等）能更好理解工具用途
 - 修复docstring中反斜杠转义导致的SyntaxWarning
 
-## [1.3.0] - 2026-03-27
+## [v1.3.0] - 2026-03-27
 
 ### 新增
 - **REQ-015 StreamingWriter流式写入**：`core/streaming_writer.py`，calamine读取 + write_only流式写入

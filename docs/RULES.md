@@ -2,6 +2,7 @@
 
 > 子代理可进化：发现更好的做法→更新本文件→记录到DECISIONS.md。
 > 但红线（.cron-prompt.md）和文档所有权不可通过自我进化修改。
+> 敏感文档（.cron-prompt.md/ROADMAP.md/REQUIREMENTS.md优先级和红线）修改时需给方案让CEO决策。其他文档自由修改。
 
 ## 文档瘦身（每轮第0步，不消耗改进时间）
 - DECISIONS.md > 40条 → 最早的10条归档到 docs/DECISIONS-ARCHIVED.md
@@ -74,6 +75,7 @@
 - 不删功能、不改架构、不加依赖（CEO可覆盖）
 - 所有文件读写显式指定encoding='utf-8'
 - 不要修改已有的CI修复（如encoding='utf-8'显式指定）
+- **CI失败是阻断性问题**：每轮用 `gh run list --limit 1` 检查CI状态，失败则 `gh run view --log-failed` 分析→定位→修复→推送。CI红灯不能无视
 - 需求必须有验收标准，没有验收标准不能标DONE
 
 ## 包结构

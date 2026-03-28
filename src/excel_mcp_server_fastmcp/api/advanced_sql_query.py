@@ -1001,7 +1001,7 @@ class AdvancedSQLQueryEngine:
             # IN子查询、标量子查询、EXISTS子查询均支持
 
             # CTE (WITH) 支持
-            with_clause = parsed_sql.args.get('with_')
+            with_clause = parsed_sql.args.get('with') or parsed_sql.args.get('with_')
             if with_clause:
                 return {'valid': True}  # CTE在_execute_query中处理
             # UNION/UNION ALL 支持已实现
@@ -1746,7 +1746,9 @@ class AdvancedSQLQueryEngine:
             pd.DataFrame: 查询结果
         """
         # 处理CTE (WITH ... AS ...)
-        with_clause = parsed_sql.args.get('with_')
+        # 兼容sqlglot不同版本：arg key可能是'with'或'with_'
+        _with_key = 'with' if parsed_sql.args.get('with') else 'with_'
+        with_clause = parsed_sql.args.get(_with_key)
         if with_clause:
             # 复制worksheets_data避免修改原始数据，逐步添加CTE结果
             cte_data = dict(worksheets_data)
@@ -1759,9 +1761,9 @@ class AdvancedSQLQueryEngine:
                     cte_data[cte_name] = cte_result
                 except Exception as e:
                     raise ValueError(f"CTE '{cte_name}' 执行失败: {e}")
-            # 从parsed_sql中移除with_子句，让后续逻辑正常处理
+            # 从parsed_sql中移除with子句，让后续逻辑正常处理
             parsed_sql = parsed_sql.copy()
-            parsed_sql.set('with_', None)
+            parsed_sql.set(_with_key, None)
 
         # 获取FROM子句中的表名（及可选的子查询）
         from_table, from_subquery = self._get_from_table(parsed_sql)

@@ -399,7 +399,7 @@ class TestCTE:
             game_config,
             "WITH high AS (SELECT * FROM 技能配置 WHERE 伤害 > 100) SELECT skill_name, damage FROM high ORDER BY damage DESC"
         )
-        assert result['success'] is True
+        assert result['success'] is True, f"CTE query failed: {result.get('message', 'N/A')}"
         data = result['data']
         rows = [r for r in data if r != data[0]]
         assert len(rows) >= 3
@@ -418,7 +418,7 @@ class TestCTE:
             multi_sheet_config,
             "WITH mages AS (SELECT * FROM 技能配置 WHERE skill_type='mage'), strong AS (SELECT * FROM mages WHERE damage > 150) SELECT skill_name FROM strong"
         )
-        assert result['success'] is True
+        assert result['success'] is True, f"Multi-CTE query failed: {result.get('message', 'N/A')}"
         data = result['data']
         rows = [r for r in data if r != data[0]]
         assert len(rows) >= 1
@@ -435,7 +435,7 @@ class TestCTE:
             game_config,
             "WITH stats AS (SELECT 技能类型, AVG(伤害) as avg_dmg FROM 技能配置 GROUP BY 技能类型) SELECT * FROM stats ORDER BY avg_dmg DESC"
         )
-        assert result['success'] is True
+        assert result['success'] is True, f"CTE aggregation query failed: {result.get('message', 'N/A')}"
         data = result['data']
         rows = [r for r in data if r != data[0]]
         assert len(rows) >= 2  # 至少2种类型
