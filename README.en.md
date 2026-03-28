@@ -149,7 +149,7 @@ Users in China may need to configure a proxy. Or just use option B (pip), which 
 <summary><b>How to confirm installation succeeded?</b></summary>
 
 ```bash
-uvx excel-mcp-server-fastmcp --help
+uvx excel-mcp-server-fastmcp@1.6.40 --help
 ```
 
 Seeing help message means it's OK.
