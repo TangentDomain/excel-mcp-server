@@ -1,184 +1,252 @@
 #!/usr/bin/env python3
 """
-自动化版本检查脚本
-确保 pyproject.toml、__init__.py、README.md、README.en.md、CHANGELOG 版本一致性
+版本一致性检查与自动化修复脚本
+自动检测并修复pyproject.toml、__init__.py、README.md、README.en.md、CHANGELOG.md之间的版本信息同步
 """
 
 import re
+import json
 import sys
 from pathlib import Path
+from typing import Dict, Optional, Tuple
 
-def get_version_from_pyproject():
-    """从 pyproject.toml 获取版本"""
-    pyproject_path = Path("pyproject.toml")
-    if not pyproject_path.exists():
-        return None
+class VersionSyncChecker:
+    def __init__(self, project_root: str = "."):
+        self.project_root = Path(project_root)
+        self.version_files = {
+            "pyproject.toml": self._extract_pyproject_version,
+            "src/excel_mcp_server_fastmcp/__init__.py": self._extract_init_version, 
+            "README.md": self._extract_readme_version,
+            "README.en.md": self._extract_readme_version,
+            "CHANGELOG.md": self._extract_changelog_version
+        }
+        self.versions = {}
+        self.inconsistencies = []
+        
+    def _extract_pyproject_version(self, content: str) -> Optional[str]:
+        """从pyproject.toml中提取版本"""
+        try:
+            import toml
+            data = toml.loads(content)
+            return data.get("project", {}).get("version")
+        except ImportError:
+            # fallback to regex if toml not available
+            match = re.search(r'version\s*=\s*["\']([^"\']+)["\']', content)
+            return match.group(1) if match else None
+        except:
+            return None
     
-    content = pyproject_path.read_text(encoding='utf-8')
-    match = re.search(r'version\s*=\s*["\']([^"\']+)["\']', content)
-    return match.group(1) if match else None
-
-def get_version_from_init():
-    """从 __init__.py 获取版本"""
-    init_path = Path("src/excel_mcp_server_fastmcp/__init__.py")
-    if not init_path.exists():
-        return None
+    def _extract_init_version(self, content: str) -> Optional[str]:
+        """从__init__.py中提取版本"""
+        match = re.search(r'__version__\s*=\s*["\']([^"\']+)["\']', content)
+        return match.group(1) if match else None
     
-    content = init_path.read_text(encoding='utf-8')
-    match = re.search(r'__version__\s*=\s*["\']([^"\']+)["\']', content)
-    return match.group(1) if match else None
-
-def get_version_from_readme(readme_path):
-    """从 README 获取版本"""
-    if not readme_path.exists():
-        return None
-    
-    content = readme_path.read_text(encoding='utf-8')
-    
-    # 查找版本徽章
-    badge_match = re.search(r'badge/version-v([0-9]+\.[0-9]+\.[0-9]+)-blue', content)
-    if badge_match:
-        return badge_match.group(1)
-    
-    # 查找当前版本行
-    current_match = re.search(r'✅\s*v([0-9]+\.[0-9]+\.[0-9]+)', content)
-    if current_match:
-        return current_match.group(1)
-    
-    return None
-
-def get_version_from_changelog():
-    """从 CHANGELOG 获取最新版本"""
-    changelog_path = Path("CHANGELOG.md")
-    if not changelog_path.exists():
-        return None
-    
-    content = changelog_path.read_text(encoding='utf-8')
-    
-    # 查找最新版本条目（支持 v1.0.0 或 1.0.0 格式）
-    lines = content.split('\n')
-    for line in lines:
-        if line.strip().startswith('## [') and ('v' in line or '[1.' in line):
-            match = re.search(r'v?([0-9]+\.[0-9]+\.[0-9]+)', line)
+    def _extract_readme_version(self, content: str) -> Optional[str]:
+        """从README文件中提取版本"""
+        # 查找常见的版本标记模式
+        patterns = [
+            r'version[:\s]+([^\n\s]+)',
+            r'v([0-9]+\.[0-9]+\.[0-9]+)',
+            r'excel-mcp-server-fastmcp[^\n]*?([0-9]+\.[0-9]+\.[0-9]+)'
+        ]
+        
+        for pattern in patterns:
+            match = re.search(pattern, content, re.IGNORECASE)
             if match:
+                version = match.group(1)
+                # 确保版本格式正确
+                if re.match(r'^[0-9]+\.[0-9]+\.[0-9]+$', version):
+                    return version
+        return None
+    
+    def _extract_changelog_version(self, content: str) -> Optional[str]:
+        """从CHANGELOG.md中提取最新版本"""
+        # 查找第一个非[Unreleased]的版本
+        lines = content.split('\n')
+        for line in lines:
+            match = re.search(r'##\s*\[?v?([0-9]+\.[0-9]+\.[0-9]+)', line)
+            if match and '[Unreleased]' not in line:
                 return match.group(1)
+        return None
     
-    return None
-
-def check_version_consistency():
-    """检查版本一致性并返回修复建议"""
-    versions = {
-        'pyproject.toml': get_version_from_pyproject(),
-        '__init__.py': get_version_from_init(),
-        'README.md': get_version_from_readme(Path("README.md")),
-        'README.en.md': get_version_from_readme(Path("README.en.md")),
-        'CHANGELOG.md': get_version_from_changelog()
-    }
+    def read_file(self, filepath: Path) -> Optional[str]:
+        """读取文件内容"""
+        try:
+            with open(filepath, 'r', encoding='utf-8') as f:
+                return f.read()
+        except Exception as e:
+            print(f"Warning: Could not read {filepath}: {e}")
+            return None
     
-    # 过滤掉None值
-    valid_versions = {k: v for k, v in versions.items() if v}
-    
-    if not valid_versions:
-        print("❌ 未找到任何版本信息")
-        return False
-    
-    # 检查一致性
-    unique_versions = set(valid_versions.values())
-    if len(unique_versions) == 1:
-        version = list(unique_versions)[0]
-        print(f"✅ 版本一致: v{version}")
-        return True
-    else:
-        print("❌ 版本不一致:")
-        for file, version in valid_versions.items():
-            print(f"  {file}: v{version}")
-        return False
-
-def get_latest_version_from_files():
-    """从文件获取最新版本号"""
-    # 从pyproject.toml获取版本作为基准
-    return get_version_from_pyproject()
-
-def auto_fix_versions():
-    """自动修复版本不一致问题"""
-    latest_version = get_latest_version_from_files()
-    if not latest_version:
-        print("❌ 无法确定最新版本号")
-        return False
-    
-    print(f"🔄 自动修复版本到: v{latest_version}")
-    files_updated = []
-    
-    # 更新 pyproject.toml
-    pyproject_path = Path("pyproject.toml")
-    if pyproject_path.exists():
-        content = pyproject_path.read_text(encoding='utf-8')
-        new_content = re.sub(r'version\s*=\s*["\'][^"\']+["\']', f'version = "{latest_version}"', content)
-        pyproject_path.write_text(new_content, encoding='utf-8')
-        files_updated.append("pyproject.toml")
-    
-    # 更新 __init__.py
-    init_path = Path("src/excel_mcp_server_fastmcp/__init__.py")
-    if init_path.exists():
-        content = init_path.read_text(encoding='utf-8')
-        new_content = re.sub(r'__version__\s*=\s*["\'][^"\']+["\']', f'__version__ = "{latest_version}"', content)
-        init_path.write_text(new_content, encoding='utf-8')
-        files_updated.append("__init__.py")
-    
-    # 更新 README.md 的版本徽章和当前版本
-    readme_path = Path("README.md")
-    if readme_path.exists():
-        content = readme_path.read_text(encoding='utf-8')
+    def check_versions(self) -> Dict[str, Optional[str]]:
+        """检查所有文件的版本"""
+        for filename, extractor in self.version_files.items():
+            filepath = self.project_root / filename
+            if filepath.exists():
+                content = self.read_file(filepath)
+                if content:
+                    self.versions[filename] = extractor(content)
+                    print(f"✓ {filename}: {self.versions[filename]}")
+                else:
+                    self.versions[filename] = None
+                    print(f"✗ {filename}: Could not extract version")
+            else:
+                self.versions[filename] = None
+                print(f"✗ {filename}: File not found")
         
-        # 更新版本徽章
-        content = re.sub(r'badge/version-v([0-9]+\.[0-9]+\.[0-9]+)-blue', f'badge/version-v{latest_version}-blue', content)
-        
-        # 更新当前版本行
-        content = re.sub(r'✅\s*v([0-9]+\.[0-9]+\.[0-9]+)', f'✅ v{latest_version}', content)
-        
-        readme_path.write_text(content, encoding='utf-8')
-        files_updated.append("README.md")
+        return self.versions
     
-    # 更新 README.en.md 的版本徽章和当前版本
-    readme_en_path = Path("README.en.md")
-    if readme_en_path.exists():
-        content = readme_en_path.read_text(encoding='utf-8')
+    def find_inconsistencies(self) -> list:
+        """发现版本不一致问题"""
+        versions = [v for v in self.versions.values() if v is not None]
+        if len(set(versions)) <= 1:
+            return []  # 所有版本一致
         
-        # 更新版本徽章
-        content = re.sub(r'badge/version-v([0-9]+\.[0-9]+\.[0-9]+)-blue', f'badge/version-v{latest_version}-blue', content)
+        self.inconsistencies = []
+        reference_version = self._get_reference_version()
         
-        # 更新当前版本行
-        content = re.sub(r'✅\s*v([0-9]+\.[0-9]+\.[0-9]+)', f'✅ v{latest_version}', content)
+        for filename, version in self.versions.items():
+            if version and version != reference_version:
+                self.inconsistencies.append({
+                    "file": filename,
+                    "current": version,
+                    "expected": reference_version
+                })
         
-        readme_en_path.write_text(content, encoding='utf-8')
-        files_updated.append("README.en.md")
+        return self.inconsistencies
     
-    return files_updated
+    def _get_reference_version(self) -> Optional[str]:
+        """获取参考版本（优先使用pyproject.toml的版本）"""
+        return self.versions.get("pyproject.toml")
+    
+    def fix_versions(self, target_version: Optional[str] = None) -> bool:
+        """修复版本不一致问题"""
+        if not target_version:
+            target_version = self._get_reference_version()
+        
+        if not target_version:
+            print("✗ Cannot determine target version")
+            return False
+        
+        fixed_files = []
+        
+        for filename, version in self.versions.items():
+            if version and version != target_version:
+                filepath = self.project_root / filename
+                content = self.read_file(filepath)
+                if content:
+                    fixed_content = self._fix_file_content(content, target_version, filename)
+                    if fixed_content:
+                        with open(filepath, 'w', encoding='utf-8') as f:
+                            f.write(fixed_content)
+                        fixed_files.append(filename)
+                        print(f"✓ Fixed {filename}: {version} → {target_version}")
+        
+        return len(fixed_files) > 0
+    
+    def _fix_file_content(self, content: str, target_version: str, filename: str) -> Optional[str]:
+        """修复文件内容中的版本"""
+        if filename == "pyproject.toml":
+            # 使用toml库如果可用，否则简单替换
+            try:
+                import toml
+                data = toml.loads(content)
+                if data.get("project", {}).get("version") != target_version:
+                    data["project"]["version"] = target_version
+                    return toml.dumps(data)
+            except ImportError:
+                content = re.sub(
+                    r'version\s*=\s*["\'][^"\']*["\']',
+                    f'version = "{target_version}"',
+                    content
+                )
+        
+        elif filename == "__init__.py":
+            content = re.sub(
+                r'__version__\s*=\s*["\'][^"\']*["\']',
+                f'__version__ = "{target_version}"',
+                content
+            )
+        
+        elif filename in ["README.md", "README.en.md"]:
+            # 修复多种版本标记模式
+            patterns = [
+                (r'version[:\s]+[^\n\s]+', f'version: {target_version}'),
+                (r'v([0-9]+\.[0-9]+\.[0-9]+)', f'v{target_version}'),
+                (r'excel-mcp-server-fastmcp[^\n]*?([0-9]+\.[0-9]+\.[0-9]+)', 
+                 f'excel-mcp-server-fastmcp v{target_version}')
+            ]
+            
+            for pattern, replacement in patterns:
+                content = re.sub(pattern, replacement, content, flags=re.IGNORECASE)
+        
+        elif filename == "CHANGELOG.md":
+            # 确保第一个非Unreleased版本号正确
+            content = re.sub(
+                r'##\s*(?:\[Unreleased\]|v[0-9]+\.[0-9]+\.[0-9]+)',
+                f'## v{target_version}',
+                content,
+                count=1
+            )
+        
+        return content
+    
+    def generate_report(self) -> str:
+        """生成检查报告"""
+        report = []
+        report.append("=== 版本一致性检查报告 ===")
+        report.append("")
+        
+        # 检查结果
+        report.append("版本检查结果:")
+        for filename, version in self.versions.items():
+            status = "✓" if version else "✗"
+            report.append(f"  {status} {filename}: {version}")
+        
+        report.append("")
+        
+        # 不一致问题
+        if self.inconsistencies:
+            report.append("发现版本不一致问题:")
+            for issue in self.inconsistencies:
+                report.append(f"  ✗ {issue['file']}: {issue['current']} → {issue['expected']}")
+        else:
+            report.append("✓ 所有文件版本一致")
+        
+        return "\n".join(report)
 
 def main():
     """主函数"""
-    print("🔍 开始版本一致性检查...")
+    print("开始版本一致性检查...")
     
-    if check_version_consistency():
-        print("✅ 版本检查通过")
-        return 0
-    else:
-        print("🔧 发现版本不一致，尝试自动修复...")
-        updated_files = auto_fix_versions()
-        
-        if updated_files:
-            print(f"✅ 已修复文件: {', '.join(updated_files)}")
-            
-            # 记录到DECISIONS.md
-            decision_entry = f"[自我进化建议] 版本一致性检查与自动化修复 → 创建check-version-sync.py脚本，自动检测并修复版本不一致问题"
-            with open("docs/DECISIONS.md", "a", encoding="utf-8") as f:
-                f.write(f"- {decision_entry}\n")
-            
-            print(f"📝 已记录修复操作到docs/DECISIONS.md")
-            return 0
+    checker = VersionSyncChecker()
+    
+    # 检查版本
+    versions = checker.check_versions()
+    
+    # 发现不一致
+    inconsistencies = checker.find_inconsistencies()
+    
+    # 生成报告
+    report = checker.generate_report()
+    print(report)
+    
+    # 如果有不一致，询问是否修复
+    if inconsistencies:
+        print("\n发现版本不一致，尝试自动修复...")
+        if checker.fix_versions():
+            print("✓ 版本修复完成")
+            # 重新检查
+            checker.check_versions()
+            checker.find_inconsistencies()
+            final_report = checker.generate_report()
+            print("\n最终检查结果:")
+            print(final_report)
         else:
-            print("❌ 自动修复失败")
+            print("✗ 版本修复失败")
             return 1
+    
+    return 0
 
 if __name__ == "__main__":
     sys.exit(main())
