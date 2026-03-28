@@ -10,13 +10,13 @@
 [![Python 版本](https://img.shields.io/badge/python-3.10+-blue.svg)](https://www.python.org/downloads/)
 [![技术支持: FastMCP](https://img.shields.io/badge/Powered%20by-FastMCP-orange)](https://github.com/jlowin/fastmcp)
 ![状态](https://img.shields.io/badge/status-stable-green.svg)
-![测试覆盖](https://img.shields.io/badge/tests-1156%20tests-brightgreen.svg)
+![测试覆盖](https://img.shields.io/badge/tests-1175%20tests-brightgreen.svg)
 ![工具数量](https://img.shields.io/badge/tools-53%20verified%20tools-green.svg)
 [![PyPI](https://img.shields.io/pypi/v/excel-mcp-server-fastmcp.svg)](https://pypi.org/project/excel-mcp-server-fastmcp/)
 [![版本](https://img.shields.io/badge/version-v1.6.35-blue.svg)](https://pypi.org/project/excel-mcp-server-fastmcp/#history)
 [![CI](https://github.com/TangentDomain/excel-mcp-server/actions/workflows/ci.yml/badge.svg)](https://github.com/TangentDomain/excel-mcp-server/actions/workflows/ci.yml)
 
-**ExcelMCP** 是专为游戏开发设计的Excel配置表管理MCP服务器。通过AI自然语言指令，实现技能配置表、装备数据、怪物属性等游戏配置的智能化操作。基于**FastMCP**构建，读取使用**python-calamine**（Rust引擎，2300x提速），写入使用**openpyxl**，拥有**53个专业工具**和**1156个测试用例**，确保企业级可靠性。
+**ExcelMCP** 是专为游戏开发设计的Excel配置表管理MCP服务器。通过AI自然语言指令，实现技能配置表、装备数据、怪物属性等游戏配置的智能化操作。基于**FastMCP**构建，读取使用**python-calamine**（Rust引擎，2300x提速），写入使用**openpyxl**，拥有**53个专业工具**和**1175个测试用例**，确保企业级可靠性。
 
 🎯 **核心功能**: 技能系统、装备管理、怪物配置、数值平衡、版本对比、策划工具链
 
@@ -36,8 +36,8 @@
 | **游戏垂直优化** | ✅ 专用游戏数据结构 | ❌ 通用表格处理 |
 | **跨文件JOIN** | ✅ `@'filepath'`语法 | ❌ 不支持 |
 | **错误处理** | ✅ 结构化错误+AI修复提示 | ❌ 基础异常 |
-| **测试覆盖** | ✅ 1156个测试用例 | ❌ 有限测试 |
-| **当前版本** | ✅ v1.6.34 | ✅ 最新版本 |
+| **测试覆盖** | ✅ 1175个测试用例 | ❌ 有限测试 |
+| **当前版本** | ✅ v1.6.35 | ✅ 最新版本 |
 | **安装方式** | ✅ `uvx`一键运行 | ⚠️ 需要pip安装 |
 
 ## 🚀 为什么选择 ExcelMCP
@@ -223,7 +223,7 @@ python scripts/benchmark.py --compare      # 与上次结果对比
 | **双行表头** | ✅ 自动识别中文描述+英文字段 | ❌ | ❌ |
 | **SQL UPDATE** | ✅ 条件批量修改 | ❌ | ❌ |
 | **跨文件JOIN** | ✅ @filepath 语法 | ❌ | ❌ |
-| **测试覆盖** | 1156 tests | ~50 tests | ~30 tests |
+| **测试覆盖** | 1175 tests | ~50 tests | ~30 tests |
 | **错误恢复** | ✅ 结构化错误码+AI可修复提示 | ❌ 纯文本 | ❌ 纯文本 |
 | **中文列名查询** | ✅ | ❌ | ❌ |
 | **备份/恢复** | ✅ | ❌ | ❌ |
@@ -889,7 +889,7 @@ API业务逻辑层 (集中式处理)
 ## 📊 项目信息
 
 ### 质量验证指标
-- **测试用例**: 1159个（行为验证，无覆盖率填充）
+- **测试用例**: 1175个（行为验证，无覆盖率填充）
 - **测试文件**: 49个测试文件
 - **测试代码**: 16,496行
 - **工具数量**: 53个 (@mcp.tool装饰器验证)
@@ -1017,10 +1017,10 @@ await excel_write_rows(
 ```
 
 **项目状态**
-- **版本**: v1.6.34（第185轮文档一致性优化）
-- **测试**: 1156个测试用例通过
+- **版本**: v1.6.35（第191轮文档数据校正）
+- **测试**: 1175个测试用例通过
 - **工具**: 53个专业工具，全部docstring优化完成
-- **更新**: 第185轮REQ-026文档与门面优化，CHANGELOG去重与数据校正
+- **更新**: 第191轮REQ-026文档与门面优化，测试数据/竞品对比/CHANGELOG同步校正
 
 ## 🔧 常见问题与故障排除
 
