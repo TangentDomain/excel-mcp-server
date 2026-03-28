@@ -13,7 +13,7 @@
 ![测试覆盖](https://img.shields.io/badge/tests-1164%20tests-brightgreen.svg)
 ![工具数量](https://img.shields.io/badge/tools-44%20verified%20tools-green.svg)
 [![PyPI](https://img.shields.io/pypi/v/excel-mcp-server-fastmcp.svg)](https://pypi.org/project/excel-mcp-server-fastmcp/)
-[![版本](https://img.shields.io/badge/version-v1.6.32-blue.svg)](https://pypi.org/project/excel-mcp-server-fastmcp/#history)
+[![版本](https://img.shields.io/badge/version-v1.6.33-blue.svg)](https://pypi.org/project/excel-mcp-server-fastmcp/#history)
 [![CI](https://github.com/TangentDomain/excel-mcp-server/actions/workflows/ci.yml/badge.svg)](https://github.com/TangentDomain/excel-mcp-server/actions/workflows/ci.yml)
 
 **ExcelMCP** 是专为游戏开发设计的Excel配置表管理MCP服务器。通过AI自然语言指令，实现技能配置表、装备数据、怪物属性等游戏配置的智能化操作。基于**FastMCP**构建，读取使用**python-calamine**（Rust引擎，2300x提速），写入使用**openpyxl**，拥有**44个专业工具**和**1164个测试用例**，确保企业级可靠性。
@@ -520,6 +520,26 @@ result = excel_get_headers("skills.xlsx")  # sheet_name省略
 - `excel_check_duplicate_ids` - 🔍 ID重复检测，数据质量保障
 - `excel_server_stats` - 📈 服务器运行统计，性能监控与错误分析
 
+### 🔄 批量操作
+
+- `excel_batch_update_ranges` - 🔄 批量更新多个单元格区域，减少IO提升性能
+- `excel_merge_multiple_files` - 📁 合并多个Excel文件，支持追加/覆盖/合并模式
+
+### 📊 图表生成
+
+- `excel_create_chart` - 📊 创建柱状图/折线图/饼图等，数据可视化
+- `excel_list_charts` - 📋 列出工作表中的所有图表信息
+
+### 📝 数据验证
+
+- `excel_set_data_validation` - 📝 设置数据验证规则，限制输入类型和范围
+- `excel_clear_validation` - 🧹 清除数据验证规则
+
+### 🎨 条件格式
+
+- `excel_add_conditional_format` - 🎨 添加条件格式，数据可视化增强
+- `excel_clear_conditional_format` - 🧹 清除条件格式规则
+
 ### 🛡️ 安全与备份
 - `excel_create_backup` - 创建文件自动备份
 - `excel_restore_backup` - 从备份恢复文件
@@ -813,7 +833,7 @@ ExcelMCP 内置多层安全防护，保护用户数据和系统安全：
 ```
 src/excel_mcp_server_fastmcp/    # 主包（pip install 后可直接 import）
 ├── __init__.py                   # 包入口，暴露 main()
-├── server.py                     # MCP接口层（44个工具定义）
+├── server.py                     # MCP接口层（52个工具定义）
 ├── api/                          # API业务逻辑层
 │   ├── excel_operations.py       # Excel操作统一入口
 │   └── advanced_sql_query.py     # SQL查询引擎

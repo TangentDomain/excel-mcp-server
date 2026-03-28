@@ -13,7 +13,7 @@
 ![Tests](https://img.shields.io/badge/tests-1164%20tests-brightgreen.svg)
 ![Tools](https://img.shields.io/badge/tools-44%20verified%20tools-green.svg)
 [![PyPI](https://img.shields.io/pypi/v/excel-mcp-server-fastmcp.svg)](https://pypi.org/project/excel-mcp-server-fastmcp/)
-[![Version](https://img.shields.io/badge/version-v1.6.32-blue.svg)](https://pypi.org/project/excel-mcp-server-fastmcp/#history)
+[![Version](https://img.shields.io/badge/version-v1.6.33-blue.svg)](https://pypi.org/project/excel-mcp-server-fastmcp/#history)
 [![CI](https://github.com/TangentDomain/excel-mcp-server/actions/workflows/ci.yml/badge.svg)](https://github.com/TangentDomain/excel-mcp-server/actions/workflows/ci.yml)
 
 **ExcelMCP** is an Excel configuration table management MCP server designed for game development. Through AI natural language commands, it enables intelligent operations on game configurations such as skill tables, equipment data, and monster attributes. Built with **FastMCP**, reads use **python-calamine** (Rust engine, 2300x speedup), writes use **openpyxl**. Features **44 professional tools** and **1164 test cases**, ensuring enterprise-grade reliability.
@@ -469,6 +469,26 @@ SELECT a.skill_name, b.equip_name FROM SkillConfig a INNER JOIN EquipConfig b ON
 - `excel_compare_files` - Multi-worksheet file comparison
 - `excel_check_duplicate_ids` - ID duplicate detection
 - `excel_server_stats` - Server runtime statistics (tool call count, latency, error rate, error classification)
+
+### 🔄 Batch Operations
+
+- `excel_batch_update_ranges` - Batch update multiple cell ranges, reduce IO for better performance
+- `excel_merge_multiple_files` - Merge multiple Excel files with append/overwrite/merge modes
+
+### 📊 Chart Generation
+
+- `excel_create_chart` - Create column/line/pie charts for data visualization
+- `excel_list_charts` - List all charts in a worksheet
+
+### 📝 Data Validation
+
+- `excel_set_data_validation` - Set data validation rules to restrict input type and range
+- `excel_clear_validation` - Clear data validation rules
+
+### 🎨 Conditional Formatting
+
+- `excel_add_conditional_format` - Add conditional formatting for enhanced data visualization
+- `excel_clear_conditional_format` - Clear conditional formatting rules
 
 ### 🛡️ Safety & Backup
 - `excel_create_backup` - Create file auto-backup
