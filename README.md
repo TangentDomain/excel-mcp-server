@@ -10,15 +10,20 @@
 [![Python 版本](https://img.shields.io/badge/python-3.10+-blue.svg)](https://www.python.org/downloads/)
 [![技术支持: FastMCP](https://img.shields.io/badge/Powered%20by-FastMCP-orange)](https://github.com/jlowin/fastmcp)
 ![状态](https://img.shields.io/badge/status-stable-green.svg)
-![测试覆盖](https://img.shields.io/badge/tests-1164%20tests-brightgreen.svg)
+![测试覆盖](https://img.shields.io/badge/tests-1156%20tests-brightgreen.svg)
 ![工具数量](https://img.shields.io/badge/tools-53%20verified%20tools-green.svg)
 [![PyPI](https://img.shields.io/pypi/v/excel-mcp-server-fastmcp.svg)](https://pypi.org/project/excel-mcp-server-fastmcp/)
-[![版本](https://img.shields.io/badge/version-v1.6.33-blue.svg)](https://pypi.org/project/excel-mcp-server-fastmcp/#history)
+[![版本](https://img.shields.io/badge/version-v1.6.34-blue.svg)](https://pypi.org/project/excel-mcp-server-fastmcp/#history)
 [![CI](https://github.com/TangentDomain/excel-mcp-server/actions/workflows/ci.yml/badge.svg)](https://github.com/TangentDomain/excel-mcp-server/actions/workflows/ci.yml)
 
-**ExcelMCP** 是专为游戏开发设计的Excel配置表管理MCP服务器。通过AI自然语言指令，实现技能配置表、装备数据、怪物属性等游戏配置的智能化操作。基于**FastMCP**构建，读取使用**python-calamine**（Rust引擎，2300x提速），写入使用**openpyxl**，拥有**44个专业工具**和**1164个测试用例**，确保企业级可靠性。
+**ExcelMCP** 是专为游戏开发设计的Excel配置表管理MCP服务器。通过AI自然语言指令，实现技能配置表、装备数据、怪物属性等游戏配置的智能化操作。基于**FastMCP**构建，读取使用**python-calamine**（Rust引擎，2300x提速），写入使用**openpyxl**，拥有**53个专业工具**和**1156个测试用例**，确保企业级可靠性。
 
 🎯 **核心功能**: 技能系统、装备管理、怪物配置、数值平衡、版本对比、策划工具链
+
+## 🔍 快速定位
+- **🚀 新手入门**: [安装配置](#-快速入门-3分钟设置) • [命令速查](#-快速参考) • [游戏场景教程](#-游戏策划完整工作流教程)
+- **🛠️ 工具参考**: [完整工具列表](#️-完整工具列表53个专业工具) • [SQL查询指南](#-sql实战场景) • [游戏开发场景](#-游戏开发场景速查)
+- **📚 学习资源**: [使用指南](#-使用指南) • [技术架构](#-技术架构) • [故障排除](#-常见问题与故障排除)
 
 ## 🏆 竞品对比
 
@@ -31,8 +36,8 @@
 | **游戏垂直优化** | ✅ 专用游戏数据结构 | ❌ 通用表格处理 |
 | **跨文件JOIN** | ✅ `@'filepath'`语法 | ❌ 不支持 |
 | **错误处理** | ✅ 结构化错误+AI修复提示 | ❌ 基础异常 |
-| **测试覆盖** | ✅ 1164个测试用例 | ❌ 有限测试 |
-| **当前版本** | ✅ v1.6.31 | ✅ 最新版本 |
+| **测试覆盖** | ✅ 1156个测试用例 | ❌ 有限测试 |
+| **当前版本** | ✅ v1.6.34 | ✅ 最新版本 |
 | **安装方式** | ✅ `uvx`一键运行 | ⚠️ 需要pip安装 |
 
 ## 🚀 为什么选择 ExcelMCP
@@ -137,15 +142,21 @@ JOIN equipment.xlsx装备表 e ON s.技能名 = e.推荐技能
 
 ## 🚀 快速入门
 
-### 方式一：uvx 一键运行（推荐）
+### 📦 一键安装（推荐）
 
-无需克隆项目，从PyPI直接运行：
+**最简单方式**：直接从PyPI运行，无需克隆项目
 
 ```bash
+# 安装并运行
 uvx excel-mcp-server-fastmcp
+
+# 或安装到本地
+pip install excel-mcp-server-fastmcp
 ```
 
-MCP客户端配置：
+### 🔧 MCP客户端配置
+
+**配置文件**（推荐方式）：
 ```json
 {
   "mcpServers": {
@@ -157,38 +168,31 @@ MCP客户端配置：
 }
 ```
 
+**环境变量方式**：
+```bash
+export EXCEL_MCP_SERVER="uvx excel-mcp-server-fastmcp"
+```
 
-### 方式二：从源码安装
+### 🚀 验证安装
 
-1. **克隆项目**
-   ```bash
-   git clone https://github.com/TangentDomain/excel-mcp-server.git
-   cd excel-mcp-server
-   ```
+```bash
+# 检查版本
+excel-mcp-server-fastmcp --version
 
-2. **安装依赖**
-   ```bash
-   # 推荐：使用 uv (更快)
-   pip install uv && uv sync
+# 测试连接
+uvx excel-mcp-server-fastmcp --help
+```
 
-   # 备选：使用 pip
-   pip install -e .
-   ```
+### 🎯 常用命令示例
 
-3. **配置MCP客户端**
-   ```json
-   {
-     "mcpServers": {
-       "excelmcp": {
-         "command": "python",
-         "args": ["-m", "excel_mcp_server_fastmcp"]
-       }
-     }
-   }
-   ```
-
-4. **开始使用**
-   准备就绪！让AI助手通过自然语言控制Excel文件。
+配置完成后，直接对你的AI说：
+```text
+"查看 skills.xlsx 有哪些表"
+"搜索所有火系技能" 
+"查询DPM最高的10个技能"
+"把所有火系技能伤害提升20%"
+"对比v1和v2版本差异"
+```
 
 ### 验证安装
 ```bash
@@ -214,12 +218,12 @@ python scripts/benchmark.py --compare      # 与上次结果对比
 |------|----------|-------|------------|
 | **SQL查询引擎** | ✅ 完整SQL（JOIN/子查询/窗口函数/CTE） | ❌ | ❌ |
 | **读取引擎** | 🦀 python-calamine（Rust，2300x提速） | openpyxl | openpyxl |
-| **工具数量** | 44个专业工具 | ~15个基础工具 | ~10个 |
+| **工具数量** | 53个专业工具 | ~15个基础工具 | ~10个 |
 | **游戏开发** | ✅ 垂直优化（DPM/数值平衡/配置表） | ❌ 通用 | ❌ 通用 |
 | **双行表头** | ✅ 自动识别中文描述+英文字段 | ❌ | ❌ |
 | **SQL UPDATE** | ✅ 条件批量修改 | ❌ | ❌ |
 | **跨文件JOIN** | ✅ @filepath 语法 | ❌ | ❌ |
-| **测试覆盖** | 1164 tests | ~50 tests | ~30 tests |
+| **测试覆盖** | 1156 tests | ~50 tests | ~30 tests |
 | **错误恢复** | ✅ 结构化错误码+AI可修复提示 | ❌ 纯文本 | ❌ 纯文本 |
 | **中文列名查询** | ✅ | ❌ | ❌ |
 | **备份/恢复** | ✅ | ❌ | ❌ |
@@ -441,7 +445,7 @@ SELECT a.skill_name, b.equip_name FROM SkillConfig a INNER JOIN EquipConfig b ON
 
 ---
 
-## 🛠️ 完整工具列表（44个专业工具）
+## 🛠️ 完整工具列表（53个专业工具）
 
 ### 📁 文件与工作表管理
 - `excel_create_file` - 创建新Excel文件，支持自定义工作表
@@ -888,7 +892,7 @@ API业务逻辑层 (集中式处理)
 - **测试用例**: 1159个（行为验证，无覆盖率填充）
 - **测试文件**: 49个测试文件
 - **测试代码**: 16,496行
-- **工具数量**: 44个 (@mcp.tool装饰器验证)
+- **工具数量**: 53个 (@mcp.tool装饰器验证)
 - **架构层次**: 4层分层设计 (MCP→API→Core→Utils)
 
 ### 验证命令
@@ -897,7 +901,7 @@ API业务逻辑层 (集中式处理)
 python -m pytest tests/ -q --tb=short -n auto --timeout=30
 
 # 验证工具完整性
-grep -c "def excel_" src/excel_mcp_server_fastmcp/server.py  # 应输出: 44
+grep -c "def excel_" src/excel_mcp_server_fastmcp/server.py  # 应输出: 53
 
 # 生成覆盖率报告
 python -m pytest tests/ --cov=src --cov-report=html
@@ -957,7 +961,7 @@ A: 使用专门的配置表对比工具，支持ID对象跟踪
 
 | 🎯 **快速开始** | 🛠️ **工具参考** | 📚 **学习指南** |
 |----------------|----------------|----------------|
-| [🚀 安装配置](#-快速入门-3分钟设置) | [📋 完整工具列表](#️-完整工具列表44个专业工具) | [📖 使用指南](#-使用指南) |
+| [🚀 安装配置](#-快速入门-3分钟设置) | [📋 完整工具列表](#️-完整工具列表53个专业工具) | [📖 使用指南](#-使用指南) |
 | [⚡ 命令速查](#-快速参考) | [🏗️ 技术架构](#️-技术架构) | [🚨 故障排除](#-故障排除) |
 | [🎮 游戏配置管理](#-使用指南) | [📊 项目信息](#-项目信息) | [❓ 常见问题](#-常见问题) |
 
@@ -1013,10 +1017,10 @@ await excel_write_rows(
 ```
 
 **项目状态**
-- **版本**: v1.6.29（第169轮文档优化完成）
-- **测试**: 1164个测试用例通过
-- **工具**: 44个专业工具，全部docstring优化完成
-- **更新**: 第154轮工具描述优化成果已记录
+- **版本**: v1.6.34（第182轮文档优化完成）
+- **测试**: 1156个测试用例通过
+- **工具**: 53个专业工具，全部docstring优化完成
+- **更新**: 第182轮文档一致性优化成果已记录
 
 ## 🔧 常见问题与故障排除
 

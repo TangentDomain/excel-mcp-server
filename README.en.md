@@ -10,15 +10,20 @@
 [![Python Version](https://img.shields.io/badge/python-3.10+-blue.svg)](https://www.python.org/downloads/)
 [![Powered by: FastMCP](https://img.shields.io/badge/Powered%20by-FastMCP-orange)](https://github.com/jlowin/fastmcp)
 ![Status](https://img.shields.io/badge/status-stable-green.svg)
-![Tests](https://img.shields.io/badge/tests-1164%20tests-brightgreen.svg)
+![Tests](https://img.shields.io/badge/tests-1156%20tests-brightgreen.svg)
 ![Tools](https://img.shields.io/badge/tools-53%20verified%20tools-green.svg)
 [![PyPI](https://img.shields.io/pypi/v/excel-mcp-server-fastmcp.svg)](https://pypi.org/project/excel-mcp-server-fastmcp/)
-[![Version](https://img.shields.io/badge/version-v1.6.33-blue.svg)](https://pypi.org/project/excel-mcp-server-fastmcp/#history)
+[![Version](https://img.shields.io/badge/version-v1.6.34-blue.svg)](https://pypi.org/project/excel-mcp-server-fastmcp/#history)
 [![CI](https://github.com/TangentDomain/excel-mcp-server/actions/workflows/ci.yml/badge.svg)](https://github.com/TangentDomain/excel-mcp-server/actions/workflows/ci.yml)
 
-**ExcelMCP** is an Excel configuration table management MCP server designed for game development. Through AI natural language commands, it enables intelligent operations on game configurations such as skill tables, equipment data, and monster attributes. Built with **FastMCP**, reads use **python-calamine** (Rust engine, 2300x speedup), writes use **openpyxl**. Features **44 professional tools** and **1164 test cases**, ensuring enterprise-grade reliability.
+**ExcelMCP** is an Excel configuration table management MCP server designed for game development. Through AI natural language commands, it enables intelligent operations on game configurations such as skill tables, equipment data, and monster attributes. Built with **FastMCP**, reads use **python-calamine** (Rust engine, 2300x speedup), writes use **openpyxl**. Features **53 professional tools** and **1156 test cases**, ensuring enterprise-grade reliability.
 
 🎯 **Core Features**: Skill systems, equipment management, monster configuration, numerical balancing, version comparison, designer toolchain
+
+## 🔍 Quick Navigation
+- **🚀 Quick Start**: [Installation](#-quick-start) • [Command Cheat Sheet](#-quick-reference) • [Game Dev Tutorial](#-game-designer-complete-workflow-tutorial)
+- **🛠️ Tools & Reference**: [Complete Tool List](#️-complete-tool-list-53-professional-tools) • [SQL Query Guide](#-sql-practical-scenarios) • [Game Scenarios](#-game-development-scenario-quick-reference)
+- **📚 Learning Resources**: [Usage Guide](#-usage-guide) • [Technical Architecture](#-technical-architecture) • [Troubleshooting](#-troubleshooting)
 
 ## 🏆 Competitor Comparison
 
@@ -31,7 +36,7 @@
 | **Game Optimization** | ✅ Specialized Game Data Structures | ❌ Generic Spreadsheet Processing |
 | **Cross-file JOIN** | ✅ `@'filepath'` Syntax | ❌ Not Supported |
 | **Error Handling** | ✅ Structured Errors + AI Repair Hints | ❌ Basic Exceptions |
-| **Test Coverage** | ✅ 1164 Test Cases | ❌ Limited Testing |
+| **Test Coverage** | ✅ 1156 Test Cases | ❌ Limited Testing |
 | **Installation** | ✅ `uvx` One-line Command | ⚠️ Requires pip Installation |
 
 ## 🚀 Why Choose ExcelMCP
@@ -189,6 +194,17 @@ MCP client configuration:
 4. **Start using**
    Ready! Let your AI assistant control Excel files through natural language.
 
+### 🎯 Common Command Examples
+
+After configuration, just tell your AI:
+```text
+"Show me all sheets in skills.xlsx"
+"Search for all fire skills"
+"Find the top 10 skills by DPM"
+"Increase all fire skill damage by 20%"
+"Compare differences between v1 and v2"
+```
+
 ### Verify Installation
 ```bash
 # Check version
@@ -213,12 +229,12 @@ python scripts/benchmark.py --compare      # Compare with previous results
 |---------|----------|-------|------------|
 | **SQL Query Engine** | ✅ Full SQL (JOIN/subquery/window/CTE) | ❌ | ❌ |
 | **Read Engine** | 🦀 python-calamine (Rust, 2300x speedup) | openpyxl | openpyxl |
-| **Tool Count** | 44 professional tools | ~15 basic tools | ~10 |
+| **Tool Count** | 53 professional tools | ~15 basic tools | ~10 |
 | **Game Dev Focus** | ✅ Vertical optimization (DPM/balance/configs) | ❌ General | ❌ General |
 | **Dual-row Headers** | ✅ Auto-detect Chinese desc + English field | ❌ | ❌ |
 | **SQL UPDATE** | ✅ Conditional batch modification | ❌ | ❌ |
 | **Cross-file JOIN** | ✅ @filepath syntax | ❌ | ❌ |
-| **Test Coverage** | 1164 tests | ~50 tests | ~30 tests |
+| **Test Coverage** | 1156 tests | ~50 tests | ~30 tests |
 | **Error Recovery** | ✅ Structured error codes + AI-fixable hints | ❌ Plain text | ❌ Plain text |
 | **Chinese Column Names** | ✅ | ❌ | ❌ |
 | **Backup/Restore** | ✅ | ❌ | ❌ |
@@ -432,7 +448,7 @@ SELECT a.skill_name, b.equip_name FROM SkillConfig a INNER JOIN EquipConfig b ON
 
 ---
 
-## 🛠️ Complete Tool List (44 Professional Tools)
+## 🛠️ Complete Tool List (53 Professional Tools)
 
 ### 📁 File & Worksheet Management
 - `excel_create_file` - Create new Excel files with custom worksheets
@@ -765,7 +781,7 @@ ExcelMCP includes multi-layer security protections:
 ```
 src/excel_mcp_server_fastmcp/    # Main package (directly importable after pip install)
 ├── __init__.py                   # Package entry point, exposes main()
-├── server.py                     # MCP interface layer (44 tool definitions)
+├── server.py                     # MCP interface layer (53 tool definitions)
 ├── api/                          # API business logic layer
 │   ├── excel_operations.py       # Excel operations unified entry
 │   └── advanced_sql_query.py     # SQL query engine
@@ -817,10 +833,10 @@ Tool Layer (Common Functions)
 ## 📊 Project Information
 
 ### Quality Validation Metrics
-- **Test Cases**: 1164 (behavior validation, no coverage padding)
+- **Test Cases**: 1156 (behavior validation, no coverage padding)
 - **Test Files**: 49 test files
 - **Test Code**: 16,496 lines
-- **Tool Count: 44 (@mcp.tool decorator verified)
+- **Tool Count: 53 (@mcp.tool decorator verified)
 - **Architecture Layers**: 4-layer design (MCP→API→Core→Utils)
 
 ### Verification Commands
@@ -829,7 +845,7 @@ Tool Layer (Common Functions)
 python -m pytest tests/ -q --tb=short -n auto --timeout=30
 
 # Verify tool completeness
-grep -c "def excel_" src/excel_mcp_server_fastmcp/server.py  # Should output: 44
+grep -c "def excel_" src/excel_mcp_server_fastmcp/server.py  # Should output: 53
 
 # Generate coverage report
 python -m pytest tests/ --cov=src --cov-report=html
@@ -889,7 +905,7 @@ See [CHANGELOG.md](CHANGELOG.md) for detailed release notes.
 
 | 🎯 **Quick Start** | 🛠️ **Tool Reference** | 📚 **Learning Guide** |
 |-------------------|------------------------|---------------------|
-| [🚀 Installation](#-quick-start) | [📋 Complete Tool List](#️-complete-tool-list-41-professional-tools) | [📖 Usage Guide](#-usage-guide) |
+| [🚀 Installation](#-quick-start) | [📋 Complete Tool List](#️-complete-tool-list-53-professional-tools) | [📖 Usage Guide](#-usage-guide) |
 | [⚡ Command Cheat Sheet](#-quick-reference) | [🏗️ Technical Architecture](#️-technical-architecture) | [🚨 Troubleshooting](#-troubleshooting) |
 | [🎮 Game Config Management](#-usage-guide) | [📊 Project Info](#-project-information) | [❓ FAQ](#-frequently-asked-questions) |
 
@@ -917,7 +933,7 @@ main()
 See the examples folder for comprehensive usage scenarios.
 
 **Project Status**
-- **Version**: v1.6.29 (Round 169 Documentation Optimization Complete)
-- **Tests**: 1164 test cases passed
-- **Tools**: 44 professional tools, all docstrings optimized
-- **Update**: Results from 154th round of tool description optimization documented
+- **Version**: v1.6.34 (Round 182 Documentation Optimization Complete)
+- **Tests**: 1156 test cases passed
+- **Tools**: 53 professional tools, all docstrings optimized
+- **Update**: Results from 182nd round of documentation consistency optimization documented
