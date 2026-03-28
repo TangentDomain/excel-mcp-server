@@ -3,7 +3,7 @@
     "REQ-031": {
       "title": "自动化版本一致性检查脚本",
       "description": "创建check-version-sync.py脚本，自动检测并修复pyproject.toml、__init__.py、README.md、README.en.md中的版本不一致问题",
-      "status": "OPEN",
+      "status": "DONE",
       "priority": "HIGH",
       "acceptance_criteria": [
         "创建scripts/check-version-sync.py脚本",

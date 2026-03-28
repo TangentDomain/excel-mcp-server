@@ -18,8 +18,8 @@ DECISIONS_FILE = PROJECT_ROOT / "docs" / "DECISIONS.md"
 FILES_TO_CHECK = {
     "pyproject.toml": r'version\s*=\s*["\']([^"\']+)["\']',
     "src/excel_mcp_server_fastmcp/__init__.py": r'__version__\s*=\s*["\']([^"\']+)["\']',
-    "README.md": r'[\[!\(][^)\]]*pypi\.org/project/[^/]+/v([^)"\']+)["\']',
-    "README.en.md": r'[\[!\(][^)\]]*pypi\.org/project/[^/]+/v([^)"\']+)["\']'
+    "README.md": r'pypi\.org/project/[^/]+/v([^"\'\s\)]+)',
+    "README.en.md": r'pypi\.org/project/[^/]+/v([^"\'\s\)]+)'
 }
 
 def get_version_from_file(file_path, pattern):
