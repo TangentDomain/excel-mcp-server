@@ -453,7 +453,7 @@ if _cleaned:
 # 创建FastMCP服务器实例，开启调试模式和详细日志
 mcp = FastMCP(
     name="excel-mcp",
-    instructions=r"""🎮 游戏开发Excel配置表管理专家 — 44个工具
+    instructions=r"""🎮 游戏开发Excel配置表管理专家 — 52个工具
 
 ## 🔥 核心原则：SQL优先
 
@@ -4391,7 +4391,7 @@ def excel_merge_multiple_files(source_files: List[str], target_file: str, merge_
 • excel_compare_files → 验证合并结果准确性
 """
     try:
-        from openpyxl import load_workbook
+        from openpyxl import load_workbook, Workbook
         import os
         
         merged_sheets = {}

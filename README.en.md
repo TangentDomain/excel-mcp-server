@@ -470,6 +470,26 @@ SELECT a.skill_name, b.equip_name FROM SkillConfig a INNER JOIN EquipConfig b ON
 - `excel_check_duplicate_ids` - ID duplicate detection
 - `excel_server_stats` - Server runtime statistics (tool call count, latency, error rate, error classification)
 
+### 🔄 Batch Operations
+
+- `excel_batch_update_ranges` - Batch update multiple cell ranges, reduce IO for better performance
+- `excel_merge_multiple_files` - Merge multiple Excel files with append/overwrite/merge modes
+
+### 📊 Chart Generation
+
+- `excel_create_chart` - Create column/line/pie charts for data visualization
+- `excel_list_charts` - List all charts in a worksheet
+
+### 📝 Data Validation
+
+- `excel_set_data_validation` - Set data validation rules to restrict input type and range
+- `excel_clear_validation` - Clear data validation rules
+
+### 🎨 Conditional Formatting
+
+- `excel_add_conditional_format` - Add conditional formatting for enhanced data visualization
+- `excel_clear_conditional_format` - Clear conditional formatting rules
+
 ### 🛡️ Safety & Backup
 - `excel_create_backup` - Create file auto-backup
 - `excel_restore_backup` - Restore from backup files
