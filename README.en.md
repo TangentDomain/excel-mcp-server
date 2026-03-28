@@ -4,7 +4,7 @@
 
 [![PyPI](https://img.shields.io/pypi/v/excel-mcp-server-fastmcp.svg)](https://pypi.org/project/excel-mcp-server-fastmcp/)
 [![CI](https://github.com/TangentDomain/excel-mcp-server/actions/workflows/ci.yml/badge.svg)](https://github.com/TangentDomain/excel-mcp-server/actions/workflows/ci.yml)
-![Tests](https://img.shields.io/badge/tests-1187-brightgreen.svg)
+![Tests](https://img.shields.io/badge/tests-1161-brightgreen.svg)
 ![Tools](https://img.shields.io/badge/tools-53-green.svg)
 
 > AI-driven Excel configuration table management tool. Use natural language or SQL to operate game configuration data, supporting cross-table JOIN, version comparison, and batch modifications.
