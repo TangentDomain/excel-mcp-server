@@ -607,14 +607,11 @@ class AdvancedSQLQueryEngine:
                     result_data = self._execute_query(parsed_sql, worksheets_data, limit)
                 _query_elapsed = (time.time() - _query_start) * 1000
 
-                # 性能优化：缓存查询结果
-                if result and result.get('success') and len(result.get('data', [])) > 0:
-                    # 将结果转换为DataFrame进行缓存
+                # 性能优化：缓存查询结果（仅缓存成功的非空结果）
+                if result_data is not None and hasattr(result_data, 'empty') and not result_data.empty:
                     try:
-                        result_df = pd.DataFrame(result['data'])
-                        self._cache_query_result(cache_key, result_df, file_mtime)
+                        self._cache_query_result(cache_key, result_data, file_mtime)
                     except Exception:
-                        # 如果转换失败，跳过缓存
                         pass
 
                 # 格式化结果（传入parsed_sql和WHERE前数据用于空结果智能建议）
@@ -2447,12 +2444,14 @@ class AdvancedSQLQueryEngine:
                 )
 
             right_df = worksheets_data[right_table].copy()
-            
-            # 性能优化：为大数据集创建索引（如果JOIN列存在且数据量大）
+
+            # 解析ON条件（CROSS JOIN不需要ON）
+            on_clause = join.args.get('on')
             left_on_col = None
             right_on_col = None
             actual_right_on = None
             
+            # 性能优化：为大数据集创建索引（如果JOIN列存在且数据量大）
             if on_clause and total_memory_mb > 10:  # 大于10MB的数据集使用索引优化
                 # 提前解析ON条件来决定是否需要索引
                 left_on_col, right_on_col = self._parse_join_on_condition(on_clause, left_table, right_table, right_alias)
