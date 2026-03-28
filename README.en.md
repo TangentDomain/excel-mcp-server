@@ -6,6 +6,7 @@
 [![CI](https://github.com/TangentDomain/excel-mcp-server/actions/workflows/ci.yml/badge.svg)](https://github.com/TangentDomain/excel-mcp-server/actions/workflows/ci.yml)
 ![Tests](https://img.shields.io/badge/tests-1161-brightgreen.svg)
 ![Tools](https://img.shields.io/badge/tools-53-green.svg)
+![GitHub stars](https://img.shields.io/github/stars/TangentDomain/excel-mcp-server?style=social&label=Stars)
 
 > **AI-Driven Excel Configuration Table Management Tool** - Use natural language or SQL to operate game configuration data, supporting cross-table JOIN, version comparison, and batch modifications
 
@@ -243,15 +244,24 @@ See full docs: https://github.com/TangentDomain/excel-mcp-server
 
 ---
 
-## 🤝 Contributing
+## 🤝 Contributing & Support
 
 Contributions welcome! See [CONTRIBUTING.md](CONTRIBUTING.md) for ways to contribute.
+
+### 🌟 Star Our Project
+If this tool helps you, please give us a ⭐ Star!
+- ⭐ **Star Support**: Help more game developers discover this tool
+- 🔄 **Follow Updates**: Star to receive project notifications
+- 📈 **Community Growth**: Every Star motivates us to improve
 
 ### Quick Contributions
 - 🐛 Report Bugs: Use issue template
 - 💡 Suggestions: Welcome new feature ideas
 - 📚 Improve Docs: Help other users
-- ⭐ Star Support: Help更多人发现这个工具
+- 💻 Submit Code: See [CONtribution Guide](CONTRIBUTING.md)
+
+### 🎯 Project Goal
+We aim to be the preferred tool for game development Excel configuration table management, **currently 4⭐, target 100⭐**! Every Star helps us reach this goal.
 
 ## 📄 License
 
