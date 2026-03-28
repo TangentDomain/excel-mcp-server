@@ -1,3 +1,12 @@
+[第201轮] 2026-03-28 10:10 UTC
+[D051 REQ-035 P0] sqlglot 27.x CTE arg key兼容性修复
+- **问题**: CI所有平台11个job中3个CTE测试失败，错误被吞掉只显示`assert False is True`
+- **根因**: sqlglot 27.29.0将CTE WITH子句存储在`args['with']`，而代码用`args.get('with_')`返回None
+- **修复**: `_with_key = 'with' if parsed_sql.args.get('with') else 'with_'`，自动检测兼容所有版本
+- **诊断经验**: 测试assertion应包含error message（`assert x, f"msg: {result['message']}"`），否则CI只显示无意义的`assert False is True`
+- **影响**: 修复后CTE功能在sqlglot 27.29.0~27.x全版本可用
+- **状态**: ✅ 已修复并发布v1.6.39
+
 [第200轮] 2026-03-28 09:48 UTC
 [D050 REQ-026 持续优化] CHANGELOG格式一致性优化
 - **问题**: CHANGELOG.md中版本号格式不一致，部分条目缺少v前缀（如[1.6.36]而非[v1.6.36]）

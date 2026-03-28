@@ -7,9 +7,9 @@
 
 ### REQ-035 [P0] CI CTE测试全平台失败
 
-**状态**: OPEN
+**状态**: DONE
 **优先级**: P0（阻断CI）
-**发现轮次**: 185（MCP真实验证发现），198-200（CI持续失败确认）
+**发现轮次**: 185（MCP真实验证发现），198-200（CI持续失败确认），201（修复）
 
 **问题描述**:
 `tests/test_sql_enhanced.py::TestCTE` 3个测试在CI所有平台（Linux/macOS/Windows, Python 3.10-3.13）失败，仅macOS 3.10被skipif跳过。
