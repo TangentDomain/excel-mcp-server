@@ -7,6 +7,23 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [v1.6.38] - 2026-03-28
+
+### 优化
+- **REQ-027 GitHub star 提升计划**：GitHub star 统计和激励系统
+- **REQ-026 文档优化**：自动化版本检查脚本，确保文档版本同步
+- 新增 CONTRIBUTING.md 贡献指南和 GitHub 模板
+- 创建 star-booster.py 自动化脚本和统计系统
+
+## [v1.6.37] - 2026-03-28
+
+### 优化
+- **REQ-026 文档与门面优化**：版本同步和格式修复
+- 自动化版本检查脚本 scripts/check-version-sync.py
+- 修复 README.md/README.en.md 版本徽章格式问题
+- 统一 pyproject.toml/__init__.py/README.md/README.en.md 版本号
+- 清理 HTML 徽章格式，修复缺失的 closing brackets
+
 ## [1.6.38] - 2026-03-28
 - **REQ-026 文档与门面优化（第196轮）**：版本一致性优化
   - 修复pyproject.toml/__init__.py/README.md/README.en.md版本不一致问题
