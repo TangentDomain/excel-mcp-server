@@ -1,4 +1,4 @@
-[简体中文](README.md) ｜ [English](README.en.md)
+[简体中文](README.md) | [English](README.en.md)
 
 # 🎮 ExcelMCP: 游戏开发专用 Excel 配置表管理器
 
@@ -8,24 +8,24 @@
 ![Tools](https://img.shields.io/badge/tools-53-green.svg)
 ![GitHub stars](https://img.shields.io/github/stars/TangentDomain/excel-mcp-server?style=social&label=Stars)
 
-> **AI驱动的Excel配置表管理工具** - 用自然语言或SQL操作游戏配置数据，支持跨表JOIN、版本对比、批量修改
+> **AI-Driven Excel Configuration Table Management Tool** - Use natural language or SQL to operate game configuration data, supporting cross-table JOIN, version comparison, and batch modifications
 
 ---
 
-## 🚀 3分钟快速上手（跟着做就行）
+## 🚀 3-Minute Quick Start (Follow these steps)
 
-### ✅ 第1步：确认Python环境（10秒）
+### ✅ Step 1: Check Python Environment (10 seconds)
 
 打开终端，输入：
 ```bash
 python --version
 ```
 
-看到 `Python 3.10+`？✅ **直接跳到第2步**
+See `Python 3.10+`? ✅ **Skip to Step 2**
 
-没装Python？去 [python.org](https://www.python.org/downloads/) 下载安装（Windows用户记得勾选 "Add Python to PATH"）
+No Python? Download from [python.org](https://www.python.org/downloads/) (Windows users: remember to check "Add Python to PATH")
 
-### ⚡ 第2步：安装工具（二选一，30秒）
+### ⚡ Step 2: Install Tool (Choose one, 30 seconds)
 
 #### 🎯 推荐方式：uvx（最快，无安装）
 ```bash
@@ -46,12 +46,12 @@ uvx --version
 pip install excel-mcp-server-fastmcp
 ```
 
-> 💡 **国内用户**下载慢？加镜像源：
+> 💡 **Users in China** having slow downloads? Use mirror:
 > ```bash
 > pip install excel-mcp-server-fastmcp -i https://pypi.tuna.tsinghua.edu.cn/simple
 > ```
 
-### 🔧 第3步：配置AI客户端（1分钟）
+### 🔧 Step 3: Configure AI Client (1 minute)
 
 找到你的AI客户端，按说明配置：
 
@@ -93,73 +93,73 @@ pip install excel-mcp-server-fastmcp
 - **VSCode + Continue**: 设置 → MCP → 添加服务器
 - **OpenClaw**: 已内置支持
 
-### ✅ 第4步：验证配置（10秒）
+### ✅ Step 4: Verify Configuration (10 seconds)
 
-重启AI客户端后，让AI助手帮你测试：
+After restarting AI client, ask AI to test:
 ```
-请帮我读取Excel文件测试配置是否成功
+Please help me read an Excel file to test if configuration is successful
 ```
 
-成功看到Excel文件内容？🎉 **恭喜你，配置完成！**
+Successfully see Excel file content? 🎉 **Congratulations, setup complete!**
 
 ---
 
-## 💡 我能做什么？
+## 💡 What Can I Do?
 
-### 🎮 游戏开发场景
+### 🎮 Game Development Scenarios
 
-**游戏策划**：
-- "帮我把技能表里的所有攻击力提升10%"
-- "找出装备表中价格超过1000的装备"
-- "合并技能表和职业表，按职业分组"
+**Game Designers**:
+- "Help me increase all attack power in skill table by 10%"
+- "Find equipment with price over 1000 in equipment table"
+- "Merge skill table and class table, group by class"
 
-**数值策划**：
-- "计算每个职业的平均攻击力"
-- "找出攻击力最高的前5个技能"
-- "批量修改技能冷却时间"
+**Balance Designers**:
+- "Calculate average attack power for each class"
+- "Find top 5 skills with highest attack power"
+- "Batch modify skill cooldown times"
 
-**关卡策划**：
-- "读取关卡配置表，找出所有需要收集的道具"
-- "批量修改怪物掉落概率"
+**Level Designers**:
+- "Read level configuration table, find all collectible items"
+- "Batch modify monster drop rates"
 
-### 📊 数据分析场景
+### 📊 Data Analysis Scenarios
 
-**数据处理**：
-- "读取销售数据，计算每个月的总额"
-- "找出销售额超过1000的客户"
-- "合并多个Excel文件的数据"
+**Data Processing**:
+- "Read sales data, calculate total for each month"
+- "Find customers with sales over 1000"
+- "Merge data from multiple Excel files"
 
-### 🚀 高级功能
+### 🚀 Advanced Features
 
-- **跨表JOIN**：`连接技能表和装备表，找出同时拥有技能和装备的角色`
-- **SQL查询**：`SELECT * FROM 技能表 WHERE 攻击力 > 100`
-- **批量操作**：`批量修改多个文件的数据`
-- **版本对比**：`对比两个版本的Excel文件差异`
+- **Cross-table JOIN**: `Connect skill table and equipment table, find characters with both skills and equipment`
+- **SQL Queries**: `SELECT * FROM skills WHERE attack_power > 100`
+- **Batch Operations**: `Batch modify data in multiple files`
+- **Version Comparison**: `Compare differences between two Excel versions`
 
 ---
 
-## 📚 使用示例
+## 📚 Usage Examples
 
-### 基础操作
+### Basic Operations
 ```
-读取技能表.xlsx
-创建新技能数据
-修改技能冷却时间
-保存修改到新文件
-```
-
-### 高级查询
-```
-连接技能表和职业表，按职业分组统计技能数量
-查询所有攻击力超过100的技能
-批量修改多个装备的耐久度
+Read skill_table.xlsx
+Create new skill data
+Modify skill cooldown time
+Save modifications to new file
 ```
 
-### 游戏开发专用
+### Advanced Queries
 ```
-生成RPG游戏角色属性表
-计算装备套装加成效果
-平衡游戏数值参数
+Connect skill table and class table, group by class to count skills
+Query all skills with attack power over 100
+Batch modify durability for multiple equipment
+```
+
+### Game Development Specific
+```
+Generate RPG game character attribute table
+Calculate equipment set bonus effects
+Balance game numerical parameters
 ```
 
 ---
@@ -172,28 +172,28 @@ pip install excel-mcp-server-fastmcp
 | Cursor | ✅ 完美支持 | ⭐ 简单 |
 | Cherry Studio | ✅ 支持 | ⭐⭐ 中等 |
 | VSCode + Continue | ✅ 支持 | ⭐⭐ 中等 |
-| OpenClaw | ✅ 内置支持 | ⭐ 最简单 |
+| OpenClaw | ✅ Built-in Support | ⭐ Easiest |
 
 ---
 
-## 🎯 核心优势
+## 🎯 Core Advantages
 
-### ✅ 对比传统Excel工具
-| 特性 | ExcelMCP | 传统Excel |
-|------|----------|-----------|
-| 学习成本 | 0（自然语言） | 高（需要函数知识） |
-| 跨表操作 | ✅ 自动处理 | ❌ 复杂VLOOKUP |
-| 批量修改 | ✅ 一行指令 | ❌ 手动操作 |
-| 错误处理 | ✅ 智能提示 | ❌ 容易出错 |
-| 版本管理 | ✅ 自动记录 | ❌ 需要手动 |
+### ✅ vs Traditional Excel Tools
+| Feature | ExcelMCP | Traditional Excel |
+|--------|----------|-------------------|
+| Learning Curve | 0 (Natural Language) | High (Requires formula knowledge) |
+| Cross-table Ops | ✅ Automatic | ❌ Complex VLOOKUP |
+| Batch Modify | ✅ One Command | ❌ Manual Operations |
+| Error Handling | ✅ Smart Hints | ❌ Easy to Make Mistakes |
+| Version Control | ✅ Automatic Records | ❌ Manual Management |
 
-### ✅ 对比其他AI工具
-| 特性 | ExcelMCP | ChatGPT插件 | Claude Desktop |
-|------|----------|--------------|----------------|
-| Excel操作 | ✅ 专用优化 | ❌ 限制多 | ❌ 无支持 |
-| 游戏开发 | ✅ 专用场景 | ❌ 通用 | ❌ 无支持 |
-| 性能表现 | ✅ 快速响应 | ⚡ 中等 | ⚡ 中等 |
-| 隐私保护 | ✅ 本地处理 | ❌ 上传云端 | ❌ 上传云端 |
+### ✅ vs Other AI Tools
+| Feature | ExcelMCP | ChatGPT Plugin | Claude Desktop |
+|--------|----------|----------------|----------------|
+| Excel Operations | ✅ Specialized Optimized | ❌ Many Restrictions | ❌ No Support |
+| Game Development | ✅ Specialized Scenarios | ❌ General Purpose | ❌ No Support |
+| Performance | ✅ Fast Response | ⚡ Medium | ⚡ Medium |
+| Privacy | ✅ Local Processing | ❌ Upload to Cloud | ❌ Upload to Cloud |
 
 ---
 
@@ -212,51 +212,51 @@ python --version
 
 **❌ 网络连接问题**
 ```bash
-# 国内用户使用镜像源
+# Chinese users use mirror source
 pip install excel-mcp-server-fastmcp -i https://pypi.tuna.tsinghua.edu.cn/simple
 ```
 
-**❌ AI客户端配置错误**
-- 确保配置文件格式正确（JSON格式）
-- 重启AI客户端
-- 检查uvx是否可用：`uvx --version`
+**❌ AI Client Configuration Error**
+- Ensure config file format is correct (JSON format)
+- Restart AI client
+- Check if uvx is available: `uvx --version`
 
-### 获取帮助
+### Get Help
 ```
-让AI助手运行：excel-mcp-server-fastmcp --help
-查看完整文档：https://github.com/TangentDomain/excel-mcp-server
+Ask AI to run: excel-mcp-server-fastmcp --help
+See full docs: https://github.com/TangentDomain/excel-mcp-server
 ```
 
 ---
 
-## 📈 性能指标
+## 📈 Performance Metrics
 
-- **响应速度**：< 1秒（小文件），< 5秒（大文件）
-- **支持格式**：.xlsx, .xlsm, .xlsb
-- **最大支持**：10万行 × 1000列
-- **内存占用**：< 100MB（典型文件）
-- **工具数量**：53个专用工具
+- **Response Speed**: < 1s (small files), < 5s (large files)
+- **Supported Formats**: .xlsx, .xlsm, .xlsb
+- **Max Support**: 100,000 rows × 1,000 columns
+- **Memory Usage**: < 100MB (typical files)
+- **Tool Count**: 53 specialized tools
 
 ---
 
-## 🤝 贡献 & 支持
+## 🤝 Contributing & Support
 
-欢迎贡献代码和建议！查看 [CONTRIBUTING.md](CONTRIBUTING.md) 了解参与方式。
+Contributions welcome! See [CONTRIBUTING.md](CONTRIBUTING.md) for ways to contribute.
 
-### 🌟 Star 我们的项目
-如果你觉得这个工具对你有帮助，请给我们一个⭐ Star！
-- ⭐ **Star支持**：让更多人发现这个工具，帮助游戏开发者
-- 🔄 **关注动态**：Star后可以收到项目更新通知
-- 📈 **社区成长**：Star数量是我们持续改进的动力
+### 🌟 Star Our Project
+If this tool helps you, please give us a ⭐ Star!
+- ⭐ **Star Support**: Help more game developers discover this tool
+- 🔄 **Follow Updates**: Star to receive project notifications
+- 📈 **Community Growth**: Every Star motivates us to improve
 
-### 快速贡献
-- 🐛 报告Bug：使用issue模板
-- 💡 提出建议：欢迎新的功能想法  
-- 📚 完善文档：帮助其他用户
-- 💻 提交代码：查看[贡献指南](CONTRIBUTING.md)
+### Quick Contributions
+- 🐛 Report Bugs: Use issue template
+- 💡 Suggestions: Welcome new feature ideas  
+- 📚 Improve Docs: Help other users
+- 💻 Submit Code: See [Contribution Guide](CONTRIBUTING.md)
 
-### 🎯 项目目标
-我们目标是成为游戏开发Excel配置表管理的首选工具，**当前4⭐，目标100⭐**！你的每一个Star都帮助我们接近这个目标。
+### 🎯 Project Goal
+We aim to be the preferred tool for game development Excel configuration table management, **currently 4⭐, target 100⭐**! Every Star helps us reach this goal.
 
 ## 📄 许可证
 
@@ -264,18 +264,59 @@ pip install excel-mcp-server-fastmcp -i https://pypi.tuna.tsinghua.edu.cn/simple
 
 ---
 
-## 🎉 致谢
+## 🎉 Acknowledgments
 
-🌱 **当前 4 stars！** 感谢你的支持！
+Thanks to all contributors and users! Special thanks to the game development community for feedback and suggestions.
 
-🙏 **感谢最新Star者：**
-  - @AnitaSherry
-  - @Dikyee
-  - @leviseek
-  - @TangentDomain
-
-感谢所有贡献者和用户的支持！特别感谢游戏开发社区的反馈和建议。
-
-让AI为游戏开发赋能！ 🚀
+Empowering game development with AI! 🚀
 
 ---
+
+
+## 📊 GitHub 统计
+
+
+[![GitHub stars](https://img.shields.io/github/stars/TangentDomain/excel-mcp-server?style=social&label=Star&color=gold)](https://github.com/TangentDomain/excel-mcp-server/stargazers)
+[![GitHub forks](https://img.shields.io/github/forks/TangentDomain/excel-mcp-server?style=social)](https://github.com/TangentDomain/excel-mcp-server/network)
+[![GitHub issues](https://img.shields.io/github/issues/TangentDomain/excel-mcp-server?style=social)](https://github.com/TangentDomain/excel-mcp-server/issues)
+[![GitHub language](https://img.shields.io/github/languages/top/TangentDomain/excel-mcp-server?style=social)](https://github.com/TangentDomain/excel-mcp-server)
+[![GitHub last commit](https://img.shields.io/github/last-commit/TangentDomain/excel-mcp-server?style=social)](https://github.com/TangentDomain/excel-mcp-server/commits/main)
+
+
+
+| 指标 | 数值 | 状态 |
+|------|------|------|
+| ⭐ Stars | 4 | 🎯 **目标: 100** |
+| 🍴 Forks | 0 | 📈 活跃度 |
+| 👀 Watchers | 0 | 🔔 关注度 |
+| 🐛 Issues | 0 | 📝 待处理 |
+| 💻 语言 | Python | 🛠️ 技术 |
+| 👥 贡献者 | 1 | 🤝 社区 |
+| 📝 最近提交 | 10 | 🚀 活跃度 |
+
+## 🎯 里程碑进度
+
+- ⏳ **50 Stars**: 4 / 50
+- ⏳ **100 Stars**: 4 / 100
+- ⏳ **200 Stars**: 4 / 200
+- ⏳ **500 Stars**: 4 / 500
+
+
+## 📈 项目状态
+- **创建时间**: 2025-09-22
+- **最后更新**: 2026-03-28
+- **社区活跃度**: 🔥 高度活跃
+- **发展潜力**: 🌱 成长中
+
+## 🤝 参与方式
+
+感谢关注！您可以通过以下方式参与项目：
+
+1. 🌟 **Star**: 如果项目对您有帮助，请给我们一个 Star
+2. 🐛 **Issue**: 报告 Bug 或提出功能建议
+3. 💻 **Code**: 提交代码改进和修复
+4. 📚 **Docs**: 改进文档和使用示例
+5. 📢 **Share**: 分享项目给更多开发者
+
+
+
