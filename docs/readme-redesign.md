@@ -19,7 +19,7 @@
 
 [![PyPI](https://img.shields.io/pypi/v/excel-mcp-server-fastmcp.svg)](https://pypi.org/project/excel-mcp-server-fastmcp/)
 [![CI](https://github.com/TangentDomain/excel-mcp-server/actions/workflows/ci.yml/badge.svg)](https://github.com/TangentDomain/excel-mcp-server/actions/workflows/ci.yml)
-![Tests](https://img.shields.io/badge/tests-1187-brightgreen.svg)
+![Tests](https://img.shields.io/badge/tests-1161-brightgreen.svg)
 ![Tools](https://img.shields.io/badge/tools-53-green.svg)
 
 > AI驱动的Excel配置表管理工具。用自然语言或SQL操作游戏配置数据，支持跨表JOIN、版本对比、批量修改。
