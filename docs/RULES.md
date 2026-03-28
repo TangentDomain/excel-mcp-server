@@ -9,6 +9,15 @@
 - NOW.md > 30行 → 精简历史记录，只保留最近3轮
 - 超限时不瘦身，本轮产出无效
 
+## 自动化版本检查（新增规则）
+**问题**: 文档同步依赖手动操作，容易出错且耗时
+**解决**: 每轮自动检查版本一致性，异常时立即修复
+**规则**:
+1. 每轮开工执行 `python3 scripts/check-version-sync.py`（需创建）
+2. 检查项目：pyproject.toml、__init__.py、README.md、README.en.md、CHANGELOG
+3. 发现不一致 → 自动修复 + 记录到DECISIONS.md
+4. 清理脚本维护：归档过期版本检查历史
+
 🔄 **效率追踪**（2026-03-27 R131，docstring质量提升规则修改后第1轮）
 **改前基线**: docstring评分 2个excellent → 6个excellent，质量提升200%
 **预期效果**: AI工具使用体验提升，减少用户查询成本
