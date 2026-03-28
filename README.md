@@ -8,31 +8,31 @@
 ![Tools](https://img.shields.io/badge/tools-53-green.svg)
 ![GitHub stars](https://img.shields.io/github/stars/TangentDomain/excel-mcp-server?style=social&label=Stars)
 
-> **AI-Driven Excel Configuration Table Management Tool** - Use natural language or SQL to operate game configuration data, supporting cross-table JOIN, version comparison, and batch modifications
+> 用自然语言或 SQL 操作游戏配置数据，支持跨表 JOIN、版本对比、批量修改
 
 ---
 
-## 🚀 3-Minute Quick Start (Follow these steps)
+## 🚀 3分钟快速上手
 
-### ✅ Step 1: Check Python Environment (10 seconds)
+### ✅ 第一步：检查 Python 环境（10秒）
 
 打开终端，输入：
 ```bash
 python --version
 ```
 
-See `Python 3.10+`? ✅ **Skip to Step 2**
+看到 `Python 3.10+`？✅ **直接跳到第二步**
 
-No Python? Download from [python.org](https://www.python.org/downloads/) (Windows users: remember to check "Add Python to PATH")
+没装 Python？去 [python.org](https://www.python.org/downloads/) 下载（Windows 用户记得勾选 "Add Python to PATH"）
 
-### ⚡ Step 2: Install Tool (Choose one, 30 seconds)
+### ⚡ 第二步：安装工具（任选其一，30秒）
 
-#### 🎯 推荐方式：uvx（最快，无安装）
+#### 🎯 推荐方式：uvx（最快，无需安装）
 ```bash
 # Mac/Linux
 curl -LsSf https://astral.sh/uv/install.sh | sh
 
-# Windows (PowerShell管理员模式)
+# Windows（PowerShell 管理员模式）
 powershell -ExecutionPolicy ByPass -c "irm https://astral.sh/uv/install.ps1 | iex"
 ```
 
@@ -46,14 +46,14 @@ uvx --version
 pip install excel-mcp-server-fastmcp
 ```
 
-> 💡 **Users in China** having slow downloads? Use mirror:
+> 💡 国内下载慢？用镜像源：
 > ```bash
 > pip install excel-mcp-server-fastmcp -i https://pypi.tuna.tsinghua.edu.cn/simple
 > ```
 
-### 🔧 Step 3: Configure AI Client (1 minute)
+### 🔧 第三步：配置 AI 客户端（1分钟）
 
-找到你的AI客户端，按说明配置：
+找到你的 AI 客户端，按说明配置：
 
 #### 🟢 Claude Desktop（推荐）
 
@@ -73,7 +73,7 @@ pip install excel-mcp-server-fastmcp
 }
 ```
 
-3. 保存文件，**重启Claude Desktop**
+3. 保存文件，**重启 Claude Desktop**
 
 #### 🟡 Cursor
 
@@ -85,7 +85,7 @@ pip install excel-mcp-server-fastmcp
    - **Command**: `uvx`
    - **Args**: `["excel-mcp-server-fastmcp"]`
 
-5. 重启Cursor
+5. 重启 Cursor
 
 #### 🔴 其他客户端
 
@@ -93,79 +93,78 @@ pip install excel-mcp-server-fastmcp
 - **VSCode + Continue**: 设置 → MCP → 添加服务器
 - **OpenClaw**: 已内置支持
 
-### ✅ Step 4: Verify Configuration (10 seconds)
+### ✅ 第四步：验证配置（10秒）
 
-After restarting AI client, ask AI to test:
+重启 AI 客户端后，让 AI 帮你测试：
 ```
-Please help me read an Excel file to test if configuration is successful
+帮我读一个 Excel 文件，测试配置是否成功
 ```
 
-Successfully see Excel file content? 🎉 **Congratulations, setup complete!**
+能看到 Excel 文件内容？🎉 **恭喜，配置完成！**
 
 ---
 
-## 💡 What Can I Do?
+## 💡 能做什么？
 
-### 🎮 Game Development Scenarios
+### 🎮 游戏开发场景
 
-**Game Designers**:
-- "Help me increase all attack power in skill table by 10%"
-- "Find equipment with price over 1000 in equipment table"
-- "Merge skill table and class table, group by class"
+**策划**：
+- "帮我把技能表里所有攻击力加 10%"
+- "在装备表里找价格超过 1000 的装备"
+- "把技能表和职业表关联，按职业分组"
 
-**Balance Designers**:
-- "Calculate average attack power for each class"
-- "Find top 5 skills with highest attack power"
-- "Batch modify skill cooldown times"
+**数值策划**：
+- "算一下每个职业的平均攻击力"
+- "找出攻击力最高的前 5 个技能"
+- "批量修改技能冷却时间"
 
-**Level Designers**:
-- "Read level configuration table, find all collectible items"
-- "Batch modify monster drop rates"
+**关卡策划**：
+- "读取关卡配置表，找出所有可收集道具"
+- "批量修改怪物掉落概率"
 
-### 📊 Data Analysis Scenarios
+### 📊 数据分析场景
 
-**Data Processing**:
-- "Read sales data, calculate total for each month"
-- "Find customers with sales over 1000"
-- "Merge data from multiple Excel files"
+- "读取销售数据，算每个月的总额"
+- "找销售额超过 1000 的客户"
+- "合并多个 Excel 文件的数据"
 
-### 🚀 Advanced Features
+### 🚀 高级功能
 
-- **Cross-table JOIN**: `Connect skill table and equipment table, find characters with both skills and equipment`
-- **SQL Queries**: `SELECT * FROM skills WHERE attack_power > 100`
-- **Batch Operations**: `Batch modify data in multiple files`
-- **Version Comparison**: `Compare differences between two Excel versions`
-- **AI-Enhanced Error Handling**: `Intelligent error detection with AI-powered suggestions and recovery guidance`
-
----
-
-## 📚 Usage Examples
-
-### Basic Operations
-```
-Read skill_table.xlsx
-Create new skill data
-Modify skill cooldown time
-Save modifications to new file
-```
-
-### Advanced Queries
-```
-Connect skill table and class table, group by class to count skills
-Query all skills with attack power over 100
-Batch modify durability for multiple equipment
-```
-
-### Game Development Specific
-```
-Generate RPG game character attribute table
-Calculate equipment set bonus effects
-Balance game numerical parameters
-```
+- **跨表 JOIN**：关联技能表和装备表，找出同时拥有技能和装备的角色
+- **SQL 查询**：`SELECT * FROM skills WHERE attack_power > 100`
+- **批量操作**：批量修改多个文件中的数据
+- **版本对比**：比较两个 Excel 版本的差异
+- **AI 智能错误处理**：智能检测错误并提供修复建议
 
 ---
 
-## 🛠️ 支持的AI客户端
+## 📚 使用示例
+
+### 基础操作
+```
+读取技能表.xlsx
+创建新的技能数据
+修改技能冷却时间
+把修改保存到新文件
+```
+
+### 高级查询
+```
+关联技能表和职业表，按职业统计技能数量
+查询攻击力超过 100 的所有技能
+批量修改多个装备的耐久度
+```
+
+### 游戏开发专用
+```
+生成 RPG 游戏角色属性表
+计算装备套装加成效果
+平衡游戏数值参数
+```
+
+---
+
+## 🛠️ 支持的 AI 客户端
 
 | 客户端 | 支持状态 | 配置难度 |
 |--------|----------|----------|
@@ -173,28 +172,28 @@ Balance game numerical parameters
 | Cursor | ✅ 完美支持 | ⭐ 简单 |
 | Cherry Studio | ✅ 支持 | ⭐⭐ 中等 |
 | VSCode + Continue | ✅ 支持 | ⭐⭐ 中等 |
-| OpenClaw | ✅ Built-in Support | ⭐ Easiest |
+| OpenClaw | ✅ 内置支持 | ⭐ 最简单 |
 
 ---
 
-## 🎯 Core Advantages
+## 🎯 核心优势
 
-### ✅ vs Traditional Excel Tools
-| Feature | ExcelMCP | Traditional Excel |
-|--------|----------|-------------------|
-| Learning Curve | 0 (Natural Language) | High (Requires formula knowledge) |
-| Cross-table Ops | ✅ Automatic | ❌ Complex VLOOKUP |
-| Batch Modify | ✅ One Command | ❌ Manual Operations |
-| Error Handling | ✅ Smart Hints | ❌ Easy to Make Mistakes |
-| Version Control | ✅ Automatic Records | ❌ Manual Management |
+### ✅ 对比传统 Excel 工具
+| 功能 | ExcelMCP | 传统 Excel |
+|------|----------|------------|
+| 学习成本 | 0（自然语言） | 高（需要公式知识） |
+| 跨表操作 | ✅ 自动关联 | ❌ 复杂的 VLOOKUP |
+| 批量修改 | ✅ 一条指令 | ❌ 手动操作 |
+| 错误处理 | ✅ 智能提示 | ❌ 容易出错 |
+| 版本管理 | ✅ 自动记录 | ❌ 手动管理 |
 
-### ✅ vs Other AI Tools
-| Feature | ExcelMCP | ChatGPT Plugin | Claude Desktop |
-|--------|----------|----------------|----------------|
-| Excel Operations | ✅ Specialized Optimized | ❌ Many Restrictions | ❌ No Support |
-| Game Development | ✅ Specialized Scenarios | ❌ General Purpose | ❌ No Support |
-| Performance | ✅ Fast Response | ⚡ Medium | ⚡ Medium |
-| Privacy | ✅ Local Processing | ❌ Upload to Cloud | ❌ Upload to Cloud |
+### ✅ 对比其他 AI 工具
+| 功能 | ExcelMCP | ChatGPT 插件 | Claude Desktop |
+|------|----------|--------------|----------------|
+| Excel 操作 | ✅ 专业优化 | ❌ 限制多 | ❌ 不支持 |
+| 游戏开发 | ✅ 专属场景 | ❌ 通用场景 | ❌ 不支持 |
+| 响应速度 | ✅ 快速 | ⚡ 中等 | ⚡ 中等 |
+| 隐私安全 | ✅ 本地处理 | ❌ 上传云端 | ❌ 上传云端 |
 
 ---
 
@@ -202,62 +201,60 @@ Balance game numerical parameters
 
 ### 常见问题
 
-**❌ Python版本过低**
+**❌ Python 版本过低**
 ```bash
-# Check Python version
 python --version
-# 需要3.10+，否则升级
-# Mac/Linux: 使用brew install python
-# Windows: Download latest version
+# 需要 3.10+，否则升级
+# Mac/Linux: brew install python
+# Windows: 去 python.org 下载最新版
 ```
 
-**❌ 网络连接问题**
+**❌ 网络问题**
 ```bash
-# Chinese users use mirror source
+# 国内用户用镜像源
 pip install excel-mcp-server-fastmcp -i https://pypi.tuna.tsinghua.edu.cn/simple
 ```
 
-**❌ AI Client Configuration Error**
-- Ensure config file format is correct (JSON format)
-- Restart AI client
-- Check if uvx is available: `uvx --version`
+**❌ AI 客户端配置错误**
+- 检查配置文件格式是否正确（JSON 格式）
+- 重启 AI 客户端
+- 检查 uvx 是否可用：`uvx --version`
 
-### Get Help
+### 获取帮助
 ```
-Ask AI to run: excel-mcp-server-fastmcp --help
-See full docs: https://github.com/TangentDomain/excel-mcp-server
+让 AI 运行: excel-mcp-server-fastmcp --help
+查看文档: https://github.com/TangentDomain/excel-mcp-server
 ```
 
 ---
 
-## 📈 Performance Metrics
+## 📈 性能指标
 
-- **Response Speed**: < 1s (small files), < 5s (large files)
-- **Supported Formats**: .xlsx, .xlsm, .xlsb
-- **Max Support**: 100,000 rows × 1,000 columns
-- **Memory Usage**: < 100MB (typical files)
-- **Tool Count**: 53 specialized tools
+- **响应速度**：小文件 < 1秒，大文件 < 5秒
+- **支持格式**：.xlsx、.xlsm、.xlsb
+- **最大支持**：10万行 × 1000列
+- **内存占用**：< 100MB（典型文件）
+- **工具数量**：53 个专业工具
 
 ---
 
-## 🤝 Contributing & Support
+## 🤝 参与贡献
 
-Contributions welcome! See [CONTRIBUTING.md](CONTRIBUTING.md) for ways to contribute.
+欢迎贡献代码！查看 [CONTRIBUTING.md](CONTRIBUTING.md) 了解贡献方式。
 
-### 🌟 Star Our Project
-If this tool helps you, please give us a ⭐ Star!
-- ⭐ **Star Support**: Help more game developers discover this tool
-- 🔄 **Follow Updates**: Star to receive project notifications
-- 📈 **Community Growth**: Every Star motivates us to improve
+### 🌟 Star 支持我们
+如果这个工具对你有帮助，请给个 ⭐ Star！
+- ⭐ **Star 支持**：帮助更多游戏开发者发现这个工具
+- 🔄 **关注更新**：Star 后会收到项目通知
+- 📈 **社区成长**：每一个 Star 都是我们改进的动力
 
-### Quick Contributions
-- 🐛 Report Bugs: Use issue template
-- 💡 Suggestions: Welcome new feature ideas  
-- 📚 Improve Docs: Help other users
-- 💻 Submit Code: See [Contribution Guide](CONTRIBUTING.md)
+### 快速贡献
+- 🐛 报告 Bug：使用 issue 模板
+- 💡 功能建议：欢迎提出新想法
+- 📚 改进文档：帮助其他用户
+- 💻 提交代码：查看 [贡献指南](CONTRIBUTING.md)
 
-### 🎯 Project Goal
-We aim to be the preferred tool for game development Excel configuration table management, **currently 4⭐, target 100⭐**! Every Star helps us reach this goal.
+---
 
 ## 📄 许可证
 
@@ -265,59 +262,8 @@ We aim to be the preferred tool for game development Excel configuration table m
 
 ---
 
-## 🎉 Acknowledgments
+## 🎉 鸣谢
 
-Thanks to all contributors and users! Special thanks to the game development community for feedback and suggestions.
+感谢所有贡献者和用户！特别感谢游戏开发社区的反馈和建议。
 
-Empowering game development with AI! 🚀
-
----
-
-
-## 📊 GitHub 统计
-
-
-[![GitHub stars](https://img.shields.io/github/stars/TangentDomain/excel-mcp-server?style=social&label=Star&color=gold)](https://github.com/TangentDomain/excel-mcp-server/stargazers)
-[![GitHub forks](https://img.shields.io/github/forks/TangentDomain/excel-mcp-server?style=social)](https://github.com/TangentDomain/excel-mcp-server/network)
-[![GitHub issues](https://img.shields.io/github/issues/TangentDomain/excel-mcp-server?style=social)](https://github.com/TangentDomain/excel-mcp-server/issues)
-[![GitHub language](https://img.shields.io/github/languages/top/TangentDomain/excel-mcp-server?style=social)](https://github.com/TangentDomain/excel-mcp-server)
-[![GitHub last commit](https://img.shields.io/github/last-commit/TangentDomain/excel-mcp-server?style=social)](https://github.com/TangentDomain/excel-mcp-server/commits/main)
-
-
-
-| 指标 | 数值 | 状态 |
-|------|------|------|
-| ⭐ Stars | 4 | 🎯 **目标: 100** |
-| 🍴 Forks | 0 | 📈 活跃度 |
-| 👀 Watchers | 0 | 🔔 关注度 |
-| 🐛 Issues | 0 | 📝 待处理 |
-| 💻 语言 | Python | 🛠️ 技术 |
-| 👥 贡献者 | 1 | 🤝 社区 |
-| 📝 最近提交 | 10 | 🚀 活跃度 |
-
-## 🎯 里程碑进度
-
-- ⏳ **50 Stars**: 4 / 50
-- ⏳ **100 Stars**: 4 / 100
-- ⏳ **200 Stars**: 4 / 200
-- ⏳ **500 Stars**: 4 / 500
-
-
-## 📈 项目状态
-- **创建时间**: 2025-09-22
-- **最后更新**: 2026-03-28
-- **社区活跃度**: 🔥 高度活跃
-- **发展潜力**: 🌱 成长中
-
-## 🤝 参与方式
-
-感谢关注！您可以通过以下方式参与项目：
-
-1. 🌟 **Star**: 如果项目对您有帮助，请给我们一个 Star
-2. 🐛 **Issue**: 报告 Bug 或提出功能建议
-3. 💻 **Code**: 提交代码改进和修复
-4. 📚 **Docs**: 改进文档和使用示例
-5. 📢 **Share**: 分享项目给更多开发者
-
-
-
+用 AI 赋能游戏开发！🚀
