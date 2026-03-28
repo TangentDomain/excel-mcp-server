@@ -743,49 +743,53 @@ def _infer_error_code(message: str) -> str:
 @_track_call
 def excel_list_sheets(file_path: str) -> Dict[str, Any]:
     """
-📋 Excel工作表清单 - 获取文件中的所有工作表名称
+    Excel工作表清单 - 获取文件中的所有工作表名称
 
-**核心功能**: 快速列出Excel文件中所有工作表的名称，支持多文件表结构了解。在进行SQL查询前，建议先用此工具确认目标工作表存在。
+    快速列出Excel文件中所有工作表的名称，支持多文件表结构了解。
+    在进行SQL查询前，建议先用此工具确认目标工作表存在。
 
-**🎮 游戏开发场景**:
-• **表结构扫描**: 快速了解技能表、装备表、怪物表等存在情况
-• **多表操作**: 确认目标工作表存在后再进行查询或修改操作
-• **文件检查**: 验证Excel文件是否包含预期的工作表
-• **配置管理**: 了解配置文件包含哪些类型的配置表
+    Args:
+        file_path (str): Excel文件路径（支持相对路径）
 
-**📊 返回信息**:
-• **sheets**: 工作表名称列表（数组格式）
-• **success**: 操作是否成功
-• **message**: 状态消息或错误信息
+    Returns:
+        Dict[str, Any]: 包含工作表信息的字典，格式：
+            {
+                "success": bool,
+                "message": str,
+                "data": {
+                    "sheets": List[str]  # 工作表名称列表
+                },
+                "meta": {
+                    "error_code": str,
+                    "execution_time_ms": int
+                }
+            }
 
-**🔧 参数说明**:
-• **file_path**: Excel文件路径（支持相对路径）
+    🎮 游戏开发场景:
+    • **表结构扫描**: 快速了解技能表、装备表、怪物表等存在情况
+    • **多表操作**: 确认目标工作表存在后再进行查询或修改操作
+    • **文件检查**: 验证Excel文件是否包含预期的工作表
+    • **配置管理**: 了解配置文件包含哪些类型的配置表
 
-**💡 实用技巧**:
-• **查询前必用**: 在使用excel_query前，先用此工具确认工作表存在，避免列名错误
-• **双文件对比**: 同时查看两个Excel文件的工作表结构，快速识别差异
-• **批量检查**: 对整个配置目录的文件进行工作表普查，发现命名不规范文件
-• **跨文件验证**: 确认引用的工作表确实存在于被引用的文件中
+    💡 实用技巧:
+    • **查询前必用**: 在使用excel_query前，先用此工具确认工作表存在，避免列名错误
+    • **双文件对比**: 同时查看两个Excel文件的工作表结构，快速识别差异
+    • **批量检查**: 对整个配置目录的文件进行工作表普查，发现命名不规范文件
 
-**🎯 游戏开发最佳实践**:
-• **RPG项目**: 优先检查"技能表"、"装备表"、"怪物表"、"任务表"、"道具表"是否存在
-• **MMO项目**: 关注"玩家配置"、"副本配置"、"公会系统"等大型配置表
-• **手游项目**: 验证本地配置表和远程配置表的表结构一致性
-• **项目管理**: 定期检查配置文件表命名规范，避免拼写错误
+    🎯 游戏开发最佳实践:
+    • **RPG项目**: 优先检查"技能表"、"装备表"、"怪物表"、"任务表"、"道具表"是否存在
+    • **MMO项目**: 关注"玩家配置"、"副本配置"、"公会系统"等大型配置表
+    • **手游项目**: 验证本地配置表和远程配置表的表结构一致性
 
-**🔗 配合使用**:
-• + excel_describe_table → 了解工作表结构详情
-• + excel_query → 确认工作表存在后再进行数据查询
-• + excel_search_directory → 批量检查多个配置文件的表结构
+    🔗 配合使用:
+    • + excel_describe_table → 了解工作表结构详情
+    • + excel_query → 确认工作表存在后再进行数据查询
+    • + excel_search_directory → 批量检查多个配置文件的表结构
 
-**🚫 注意事项**:
-• **必用前置**: 在执行excel_query前先用此工具确认工作表存在
-• **批量操作**: 多个文件操作前先用此工具了解表结构
-• **错误预防**: 避免"工作表不存在"的错误
-
-**🚫 注意事项**:
-• 只返回工作表名称，不包含表结构信息
-• 了解表结构需要配合excel_describe_table
+    🚫 注意事项:
+    • **必用前置**: 在执行excel_query前先用此工具确认工作表存在
+    • **批量操作**: 多个文件操作前先用此工具了解表结构
+    • **只返回工作表名称**: 不包含表结构信息，了解表结构需要配合excel_describe_table
     """
     _path_err = _validate_path(file_path)
     if _path_err:
@@ -807,66 +811,66 @@ def excel_search(
     range: Optional[str] = None
 ) -> Dict[str, Any]:
     """
-🔍 智能文本搜索 - 快速定位Excel中的目标内容
+    智能文本搜索 - 快速定位Excel中的目标内容
 
-**核心功能**: 在Excel文件中搜索文本、数值或公式，支持正则表达式。精确匹配单元格位置，支持灵活的搜索策略。
+    在Excel文件中搜索文本、数值或公式，支持正则表达式。
+    精确匹配单元格位置，支持灵活的搜索策略。
 
-**🎮 游戏开发场景**:
-• **技能查找**: "火" 搜索所有火系技能，"瞬发" 查找无冷却技能
-• **装备定位**: "传说" 查找所有传说装备，"史诗" 查找史诗级装备
-• **问题排查**: "测试" 查找所有测试数据便于清理，"调试" 查找调试标记
-• **关键字定位**: "CD" 或 "冷却" 找到冷却时间字段，"消耗MP" 查找蓝耗相关字段
-• **数值搜索**: "100+" 查找大于100的数值配置，"0.1" 查找小数值精度配置
-• **状态效果**: "眩晕"、"中毒"、"流血" 查找状态效果相关配置
-• **NPC对话**: "任务"、"接取"、"完成" 查找任务相关对话内容
+    Args:
+        file_path (str): Excel文件路径
+        pattern (str): 搜索文本（支持正则表达式）
+        sheet_name (Optional[str], optional): 工作表名称（可选，默认搜索所有表）
+        case_sensitive (bool, optional): 大小写敏感（默认False）
+        whole_word (bool, optional): 全词匹配（默认False）
+        use_regex (bool, optional): 使用正则表达式（默认False）
+        include_values (bool, optional): 包含单元格值（默认True）
+        include_formulas (bool, optional): 包含公式搜索（默认False）
+        range (Optional[str], optional): 搜索范围（如"A1:C100"，可选）
 
-**⚡ 性能优化技巧**:
-• **限制搜索范围**: 对于大型文件，使用range参数缩小搜索范围如"A1:Z1000"
-• **精准匹配**: 使用whole_word=True避免误匹配，如精确查找"技能"而非"技能书"
-• **正则优化**: 复杂正则表达式可能较慢，优先使用简单模式或固定字符串
-• **多表搜索**: 不指定sheet_name时搜索所有表，但会增加耗时
+    Returns:
+        Dict[str, Any]: 搜索结果字典，格式：
+            {
+                "success": bool,
+                "message": str,
+                "data": {
+                    "matches": List[Dict],  # 匹配结果列表
+                    "match_count": int,    # 总匹配数量
+                    "search_info": Dict   # 搜索信息
+                },
+                "meta": {
+                    "error_code": str,
+                    "execution_time_ms": int
+                }
+            }
 
-**🎯 游戏开发最佳实践**:
-• **配置管理**: 定期搜索"TODO"、"FIXME"标记，清理未完成的配置项
-• **数据一致性**: 检查多个文件中相同的配置项，确保数值同步
-• **版本控制**: 搜索"version"、"build"等关键字，了解配置文件版本信息
-• **错误排查**: 搜索"error"、"fail"等关键字，定位可能的配置错误
+    🎮 游戏开发场景:
+    • **技能查找**: "火" 搜索所有火系技能，"瞬发" 查找无冷却技能
+    • **装备定位**: "传说" 查找所有传说装备，"史诗" 查找史诗级装备
+    • **问题排查**: "测试" 查找所有测试数据便于清理，"调试" 查找调试标记
+    • **关键字定位**: "CD" 或 "冷却" 找到冷却时间字段，"消耗MP" 查找蓝耗相关字段
 
-**🔧 参数说明**:
-• **file_path**: Excel文件路径
-• **pattern**: 搜索文本（支持正则表达式）
-• **sheet_name**: 工作表名称（可选，默认搜索所有表）
-• **case_sensitive**: 大小写敏感（默认False）
-• **whole_word**: 全词匹配（默认False）
-• **use_regex**: 使用正则表达式（默认False）
-• **include_values**: 包含单元格值（默认True）
-• **include_formulas**: 包含公式搜索（默认False）
-• **range**: 搜索范围（如"A1:C100"，可选）
+    ⚡ 性能优化技巧:
+    • **限制搜索范围**: 对于大型文件，使用range参数缩小搜索范围如"A1:Z1000"
+    • **精准匹配**: 使用whole_word=True避免误匹配，如精确查找"技能"而非"技能书"
+    • **正则优化**: 复杂正则表达式可能较慢，优先使用简单模式或固定字符串
+    • **多表搜索**: 不指定sheet_name时搜索所有表，但会增加耗时
 
-**📊 返回信息**:
-• **matches**: 匹配结果列表，每个匹配包含row、column、value、sheet_name
-• **match_count**: 总匹配数量
-• **search_info**: 搜索信息{pattern_used、search_range、search_mode}
-• **file_path**: 源文件路径
-• **success**: 操作是否成功
-• **message**: 状态消息或错误信息
+    💡 使用示例:
+    ```python
+    # 搜索技能表中的"火"字
+    result = excel_search("技能表.xlsx", "火", sheet_name="技能")
 
-**💡 使用示例**:
-```python
-# 搜索技能表中的"火"字
-result = excel_search("技能表.xlsx", "火", sheet_name="技能")
+    # 正则搜索等级1-5的技能
+    result = excel_search("技能表.xlsx", "等级[1-5]", use_regex=True)
 
-# 正则搜索等级1-5的技能  
-result = excel_search("技能表.xlsx", "等级[1-5]", use_regex=True)
+    # 搜索指定范围
+    result = excel_search("配置.xlsx", "攻击力", range="B1:B100")
+    ```
 
-# 搜索指定范围
-result = excel_search("配置.xlsx", "攻击力", range="B1:B100")
-```
-
-**🔗 配合使用**:
-• 定位后修改: 搜索结果→excel_update_query批量修改
-• 查看详情: excel_describe_table了解字段含义
-• 大文件搜索: excel_search_directory支持多文件搜索
+    🔗 配合使用:
+    • 定位后修改: 搜索结果→excel_update_query批量修改
+    • 查看详情: excel_describe_table了解字段含义
+    • 大文件搜索: excel_search_directory支持多文件搜索
     """
     _path_err = _validate_path(file_path)
     if _path_err:

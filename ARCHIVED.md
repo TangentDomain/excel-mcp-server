@@ -48,6 +48,9 @@
 
 **修复方向**:
 1. CI改用 `--tb=long` 获取完整traceback，确认具体错误
+
+### 2026-03-28 新增归档
+- REQ-036 [DONE] README新手友好化改造 ✅（R204）- 头部简化、5分钟上手教程、分客户端教程、FAQ折叠块、中英同步
 2. 测试中打印 `result['message']` 看实际错误信息
 3. pin python-calamine到已知工作版本，或修代码兼容所有版本
 4. 可能原因：python-calamine新版本读xlsx后DataFrame结构变化，CTE依赖的双行表头检测失效
