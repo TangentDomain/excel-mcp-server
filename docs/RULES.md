@@ -77,6 +77,7 @@
 - 所有文件读写显式指定encoding='utf-8'
 - 不要修改已有的CI修复（如encoding='utf-8'显式指定）
 - **CI失败是阻断性问题**：每轮用 `gh run list --limit 1` 检查CI状态，失败则 `gh run view --log-failed` 分析→定位→修复→推送。CI红灯不能无视
+- **仓库整洁**：不往根目录/子代理目录创建临时文件，内部文件必须被.gitignore覆盖。scripts/只放对用户有用的脚本，docs/只放对外文档
 - 需求必须有验收标准，没有验收标准不能标DONE
 
 ## 包结构
