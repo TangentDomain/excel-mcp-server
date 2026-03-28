@@ -50,6 +50,7 @@ docs/清理：
 
 **注意**:
 - 清理前先commit当前状态，避免丢失
+- **⚠️ 元迭代文件绝对不能删除**：.cron-prompt.md、.cron-focus.md、docs/NOW.md、docs/DECISIONS.md、docs/ROADMAP.md、docs/RULES.md、docs/REQUIREMENTS.md、docs/ARCHIVED.md、docs/DECISIONS-ARCHIVED.md、docs/FEEDBACK.md（如有）——这些用.gitignore排除，不删除文件本身
 - 删除.gitignore排除的文件用 `git rm --cached`
 - 清理后验证CI通过
 - 子代理后续轮次生成的内部文件必须被.gitignore覆盖
