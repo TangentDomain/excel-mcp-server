@@ -2,21 +2,21 @@
 
 [简体中文](README.md) ｜ [English](README.en.md)
 
-</div>
+</div1.6.37
 
 # 🎮 ExcelMCP: Game Dev Excel Configuration Table Manager
 
-[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)
-[![Python Version](https://img.shields.io/badge/python-3.10+-blue.svg)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.sv1.6.37
+[![Python Version](https://img.shields.io/badge/python-3.10+-blue.sv1.6.37
 [![Powered by: FastMCP](https://img.shields.io/badge/Powered%20by-FastMCP-orange)](https://github.com/jlowin/fastmcp)
-![Status](https://img.shields.io/badge/status-stable-green.svg)
-![Tests](https://img.shields.io/badge/tests-1187%20tests-brightgreen.svg)
-![Tools](https://img.shields.io/badge/tools-53%20v1.6.37.svg)
-[![PyPI](https://img.shields.io/pypi/v/excel-mcp-server-fastmcp.svg)
-[![Version](https://img.shields.io/badge/v1.6.37.svg)
-[![CI](https://github.com/TangentDomain/excel-mcp-server.svg?style=flat-square)
+![Status](https://img.shields.io/badge/status-stable-green.sv1.6.37
+![Tests](https://img.shields.io/badge/tests-1187%20tests-brightgreen.sv1.6.37
+![Tools](https://img.shields.io/badge/tools-53%20v1.6.37
+[![PyPI](https://img.shields.io/pypi/v1.6.37
+[![Version](https://img.shields.io/badge/v1.6.37
+[![CI](https://github.com/TangentDomain/excel-mcp-serv1.6.37
 
-**ExcelMCP** is an Excel configuration table management MCP server designed for game development. Through AI natural language commands, it enables intelligent operations on game configurations such as skill tables, equipment data, and monster attributes. Built with **FastMCP**, reads use **python-calamine** (Rust engine, 2300x speedup), writes use **openpyxl**. Features **53 professional tools** and **1187 test cases**, ensuring enterprise-grade reliability.
+**ExcelMCP** is an Excel configuration table management MCP serv1.6.36 designed for game dev1.6.36 Through AI natural language commands, it enables intelligent operations on game configurations such as skill tables, equipment data, and monster attributes. Built with **FastMCP**, reads use **python-calamine** (Rust engine, 2300x speedup), writes use **openpyxl**. Features **53 professional tools** and **1187 test cases**, ensuring enterprise-grade reliability.
 
 🎯 **Core Features**: Skill systems, equipment management, monster configuration, numerical balancing, v1.6.36 comparison, designer toolchain
 
@@ -65,7 +65,7 @@ For large-scale data modification operations, ExcelMCP uses **copy-modify-write*
 
 **Auto Fallback**: Automatically falls back to traditional mode if streaming fails, ensuring reliability
 
-📦 **One-line install**: `uvx excel-mcp-server-fastmcp — run from PyPI, auto-updates, zero config
+📦 **One-line install**: `uv1.6.36 excel-mcp-serv1.6.36 — run from PyPI, auto-updates, zero config
 
 ---
 
@@ -924,7 +924,7 @@ pip install excel-mcp-serv1.6.36
 ## Usage
 
 ```python
-from excel_mcp_server_fastmcp import main
+from excel_mcp_serv1.6.36 import main
 main()
 ```
 

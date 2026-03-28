@@ -2,19 +2,19 @@
 
 [中文](README.md) ｜ [English](README.en.md)
 
-</div>
+</div1.6.37
 
 # 🎮 ExcelMCP: 游戏开发专用 Excel 配置表管理器
 
-[![许可证: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)
-[![Python 版本](https://img.shields.io/badge/python-3.10+-blue.svg)
+[![许可证: MIT](https://img.shields.io/badge/License-MIT-yellow.sv1.6.37
+[![Python 版本](https://img.shields.io/badge/python-3.10+-blue.sv1.6.37
 [![技术支持: FastMCP](https://img.shields.io/badge/Powered%20by-FastMCP-orange)](https://github.com/jlowin/fastmcp)
-![状态](https://img.shields.io/badge/status-stable-green.svg)
-![测试覆盖](https://img.shields.io/badge/tests-1187%20tests-brightgreen.svg)
-![工具数量](https://img.shields.io/badge/tools-53%20v1.6.37.svg)
-[![PyPI](https://img.shields.io/pypi/v/excel-mcp-server-fastmcp.svg)
-[![版本](https://img.shields.io/badge/v1.6.37.svg)
-[![CI](https://github.com/TangentDomain/excel-mcp-server.svg?style=flat-square)
+![状态](https://img.shields.io/badge/status-stable-green.sv1.6.37
+![测试覆盖](https://img.shields.io/badge/tests-1187%20tests-brightgreen.sv1.6.37
+![工具数量](https://img.shields.io/badge/tools-53%20v1.6.37
+[![PyPI](https://img.shields.io/pypi/v1.6.37
+[![版本](https://img.shields.io/badge/v1.6.37
+[![CI](https://github.com/TangentDomain/excel-mcp-serv1.6.37
 
 **ExcelMCP** 是专为游戏开发设计的Excel配置表管理MCP服务器。通过AI自然语言指令，实现技能配置表、装备数据、怪物属性等游戏配置的智能化操作。基于**FastMCP**构建，读取使用**python-calamine**（Rust引擎，2300x提速），写入使用**openpyxl**，拥有**53个专业工具**和**1187个测试用例**，确保企业级可靠性。
 
@@ -974,7 +974,7 @@ A: 使用专门的配置表对比工具，支持ID对象跟踪
 ## Installation
 
 ```bash
-pip install excel-mcp-server-fastmcp
+pip install excel-mcp-serv1.6.36
 ```
 
 ## Usage
@@ -1063,4 +1063,4 @@ await excel_write_rows(
 ### 获取帮助
 - **文档**: 查看 [详细使用指南](#-使用指南)
 - **示例**: 参考 [examples/](examples/) 目录中的完整示例
-- **问题**: 提交 [GitHub Issues](https://github.com/TangentDomain/excel-mcp-server
+- **问题**: 提交 [GitHub Issues](https://github.com/TangentDomain/excel-mcp-serv1.6.36
