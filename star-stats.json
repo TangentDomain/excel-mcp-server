@@ -1,0 +1,28 @@
+{
+  "stars": 4,
+  "target": 100,
+  "percentage": 4.0,
+  "last_updated": "2026-03-28T08:52:41.439203",
+  "milestones": {
+    "50": {
+      "stars": 50,
+      "achieved": false,
+      "reward": "游戏配置模板系统"
+    },
+    "100": {
+      "stars": 100,
+      "achieved": false,
+      "reward": "VSCode插件 + 社区文档"
+    },
+    "200": {
+      "stars": 200,
+      "achieved": false,
+      "reward": "高级功能教程视频"
+    },
+    "500": {
+      "stars": 500,
+      "achieved": false,
+      "reward": "企业版功能预览"
+    }
+  }
+}
