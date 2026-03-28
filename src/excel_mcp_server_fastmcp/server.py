@@ -107,7 +107,16 @@ class OperationLogger:
         self.current_session = []
 
     def start_session(self, file_path: str):
-        """开始新的操作会话"""
+        """开始新的操作会话
+        
+        创建一个新的操作会话，初始化日志记录系统。
+        
+        Args:
+            file_path (str): 要操作的Excel文件路径
+            
+        Returns:
+            None
+        """
         self.log_file = os.path.join(
             os.path.dirname(file_path),
             ".excel_mcp_logs",
@@ -125,7 +134,17 @@ class OperationLogger:
         self._save_log()
 
     def log_operation(self, operation: str, details: Dict[str, Any]):
-        """记录操作"""
+        """记录操作
+        
+        将操作记录添加到当前会话中，并保存日志。
+        
+        Args:
+            operation (str): 操作名称（如 'read_cell', 'write_range'）
+            details (Dict[str, Any]): 操作详情，包含参数和返回结果
+            
+        Returns:
+            None
+        """
         if not self.current_session:
             return
 
@@ -139,7 +158,19 @@ class OperationLogger:
         self._save_log()
 
     def _save_log(self):
-        """保存日志到文件"""
+        """保存日志到文件
+        
+        将当前会话的日志记录保存到JSON文件。
+        
+        Args:
+            None
+            
+        Returns:
+            None
+            
+        Raises:
+            IOError: 当文件写入失败时记录错误日志
+        """
         if not self.log_file:
             return
 
@@ -150,7 +181,19 @@ class OperationLogger:
             logger.error(f"保存操作日志失败: {e}")
 
     def get_recent_operations(self, limit: int = 10) -> List[Dict[str, Any]]:
-        """获取最近的操作记录"""
+        """获取最近的操作记录
+        
+        返回当前会话中最近的操作记录。
+        
+        Args:
+            limit (int): 返回的最大记录数，默认为10
+            
+        Returns:
+            List[Dict[str, Any]]: 最近的操作记录列表，每条记录包含timestamp, operation, details
+            
+        Raises:
+            ValueError: 当limit为负数时
+        """
         if not self.current_session:
             return []
 
@@ -552,7 +595,18 @@ UNION: SELECT 技能名 FROM 法师技能 UNION ALL SELECT 技能名 FROM 战士
 # ==================== 统一响应格式 ====================
 
 def _ok(message: str = "", data=None, meta: dict = None) -> dict:
-    """统一成功响应: {success, message, data, meta}"""
+    """统一成功响应生成器
+    
+    生成标准化的成功响应格式，用于所有MCP工具函数。
+    
+    Args:
+        message (str, optional): 成功消息描述，默认为空字符串
+        data (any, optional): 成功时的数据内容，默认为None
+        meta (dict, optional): 元信息字典，包含执行时间、缓存状态等，默认为None
+        
+    Returns:
+        dict: 统一的成功响应格式 {success: true, message: str, data: any, meta: dict}
+    """
     r: dict = {"success": True}
     if message:
         r["message"] = message
@@ -597,7 +651,20 @@ _ERROR_HINTS = {
 
 
 def _fail(message: str, meta: dict = None) -> dict:
-    """统一错误响应: {success, message, meta}。自动附加error_code对应的修复提示。"""
+    """统一错误响应生成器
+    
+    生成标准化的错误响应格式，自动附加错误代码对应的修复提示。
+    
+    Args:
+        message (str): 错误消息描述，通常包含具体的错误信息
+        meta (dict, optional): 元信息字典，包含error_code、file_path、suggested_fix等，默认为None
+        
+    Returns:
+        dict: 统一的错误响应格式 {success: false, message: str, meta: dict}
+        
+    Note:
+        当meta中包含error_code时，会自动添加对应的💡修复提示到message中
+    """
     r: dict = {"success": False, "message": message}
     if meta:
         r["meta"] = meta
