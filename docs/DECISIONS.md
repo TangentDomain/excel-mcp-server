@@ -1,3 +1,14 @@
+## D045: REQ-027 工具实用性提升 - 8个新工具实现 (2026-06-17, R181)
+**需求**: REQ-027 [P1] 工具实用性提升
+**问题**: 工具总数44，需要增加实用工具提升产品竞争力
+**根因**: 批量操作、图表生成、数据验证、条件格式是高频需求但缺失
+**决策**: 
+1. 新增8个工具：batch_update_ranges、merge_multiple_files、create_chart、list_charts、set_data_validation、clear_validation、add_conditional_format、clear_conditional_format
+2. 13个测试用例全部通过，全量1155通过
+3. README中英文同步更新
+4. v1.6.33发布PyPI，main+develop推送完成
+**结果**: ✅ 工具数44→52，v1.6.33发布成功
+
 **根因**: 规则要求每5轮进行MCP真实验证，验证12项核心功能的实际可用性
 **决策**: 
 1. 执行MCP真实验证：创建真实xlsx测试文件，测试12项核心功能
