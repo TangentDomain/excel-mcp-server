@@ -63,8 +63,8 @@ def get_version_from_changelog():
     try:
         with open("CHANGELOG.md", "r", encoding="utf-8") as f:
             content = f.read()
-            # 查找第一个版本号
-            match = re.search(r'## \[([^\]]+)\]', content)
+            # 查找第一个版本号，支持v1.6.41和1.6.41两种格式
+            match = re.search(r'## \[v?([^\]]+)\]', content)
             if match:
                 return match.group(1)
     except Exception as e:

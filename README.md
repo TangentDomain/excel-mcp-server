@@ -149,7 +149,7 @@ pip install excel-mcp-server-fastmcp
 <summary><b>怎么确认安装成功了？</b></summary>
 
 ```bash
-uvx excel-mcp-server-fastmcp@1.6.40 --help
+uvx excel-mcp-server-fastmcp@1.6.41 --help
 ```
 
 看到帮助信息就OK了。

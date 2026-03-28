@@ -5,7 +5,12 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased]
+## [v1.6.41] - 2026-03-28
+
+### 优化
+- **自动化版本检查修复**：修复CHANGELOG.md版本同步问题，确保所有文件版本一致性
+- **版本检查脚本改进**：优化CHANGELOG.md版本匹配逻辑，支持Unreleased内容自动检测
+- **文档同步机制完善**：自动化版本检查脚本功能验证通过
 
 ## [v1.6.40] - 2026-03-28
 
