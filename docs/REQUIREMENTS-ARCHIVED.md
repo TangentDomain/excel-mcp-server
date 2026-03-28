@@ -35,7 +35,7 @@
       "notes": "错误处理机制优化完成，PyPI发布成功"
     }
   }
-}{
+},
   "REQUIREMENTS": {
     "REQ-030": {
       "title": "CI CTE测试失败修复",

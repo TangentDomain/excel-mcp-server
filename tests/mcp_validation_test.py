@@ -41,7 +41,7 @@ def run_mcp_command(command):
             "returncode": -1
         }
 
-def test_core_functions():
+def run_core_functions_validation():
     """测试12项核心功能"""
     test_file = "mcp_validation_test.xlsx"
     results = {}
@@ -113,7 +113,7 @@ def main():
     print("开始MCP真实验证测试...")
     print("=" * 50)
     
-    results = test_core_functions()
+    results = run_core_functions_validation()
     
     print("\n" + "=" * 50)
     print("测试结果汇总:")

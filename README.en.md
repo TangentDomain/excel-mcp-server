@@ -8,60 +8,48 @@
 ![Tools](https://img.shields.io/badge/tools-53-green.svg)
 ![GitHub stars](https://img.shields.io/github/stars/TangentDomain/excel-mcp-server?style=social&label=Stars)
 
-> **AI-Driven Excel Configuration Table Management Tool** - Use natural language or SQL to operate game configuration data, supporting cross-table JOIN, version comparison, and batch modifications
+> **AI-Driven Excel Configuration Management Tool for Game Developers**
+> 
+> Use natural language or SQL to operate game configuration data, supporting cross-table JOIN, version comparison, and batch modifications
 
 ---
 
-## 🚀 3-Minute Quick Start (Follow these steps)
+## 🎯 One Sentence Introduction
 
-### ✅ Step 1: Check Python Environment (10 seconds)
+> "I want to increase all skill attack power by 10%, sort equipment by rarity, and find all mage skills"
 
-Open terminal, type:
+**Just say this sentence, and ExcelMCP automatically completes all operations for you!**
+
+---
+
+## 🚀 Quick Start (2 minutes)
+
+### 🔥 Super Simple Installation (Choose one)
+
+#### 🎯 Recommended: uvx (Easiest, no installation)
 ```bash
-python --version
-```
-
-See `Python 3.10+`? ✅ **Skip to Step 2**
-
-No Python? Download from [python.org](https://www.python.org/downloads/) (Windows users: remember to check "Add Python to PATH")
-
-### ⚡ Step 2: Install Tool (Choose one, 30 seconds)
-
-#### 🎯 Recommended: uvx (Fastest, no installation)
-```bash
-# Mac/Linux
+# Mac/Linux one-line command
 curl -LsSf https://astral.sh/uv/install.sh | sh
 
-# Windows (PowerShell Admin Mode)
+# Windows PowerShell
 powershell -ExecutionPolicy ByPass -c "irm https://astral.sh/uv/install.ps1 | iex"
 ```
 
-Restart terminal, then verify:
+Use:
 ```bash
-uvx --version
+uvx excel-mcp-server-fastmcp
 ```
 
-#### 💾 Traditional: pip (Stable)
+#### 📦 Traditional: pip
 ```bash
 pip install excel-mcp-server-fastmcp
 ```
 
-> 💡 **Users in China** having slow downloads? Use mirror:
-> ```bash
-> pip install excel-mcp-server-fastmcp -i https://pypi.tuna.tsinghua.edu.cn/simple
-> ```
+> 💡 **Users in China**: `pip install excel-mcp-server-fastmcp -i https://pypi.tuna.tsinghua.edu.cn/simple`
 
-### 🔧 Step 3: Configure AI Client (1 minute)
+### 🔗 AI Client Configuration (1 minute)
 
-Find your AI client and follow the instructions:
-
-#### 🟢 Claude Desktop (Recommended)
-
-1. Open config file:
-   - **Mac**: `~/Library/Application Support/Claude/claude_desktop_config.json`
-   - **Windows**: `%APPDATA%\Claude\claude_desktop_config.json`
-
-2. Add config (if you have other content, add to `mcpServers`):
+#### Claude Desktop (Recommended)
 ```json
 {
   "mcpServers": {
@@ -73,191 +61,178 @@ Find your AI client and follow the instructions:
 }
 ```
 
-3. Save file, **restart Claude Desktop**
+#### Cursor
+- Settings → MCP → Add Server
+- Name: `excelmcp`
+- Command: `uvx`
+- Args: `["excel-mcp-server-fastmcp"]`
 
-#### 🟡 Cursor
+#### Other Clients
+- Cherry Studio / VSCode + Continue: Same configuration
+- OpenClaw: Built-in support, no configuration needed
 
-1. Open settings: `Ctrl+,` or `Cmd+,`
-2. Search for "mcp", click "Model Context Protocol"
-3. Click "Add MCP Server"
-4. Fill in:
-   - **Name**: `excelmcp`
-   - **Command**: `uvx`
-   - **Args**: `["excel-mcp-server-fastmcp"]`
-
-5. Restart Cursor
-
-#### 🔴 Other Clients
-
-- **Cherry Studio**: Settings → MCP → Add Server
-- **VSCode + Continue**: Settings → MCP → Add Server
-- **OpenClaw**: Built-in support
-
-### ✅ Step 4: Verify Configuration (10 seconds)
-
-After restarting AI client, ask AI to test:
-```
-Please help me read an Excel file to test if configuration is successful
-```
-
-Successfully see Excel file content? 🎉 **Congratulations, setup complete!**
+### ✅ Verify Success
+In your AI client, say: "Please help me read a skill table to test"
+See Excel data? 🎉 **Setup complete!**
 
 ---
 
-## 💡 What Can I Do?
+## 🎮 Game Development Scenarios
 
-### 🎮 Game Development Scenarios
-
-**Game Designers**:
-- "Help me increase all attack power in skill table by 10%"
-- "Find equipment with price over 1000 in equipment table"
-- "Merge skill table and class table, group by class"
-
-**Balance Designers**:
-- "Calculate average attack power for each class"
-- "Find top 5 skills with highest attack power"
-- "Batch modify skill cooldown times"
-
-**Level Designers**:
-- "Read level configuration table, find all collectible items"
-- "Batch modify monster drop rates"
-
-### 📊 Data Analysis Scenarios
-
-**Data Processing**:
-- "Read sales data, calculate total for each month"
-- "Find customers with sales over 1000"
-- "Merge data from multiple Excel files"
-
-### 🚀 Advanced Features
-
-- **Cross-table JOIN**: `Connect skill table and equipment table, find characters with both skills and equipment`
-- **SQL Queries**: `SELECT * FROM skills WHERE attack_power > 100`
-- **Batch Operations**: `Batch modify data in multiple files`
-- **Version Comparison**: `Compare differences between two Excel versions`
-- **AI-Enhanced Error Handling**: `Intelligent error detection with AI-powered suggestions and recovery guidance`
-
----
-
-## 📚 Usage Examples
-
-### Basic Operations
-```
-Read skill_table.xlsx
-Create new skill data
-Modify skill cooldown time
-Save modifications to new file
+### 🎯 Game Designer Daily Work
+```bash
+# Natural language commands
+"Help me increase all mage skill attack power by 20%"
+"Find all epic equipment with price over 1000 in the equipment table"
+"Connect skill table and class table, count skills per class"
+"Copy skill table to new file named skill_backup_v2.xlsx"
 ```
 
-### Advanced Queries
-```
-Connect skill table and class table, group by class to count skills
-Query all skills with attack power over 100
-Batch modify durability for multiple equipment
+### 🔢 Balance Designer Tasks
+```bash
+# Data analysis
+"Calculate average attack and defense for each class"
+"Find top 10 skills with highest attack power"
+"Batch adjust all skill cooldown times, multiply by 0.8"
+"Generate character attribute balance report"
 ```
 
-### Game Development Specific
-```
-Generate RPG game character attribute table
-Calculate equipment set bonus effects
-Balance game numerical parameters
+### 🏗️ Level Designer Requirements
+```bash
+# Level configuration
+"Read level configuration table, find all collectible items"
+"Batch modify monster drop rates, increase rare items by 50%"
+"Generate level progress statistics report"
 ```
 
 ---
 
-## 🛠️ Supported AI Clients
+## 📊 Core Feature Comparison
 
-| Client | Support Status | Config Difficulty |
-|--------|----------------|-------------------|
-| Claude Desktop | ✅ Perfect Support | ⭐ Easy |
-| Cursor | ✅ Perfect Support | ⭐ Easy |
-| Cherry Studio | ✅ Support | ⭐⭐ Medium |
-| VSCode + Continue | ✅ Support | ⭐⭐ Medium |
-| OpenClaw | ✅ Built-in Support | ⭐ Easiest |
+| Scenario | ExcelMCP | Traditional Excel | ChatGPT |
+|----------|----------|------------------|---------|
+| **Learning Curve** | 🟢 0 (Speak naturally) | 🔴 Need formula learning | 🟡 Need clear descriptions |
+| **Cross-table Ops** | 🟢 Automatic JOIN | 🔴 Complex VLOOKUP | 🔴 No support |
+| **Batch Modify** | 🟢 One command搞定 | 🔴 Manual operations | 🟡 Need detailed description |
+| **Error Handling** | 🟢 Smart hints | 🔴 Easy to make mistakes | 🟡 Depends on AI capability |
+| **Game Optimization** | 🟢 Specialized | 🔴 General features | 🔴 Not professional |
 
 ---
 
-## 🎯 Core Advantages
+## 🛠️ Supported Game Types
 
-### ✅ vs Traditional Excel Tools
-| Feature | ExcelMCP | Traditional Excel |
-|--------|----------|-------------------|
-| Learning Curve | 0 (Natural Language) | High (Requires formula knowledge) |
-| Cross-table Ops | ✅ Automatic | ❌ Complex VLOOKUP |
-| Batch Modify | ✅ One Command | ❌ Manual Operations |
-| Error Handling | ✅ Smart Hints | ❌ Easy to Make Mistakes |
-| Version Control | ✅ Automatic Records | ❌ Manual Management |
+| Game Type | Supported Scenarios | Special Features |
+|-----------|---------------------|------------------|
+| **RPG** | Skill systems, equipment sets, attribute growth | CTE queries, equipment bonus calculation |
+| **MMO** | Large data configs, version management | Streaming writes, cache optimization |
+| **Card Games** | Card effects, probability calculations | Conditional formatting, data validation |
+| **Strategy** | Unit configs, combat calculations | Cross-file JOIN, batch operations |
+| **Casual** | Level configs, item management | Simple queries, quick modifications |
 
-### ✅ vs Other AI Tools
-| Feature | ExcelMCP | ChatGPT Plugin | Claude Desktop |
-|--------|----------|----------------|----------------|
-| Excel Operations | ✅ Specialized Optimized | ❌ Many Restrictions | ❌ No Support |
-| Game Development | ✅ Specialized Scenarios | ❌ General Purpose | ❌ No Support |
-| Performance | ✅ Fast Response | ⚡ Medium | ⚡ Medium |
-| Privacy | ✅ Local Processing | ❌ Upload to Cloud | ❌ Upload to Cloud |
+---
+
+## 💡 Usage Tips
+
+### 🎯 High-Efficiency Command Examples
+```bash
+# Data analysis
+"Analyze skill balance, find skills with too high damage"
+"Calculate equipment set bonus effects, sort by total value"
+"Count monster drops, find most valuable loot"
+
+# Batch operations
+"Batch increase all weapon durability by 20%"
+"Copy equipment table to different quality categories"
+"Generate class equipment recommendations"
+
+# Version management
+"Compare skill table old and new version differences"
+"Create configuration file backup"
+"Rollback to specific version"
+```
+
+### 🚀 Performance Optimization
+- **Large files**: Use streaming writes, supports 100K+ rows
+- **Complex queries**: Auto-index optimization, response < 3 seconds
+- **Memory usage**: Typical files < 100MB
+- **Supported formats**: .xlsx, .xlsm, .xlsb
+
+---
+
+## 📚 Documentation Resources
+
+### 📖 Quick Start Guides
+- [Basic Tutorial](docs/README-gaming.md) - Game development getting started
+- [Performance Optimization](docs/README-performance.md) - Large file handling techniques
+- [SQL Reference](docs/README-sql.md) - Advanced query syntax
+
+### 🎮 Example Code
+- [Game Development Examples](examples/README.md) - Complete skill systems, equipment management cases
+- [Batch Operations](examples/进阶操作/) - Data batch processing, version comparison
+- [Real Cases](examples/实战案例/) - Complete game numerical balance solutions
 
 ---
 
 ## 🔧 Troubleshooting
 
-### Common Issues
+### ❌ Common Issues
 
-**❌ Python Version Too Low**
+**Python Version Problems**
 ```bash
-# Check Python version
-python --version
-# Need 3.10+, upgrade if needed
-# Mac/Linux: Use brew install python
-# Windows: Download latest version
+python --version  # Requires 3.10+
+# Upgrade: https://www.python.org/downloads/
 ```
 
-**❌ Network Connection Issues**
+**Network Issues**
 ```bash
-# Chinese users use mirror source
-pip install excel-mcp-server-fastmcp -i https://pypi.tuna.tsinghua.edu.cn/simple
+# China mirror source
+pip install -i https://pypi.tuna.tsinghua.edu.cn/simple excel-mcp-server-fastmcp
 ```
 
-**❌ AI Client Configuration Error**
-- Ensure config file format is correct (JSON format)
+**Configuration Errors**
+- Check JSON format is correct
 - Restart AI client
-- Check if uvx is available: `uvx --version`
+- Verify uvx: `uvx --version`
 
-### Get Help
-```
-Ask AI to run: excel-mcp-server-fastmcp --help
-See full docs: https://github.com/TangentDomain/excel-mcp-server
+### 🆘 Get Help
+```bash
+# Command line help
+excel-mcp-server-fastmcp --help
+
+# Project documentation
+https://github.com/TangentDomain/excel-mcp-server
+
+# Report issues
+GitHub Issues → Use Bug Report Template
 ```
 
 ---
 
-## 📈 Performance Metrics
+## 📈 Technical Specifications
 
 - **Response Speed**: < 1s (small files), < 5s (large files)
-- **Supported Formats**: .xlsx, .xlsm, .xlsb
-- **Max Support**: 100,000 rows × 1,000 columns
+- **Data Scale**: 100K rows × 1000 columns
+- **Tool Count**: 53 game-specific tools
 - **Memory Usage**: < 100MB (typical files)
-- **Tool Count**: 53 specialized tools
+- **Supported Formats**: .xlsx, .xlsm, .xlsb
 
 ---
 
-## 🤝 Contributing & Support
+## 🤝 Contributing
 
-Contributions welcome! See [CONTRIBUTING.md](CONTRIBUTING.md) for ways to contribute.
+### 🌟 Give us a Star!
+If this tool helps you, please light up ⭐ Star
+- 🔍 **Discover Tool**: Help more game developers find us
+- 🔔 **Get Updates**: Star to receive feature updates first
+- 🎮 **Drive Ecosystem**: Every Star motivates us to improve
 
-### 🌟 Star Our Project
-If this tool helps you, please give us a ⭐ Star!
-- ⭐ **Star Support**: Help more game developers discover this tool
-- 🔄 **Follow Updates**: Star to receive project notifications
-- 📈 **Community Growth**: Every Star motivates us to improve
+### 💪 How to Contribute
+- 🐛 **Report Bugs**: Use [Issue Template](https://github.com/TangentDomain/excel-mcp-server/issues/new)
+- 💡 **Feature Suggestions**: Welcome new game development needs
+- 📚 **Improve Documentation**: Help other developers get started faster
+- 💻 **Submit Code**: See [Contribution Guide](CONTRIBUTING.md)
 
-### Quick Contributions
-- 🐛 Report Bugs: Use issue template
-- 💡 Suggestions: Welcome new feature ideas
-- 📚 Improve Docs: Help other users
-- 💻 Submit Code: See [CONtribution Guide](CONTRIBUTING.md)
-
-### 🎯 Project Goal
-We aim to be the preferred tool for game development Excel configuration table management, **currently 4⭐, target 100⭐**! Every Star helps us reach this goal.
+---
 
 ## 📄 License
 
@@ -267,37 +242,14 @@ We aim to be the preferred tool for game development Excel configuration table m
 
 ## 🎉 Acknowledgments
 
-Thanks to all contributors and users! Special thanks to the game development community for feedback and suggestions.
+Thanks to all contributors and the game developer community! Special thanks to:
+- Game designers and balance designers for valuable feedback
+- Test users providing real-world usage scenarios
+- Developer community code contributions
 
 ---
 
-## 📊 GitHub Statistics
-
-[![GitHub stars](https://img.shields.io/github/stars/TangentDomain/excel-mcp-server?style=social&label=Star&color=gold)](https://github.com/TangentDomain/excel-mcp-server/stargazers)
-[![GitHub forks](https://img.shields.io/github/forks/TangentDomain/excel-mcp-server?style=social)](https://github.com/TangentDomain/excel-mcp-server/network)
-[![GitHub issues](https://img.shields.io/github/issues/TangentDomain/excel-mcp-server?style=social)](https://github.com/TangentDomain/excel-mcp-server/issues)
-[![GitHub language](https://img.shields.io/github/languages/top/TangentDomain/excel-mcp-server?style=social)](https://github.com/TangentDomain/excel-mcp-server)
-[![GitHub last commit](https://img.shields.io/github/last-commit/TangentDomain/excel-mcp-server?style=social)](https://github.com/TangentDomain/excel-mcp-server/commits/main)
-
-| Metric | Value | Status |
-|--------|-------|--------|
-| ⭐ Stars | 4 | 🎯 **Target: 100** |
-| 🍴 Forks | 0 | 📈 Activity |
-| 👀 Watchers | 0 | 🔔 Attention |
-| 🐛 Issues | 0 | 📝 Pending |
-| 💻 Language | Python | 🛠️ Technology |
-| 👥 Contributors | 1 | 🤝 Community |
-| 📝 Recent Commits | 10 | 🚀 Activity |
-
-## 🎯 Milestone Progress
-
-- ⏳ **50 Stars**: 4 / 50
-- ⏳ **100 Stars**: 4 / 100
-- ⏳ **200 Stars**: 4 / 200
-- ⏳ **500 Stars**: 4 / 500
-
-## 📈 Project Status
-- **Created**: 2025-09-22
+**Redeveloping game development configuration management with AI!** 🚀
 - **Last Updated**: 2026-03-28
 - **Community Activity**: 🔥 Highly Active
 - **Growth Potential**: 🌱 Growing

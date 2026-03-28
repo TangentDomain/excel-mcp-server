@@ -8,60 +8,48 @@
 ![Tools](https://img.shields.io/badge/tools-53-green.svg)
 ![GitHub stars](https://img.shields.io/github/stars/TangentDomain/excel-mcp-server?style=social&label=Stars)
 
+> **专为游戏开发者打造的 AI 驱动 Excel 配置管理工具**
+> 
 > 用自然语言或 SQL 操作游戏配置数据，支持跨表 JOIN、版本对比、批量修改
 
 ---
 
-## 🚀 3分钟快速上手
+## 🎯 一句话介绍
 
-### ✅ 第一步：检查 Python 环境（10秒）
+> "我要把技能攻击力全部加10%，装备按稀有度排序，找出法师职业所有技能"
 
-打开终端，输入：
+**只需要说这句话，ExcelMCP 自动帮你完成所有操作！**
+
+---
+
+## 🚀 快速开始（2分钟）
+
+### 🔥 超简单安装（任选一种）
+
+#### 🎯 推荐：uvx（最简单，无安装）
 ```bash
-python --version
-```
-
-看到 `Python 3.10+`？✅ **直接跳到第二步**
-
-没装 Python？去 [python.org](https://www.python.org/downloads/) 下载（Windows 用户记得勾选 "Add Python to PATH"）
-
-### ⚡ 第二步：安装工具（任选其一，30秒）
-
-#### 🎯 推荐方式：uvx（最快，无需安装）
-```bash
-# Mac/Linux
+# Mac/Linux 一行命令
 curl -LsSf https://astral.sh/uv/install.sh | sh
 
-# Windows（PowerShell 管理员模式）
+# Windows PowerShell
 powershell -ExecutionPolicy ByPass -c "irm https://astral.sh/uv/install.ps1 | iex"
 ```
 
-重启终端后验证：
+使用：
 ```bash
-uvx --version
+uvx excel-mcp-server-fastmcp
 ```
 
-#### 💾 传统方式：pip（稳定）
+#### 📦 传统：pip
 ```bash
 pip install excel-mcp-server-fastmcp
 ```
 
-> 💡 国内下载慢？用镜像源：
-> ```bash
-> pip install excel-mcp-server-fastmcp -i https://pypi.tuna.tsinghua.edu.cn/simple
-> ```
+> 💡 国内用户：`pip install excel-mcp-server-fastmcp -i https://pypi.tuna.tsinghua.edu.cn/simple`
 
-### 🔧 第三步：配置 AI 客户端（1分钟）
+### 🔗 AI 客户端配置（1分钟）
 
-找到你的 AI 客户端，按说明配置：
-
-#### 🟢 Claude Desktop（推荐）
-
-1. 打开配置文件：
-   - **Mac**: `~/Library/Application Support/Claude/claude_desktop_config.json`
-   - **Windows**: `%APPDATA%\Claude\claude_desktop_config.json`
-
-2. 添加配置（如果已有其他内容，加到 `mcpServers` 里）：
+#### Claude Desktop（推荐）
 ```json
 {
   "mcpServers": {
@@ -73,186 +61,176 @@ pip install excel-mcp-server-fastmcp
 }
 ```
 
-3. 保存文件，**重启 Claude Desktop**
+#### Cursor
+- 设置 → MCP → Add Server
+- Name: `excelmcp`
+- Command: `uvx`
+- Args: `["excel-mcp-server-fastmcp"]`
 
-#### 🟡 Cursor
+#### 其他客户端
+- Cherry Studio / VSCode + Continue：同样配置
+- OpenClaw：内置支持，无需配置
 
-1. 打开设置：`Ctrl+,` 或 `Cmd+,`
-2. 搜索 "mcp"，点击 "Model Context Protocol"
-3. 点击 "Add MCP Server"
-4. 填入：
-   - **Name**: `excelmcp`
-   - **Command**: `uvx`
-   - **Args**: `["excel-mcp-server-fastmcp"]`
-
-5. 重启 Cursor
-
-#### 🔴 其他客户端
-
-- **Cherry Studio**: 设置 → MCP → 添加服务器
-- **VSCode + Continue**: 设置 → MCP → 添加服务器
-- **OpenClaw**: 已内置支持
-
-### ✅ 第四步：验证配置（10秒）
-
-重启 AI 客户端后，让 AI 帮你测试：
-```
-帮我读一个 Excel 文件，测试配置是否成功
-```
-
-能看到 Excel 文件内容？🎉 **恭喜，配置完成！**
+### ✅ 验证成功
+在 AI 客户端说："帮我读取技能表测试一下" 
+看到 Excel 数据？🎉 **配置完成！**
 
 ---
 
-## 💡 能做什么？
+## 🎮 游戏开发场景演示
 
-### 🎮 游戏开发场景
-
-**策划**：
-- "帮我把技能表里所有攻击力加 10%"
-- "在装备表里找价格超过 1000 的装备"
-- "把技能表和职业表关联，按职业分组"
-
-**数值策划**：
-- "算一下每个职业的平均攻击力"
-- "找出攻击力最高的前 5 个技能"
-- "批量修改技能冷却时间"
-
-**关卡策划**：
-- "读取关卡配置表，找出所有可收集道具"
-- "批量修改怪物掉落概率"
-
-### 📊 数据分析场景
-
-- "读取销售数据，算每个月的总额"
-- "找销售额超过 1000 的客户"
-- "合并多个 Excel 文件的数据"
-
-### 🚀 高级功能
-
-- **跨表 JOIN**：关联技能表和装备表，找出同时拥有技能和装备的角色
-- **SQL 查询**：`SELECT * FROM skills WHERE attack_power > 100`
-- **批量操作**：批量修改多个文件中的数据
-- **版本对比**：比较两个 Excel 版本的差异
-- **AI 智能错误处理**：智能检测错误并提供修复建议
-
----
-
-## 📚 使用示例
-
-### 基础操作
-```
-读取技能表.xlsx
-创建新的技能数据
-修改技能冷却时间
-把修改保存到新文件
+### 🎯 策划日常工作
+```bash
+# 自然语言指令
+"帮我把技能表里所有法师技能攻击力加 20%"
+"找出装备表中价格超过 1000 的史诗装备"
+"把技能表和职业表关联，统计每个职业的技能数量"
+"复制技能表到新文件，命名为技能备份_v2.xlsx"
 ```
 
-### 高级查询
-```
-关联技能表和职业表，按职业统计技能数量
-查询攻击力超过 100 的所有技能
-批量修改多个装备的耐久度
+### 🔢 数值策划任务
+```bash
+# 数据分析
+"计算每个职业的平均攻击力和防御力"
+"找出攻击力最高的前 10 个技能"
+"批量调整所有技能冷却时间，乘以 0.8"
+"生成角色属性平衡报告"
 ```
 
-### 游戏开发专用
-```
-生成 RPG 游戏角色属性表
-计算装备套装加成效果
-平衡游戏数值参数
+### 🏗️ 关卡策划需求
+```bash
+# 关卡配置
+"读取关卡配置表，找出所有可收集道具"
+"批量修改怪物掉落概率，稀有物品提升 50%"
+"生成关卡进度统计报表"
 ```
 
 ---
 
-## 🛠️ 支持的 AI 客户端
+## 📊 核心功能对比
 
-| 客户端 | 支持状态 | 配置难度 |
-|--------|----------|----------|
-| Claude Desktop | ✅ 完美支持 | ⭐ 简单 |
-| Cursor | ✅ 完美支持 | ⭐ 简单 |
-| Cherry Studio | ✅ 支持 | ⭐⭐ 中等 |
-| VSCode + Continue | ✅ 支持 | ⭐⭐ 中等 |
-| OpenClaw | ✅ 内置支持 | ⭐ 最简单 |
+| 场景 | ExcelMCP | 传统 Excel | ChatGPT |
+|------|----------|------------|---------|
+| **学习成本** | 🟢 0（直接说人话） | 🔴 需要公式学习 | 🟡 需要描述清楚 |
+| **跨表操作** | 🟢 自动 JOIN | 🔴 复杂 VLOOKUP | 🔴 不支持 |
+| **批量修改** | 🟢 一条指令搞定 | 🔴 手动操作 | 🟡 需要详细描述 |
+| **错误处理** | 🟢 智能提示 | 🔴 容易出错 | 🟡 依赖 AI 能力 |
+| **游戏优化** | 🟢 专属优化 | 🔴 通用功能 | 🔴 不专业 |
 
 ---
 
-## 🎯 核心优势
+## 🛠️ 支持的游戏类型
 
-### ✅ 对比传统 Excel 工具
-| 功能 | ExcelMCP | 传统 Excel |
-|------|----------|------------|
-| 学习成本 | 0（自然语言） | 高（需要公式知识） |
-| 跨表操作 | ✅ 自动关联 | ❌ 复杂的 VLOOKUP |
-| 批量修改 | ✅ 一条指令 | ❌ 手动操作 |
-| 错误处理 | ✅ 智能提示 | ❌ 容易出错 |
-| 版本管理 | ✅ 自动记录 | ❌ 手动管理 |
+| 游戏类型 | 支持场景 | 特色功能 |
+|----------|----------|----------|
+| **RPG** | 技能系统、装备套装、属性成长 | CTE 查询、装备加成计算 |
+| **MMO** | 大数据量配置、版本管理 | 流式写入、缓存优化 |
+| **卡牌** | 卡牌效果、概率计算 | 条件格式、数据验证 |
+| **策略** | 单位配置、战斗计算 | 跨文件 JOIN、批量操作 |
+| **休闲** | 关卡配置、道具管理 | 简单查询、快速修改 |
 
-### ✅ 对比其他 AI 工具
-| 功能 | ExcelMCP | ChatGPT 插件 | Claude Desktop |
-|------|----------|--------------|----------------|
-| Excel 操作 | ✅ 专业优化 | ❌ 限制多 | ❌ 不支持 |
-| 游戏开发 | ✅ 专属场景 | ❌ 通用场景 | ❌ 不支持 |
-| 响应速度 | ✅ 快速 | ⚡ 中等 | ⚡ 中等 |
-| 隐私安全 | ✅ 本地处理 | ❌ 上传云端 | ❌ 上传云端 |
+---
+
+## 💡 使用技巧
+
+### 🎯 高效指令示例
+```bash
+# 数据分析
+"分析技能平衡性，找出伤害过高的技能"
+"计算装备套装加成效果，按总价排序"
+"统计怪物掉落，找出最值钱的掉落"
+
+# 批量操作
+"批量修改所有武器耐久度 +20%"
+"复制装备表到不同品质分类"
+"生成职业配装推荐"
+
+# 版本管理
+"比较技能表新旧版本差异"
+"创建配置文件备份"
+"回滚到指定版本"
+```
+
+### 🚀 性能优化
+- **大文件**：使用流式写入，支持 10万+ 行数据
+- **复杂查询**：自动索引优化，响应 < 3 秒
+- **内存占用**：典型文件 < 100MB
+- **支持格式**：.xlsx、.xlsm、.xlsb
+
+---
+
+## 📚 文档资源
+
+### 📖 快速上手
+- [基础教程](docs/README-gaming.md) - 游戏开发入门指南
+- [性能优化](docs/README-performance.md) - 大文件处理技巧
+- [SQL 参考](docs/README-sql.md) - 高级查询语法
+
+### 🎮 示例代码
+- [游戏开发示例](examples/README.md) - 完整技能系统、装备管理案例
+- [批量操作示例](examples/进阶操作/) - 数据批处理、版本对比
+- [实战案例](examples/实战案例/) - 完整游戏数值平衡方案
 
 ---
 
 ## 🔧 故障排除
 
-### 常见问题
+### ❌ 常见问题
 
-**❌ Python 版本过低**
+**Python 版本问题**
 ```bash
-python --version
-# 需要 3.10+，否则升级
-# Mac/Linux: brew install python
-# Windows: 去 python.org 下载最新版
+python --version  # 需要 3.10+
+# 升级：https://www.python.org/downloads/
 ```
 
-**❌ 网络问题**
+**网络问题**
 ```bash
-# 国内用户用镜像源
-pip install excel-mcp-server-fastmcp -i https://pypi.tuna.tsinghua.edu.cn/simple
+# 国内镜像源
+pip install -i https://pypi.tuna.tsinghua.edu.cn/simple excel-mcp-server-fastmcp
 ```
 
-**❌ AI 客户端配置错误**
-- 检查配置文件格式是否正确（JSON 格式）
+**配置错误**
+- 检查 JSON 格式是否正确
 - 重启 AI 客户端
-- 检查 uvx 是否可用：`uvx --version`
+- 验证 uvx：`uvx --version`
 
-### 获取帮助
-```
-让 AI 运行: excel-mcp-server-fastmcp --help
-查看文档: https://github.com/TangentDomain/excel-mcp-server
+### 🆘 获取帮助
+```bash
+# 命令行帮助
+excel-mcp-server-fastmcp --help
+
+# 项目文档
+https://github.com/TangentDomain/excel-mcp-server
+
+# 提交问题
+GitHub Issues → 使用 Bug 报告模板
 ```
 
 ---
 
-## 📈 性能指标
+## 📈 技术规格
 
 - **响应速度**：小文件 < 1秒，大文件 < 5秒
-- **支持格式**：.xlsx、.xlsm、.xlsb
-- **最大支持**：10万行 × 1000列
+- **数据规模**：10万行 × 1000列
+- **工具数量**：53 个游戏专用工具
 - **内存占用**：< 100MB（典型文件）
-- **工具数量**：53 个专业工具
+- **支持格式**：.xlsx、.xlsm、.xlsb
 
 ---
 
 ## 🤝 参与贡献
 
-欢迎贡献代码！查看 [CONTRIBUTING.md](CONTRIBUTING.md) 了解贡献方式。
+### 🌟 给个 Star 吧！
+如果这个工具对你有帮助，请点亮 ⭐ Star
+- 🔍 **发现工具**：帮助更多游戏开发者找到我们
+- 🔔 **获取更新**：Star 后第一时间收到功能更新
+- 🎮 **推动生态**：每一个 Star 都是我们改进的动力
 
-### 🌟 Star 支持我们
-如果这个工具对你有帮助，请给个 ⭐ Star！
-- ⭐ **Star 支持**：帮助更多游戏开发者发现这个工具
-- 🔄 **关注更新**：Star 后会收到项目通知
-- 📈 **社区成长**：每一个 Star 都是我们改进的动力
-
-### 快速贡献
-- 🐛 报告 Bug：使用 issue 模板
-- 💡 功能建议：欢迎提出新想法
-- 📚 改进文档：帮助其他用户
-- 💻 提交代码：查看 [贡献指南](CONTRIBUTING.md)
+### 💪 如何贡献
+- 🐛 **报告 Bug**：使用 [Issue 模板](https://github.com/TangentDomain/excel-mcp-server/issues/new)
+- 💡 **功能建议**：欢迎提出游戏开发新需求
+- 📚 **改进文档**：让其他开发者更容易上手
+- 💻 **提交代码**：查看 [贡献指南](CONTRIBUTING.md)
 
 ---
 
@@ -262,8 +240,13 @@ pip install excel-mcp-server-fastmcp -i https://pypi.tuna.tsinghua.edu.cn/simple
 
 ---
 
-## 🎉 鸣谢
+## 🎉 致谢
 
-感谢所有贡献者和用户！特别感谢游戏开发社区的反馈和建议。
+感谢所有贡献者和游戏开发者社区！特别感谢：
+- 游戏策划和数值策划的宝贵反馈
+- 测试用户提供的真实使用场景
+- 开发者社区的代码贡献
 
-用 AI 赋能游戏开发！🚀
+---
+
+**用 AI 重新定义游戏开发配置管理！** 🚀
