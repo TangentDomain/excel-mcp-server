@@ -39,6 +39,29 @@ class ExcelOperations:
     # ==================== 主干API ====================
 
     @classmethod
+    def query(cls, file_path: str, sql: str, include_headers: bool = True) -> Dict[str, Any]:
+        """
+        @intention 执行SQL查询Excel数据
+
+        Args:
+            file_path: Excel文件路径
+            sql: SQL查询语句
+            include_headers: 是否包含表头
+
+        Returns:
+            Dict: 查询结果
+        """
+        try:
+            from .advanced_sql_query import AdvancedSQLQueryEngine
+            engine = AdvancedSQLQueryEngine()
+            result = engine.execute_sql_query(file_path, sql, include_headers=include_headers)
+            return result
+        except Exception as e:
+            error_msg = f"SQL查询失败: {str(e)}"
+            logger.error(f"{cls._LOG_PREFIX} {error_msg}")
+            return cls._format_error_result(error_msg)
+
+    @classmethod
     def get_range(
         cls,
         file_path: str,
