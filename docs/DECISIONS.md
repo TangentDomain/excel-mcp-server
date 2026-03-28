@@ -1,3 +1,14 @@
+## D049: 第185轮MCP真实验证完成与问题发现 第185轮 (2026-03-28, R185)
+**需求**: 执行第185轮MCP真实验证（按第184轮调度器执行）
+**问题**: MCP真实验证发现多项核心功能存在严重问题，影响游戏开发场景的可用性
+**根因**: 项目在持续迭代过程中引入了多个功能缺陷，包括SQL解析器编码问题、数据验证逻辑错误、参数格式要求不明确
+**决策**: 
+1. 执行第185轮MCP真实验证，创建真实xlsx测试文件
+2. 测试12项核心功能：list_sheets, get_range, query WHERE/JOIN/GROUP BY/子查询/FROM子查询, get_headers, find_last_row, batch_insert_rows, delete_rows, describe_table
+3. 发现4项正常工作（list_sheets, get_headers, find_last_row, describe_table），7项存在严重问题
+4. 分析发现的问题并记录到REQUIREMENTS.md，为后续修复提供依据
+**结果**: ✅ 完成MCP真实验证，发现多项需要立即修复的bug，记录详细问题清单到REQUIREMENTS.md
+
 ## D048: 第184轮MCP验证调度与分支清理 第184轮 (2026-03-28, R184)
 **需求**: NOW.md下轮待办任务实现
 **问题**: 第183轮待办任务"每5轮MCP真实验证下次第185轮"和"清理废弃feature分支"需要执行

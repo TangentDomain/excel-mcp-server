@@ -1,7 +1,20 @@
 {
   "round": 185,
-  "current_round": 183,
+  "current_round": 185,
   "scheduled_at": "2026-03-28T05:28:25.952876",
-  "status": "scheduled",
-  "description": "第185轮MCP真实验证"
+  "completed_at": "2026-03-28T05:41:51.000000",
+  "status": "completed",
+  "description": "第185轮MCP真实验证",
+  "results": {
+    "total_tests": 12,
+    "passed": 4,
+    "failed": 7,
+    "issues_found": [
+      "SQL解析器中文表名编码问题",
+      "get_range格式要求不明确",
+      "batch_insert_rows数据验证错误",
+      "delete_rows类型比较错误",
+      "所有SQL查询功能失效"
+    ]
+  }
 }
