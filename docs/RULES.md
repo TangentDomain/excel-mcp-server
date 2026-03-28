@@ -16,6 +16,7 @@
 **规则**:
 1. 每轮开工执行 `python3 scripts/check-version-sync.py`（需创建）
 2. 检查项目：pyproject.toml、__init__.py、README.md、README.en.md、CHANGELOG
+   - README只写MCP使用方式，不写Python API代码（读者是策划/分析师，不是开发者）
 3. 发现不一致 → 自动修复 + 记录到DECISIONS.md
 4. 清理脚本维护：归档过期版本检查历史
 
