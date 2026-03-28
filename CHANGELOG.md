@@ -7,6 +7,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [v1.6.44] - 2026-03-28
+
+### 优化
+- **代码质量重构**：`excel_describe_table` 函数从216行拆分为6个职责单一的小函数
+  - `_detect_dual_header()`：双行表头检测（32行）
+  - `_collect_column_statistics()`：列统计信息收集（33行）
+  - `_build_describe_columns()`：列类型推断和结果构建（33行）
+  - `_resolve_row_count()`：行数统计含streaming兼容（44行）
+  - `_prepare_describe_result()`：结果格式化（22行）
+  - 主函数从216行降至129行（减少40%）
+- 新增 `scripts/code_quality_analysis.py` 代码质量分析工具
+
 ## [v1.6.43] - 2026-03-28
 
 ### 新增
