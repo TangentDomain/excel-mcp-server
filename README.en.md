@@ -124,10 +124,6 @@ Successfully see Excel file content? 🎉 **Congratulations, setup complete!**
 
 ### 📊 Data Analysis Scenarios
 
-<<<<<<< HEAD
-```bash
-uvx excel-mcp-server-fastmcp@1.6.41 --help
-=======
 **Data Processing**:
 - "Read sales data, calculate total for each month"
 - "Find customers with sales over 1000"
@@ -150,7 +146,6 @@ Read skill_table.xlsx
 Create new skill data
 Modify skill cooldown time
 Save modifications to new file
->>>>>>> feature/REQ-026
 ```
 
 ### Advanced Queries

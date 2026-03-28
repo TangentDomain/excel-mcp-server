@@ -124,10 +124,6 @@ pip install excel-mcp-server-fastmcp
 
 ### 📊 数据分析场景
 
-<<<<<<< HEAD
-```bash
-uvx excel-mcp-server-fastmcp@1.6.41 --help
-=======
 **数据处理**：
 - "读取销售数据，计算每个月的总额"
 - "找出销售额超过1000的客户"
@@ -150,7 +146,6 @@ uvx excel-mcp-server-fastmcp@1.6.41 --help
 创建新技能数据
 修改技能冷却时间
 保存修改到新文件
->>>>>>> feature/REQ-026
 ```
 
 ### 高级查询
