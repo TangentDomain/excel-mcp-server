@@ -14,7 +14,7 @@
 - ✅ 文档门面（README优化、30秒上手教程、CHANGELOG）
 - ✅ 写入性能优化（write_only流式写入，create/import/merge已完成）
 - ✅ 多客户端兼容性验证（Cursor、Claude Desktop、VSCode MCP、OpenAI ChatGPT Plugin 100%通过）
-- 进行中：write_only覆盖修改操作
+- ✅ write_only覆盖修改操作（excel_write_only_override，流式+openpyxl双模式）
 - 完成标志：AI选工具准确率>95% + 多客户端验证通过 ✅
 
 ## Phase 3：生态扩展（规划）

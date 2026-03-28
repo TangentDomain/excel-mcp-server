@@ -11,7 +11,7 @@
 [![技术支持: FastMCP](https://img.shields.io/badge/Powered%20by-FastMCP-orange)](https://github.com/jlowin/fastmcp)
 ![状态](https://img.shields.io/badge/status-stable-green.svg)
 ![测试覆盖](https://img.shields.io/badge/tests-1164%20tests-brightgreen.svg)
-![工具数量](https://img.shields.io/badge/tools-52%20verified%20tools-green.svg)
+![工具数量](https://img.shields.io/badge/tools-53%20verified%20tools-green.svg)
 [![PyPI](https://img.shields.io/pypi/v/excel-mcp-server-fastmcp.svg)](https://pypi.org/project/excel-mcp-server-fastmcp/)
 [![版本](https://img.shields.io/badge/version-v1.6.33-blue.svg)](https://pypi.org/project/excel-mcp-server-fastmcp/#history)
 [![CI](https://github.com/TangentDomain/excel-mcp-server/actions/workflows/ci.yml/badge.svg)](https://github.com/TangentDomain/excel-mcp-server/actions/workflows/ci.yml)
@@ -833,7 +833,7 @@ ExcelMCP 内置多层安全防护，保护用户数据和系统安全：
 ```
 src/excel_mcp_server_fastmcp/    # 主包（pip install 后可直接 import）
 ├── __init__.py                   # 包入口，暴露 main()
-├── server.py                     # MCP接口层（52个工具定义）
+├── server.py                     # MCP接口层（53个工具定义）
 ├── api/                          # API业务逻辑层
 │   ├── excel_operations.py       # Excel操作统一入口
 │   └── advanced_sql_query.py     # SQL查询引擎
