@@ -21,6 +21,16 @@ from ..core.excel_compare import ExcelComparer
 from ..core.excel_converter import ExcelConverter
 from ..models.types import ComparisonOptions
 from ..utils.formatter import format_operation_result
+from ..utils.exceptions import (
+    ExcelException,
+    SheetNotFoundError,
+    InvalidRangeError,
+    DataValidationError,
+    InvalidFormatError,
+    OperationLimitError,
+    ExcelFileNotFoundError,
+    ExcelMCPError
+)
 
 logger = logging.getLogger(__name__)
 
@@ -56,6 +66,12 @@ class ExcelOperations:
             engine = AdvancedSQLQueryEngine()
             result = engine.execute_sql_query(file_path, sql, include_headers=include_headers)
             return result
+        except InvalidFormatError as e:
+            return cls._format_error_result(f"无效的文件格式: {e.message}")
+        except ExcelFileNotFoundError as e:
+            return cls._format_error_result(f"文件不存在: {e.message}")
+        except DataValidationError as e:
+            return cls._format_error_result(f"数据验证失败: {e.message}")
         except Exception as e:
             error_msg = f"SQL查询失败: {str(e)}"
             logger.error(f"{cls._LOG_PREFIX} {error_msg}")
@@ -99,6 +115,16 @@ class ExcelOperations:
             # 步骤3: 格式化结果
             return format_operation_result(result)
 
+        except InvalidFormatError as e:
+            return cls._format_error_result(f"无效的文件格式: {e.message}")
+        except ExcelFileNotFoundError as e:
+            return cls._format_error_result(f"文件不存在: {e.message}")
+        except SheetNotFoundError as e:
+            return cls._format_error_result(f"工作表不存在: {e.message}")
+        except InvalidRangeError as e:
+            return cls._format_error_result(f"无效的范围表达式: {e.message}")
+        except DataValidationError as e:
+            return cls._format_error_result(f"数据验证失败: {e.message}")
         except Exception as e:
             error_msg = f"获取范围数据失败: {str(e)}"
             logger.error(f"{cls._LOG_PREFIX} {error_msg}")
@@ -194,6 +220,16 @@ class ExcelOperations:
             # 步骤3: 格式化结果
             return format_operation_result(result)
 
+        except InvalidFormatError as e:
+            return cls._format_error_result(f"无效的文件格式: {e.message}")
+        except ExcelFileNotFoundError as e:
+            return cls._format_error_result(f"文件不存在: {e.message}")
+        except SheetNotFoundError as e:
+            return cls._format_error_result(f"工作表不存在: {e.message}")
+        except InvalidRangeError as e:
+            return cls._format_error_result(f"无效的范围表达式: {e.message}")
+        except DataValidationError as e:
+            return cls._format_error_result(f"数据验证失败: {e.message}")
         except Exception as e:
             error_msg = f"更新范围数据失败: {str(e)}"
             logger.error(f"{cls._LOG_PREFIX} {error_msg}")
@@ -246,6 +282,10 @@ class ExcelOperations:
 
             return response
 
+        except InvalidFormatError as e:
+            return cls._format_error_result(f"无效的文件格式: {e.message}")
+        except ExcelFileNotFoundError as e:
+            return cls._format_error_result(f"文件不存在: {e.message}")
         except Exception as e:
             error_msg = f"获取工作表列表失败: {str(e)}"
             logger.error(f"{cls._LOG_PREFIX} {error_msg}")
@@ -1699,6 +1739,12 @@ class ExcelOperations:
                 'message': f"成功查找{search_info}最后一行: 第{last_row}行" if last_row > 0 else f"{search_info}没有数据"
             }
 
+        except InvalidFormatError as e:
+            return cls._format_error_result(f"无效的文件格式: {e.message}")
+        except ExcelFileNotFoundError as e:
+            return cls._format_error_result(f"文件不存在: {e.message}")
+        except SheetNotFoundError as e:
+            return cls._format_error_result(f"工作表不存在: {e.message}")
         except Exception as e:
             error_msg = f"查找最后一行失败: {str(e)}"
             logger.error(f"{cls._LOG_PREFIX} {error_msg}")

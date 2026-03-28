@@ -7,6 +7,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [v1.6.45] - 2026-03-28
+
+### 新增
+- **AI增强错误处理**：为Excel操作函数添加详细错误处理和AI修复建议
+- **错误分类机制**：SheetNotFoundError、DataValidationError等结构化异常
+- **用户友好提示**：包含具体操作上下文的错误信息和解决方案
+- **中英文文档同步**：版本号统一至1.6.45，测试数量更新至1171
+
 ## [v1.6.44] - 2026-03-28
 
 ### 优化

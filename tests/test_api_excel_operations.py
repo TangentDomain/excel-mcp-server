@@ -489,7 +489,7 @@ class TestExcelOperations:
         result = ExcelOperations.find_last_row("nonexistent_file.xlsx", "Sheet1")
 
         assert not result['success']
-        assert "查找最后一行失败" in result['message']
+        assert "文件不存在" in result['message']
 
     def test_find_last_row_invalid_column_name(self, test_excel_file):
         """测试无效的列名"""
