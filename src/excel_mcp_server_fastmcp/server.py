@@ -2116,7 +2116,15 @@ def excel_export_to_csv(
 **⚡ 使用建议**:
 • 需要导出多个工作表请分别调用，或用excel_convert_format(json)一次导出全部
 • 中文Excel导出有时需要gbk编码才能正常显示
-    """
+    
+**📊 返回信息**:
+• **exported_path**: 导出的CSV文件完整路径
+• **original_sheet**: 原始工作表名称
+• **encoding**: 使用的编码格式
+• **file_size**: 导出后的文件大小（字节）
+• **success**: 操作是否成功
+• **message**: 状态消息或错误信息
+"""
     _path_err = _validate_path(file_path)
     if _path_err:
         return _path_err
@@ -2161,7 +2169,16 @@ def excel_import_from_csv(
 • 中文CSV乱码时尝试encoding="gbk"
 • 导入后建议用excel_describe_table检查表结构
 • 需要追加到已有Excel请用excel_merge_files(append模式)
-    """
+    
+**📊 返回信息**:
+• **output_path**: 生成的Excel文件完整路径
+• **imported_rows**: 导入的行数（含标题行）
+• **imported_columns**: 导入的列数
+• **sheet_name**: 工作表名称
+• **encoding**: 使用的编码格式
+• **success**: 操作是否成功
+• **message**: 状态消息或错误信息
+"""
     for _p in [csv_path, output_path]:
         _err = _validate_path(_p)
         if _err:
@@ -2203,7 +2220,17 @@ def excel_convert_format(
 • + excel_import_from_csv → CSV转回Excel
 • 复杂格式（合并单元格、公式）转csv/json可能丢失信息
 • json输出为行列二维数组格式
-    """
+    
+**📊 返回信息**:
+• **input_format**: 输入文件原始格式
+• **output_format**: 输出文件目标格式
+• **converted_path**: 转换后的文件完整路径
+• **sheet_count**: 工作表数量（Excel相关格式）
+• **row_count**: 总行数
+• **column_count**: 总列数
+• **success**: 操作是否成功
+• **message**: 状态消息或错误信息
+"""
     for _p in [input_path, output_path]:
         _err = _validate_path(_p)
         if _err:
@@ -2252,7 +2279,17 @@ def excel_merge_files(
 • + excel_compare_files → 合并后对比确认结果正确
 • + excel_query → 合并后用SQL验证数据完整性
 • + excel_check_duplicate_ids → 合并后检查ID重复
-    """
+    
+**📊 返回信息**:
+• **merge_mode**: 使用的合并模式（sheets/append/horizontal）
+• **input_count**: 输入文件数量
+• **input_files**: 输入文件路径列表
+• **output_path**: 合并后的输出文件路径
+• **merged_sheets**: 合并后包含的工作表数量
+• **total_rows**: 合并后的总行数
+• **success**: 操作是否成功
+• **message**: 状态消息或错误信息
+"""
     for _f in input_files:
         _err = _validate_path(_f)
         if _err:
@@ -2338,7 +2375,14 @@ def excel_create_sheet(
 
 **🔧 参数说明**:
 • **index**: 插入位置（0=最前面，None=最后面）
-    """
+    
+**📊 返回信息**:
+• **sheet_name**: 创建的工作表名称
+• **sheet_index**: 工作表在文件中的位置（0-based）
+• **total_sheets**: 文件中总的工作表数量
+• **success**: 操作是否成功
+• **message**: 状态消息或错误信息
+"""
     _path_err = _validate_path(file_path)
     if _path_err:
         return _path_err
@@ -2509,7 +2553,17 @@ def excel_copy_sheet(
 • 复制后用excel_update_range修改副本的数值
 • 需要保留历史版本时建议用excel_create_backup替代
 • **大文件(>50MB)**: 强烈推荐streaming=True，内存占用降低90%
-    """
+    
+**📊 返回信息**:
+• **source_sheet**: 源工作表名称
+• **copied_sheet**: 复制后的工作表名称
+• **new_index**: 新工作表在文件中的位置（0-based）
+• **copied_rows**: 复制的行数
+• **copied_columns**: 复制的列数
+• **streaming_used**: 是否使用流式复制
+• **success**: 操作是否成功
+• **message**: 状态消息或错误信息
+"""
     _path_err = _validate_path(file_path)
     if _path_err:
         return _path_err
@@ -2549,7 +2603,15 @@ def excel_rename_column(
 **⚡ 使用建议**:
 • 不确定列名时直接传一个可能的名字，系统会提示实际列名
 • 重命名后相关引用（公式、代码）需要同步更新
-    """
+    
+**📊 返回信息**:
+• **old_header**: 原始列名
+• **new_header**: 新列名
+• **header_row**: 修改的表头行号
+• **sheet_name**: 工作表名称
+• **success**: 重命名是否成功
+• **message**: 操作结果说明
+"""
     _path_err = _validate_path(file_path)
     if _path_err:
         return _path_err
@@ -2735,7 +2797,14 @@ streaming=True（默认）使用流式写入，大文件性能更好，但不保
 • 需要按ID更新已有行请用excel_upsert_row
 • 新增数据用此工具，更新数据用excel_upsert_row
 • 首次使用建议先用少量数据测试格式是否正确
-    """
+    
+**📊 返回信息**:
+• **inserted_rows**: 成功插入的行数
+• **inserted_position**: 插入的起始行位置
+• **affected_sheet**: 工作表名称
+• **success**: 操作是否成功
+• **message**: 状态消息或错误信息
+"""
     _path_err = _validate_path(file_path)
     if _path_err:
         return _path_err
@@ -2822,7 +2891,15 @@ streaming=True（默认）使用流式写入。
 **⚡ 使用建议**:
 • 删除前建议先用excel_get_range查看目标行的内容，避免误删
 • 大量删除（>100行）时streaming模式优势明显
-    """
+    
+**📊 返回信息**:
+• **deleted_rows**: 删除的行数
+• **start_row**: 删除的起始行位置
+• **end_row**: 删除的结束行位置
+• **affected_sheet**: 工作表名称
+• **success**: 操作是否成功
+• **message**: 状态消息或错误信息
+"""
     _path_err = _validate_path(file_path)
     if _path_err:
         return _path_err
@@ -2974,7 +3051,15 @@ def excel_delete_columns(
 **⚡ 使用建议**:
 • 删除前建议先用excel_get_range查看列内容，避免误删
 • 大量列删除（>10列）时streaming模式优势明显
-    """
+    
+**📊 返回信息**:
+• **deleted_columns**: 删除的列数
+• **start_col**: 删除的起始列位置（字母）
+• **end_col**: 删除的结束列位置（字母）
+• **affected_sheet**: 工作表名称
+• **success**: 操作是否成功
+• **message**: 状态消息或错误信息
+"""
     _path_err = _validate_path(file_path)
     if _path_err:
         return _path_err
@@ -3041,7 +3126,14 @@ def excel_set_formula(
 • + excel_evaluate_formula → 写入前先验证公式正确性
 • + excel_get_range → 写入后读取计算结果
 • + excel_update_range → 批量写入多个公式到不同单元格
-    """
+    
+**📊 返回信息**:
+• **formula_applied**: 应用的公式（原始公式）
+• **formula_range**: 公式应用的单元格范围
+• **affected_sheet**: 工作表名称
+• **success**: 操作是否成功
+• **message**: 状态消息或错误信息
+"""
     _path_err = _validate_path(file_path)
     if _path_err:
         return _path_err
@@ -3619,7 +3711,15 @@ def excel_merge_cells(
 • + excel_unmerge_cells → 取消合并恢复独立单元格
 • + excel_format_cells → 合并后美化标题行样式
 • 合并后的单元格不能单独编辑子区域
-    """
+    
+**📊 返回信息**:
+• **merged_range**: 合并的单元格范围
+• **cell_count**: 合并的单元格数量
+• **merged_value**: 合并后的单元格值
+• **affected_sheet**: 工作表名称
+• **success**: 操作是否成功
+• **message**: 状态消息或错误信息
+"""
     _path_err = _validate_path(file_path)
     if _path_err:
         return _path_err
@@ -3765,7 +3865,14 @@ def excel_set_row_height(
 **🔗 配合使用**:
 • + excel_set_column_width → 同时调整行高和列宽
 • + excel_format_cells → 调整大小后美化样式
-    """
+    
+**📊 返回信息**:
+• **row_range**: 设置行高的行号范围
+• **height**: 设置的行高值（磅）
+• **affected_sheet**: 工作表名称
+• **success**: 操作是否成功
+• **message**: 状态消息或错误信息
+"""
     _path_err = _validate_path(file_path)
     if _path_err:
         return _path_err
@@ -3807,7 +3914,14 @@ def excel_set_column_width(
 **⚡ 使用建议**:
 • 中文字符约占2个字符宽度
 • 调整后如果显示"####"说明宽度不够
-    """
+    
+**📊 返回信息**:
+• **column_range**: 设置列宽的列号范围
+• **width**: 设置的列宽值（字符数）
+• **affected_sheet**: 工作表名称
+• **success**: 操作是否成功
+• **message**: 状态消息或错误信息
+"""
     _path_err = _validate_path(file_path)
     if _path_err:
         return _path_err
@@ -3975,7 +4089,18 @@ def excel_compare_sheets(
 • 逐单元格对比请用excel_compare_files
 • 大表对比可能较慢，建议缩小范围
 • ID列必须是唯一标识，否则对比结果不准确
-    """
+    
+**📊 返回信息**:
+• **comparison_result**: 比较结果详情
+• **differences_found**: 发现的差异数量
+• **added_records**: 新增的记录数量
+• **deleted_records**: 删除的记录数量
+• **modified_records**: 修改的记录数量
+• **unchanged_records**: 未变的记录数量
+• **comparison_summary**: 对比总结信息
+• **success**: 操作是否成功
+• **message**: 状态消息或错误信息
+"""
     for _p in [file1_path, file2_path]:
         _err = _validate_path(_p)
         if _err:
@@ -4007,7 +4132,17 @@ def excel_server_stats() -> Dict[str, Any]:
 
 **🔗 配合使用**:
 • 所有工具 → server_stats监控全局工具调用情况
-    """
+    
+**📊 返回信息**:
+• **tool_calls**: 各工具调用次数统计
+• **execution_stats**: 执行时间统计（平均耗时、最慢工具）
+• **error_rates**: 各工具错误率统计
+• **global_errors**: 全局错误类型统计（按错误分类的计数）
+• **server_status**: 服务器运行状态（内存、连接等）
+• **performance_metrics**: 性能指标（QPS、响应时间等）
+• **success**: 操作是否成功
+• **message**: 状态消息或错误信息
+"""
     stats = _tracker.get_stats()
     return _ok("服务器统计信息", data=stats)
 
