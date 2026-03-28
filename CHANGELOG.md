@@ -7,7 +7,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-## [1.6.37] - 2026-03-28
+## [1.6.38] - 2026-03-28
 - **REQ-026 文档与门面优化（第196轮）**：版本一致性优化
   - 修复pyproject.toml/__init__.py/README.md/README.en.md版本不一致问题
   - 统一版本号至1.6.37，确保所有文档和代码文件版本同步
