@@ -810,7 +810,7 @@ def excel_search(
     include_formulas: bool = False,
     range: Optional[str] = None
 ) -> Dict[str, Any]:
-        """
+    """
     智能文本搜索 - 快速定位Excel中的目标内容
 
     在Excel文件中搜索文本、数值或公式，支持正则表达式。
@@ -859,10 +859,10 @@ def excel_search(
     ```python
     # 搜索技能表中的"火"字
     result = excel_search("技能表.xlsx", "火", sheet_name="技能")
-    
-    # 正则搜索等级1-5的技能  
+
+    # 正则搜索等级1-5的技能
     result = excel_search("技能表.xlsx", "等级[1-5]", use_regex=True)
-    
+
     # 搜索指定范围
     result = excel_search("配置.xlsx", "攻击力", range="B1:B100")
     ```
