@@ -268,4 +268,47 @@ We aim to be the preferred tool for game development Excel configuration table m
 
 Thanks to all contributors and users! Special thanks to the game development community for feedback and suggestions.
 
+---
+
+## 📊 GitHub Statistics
+
+[![GitHub stars](https://img.shields.io/github/stars/TangentDomain/excel-mcp-server?style=social&label=Star&color=gold)](https://github.com/TangentDomain/excel-mcp-server/stargazers)
+[![GitHub forks](https://img.shields.io/github/forks/TangentDomain/excel-mcp-server?style=social)](https://github.com/TangentDomain/excel-mcp-server/network)
+[![GitHub issues](https://img.shields.io/github/issues/TangentDomain/excel-mcp-server?style=social)](https://github.com/TangentDomain/excel-mcp-server/issues)
+[![GitHub language](https://img.shields.io/github/languages/top/TangentDomain/excel-mcp-server?style=social)](https://github.com/TangentDomain/excel-mcp-server)
+[![GitHub last commit](https://img.shields.io/github/last-commit/TangentDomain/excel-mcp-server?style=social)](https://github.com/TangentDomain/excel-mcp-server/commits/main)
+
+| Metric | Value | Status |
+|--------|-------|--------|
+| ⭐ Stars | 4 | 🎯 **Target: 100** |
+| 🍴 Forks | 0 | 📈 Activity |
+| 👀 Watchers | 0 | 🔔 Attention |
+| 🐛 Issues | 0 | 📝 Pending |
+| 💻 Language | Python | 🛠️ Technology |
+| 👥 Contributors | 1 | 🤝 Community |
+| 📝 Recent Commits | 10 | 🚀 Activity |
+
+## 🎯 Milestone Progress
+
+- ⏳ **50 Stars**: 4 / 50
+- ⏳ **100 Stars**: 4 / 100
+- ⏳ **200 Stars**: 4 / 200
+- ⏳ **500 Stars**: 4 / 500
+
+## 📈 Project Status
+- **Created**: 2025-09-22
+- **Last Updated**: 2026-03-28
+- **Community Activity**: 🔥 Highly Active
+- **Growth Potential**: 🌱 Growing
+
+## 🤝 How to Contribute
+
+Thanks for your interest! You can contribute to the project in several ways:
+
+1. 🌟 **Star**: If the project is helpful to you, please give us a Star
+2. 🐛 **Issue**: Report bugs or suggest new features
+3. 💻 **Code**: Submit code improvements and fixes
+4. 📚 **Docs**: Improve documentation and usage examples
+5. 📢 **Share**: Share the project with more developers
+
 Empowering game development with AI! 🚀
