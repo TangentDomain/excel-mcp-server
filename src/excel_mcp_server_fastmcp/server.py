@@ -3619,6 +3619,175 @@ def excel_update_query(
 
 @mcp.tool()
 @_track_call
+def _detect_dual_header(rows) -> tuple:
+    """
+    检测双行表头模式
+    
+    Args:
+        rows: 工作表前几行数据
+        
+    Returns:
+        tuple: (is_dual_header, header_row_idx, descriptions)
+    """
+    is_dual_header = False
+    header_row_idx = 0
+    descriptions = None
+    
+    if len(rows) >= 2:
+        second_row = rows[1]
+        if second_row and len(second_row) >= 3:
+            all_valid = all(
+                isinstance(c, str) and c.strip().startswith(tuple('abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ_'))
+                for c in second_row if c is not None
+            )
+            first_row = rows[0]
+            any_chinese = any(
+                isinstance(c, str) and any('\u4e00' <= ch <= '\u9fff' for ch in c)
+                for c in first_row if c is not None
+            )
+            if all_valid and any_chinese:
+                is_dual_header = True
+                header_row_idx = 1
+                descriptions = first_row
+    
+    return is_dual_header, header_row_idx, descriptions
+
+def _collect_column_statistics(ws, data_start, num_cols, col_name_list):
+    """
+    收集列统计信息 - 优化版本，单次遍历
+    
+    Args:
+        ws: 工作表对象
+        data_start: 数据开始行
+        num_cols: 列数
+        col_name_list: 列名列表
+        
+    Returns:
+        dict: 列统计信息
+    """
+    col_stats = {}
+    for col_idx in range(num_cols):
+        col_name = col_name_list[col_idx]
+        col_stats[col_name] = {'non_null': 0, 'samples': [], 'type_values': []}
+    
+    # 单次遍历所有行和列，同时统计行数和列数据
+    total_rows = 0
+    for row in ws.iter_rows(min_row=data_start + 1, values_only=True):
+        total_rows += 1
+        for col_idx in range(min(len(row), num_cols)):
+            val = row[col_idx]
+            if val is not None:
+                s = col_stats[col_name_list[col_idx]]
+                s['non_null'] += 1
+                if len(s['samples']) < 3:
+                    s['samples'].append(val)
+                if len(s['type_values']) < 100:
+                    s['type_values'].append(val)
+    
+    return col_stats, total_rows
+
+def _build_describe_columns(col_stats, col_name_list, is_dual_header, descriptions):
+    """
+    分析列数据类型并构建最终列信息列表（保留原始完整行为）
+    
+    Args:
+        col_stats: 列统计信息
+        col_name_list: 列名列表
+        is_dual_header: 是否双行表头
+        descriptions: 双行表头描述列表
+        
+    Returns:
+        list: 列信息列表
+    """
+    # 推断类型并构建最终结果
+    for col_idx, col_name in enumerate(col_name_list):
+        s = col_stats[col_name]
+        tv = s['type_values']
+        if not tv:
+            col_type = "empty"
+        elif all(isinstance(v, (int, float)) and not isinstance(v, bool) for v in tv):
+            col_type = "number"
+        elif all(isinstance(v, str) for v in tv):
+            col_type = "text"
+        else:
+            col_type = "mixed"
+
+        description = str(descriptions[col_idx]).strip() if is_dual_header and descriptions and col_idx < len(descriptions) and descriptions[col_idx] else None
+        col_stats[col_name] = {
+            'name': col_name, 'type': col_type, 'description': description,
+            'non_null': s['non_null'], 'sample_values': s['samples']
+        }
+
+    return list(col_stats.values())
+
+def _resolve_row_count(ws, data_start, total_rows):
+    """
+    统计行数 — 优先使用max_row，为None则使用total_rows（已统计避免重复计算）
+    
+    Args:
+        ws: 工作表对象
+        data_start: 数据开始行
+        total_rows: 已统计的总行数
+        
+    Returns:
+        int: 行数
+    """
+    try:
+        # 修复：streaming写入后max_row可能为None的问题
+        if hasattr(ws, 'max_row') and ws.max_row is not None and ws.max_row > data_start:
+            row_count = ws.max_row - data_start
+        else:
+            # streaming写入后max_row可能为None，直接使用已统计的total_rows
+            # total_rows已经在上面的循环中统计完成，避免重复计算
+            row_count = total_rows if total_rows > 0 else 0
+            # 安全检查：如果total_rows为0，回退到iter_rows统计
+            if row_count == 0:
+                try:
+                    for idx, row in enumerate(ws.iter_rows(min_row=data_start + 1, values_only=True), start=1):
+                        # 只要行中有一个非空单元格，就计数为有效数据行
+                        if row and any(cell is not None for cell in row):
+                            row_count += 1
+                except Exception as e:
+                    logger.warning(f"iter_rows统计行数失败: {e}，使用默认值0")
+                    row_count = 0
+    except Exception as e:
+        # 极端情况处理：如果max_row访问失败，使用已统计的total_rows
+        logger.warning(f"访问ws.max_row失败: {e}，使用已统计的total_rows")
+        row_count = total_rows if total_rows > 0 else 0
+        # 确保total_rows无效时，使用iter_rows重新统计
+        if row_count == 0:
+            try:
+                for idx, row in enumerate(ws.iter_rows(min_row=data_start + 1, values_only=True), start=1):
+                    if row and any(cell is not None for cell in row):
+                        row_count += 1
+            except Exception as e2:
+                logger.warning(f"iter_rows回退统计也失败: {e2}")
+                row_count = 0
+    return row_count
+
+def _prepare_describe_result(sheet_name, is_dual_header, columns, row_count, file_path, sheet):
+    """
+    准备describe结果
+    
+    Args:
+        sheet_name: 工作表名称
+        is_dual_header: 是否双行表头
+        columns: 列信息
+        row_count: 行数
+        file_path: 文件路径
+        sheet: 工作表对象
+        
+    Returns:
+        dict: 返回结果
+    """
+    return _ok(f"表 '{sheet_name}': {len(columns)}列, {row_count}行数据, {'双行表头' if is_dual_header else '单行表头'}", data={
+        'sheet_name': sheet_name,
+        'header_type': 'dual' if is_dual_header else 'single',
+        'row_count': row_count,
+        'column_count': len(columns),
+        'columns': columns
+    }, meta={"file_path": file_path, "sheet": sheet_name})
+
 def excel_describe_table(
     file_path: str,
     sheet_name: str = None
@@ -3689,6 +3858,7 @@ def excel_describe_table(
 • **版本对比**: `excel_compare_sheets`对比不同版本的结构变化
 • **数据评估**: `excel_assess_data_impact`修改前结合describe评估影响
     """
+    # 文件验证和加载
     _path_err = _validate_path(file_path)
     if _path_err:
         return _path_err
@@ -3716,35 +3886,14 @@ def excel_describe_table(
         if not rows:
             return _fail('工作表为空', meta={"error_code": "EMPTY_SHEET"})
 
-        # 检测双行表头：第2行全是合法英文字段名
-        is_dual_header = False
-        header_row_idx = 0
-        if len(rows) >= 2:
-            second_row = rows[1]
-            if second_row and len(second_row) >= 3:
-                all_valid = all(
-                    isinstance(c, str) and c.strip().startswith(tuple('abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ_'))
-                    for c in second_row if c is not None
-                )
-                first_row = rows[0]
-                any_chinese = any(
-                    isinstance(c, str) and any('\u4e00' <= ch <= '\u9fff' for ch in c)
-                    for c in first_row if c is not None
-                )
-                if all_valid and any_chinese:
-                    is_dual_header = True
-                    header_row_idx = 1
-
+        # 检测双行表头（提取为独立函数）
+        is_dual_header, header_row_idx, descriptions = _detect_dual_header(rows)
         headers = rows[header_row_idx]
-        descriptions = rows[0] if is_dual_header else None
-
-        # 读取所有数据行统计信息 — 单次遍历所有列（优化：旧方案逐列遍历→N列×M行，新方案一次遍历→M行）
         data_start = header_row_idx + 1
+
+        # 准备列名列表
         num_cols = len(headers)
-        col_stats = {}
-        # 初始化统计结构
         col_name_list = []
-        col_stats = {}
         for col_idx in range(num_cols):
             col_name = headers[col_idx]
             if col_name is None:
@@ -3753,84 +3902,17 @@ def excel_describe_table(
             if not col_name:
                 col_name = f"column_{col_idx + 1}"
             col_name_list.append(col_name)
-            col_stats[col_name] = {'non_null': 0, 'samples': [], 'type_values': []}
 
-        # 单次遍历所有行和列，同时统计行数和列数据
-        total_rows = 0  # 统计总行数（数据行）
-        for row in ws.iter_rows(min_row=data_start + 1, values_only=True):
-            total_rows += 1
-            for col_idx in range(min(len(row), num_cols)):
-                val = row[col_idx]
-                if val is not None:
-                    s = col_stats[col_name_list[col_idx]]
-                    s['non_null'] += 1
-                    if len(s['samples']) < 3:
-                        s['samples'].append(val)
-                    if len(s['type_values']) < 100:
-                        s['type_values'].append(val)
+        # 单次遍历收集统计信息（提取为独立函数）
+        col_stats, total_rows = _collect_column_statistics(ws, data_start, num_cols, col_name_list)
 
-        # 推断类型并构建最终结果
-        for col_idx, col_name in enumerate(col_name_list):
-            s = col_stats[col_name]
-            tv = s['type_values']
-            if not tv:
-                col_type = "empty"
-            elif all(isinstance(v, (int, float)) and not isinstance(v, bool) for v in tv):
-                col_type = "number"
-            elif all(isinstance(v, str) for v in tv):
-                col_type = "text"
-            else:
-                col_type = "mixed"
+        # 推断类型并构建最终结果（提取为独立函数）
+        columns = _build_describe_columns(col_stats, col_name_list, is_dual_header, descriptions)
 
-            description = str(descriptions[col_idx]).strip() if is_dual_header and descriptions and col_idx < len(descriptions) and descriptions[col_idx] else None
-            col_stats[col_name] = {
-                'name': col_name, 'type': col_type, 'description': description,
-                'non_null': s['non_null'], 'sample_values': s['samples']
-            }
+        # 统计行数 — 优先使用max_row，为None则使用total_rows
+        row_count = _resolve_row_count(ws, data_start, total_rows)
 
-        # 统计行数 - 优先使用max_row，为None则使用total_rows（已统计避免重复计算）
-        try:
-            # 修复：streaming写入后max_row可能为None的问题
-            if hasattr(ws, 'max_row') and ws.max_row is not None and ws.max_row > data_start:
-                row_count = ws.max_row - data_start
-            else:
-                # streaming写入后max_row可能为None，直接使用已统计的total_rows
-                # total_rows已经在上面的循环中统计完成，避免重复计算
-                row_count = total_rows if total_rows > 0 else 0
-                # 安全检查：如果total_rows为0，回退到iter_rows统计
-                if row_count == 0:
-                    try:
-                        for idx, row in enumerate(ws.iter_rows(min_row=data_start + 1, values_only=True), start=1):
-                            # 只要行中有一个非空单元格，就计数为有效数据行
-                            if row and any(cell is not None for cell in row):
-                                row_count += 1
-                    except Exception as e:
-                        logger.warning(f"iter_rows统计行数失败: {e}，使用默认值0")
-                        row_count = 0
-        except Exception as e:
-            # 极端情况处理：如果max_row访问失败，使用已统计的total_rows
-            logger.warning(f"访问ws.max_row失败: {e}，使用已统计的total_rows")
-            row_count = total_rows if total_rows > 0 else 0
-            # 确保total_rows无效时，使用iter_rows重新统计
-            if row_count == 0:
-                try:
-                    for idx, row in enumerate(ws.iter_rows(min_row=data_start + 1, values_only=True), start=1):
-                        if row and any(cell is not None for cell in row):
-                            row_count += 1
-                except Exception as e2:
-                    logger.warning(f"iter_rows回退统计也失败: {e2}")
-                    row_count = 0
-
-        wb.close()
-
-        columns = list(col_stats.values())
-        return _ok(f"表 '{sheet_name}': {len(columns)}列, {row_count}行数据, {'双行表头' if is_dual_header else '单行表头'}", data={
-            'sheet_name': sheet_name,
-            'header_type': 'dual' if is_dual_header else 'single',
-            'row_count': row_count,
-            'column_count': len(columns),
-            'columns': columns
-        }, meta={"file_path": file_path, "sheet": sheet_name})
+        return _prepare_describe_result(sheet_name, is_dual_header, columns, row_count, file_path, ws)
     except Exception as e:
         return _fail(f'查看表结构失败: {e}', meta={"error_code": "DESCRIBE_FAILED"})
     finally:
