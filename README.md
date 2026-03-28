@@ -6,6 +6,7 @@
 [![CI](https://github.com/TangentDomain/excel-mcp-server/actions/workflows/ci.yml/badge.svg)](https://github.com/TangentDomain/excel-mcp-server/actions/workflows/ci.yml)
 ![Tests](https://img.shields.io/badge/tests-1161-brightgreen.svg)
 ![Tools](https://img.shields.io/badge/tools-53-green.svg)
+![GitHub stars](https://img.shields.io/github/stars/TangentDomain/excel-mcp-server?style=social&label=Stars)
 
 > **AI驱动的Excel配置表管理工具** - 用自然语言或SQL操作游戏配置数据，支持跨表JOIN、版本对比、批量修改
 
@@ -243,15 +244,24 @@ pip install excel-mcp-server-fastmcp -i https://pypi.tuna.tsinghua.edu.cn/simple
 
 ---
 
-## 🤝 贡献
+## 🤝 贡献 & 支持
 
 欢迎贡献代码和建议！查看 [CONTRIBUTING.md](CONTRIBUTING.md) 了解参与方式。
+
+### 🌟 Star 我们的项目
+如果你觉得这个工具对你有帮助，请给我们一个⭐ Star！
+- ⭐ **Star支持**：让更多人发现这个工具，帮助游戏开发者
+- 🔄 **关注动态**：Star后可以收到项目更新通知
+- 📈 **社区成长**：Star数量是我们持续改进的动力
 
 ### 快速贡献
 - 🐛 报告Bug：使用issue模板
 - 💡 提出建议：欢迎新的功能想法  
 - 📚 完善文档：帮助其他用户
-- ⭐ Star支持：让更多人发现这个工具
+- 💻 提交代码：查看[贡献指南](CONTRIBUTING.md)
+
+### 🎯 项目目标
+我们目标是成为游戏开发Excel配置表管理的首选工具，**当前4⭐，目标100⭐**！你的每一个Star都帮助我们接近这个目标。
 
 ## 📄 许可证
 
@@ -261,6 +271,16 @@ pip install excel-mcp-server-fastmcp -i https://pypi.tuna.tsinghua.edu.cn/simple
 
 ## 🎉 致谢
 
+🌱 **当前 4 stars！** 感谢你的支持！
+
+🙏 **感谢最新Star者：**
+  - @AnitaSherry
+  - @Dikyee
+  - @leviseek
+  - @TangentDomain
+
 感谢所有贡献者和用户的支持！特别感谢游戏开发社区的反馈和建议。
 
 让AI为游戏开发赋能！ 🚀
+
+---
