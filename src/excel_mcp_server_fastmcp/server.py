@@ -932,6 +932,27 @@ result = excel_get_range("配置.xlsx", "技能!A1:D50")
 
     try:
         # 验证范围表达式格式
+        # 如果没有工作表前缀，尝试自动推断（单工作表文件）
+        if '!' not in range:
+            try:
+                from openpyxl import load_workbook
+                wb = load_workbook(file_path, read_only=True)
+                sheet_names = wb.sheetnames
+                wb.close()
+                if len(sheet_names) == 1:
+                    range = f"{sheet_names[0]}!{range}"
+                else:
+                    return _fail(
+                        f"范围表达式缺少工作表名，且文件有多个工作表({', '.join(sheet_names)})。"
+                        f"请使用格式: '工作表名!A1:C10'",
+                        meta={"error_code": "VALIDATION_FAILED", "available_sheets": sheet_names}
+                    )
+            except Exception:
+                return _fail(
+                    f"范围表达式缺少工作表名。正确格式: 'Sheet1!A1:C10'，当前: '{range}'",
+                    meta={"error_code": "VALIDATION_FAILED"}
+                )
+
         range_validation = ExcelValidator.validate_range_expression(range)
 
         # 验证操作规模
@@ -2861,17 +2882,34 @@ streaming=True（默认）使用流式写入，大文件性能更好，但不保
     if condition is not None:
         # 条件定位：找到第一个匹配条件的行号
         try:
-            sql = f"SELECT _row_number FROM {sheet_name} WHERE {condition} LIMIT 1"
-            query_result = ExcelOperations.query(file_path, sql)
-            if query_result.get('success', False):
-                qdata = query_result.get('data', [])
-                if isinstance(qdata, list) and len(qdata) > 1:
-                    first_data_row = qdata[1]  # 第一行是表头
-                    if isinstance(first_data_row, (list, tuple)) and len(first_data_row) > 0:
-                        try:
-                            target_row = int(first_data_row[0])
-                        except (ValueError, TypeError):
-                            pass
+            import pandas as pd
+            df = pd.read_excel(file_path, sheet_name=sheet_name, engine='calamine', keep_default_na=False)
+            try:
+                filtered = df.query(condition)
+            except Exception:
+                # 降级：用SQL引擎
+                sql = f"SELECT * FROM {sheet_name} WHERE {condition} LIMIT 1"
+                query_result = ExcelOperations.query(file_path, sql)
+                if query_result.get('success', False):
+                    qdata = query_result.get('data', [])
+                    if isinstance(qdata, list) and len(qdata) > 1:
+                        # 匹配第一行获取行号
+                        sql_headers = qdata[0]
+                        sql_row = qdata[1]
+                        if isinstance(sql_row, (list, tuple)):
+                            row_dict = dict(zip(sql_headers, sql_row))
+                            for idx, df_row in df.iterrows():
+                                match = True
+                                for col, val in row_dict.items():
+                                    if col in df.columns and str(df_row.get(col, '')) != str(val):
+                                        match = False
+                                        break
+                                if match:
+                                    target_row = idx + 2  # 1-based + header
+                                    break
+            else:
+                if len(filtered) > 0:
+                    target_row = filtered.index[0] + 2  # 1-based + header
         except Exception as e:
             logger.warning(f"条件定位查询失败: {e}，将使用默认追加模式")
 
@@ -2958,63 +2996,83 @@ streaming=True（默认）使用流式写入。
             "condition": condition
         })
         try:
-            # 使用SQL查询找到符合条件的行号
-            sql = f"SELECT _row_number FROM {sheet_name} WHERE {condition}"
-            query_result = ExcelOperations.query(file_path, sql)
+            # 使用pandas加载工作表数据，找出符合条件的行号
+            import pandas as pd
+            from python_calamine import CalamineWorkbook
 
-            if not query_result.get('success', False):
-                return _fail(f"条件查询失败: {query_result.get('message', '未知错误')}",
-                             meta={"error_code": "CONDITION_QUERY_FAILED"})
+            cal_wb = CalamineWorkbook.from_path(file_path)
+            cal_ws = cal_wb.get_sheet_by_name(sheet_name)
+            if cal_ws is None:
+                return _fail(f"工作表 '{sheet_name}' 不存在",
+                             meta={"error_code": "SHEET_NOT_FOUND"})
 
-            # 获取行号列表
-            data = query_result.get('data', [])
-            if isinstance(data, list) and len(data) > 0:
-                # 第一行是表头，找_row_number列
-                headers = data[0] if isinstance(data[0], list) else []
-                row_num_idx = -1
-                for i, h in enumerate(headers):
-                    if h == '_row_number':
-                        row_num_idx = i
-                        break
+            # 读取全部数据
+            df = pd.read_excel(file_path, sheet_name=sheet_name, engine='calamine', keep_default_na=False)
+            # 找出表头行（第一行数据行），实际数据从第2行开始
+            # condition中的列名对应表头，行号 = 数据行index + 2（1-based表头 + 1-based offset）
+            header_row = 1  # 默认表头在第1行
 
-                if row_num_idx == -1:
-                    return _fail("条件查询结果中未找到行号列",
-                                 meta={"error_code": "NO_ROW_NUMBER_COLUMN"})
-
-                # 收集行号（从后往前删除，避免行号偏移）
+            # 使用pandas query执行条件筛选
+            try:
+                # pandas的query需要特殊处理中文列名
+                filtered = df.query(condition)
+            except Exception:
+                # 降级：用SQL引擎执行
+                sql = f"SELECT * FROM {sheet_name} WHERE {condition}"
+                query_result = ExcelOperations.query(file_path, sql)
+                if not query_result.get('success', False):
+                    return _fail(f"条件查询失败: {query_result.get('message', '未知错误')}",
+                                 meta={"error_code": "CONDITION_QUERY_FAILED"})
+                # 从SQL结果中提取行号（通过比对原始数据）
+                qdata = query_result.get('data', [])
+                if not isinstance(qdata, list) or len(qdata) <= 1:
+                    return _ok(f"条件 '{condition}' 未匹配到任何行",
+                               data={'deleted_rows': 0, 'condition': condition})
+                # SQL结果的行需要和原始df匹配来获取行号
+                sql_headers = qdata[0]
+                sql_rows = qdata[1:]
                 row_numbers = []
-                for row in data[1:]:
-                    if isinstance(row, (list, tuple)) and len(row) > row_num_idx:
-                        val = row[row_num_idx]
-                        if val is not None:
-                            try:
-                                row_numbers.append(int(val))
-                            except (ValueError, TypeError):
-                                continue
-
-                row_numbers.sort(reverse=True)  # 从后往前删除
-                total_deleted = 0
-
-                for row_num in row_numbers:
-                    result = ExcelOperations.delete_rows(file_path, sheet_name, row_num, 1, streaming)
-                    if result.get('success', False):
-                        deleted = result.get('data', {}).get('deleted_rows', result.get('metadata', {}).get('deleted_rows', 1))
-                        total_deleted += deleted
-                    else:
-                        logger.warning(f"删除行{row_num}失败: {result.get('message', '')}")
-
-                operation_logger.log_operation("operation_result", {
-                    "success": True,
-                    "deleted_rows": total_deleted,
-                    "message": f"按条件删除完成"
-                })
-
-                return _ok(f"按条件 '{condition}' 删除了 {total_deleted} 行",
-                           data={'deleted_rows': total_deleted, 'condition': condition})
-
+                for sql_row in sql_rows:
+                    if not isinstance(sql_row, (list, tuple)):
+                        continue
+                    row_dict = dict(zip(sql_headers, sql_row))
+                    # 在df中找到匹配的行
+                    for idx, df_row in df.iterrows():
+                        match = True
+                        for col, val in row_dict.items():
+                            if col in df.columns and str(df_row.get(col, '')) != str(val):
+                                match = False
+                                break
+                        if match:
+                            row_numbers.append(idx + header_row + 1)  # 1-based, +1 for header
+                            break
             else:
+                # pandas query成功，获取行号
+                row_numbers = [idx + header_row + 1 for idx in filtered.index]
+
+            if not row_numbers:
                 return _ok(f"条件 '{condition}' 未匹配到任何行",
                            data={'deleted_rows': 0, 'condition': condition})
+
+            row_numbers.sort(reverse=True)  # 从后往前删除
+            total_deleted = 0
+
+            for row_num in row_numbers:
+                result = ExcelOperations.delete_rows(file_path, sheet_name, row_num, 1, streaming)
+                if result.get('success', False):
+                    deleted = result.get('data', {}).get('deleted_rows', result.get('metadata', {}).get('deleted_rows', 1))
+                    total_deleted += deleted
+                else:
+                    logger.warning(f"删除行{row_num}失败: {result.get('message', '')}")
+
+            operation_logger.log_operation("operation_result", {
+                "success": True,
+                "deleted_rows": total_deleted,
+                "message": f"按条件删除完成"
+            })
+
+            return _ok(f"按条件 '{condition}' 删除了 {total_deleted} 行",
+                       data={'deleted_rows': total_deleted, 'condition': condition})
 
         except Exception as e:
             operation_logger.log_operation("operation_error", {

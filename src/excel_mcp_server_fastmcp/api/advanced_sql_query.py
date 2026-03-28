@@ -540,6 +540,16 @@ class AdvancedSQLQueryEngine:
                     sql, file_path, worksheets_data
                 )
 
+            # 清理ANSI转义序列（终端粘贴可能带入的不可见字符）
+            sql = re.sub(r'\x1b\[[0-9;]*[a-zA-Z]', '', sql)
+            # 清理残余控制字符
+            sql = re.sub(r'[\x00-\x1f\x7f]', '', sql)
+            # 清理残余的ANSI括号伪影：未配对的[后紧跟非ASCII字符
+            # 有效的SQL Server标识符 [名称] 有配对的]，ANSI伪影 [中文 无配对
+            if sql.count('[') != sql.count(']'):
+                # 存在未配对括号，清理[后紧跟非ASCII字符的情况
+                sql = re.sub(r'\[(?=[^\x00-\x7F])', '', sql)
+
             # 中文列名替换：将SQL中的中文列名替换为英文列名（在解析前）
             sql = self._replace_cn_columns_in_sql(sql, worksheets_data)
 
@@ -3838,6 +3848,9 @@ class AdvancedSQLQueryEngine:
 
         if not worksheets_data:
             return self._update_error('无法加载Excel数据')
+
+        # 清理ANSI转义序列（终端粘贴可能带入的不可见字符）
+        sql = re.sub(r'\x1b\[[0-9;]*[a-zA-Z]', '', sql)
 
         # 解析UPDATE语句
         # 中文列名替换（与SELECT查询保持一致）

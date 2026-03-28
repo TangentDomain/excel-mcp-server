@@ -1013,8 +1013,13 @@ class ExcelManager:
         try:
             if not sheet_name or not sheet_name.strip():
                 raise DataValidationError("工作表名称不能为空")
-            if not data or not isinstance(data, list):
+            if not data:
                 raise DataValidationError("数据不能为空，需提供行数据列表")
+            # 接受list和tuple（MCP可能传递tuple）
+            if isinstance(data, dict):
+                data = [data]  # 单个字典自动包装为列表
+            if not isinstance(data, (list, tuple)):
+                raise DataValidationError("数据必须是列表或元组，每项为字典格式的行数据")
             if len(data) > 10000:
                 raise DataValidationError(f"单次最多插入10000行，当前{len(data)}行")
 
