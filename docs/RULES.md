@@ -111,3 +111,7 @@ src/excel_mcp_server_fastmcp/
 - `python3 -m pytest tests/ -q --tb=no -n auto --timeout=30 2>&1 | tail -1` → 测试总数
 - 对比REQUIREMENTS.md修改前后 → 需求完成/推进数
 - `git tag --points-at HEAD` → 是否有发布tag
+🔄 效率追踪（2026-03-28 R165，文档同步规则修改后第2轮）
+**改前基线**: 文档版本信息不一致，用户需要手动查找解决方案
+**预期效果**: 提升用户体验，减少支持请求，文档信息准确可靠
+**验证方式**: 用户反馈收集 + 文档访问统计对比
