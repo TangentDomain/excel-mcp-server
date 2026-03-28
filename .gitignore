@@ -117,3 +117,17 @@ temp_excel_files/
 .benchmark-history/
 .cron-focus.md
 .cron-prompt.md
+
+# Internal meta-evolution files
+docs-sync-report.json
+health-monitor-result.json
+star-stats.json
+req035_done.txt
+NOW.md
+DECISIONS.md
+ROADMAP.md
+RULES.md
+REQUIREMENTS.md
+ARCHIVED.md
+DECISIONS-ARCHIVED.md
+FEISHU_SUMMARY.md
