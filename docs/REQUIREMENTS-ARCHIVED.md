@@ -35,4 +35,16 @@
       "notes": "错误处理机制优化完成，PyPI发布成功"
     }
   }
+}{
+  "REQUIREMENTS": {
+    "REQ-030": {
+      "title": "CI CTE测试失败修复",
+      "description": "CTE测试在除macOS 3.10外所有平台失败，需要排查python-calamine版本兼容性或pin版本",
+      "priority": "中",
+      "status": "DONE",
+      "source": "CEO反馈+CI观察",
+      "resolution": "CTE测试现在全部通过，可能为版本兼容性自动解决"
+    }
+  }
 }
+
