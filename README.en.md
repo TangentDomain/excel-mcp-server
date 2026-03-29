@@ -50,6 +50,8 @@
 
 ## 🚀 Quick Start (2 minutes)
 
+> 💡 **Need to find commands quickly?** → Check [📋 Quick Reference Guide](docs/QUICK_REFERENCE.md) - Find what you need in 30 seconds
+
 ### 🔥 Super Simple Installation (Choose one)
 
 #### 🎯 Recommended: uvx (Easiest, no installation)
@@ -240,6 +242,7 @@ See Excel data? 🎉 **Setup complete!**
 ## 📚 Documentation Resources
 
 ### 📖 Quick Start Guides
+- [📋 Quick Reference Guide](docs/QUICK_REFERENCE.md) - Find what you need in 30 seconds (New!)
 - [Basic Tutorial](docs/README-gaming.md) - Game development getting started
 - [Performance Optimization](docs/README-performance.md) - Large file handling techniques
 - [SQL Reference](docs/README-sql.md) - Advanced query syntax
