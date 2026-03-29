@@ -2,73 +2,73 @@
   "list_sheets": {
     "success": true,
     "stdout": "{\"method\":\"notifications/message\",\"params\":{\"level\":\"error\",\"logger\":\"mcp.server.exception_handler\",\"data\":\"Internal Server Error\"},\"jsonrpc\":\"2.0\"}\n",
-    "stderr": "2026-03-29 09:56:41,969 - mcp.server.lowlevel.server - ERROR - Received exception from stream: 1 validation error for JSONRPCMessage\n  Invalid JSON: trailing characters at line 1 column 145 [type=json_invalid, input_value='{\"jsonrpc\":\"2.0\",\"id\":1,.../mcp_verify.xlsx\"}}}}\\n', input_type=str]\n    For further information visit https://errors.pydantic.dev/2.12/v/json_invalid\n",
+    "stderr": "2026-03-29 16:58:56,252 - mcp.server.lowlevel.server - ERROR - Received exception from stream: 1 validation error for JSONRPCMessage\n  Invalid JSON: trailing characters at line 1 column 145 [type=json_invalid, input_value='{\"jsonrpc\":\"2.0\",\"id\":1,.../mcp_verify.xlsx\"}}}}\\n', input_type=str]\n    For further information visit https://errors.pydantic.dev/2.12/v/json_invalid\n",
     "returncode": 0
   },
   "get_range": {
     "success": true,
     "stdout": "{\"method\":\"notifications/message\",\"params\":{\"level\":\"error\",\"logger\":\"mcp.server.exception_handler\",\"data\":\"Internal Server Error\"},\"jsonrpc\":\"2.0\"}\n",
-    "stderr": "2026-03-29 09:56:42,965 - mcp.server.lowlevel.server - ERROR - Received exception from stream: 1 validation error for JSONRPCMessage\n  Invalid JSON: trailing characters at line 1 column 187 [type=json_invalid, input_value='{\"jsonrpc\":\"2.0\",\"id\":2,...\",\"range\":\"A1:C5\"}}}}\\n', input_type=str]\n    For further information visit https://errors.pydantic.dev/2.12/v/json_invalid\n",
+    "stderr": "2026-03-29 16:58:57,284 - mcp.server.lowlevel.server - ERROR - Received exception from stream: 1 validation error for JSONRPCMessage\n  Invalid JSON: trailing characters at line 1 column 187 [type=json_invalid, input_value='{\"jsonrpc\":\"2.0\",\"id\":2,...\",\"range\":\"A1:C5\"}}}}\\n', input_type=str]\n    For further information visit https://errors.pydantic.dev/2.12/v/json_invalid\n",
     "returncode": 0
   },
   "query_where": {
     "success": true,
     "stdout": "{\"method\":\"notifications/message\",\"params\":{\"level\":\"error\",\"logger\":\"mcp.server.exception_handler\",\"data\":\"Internal Server Error\"},\"jsonrpc\":\"2.0\"}\n",
-    "stderr": "2026-03-29 09:56:43,953 - mcp.server.lowlevel.server - ERROR - Received exception from stream: 1 validation error for JSONRPCMessage\n  Invalid JSON: trailing characters at line 1 column 213 [type=json_invalid, input_value='{\"jsonrpc\":\"2.0\",\"id\":3,...\\\\\" AND 等级>5\"}}}}\\n', input_type=str]\n    For further information visit https://errors.pydantic.dev/2.12/v/json_invalid\n",
+    "stderr": "2026-03-29 16:58:58,307 - mcp.server.lowlevel.server - ERROR - Received exception from stream: 1 validation error for JSONRPCMessage\n  Invalid JSON: trailing characters at line 1 column 213 [type=json_invalid, input_value='{\"jsonrpc\":\"2.0\",\"id\":3,...\\\\\" AND 等级>5\"}}}}\\n', input_type=str]\n    For further information visit https://errors.pydantic.dev/2.12/v/json_invalid\n",
     "returncode": 0
   },
   "query_join": {
     "success": true,
     "stdout": "{\"method\":\"notifications/message\",\"params\":{\"level\":\"error\",\"logger\":\"mcp.server.exception_handler\",\"data\":\"Internal Server Error\"},\"jsonrpc\":\"2.0\"}\n",
-    "stderr": "2026-03-29 09:56:44,990 - mcp.server.lowlevel.server - ERROR - Received exception from stream: 1 validation error for JSONRPCMessage\n  Invalid JSON: trailing characters at line 1 column 283 [type=json_invalid, input_value='{\"jsonrpc\":\"2.0\",\"id\":4,...WHERE r.等级>8\"}}}}\\n', input_type=str]\n    For further information visit https://errors.pydantic.dev/2.12/v/json_invalid\n",
+    "stderr": "2026-03-29 16:58:59,323 - mcp.server.lowlevel.server - ERROR - Received exception from stream: 1 validation error for JSONRPCMessage\n  Invalid JSON: trailing characters at line 1 column 283 [type=json_invalid, input_value='{\"jsonrpc\":\"2.0\",\"id\":4,...WHERE r.等级>8\"}}}}\\n', input_type=str]\n    For further information visit https://errors.pydantic.dev/2.12/v/json_invalid\n",
     "returncode": 0
   },
   "query_groupby": {
     "success": true,
     "stdout": "{\"method\":\"notifications/message\",\"params\":{\"level\":\"error\",\"logger\":\"mcp.server.exception_handler\",\"data\":\"Internal Server Error\"},\"jsonrpc\":\"2.0\"}\n",
-    "stderr": "2026-03-29 09:56:46,276 - mcp.server.lowlevel.server - ERROR - Received exception from stream: 1 validation error for JSONRPCMessage\n  Invalid JSON: trailing characters at line 1 column 258 [type=json_invalid, input_value='{\"jsonrpc\":\"2.0\",\"id\":5,... GROUP BY 职业\"}}}}\\n', input_type=str]\n    For further information visit https://errors.pydantic.dev/2.12/v/json_invalid\n",
+    "stderr": "2026-03-29 16:59:00,588 - mcp.server.lowlevel.server - ERROR - Received exception from stream: 1 validation error for JSONRPCMessage\n  Invalid JSON: trailing characters at line 1 column 258 [type=json_invalid, input_value='{\"jsonrpc\":\"2.0\",\"id\":5,... GROUP BY 职业\"}}}}\\n', input_type=str]\n    For further information visit https://errors.pydantic.dev/2.12/v/json_invalid\n",
     "returncode": 0
   },
   "query_subquery": {
     "success": true,
     "stdout": "{\"method\":\"notifications/message\",\"params\":{\"level\":\"error\",\"logger\":\"mcp.server.exception_handler\",\"data\":\"Internal Server Error\"},\"jsonrpc\":\"2.0\"}\n",
-    "stderr": "2026-03-29 09:56:47,283 - mcp.server.lowlevel.server - ERROR - Received exception from stream: 1 validation error for JSONRPCMessage\n  Invalid JSON: trailing characters at line 1 column 251 [type=json_invalid, input_value='{\"jsonrpc\":\"2.0\",\"id\":6,...业=\\\\\"战士\\\\\"\"}}}}\\n', input_type=str]\n    For further information visit https://errors.pydantic.dev/2.12/v/json_invalid\n",
+    "stderr": "2026-03-29 16:59:01,661 - mcp.server.lowlevel.server - ERROR - Received exception from stream: 1 validation error for JSONRPCMessage\n  Invalid JSON: trailing characters at line 1 column 251 [type=json_invalid, input_value='{\"jsonrpc\":\"2.0\",\"id\":6,...业=\\\\\"战士\\\\\"\"}}}}\\n', input_type=str]\n    For further information visit https://errors.pydantic.dev/2.12/v/json_invalid\n",
     "returncode": 0
   },
   "query_from_subquery": {
     "success": true,
     "stdout": "{\"method\":\"notifications/message\",\"params\":{\"level\":\"error\",\"logger\":\"mcp.server.exception_handler\",\"data\":\"Internal Server Error\"},\"jsonrpc\":\"2.0\"}\n",
-    "stderr": "2026-03-29 09:56:48,482 - mcp.server.lowlevel.server - ERROR - Received exception from stream: 1 validation error for JSONRPCMessage\n  Invalid JSON: trailing characters at line 1 column 255 [type=json_invalid, input_value='{\"jsonrpc\":\"2.0\",\"id\":7,...WHERE 等级<=12\"}}}}\\n', input_type=str]\n    For further information visit https://errors.pydantic.dev/2.12/v/json_invalid\n",
+    "stderr": "2026-03-29 16:59:03,111 - mcp.server.lowlevel.server - ERROR - Received exception from stream: 1 validation error for JSONRPCMessage\n  Invalid JSON: trailing characters at line 1 column 255 [type=json_invalid, input_value='{\"jsonrpc\":\"2.0\",\"id\":7,...WHERE 等级<=12\"}}}}\\n', input_type=str]\n    For further information visit https://errors.pydantic.dev/2.12/v/json_invalid\n",
     "returncode": 0
   },
   "get_headers": {
     "success": true,
     "stdout": "{\"method\":\"notifications/message\",\"params\":{\"level\":\"error\",\"logger\":\"mcp.server.exception_handler\",\"data\":\"Internal Server Error\"},\"jsonrpc\":\"2.0\"}\n",
-    "stderr": "2026-03-29 09:56:49,746 - mcp.server.lowlevel.server - ERROR - Received exception from stream: 1 validation error for JSONRPCMessage\n  Invalid JSON: trailing characters at line 1 column 173 [type=json_invalid, input_value='{\"jsonrpc\":\"2.0\",\"id\":8,...e\":\"技能配置\"}}}}\\n', input_type=str]\n    For further information visit https://errors.pydantic.dev/2.12/v/json_invalid\n",
+    "stderr": "2026-03-29 16:59:04,251 - mcp.server.lowlevel.server - ERROR - Received exception from stream: 1 validation error for JSONRPCMessage\n  Invalid JSON: trailing characters at line 1 column 173 [type=json_invalid, input_value='{\"jsonrpc\":\"2.0\",\"id\":8,...e\":\"技能配置\"}}}}\\n', input_type=str]\n    For further information visit https://errors.pydantic.dev/2.12/v/json_invalid\n",
     "returncode": 0
   },
   "find_last_row": {
     "success": true,
     "stdout": "{\"method\":\"notifications/message\",\"params\":{\"level\":\"error\",\"logger\":\"mcp.server.exception_handler\",\"data\":\"Internal Server Error\"},\"jsonrpc\":\"2.0\"}\n",
-    "stderr": "2026-03-29 09:56:50,757 - mcp.server.lowlevel.server - ERROR - Received exception from stream: 1 validation error for JSONRPCMessage\n  Invalid JSON: trailing characters at line 1 column 175 [type=json_invalid, input_value='{\"jsonrpc\":\"2.0\",\"id\":9,...e\":\"角色配置\"}}}}\\n', input_type=str]\n    For further information visit https://errors.pydantic.dev/2.12/v/json_invalid\n",
+    "stderr": "2026-03-29 16:59:05,277 - mcp.server.lowlevel.server - ERROR - Received exception from stream: 1 validation error for JSONRPCMessage\n  Invalid JSON: trailing characters at line 1 column 175 [type=json_invalid, input_value='{\"jsonrpc\":\"2.0\",\"id\":9,...e\":\"角色配置\"}}}}\\n', input_type=str]\n    For further information visit https://errors.pydantic.dev/2.12/v/json_invalid\n",
     "returncode": 0
   },
   "batch_insert_rows": {
     "success": true,
     "stdout": "{\"method\":\"notifications/message\",\"params\":{\"level\":\"error\",\"logger\":\"mcp.server.exception_handler\",\"data\":\"Internal Server Error\"},\"jsonrpc\":\"2.0\"}\n",
-    "stderr": "2026-03-29 09:56:51,791 - mcp.server.lowlevel.server - ERROR - Received exception from stream: 1 validation error for JSONRPCMessage\n  Invalid JSON: trailing characters at line 1 column 281 [type=json_invalid, input_value='{\"jsonrpc\":\"2.0\",\"id\":10...\"]],\"start_row\":6}}}}\\n', input_type=str]\n    For further information visit https://errors.pydantic.dev/2.12/v/json_invalid\n",
+    "stderr": "2026-03-29 16:59:06,612 - mcp.server.lowlevel.server - ERROR - Received exception from stream: 1 validation error for JSONRPCMessage\n  Invalid JSON: trailing characters at line 1 column 281 [type=json_invalid, input_value='{\"jsonrpc\":\"2.0\",\"id\":10...\"]],\"start_row\":6}}}}\\n', input_type=str]\n    For further information visit https://errors.pydantic.dev/2.12/v/json_invalid\n",
     "returncode": 0
   },
   "delete_rows": {
     "success": true,
     "stdout": "{\"method\":\"notifications/message\",\"params\":{\"level\":\"error\",\"logger\":\"mcp.server.exception_handler\",\"data\":\"Internal Server Error\"},\"jsonrpc\":\"2.0\"}\n",
-    "stderr": "2026-03-29 09:56:52,795 - mcp.server.lowlevel.server - ERROR - Received exception from stream: 1 validation error for JSONRPCMessage\n  Invalid JSON: trailing characters at line 1 column 198 [type=json_invalid, input_value='{\"jsonrpc\":\"2.0\",\"id\":11..._row\":6,\"count\":1}}}}\\n', input_type=str]\n    For further information visit https://errors.pydantic.dev/2.12/v/json_invalid\n",
+    "stderr": "2026-03-29 16:59:07,719 - mcp.server.lowlevel.server - ERROR - Received exception from stream: 1 validation error for JSONRPCMessage\n  Invalid JSON: trailing characters at line 1 column 198 [type=json_invalid, input_value='{\"jsonrpc\":\"2.0\",\"id\":11..._row\":6,\"count\":1}}}}\\n', input_type=str]\n    For further information visit https://errors.pydantic.dev/2.12/v/json_invalid\n",
     "returncode": 0
   },
   "describe_table": {
     "success": true,
     "stdout": "{\"method\":\"notifications/message\",\"params\":{\"level\":\"error\",\"logger\":\"mcp.server.exception_handler\",\"data\":\"Internal Server Error\"},\"jsonrpc\":\"2.0\"}\n",
-    "stderr": "2026-03-29 09:56:53,771 - mcp.server.lowlevel.server - ERROR - Received exception from stream: 1 validation error for JSONRPCMessage\n  Invalid JSON: trailing characters at line 1 column 177 [type=json_invalid, input_value='{\"jsonrpc\":\"2.0\",\"id\":12...e\":\"角色配置\"}}}}\\n', input_type=str]\n    For further information visit https://errors.pydantic.dev/2.12/v/json_invalid\n",
+    "stderr": "2026-03-29 16:59:08,966 - mcp.server.lowlevel.server - ERROR - Received exception from stream: 1 validation error for JSONRPCMessage\n  Invalid JSON: trailing characters at line 1 column 177 [type=json_invalid, input_value='{\"jsonrpc\":\"2.0\",\"id\":12...e\":\"角色配置\"}}}}\\n', input_type=str]\n    For further information visit https://errors.pydantic.dev/2.12/v/json_invalid\n",
     "returncode": 0
   }
 }
