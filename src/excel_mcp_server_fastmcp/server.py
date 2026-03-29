@@ -102,21 +102,11 @@ from .utils.validators import ExcelValidator, DataValidationError
 try:
     from .core.smart_config_recommender import SmartConfigurationRecommender
     SMART_CONFIG_AVAILABLE = True
-except ImportError:
-    SMART_CONFIG_AVAILABLE = False
-    logger.warning("智能配置推荐模块未找到，相关功能不可用")
-
-try:
-    from .server_extensions.smart_config_tools import (
-        recommend_excel_config,
-        analyze_game_patterns, 
-        generate_validation_rules,
-        optimize_data_structure
-    )
     SMART_CONFIG_TOOLS_AVAILABLE = True
 except ImportError:
+    SMART_CONFIG_AVAILABLE = False
     SMART_CONFIG_TOOLS_AVAILABLE = False
-    logger.warning("智能配置工具未找到，相关功能不可用")
+    logger.warning("智能配置推荐模块未找到，相关功能不可用")
 
 # ==================== 操作日志系统 ====================
 class OperationLogger:
