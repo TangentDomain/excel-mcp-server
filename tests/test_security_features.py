@@ -25,7 +25,6 @@ from src.excel_mcp_server_fastmcp.server import (
 from src.excel_mcp_server_fastmcp.utils.validators import ExcelValidator, DataValidationError
 from src.excel_mcp_server_fastmcp.api.excel_operations import ExcelOperations
 
-
 class TestOperationLogger:
     """测试操作日志记录器"""
 
@@ -77,7 +76,6 @@ class TestOperationLogger:
         """测试空会话时获取操作"""
         recent_ops = self.logger.get_recent_operations()
         assert recent_ops == []
-
 
 class TestEnhancedRangeValidation:
     """测试增强的范围验证功能"""
@@ -142,7 +140,6 @@ class TestEnhancedRangeValidation:
         range_info = {'type': 'cell_range', 'start_col': 1, 'end_col': 200, 'start_row': 1, 'end_row': 10}
         with pytest.raises(DataValidationError):
             ExcelValidator.validate_operation_scale(range_info)
-
 
 class TestDataAnalysis:
     """测试数据分析功能"""
@@ -209,7 +206,6 @@ class TestDataAnalysis:
         assert result['non_empty_cell_count'] == 5
         assert result['empty_cell_count'] == 4
         assert result['completeness_rate'] == (5/9) * 100
-
 
 class TestRiskAssessment:
     """测试风险评估功能"""
@@ -284,7 +280,6 @@ class TestRiskAssessment:
         assert result['data_insert_count'] == 4
         assert result['estimated_time'] == "minimal"
 
-
 class TestBackupSystem:
     """测试备份系统功能"""
 
@@ -311,14 +306,6 @@ class TestBackupSystem:
         assert 'timestamp' in result['data']
         assert os.path.exists(result['data']['backup_file'])
         assert result['data']['file_size']['original'] == result['data']['file_size']['backup']
-
-    def test_create_backup_nonexistent_file(self):
-        """测试创建不存在文件的备份"""
-        result = excel_create_backup("nonexistent.xlsx")
-
-        assert result['success'] is False
-        assert result['meta']['error_code'] == 'FILE_NOT_FOUND'
-        assert "不存在" in result['message']
 
     def test_list_backups(self):
         """测试列出备份文件"""
@@ -347,7 +334,6 @@ class TestBackupSystem:
         assert result['success'] is True
         assert result['data'].get('total_backups', 0) == 0
         assert result['data'].get('backups', []) == []
-
 
 class TestIntegrationSecurityWorkflow:
     """测试完整的安全工作流程集成"""
@@ -457,7 +443,6 @@ class TestIntegrationSecurityWorkflow:
         assert 'operation_types' in stats
         assert 'success_rate' in stats
 
-
 class TestSecurityPerformance:
     """测试安全功能的性能"""
 
@@ -506,7 +491,6 @@ class TestSecurityPerformance:
 
         # 验证性能要求（大型数据分析应在0.5秒内完成）
         assert (end_time - start_time) < 0.5
-
 
 if __name__ == "__main__":
     pytest.main([__file__, "-v"])

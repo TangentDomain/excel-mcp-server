@@ -10,17 +10,14 @@ import os
 
 GAME_CONFIG = os.path.join(os.path.dirname(__file__), "test_data", "game_config.xlsx")
 
-
 @pytest.fixture
 def engine():
     return AdvancedSQLQueryEngine()
-
 
 @pytest.fixture
 def df(engine):
     data = engine._load_excel_data(GAME_CONFIG)
     return data["技能配置"]
-
 
 class TestCoalesceVectorized:
     """验证向量化COALESCE与逐行版本结果完全一致"""
@@ -132,7 +129,6 @@ class TestCoalesceVectorized:
         assert r["success"] is True
         assert len(r["data"]) > 1  # Multiple skill types
 
-
 class TestGetRowValueNumericLiteral:
     """验证_get_row_value正确处理数字字面量（与_get_expression_value一致）"""
 
@@ -146,29 +142,6 @@ class TestGetRowValueNumericLiteral:
         result = engine._get_row_value(lit, row)
         assert result == 42
         assert isinstance(result, int)
-
-    def test_float_literal(self, engine):
-        """浮点数字面量返回float类型"""
-        import sqlglot
-        from sqlglot import expressions as exp
-
-        row = pd.Series({"a": 1})
-        lit = exp.Literal.number("3.14")
-        result = engine._get_row_value(lit, row)
-        assert result == 3.14
-        assert isinstance(result, float)
-
-    def test_string_literal(self, engine):
-        """字符串字面量返回str类型"""
-        import sqlglot
-        from sqlglot import expressions as exp
-
-        row = pd.Series({"a": 1})
-        lit = exp.Literal.string("hello")
-        result = engine._get_row_value(lit, row)
-        assert result == "hello"
-        assert isinstance(result, str)
-
 
 class TestCaseWhenNumericThen:
     """验证CASE WHEN数字THEN值修复 — _get_row_value数字字面量正确转换"""

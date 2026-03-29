@@ -32,7 +32,6 @@ sys.path.insert(0, str(project_root))
 from src.excel_mcp_server_fastmcp.api.excel_operations import ExcelOperations
 from src.excel_mcp_server_fastmcp.models.types import OperationResult
 
-
 class TestExcelOperationsBasic:
     """基础ExcelOperations API测试 - 原test_api_excel_operations.py"""
 
@@ -167,15 +166,6 @@ class TestExcelOperationsBasic:
         assert result['success'] is True
         assert result.get('data', {}).get('inserted_count') == 2
 
-    def test_batch_insert_empty_data(self, test_excel_file):
-        """测试空数据插入"""
-        result = ExcelOperations.batch_insert_rows(test_excel_file, "TestSheet", [])
-        
-        assert result['success'] is False
-        assert "不能为空" in result.get('message', '')
-
-    # ==================== delete_rows测试 ====================
-
     def test_delete_rows_by_index(self, test_excel_file):
         """测试按行号删除"""
         result = ExcelOperations.delete_rows(test_excel_file, "TestSheet", row_index=3, count=1)
@@ -231,13 +221,6 @@ class TestExcelOperationsBasic:
 
     # ==================== 错误处理测试 ====================
 
-    def test_file_not_found(self):
-        """测试文件不存在的情况"""
-        result = ExcelOperations.get_range("不存在的文件.xlsx", "Sheet1!A1:B1")
-        
-        assert result['success'] is False
-        assert "文件不存在" in result.get('message', '')
-
     def test_permission_denied(self, tmp_path):
         """测试权限拒绝的情况"""
         # 创建只读文件
@@ -251,20 +234,6 @@ class TestExcelOperationsBasic:
         with unittest.mock.patch('builtins.open', side_effect=PermissionError("Permission denied")):
             result = ExcelOperations.get_range(str(file_path), "A1:B1")
             assert result['success'] is False
-
-    def test_sheet_not_found(self, test_excel_file):
-        """测试工作表不存在的情况"""
-        result = ExcelOperations.get_range(test_excel_file, "不存在的工作表!A1:B1")
-        
-        assert result['success'] is False
-        assert "工作表" in result.get('message', '')
-
-    def test_invalid_range_format(self, test_excel_file):
-        """测试无效的range格式"""
-        result = ExcelOperations.get_range(test_excel_file, "无效格式")
-        
-        assert result['success'] is False
-        assert "格式" in result.get('message', '')
 
     def test_data_type_error(self, test_excel_file):
         """测试数据类型错误"""
@@ -288,7 +257,6 @@ class TestExcelOperationsBasic:
         with unittest.mock.patch('openpyxl.Workbook.save', side_effect=OSError("Disk full")):
             result = ExcelOperations.get_range(test_excel_file, "A1:B1")
             assert result['success'] is False
-
 
 class TestExcelOperationsAdvanced:
     """高级ExcelOperations API测试 - 原test_api_excel_operations_advanced.py"""

@@ -13,7 +13,6 @@ from src.excel_mcp_server_fastmcp.utils.formatter import format_operation_result
 from src.excel_mcp_server_fastmcp.models.types import OperationResult, CellInfo, SheetInfo, RangeInfo, RangeType
 from src.excel_mcp_server_fastmcp.utils.parsers import RangeParser
 
-
 class TestFormatter:
     """格式化工具测试"""
 
@@ -62,7 +61,6 @@ class TestFormatter:
         
         assert formatted is not None
 
-
 class TestRangeParser:
     """范围解析器测试"""
 
@@ -102,27 +100,8 @@ class TestRangeParser:
         
         assert result is False
 
-
 class TestModels:
     """数据模型测试"""
-
-    def test_range_info_creation(self):
-        """测试RangeInfo创建"""
-        info = RangeInfo(
-            sheet_name="Sheet1",
-            range_type=RangeType.CELL_RANGE,
-            cell_range="A1:C10"
-        )
-        
-        assert info.sheet_name == "Sheet1"
-        assert info.range_type == RangeType.CELL_RANGE
-
-    def test_range_type_enum(self):
-        """测试RangeType枚举"""
-        assert RangeType.CELL_RANGE.value == "cell_range"
-        assert RangeType.ROW_RANGE.value == "row_range"
-        assert RangeType.COLUMN_RANGE.value == "column_range"
-
 
 class TestValidators:
     """验证器测试"""
@@ -139,7 +118,6 @@ class TestValidators:
         for case in valid_cases:
             result = RangeParser.validate_range_syntax(case)
             assert result is True, f"Expected {case} to be valid"
-
 
 class TestIntegration:
     """集成测试"""

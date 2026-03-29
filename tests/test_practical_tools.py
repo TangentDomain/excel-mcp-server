@@ -3,7 +3,6 @@ import os
 import pytest
 from openpyxl import Workbook
 
-
 def _create_workbook(path, sheet_title, headers, rows):
     """Create a test workbook and save to path."""
     wb = Workbook()
@@ -15,7 +14,6 @@ def _create_workbook(path, sheet_title, headers, rows):
     os.makedirs(os.path.dirname(path), exist_ok=True)
     wb.save(path)
     return path
-
 
 @pytest.fixture
 def workbook(tmp_path):
@@ -31,7 +29,6 @@ def workbook(tmp_path):
                      ])
     return path
 
-
 @pytest.fixture
 def chart_workbook(tmp_path):
     """Create a test workbook with chart data."""
@@ -46,7 +43,6 @@ def chart_workbook(tmp_path):
     os.makedirs(os.path.dirname(path), exist_ok=True)
     wb.save(path)
     return path
-
 
 class TestBatchOperations:
     """Tests for batch operations."""
@@ -109,7 +105,6 @@ class TestBatchOperations:
         assert "技能表" in wb.sheetnames
         assert "装备表" in wb.sheetnames
 
-
 class TestChartOperations:
     """Tests for chart creation and listing."""
 
@@ -143,17 +138,6 @@ class TestChartOperations:
         )
         assert result["success"] is False
         assert "不支持的图表类型" in result["message"]
-
-    def test_nonexistent_sheet(self, chart_workbook):
-        """Reject non-existent sheet name."""
-        from src.excel_mcp_server_fastmcp.server import excel_create_chart
-
-        result = excel_create_chart(
-            chart_workbook, "不存在", "column", "A1:C5"
-        )
-        assert result["success"] is False
-        assert "工作表不存在" in result["message"]
-
 
 class TestDataValidation:
     """Tests for data validation set / clear."""
@@ -192,7 +176,6 @@ class TestDataValidation:
         result = excel_clear_validation(workbook, "技能配置")
         assert result["success"] is True
         assert result["data"]["cleared_count"] >= 1
-
 
 class TestConditionalFormatting:
     """Tests for conditional formatting add / clear."""

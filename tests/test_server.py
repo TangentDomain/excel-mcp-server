@@ -94,7 +94,7 @@ class TestServerInterfaces:
             assert 'test_data' in sheet_info['headers']  # Field names from row 2
             assert 'value' in sheet_info['headers']
 
-    def test_excel_get_headers_empty_sheet(self, empty_excel_file):
+    def test_excel_get_headers_empty_sheet_no_name(self, empty_excel_file):
         """Test excel_get_headers without sheet_name - empty sheet"""
         result = excel_get_headers(empty_excel_file)
 
