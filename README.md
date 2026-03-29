@@ -2,7 +2,7 @@
 
 # 🎮 ExcelMCP: 游戏开发专用 Excel 配置表管理器
 
-[![PyPI](https://img.shields.io/pypi/v/excel-mcp-server-fastmcp.svg)](https://pypi.org/project/excel-mcp-server-fastmcp/v1.6.48)
+[![PyPI](https://img.shields.io/pypi/v/excel-mcp-server-fastmcp.svg)](https://pypi.org/project/excel-mcp-server-fastmcp/v1.6.49)
 [![CI](https://github.com/TangentDomain/excel-mcp-server/actions/workflows/ci.yml/badge.svg)](https://github.com/TangentDomain/excel-mcp-server/actions/workflows/ci.yml)
 ![Tests](https://img.shields.io/badge/tests-1171-brightgreen.svg)
 ![Tools](https://img.shields.io/badge/tools-53-green.svg)
@@ -14,7 +14,7 @@
 
 ---
 
-## 🚀 最新更新 (v1.6.48)
+## 🚀 最新更新 (v1.6.49)
 
 ### ✨ 新增功能
 - **智能配置推荐系统**：基于游戏类型自动分析Excel结构，提供配置优化建议
