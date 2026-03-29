@@ -1,0 +1,18 @@
+{
+  "timestamp": "2026-03-29T17:43:41.787434",
+  "total_issues": 1,
+  "issues": [
+    {
+      "type": "test_redundancy",
+      "function": "test_file",
+      "files": [
+        "tests/test_offset.py",
+        "tests/test_api_excel_operations_consolidated.py"
+      ],
+      "issue": "测试函数 test_file 在 2 个文件中重复测试",
+      "severity": "medium"
+    }
+  ],
+  "fixes_applied": [],
+  "health_score": 95
+}
