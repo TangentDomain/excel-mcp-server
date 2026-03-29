@@ -18,7 +18,7 @@ def run_mcp_command(command):
             capture_output=True,
             text=True,
             timeout=30,
-            cwd="../wt-mcp-validation"
+            cwd="."
         )
         return {
             "success": result.returncode == 0,
@@ -43,7 +43,7 @@ def run_mcp_command(command):
 
 def run_core_functions_validation():
     """测试12项核心功能"""
-    test_file = "mcp_validation_test.xlsx"
+    test_file = "tests/test_data/mcp_verify.xlsx"
     results = {}
     
     # 1. list_sheets
