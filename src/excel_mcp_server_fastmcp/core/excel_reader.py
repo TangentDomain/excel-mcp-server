@@ -99,9 +99,9 @@ class ExcelReader:
                     sheet_info = SheetInfo(
                         index=i,
                         name=name,
-                        max_row=ws.height,
-                        max_column=ws.width,
-                        max_column_letter=get_column_letter(ws.width)
+                        max_row=ws.height or 0,
+                        max_column=ws.width or 0,
+                        max_column_letter=get_column_letter(ws.width or 1)
                     )
                     sheets_info.append(sheet_info)
 
