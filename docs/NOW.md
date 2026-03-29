@@ -1,28 +1,27 @@
-# NOW.md - 第211轮
+# NOW.md - 第212轮
 
 ## 当前状态
-- **轮次**: 第211轮（测试合并修复）
-- **时间**: 2026-03-29 07:00 UTC
-- **需求**: 测试文件合并后断言修复
+- **轮次**: 第212轮（文档优化继续）
+- **时间**: 2026-03-29 07:40 UTC
+- **需求**: REQ-026 文档与门面优化继续
 
 ## 进行中
-- 🔄 修复 test_sql_operations_consolidated.py（子代理处理中）
-- 🔄 修复 test_streaming_operations_consolidated.py（子代理处理中）
+- 🔄 MCP功能验证（8项核心测试通过）
+- 🔄 文档瘦身完成
 
 ## 完成工作
-- ✅ 合并21个冗余测试文件为3个 consolidated 文件
-- ✅ 修复 test_api_excel_operations_consolidated.py：15→0 失败（34/34 passed）
-- ✅ 修复模式：affected_rows → data.actual_count/inserted_count、metadata.mode、copy_sheet自动重命名行为
-- ✅ 删除垃圾文件：test_analysis.py、test_duplicates_analysis.json
-- ✅ 删除恢复的 tests/test_api_excel_operations.py
+- ✅ 文档瘦身：REQ-031归档至ARCHIVED.md，清理冗余测试文件
+- ✅ 版本一致性检查：所有文件v1.6.48同步
+- ✅ MCP验证：8项游戏场景测试全部通过（get_range/SQL查询/批量更新/list_sheets/get_headers/高级SQL查询/查找最后一行/删除行）
+- ✅ README检查：中英文版本一致，内容同步
+- ✅ 分支合并：develop与main同步，无冲突
 
 ## 待办
-- [ ] 等待子代理完成 SQL + Streaming consolidated 修复
-- [ ] 全量测试通过后 commit + merge + push
-- [ ] 更新 DECISIONS.md 记录测试合并决策
+- [ ] 完成REQ-026文档优化任务
+- [ ] 更新DECISIONS.md记录本轮决策
 
 ## 关键指标
 - **版本**: v1.6.48
 - **API测试**: 34/34 passed ✅
-- **SQL测试**: 修复中
-- **Streaming测试**: 修复中
+- **MCP验证**: 8/8 核心功能通过 ✅
+- **文档**: 双语同步 ✅
