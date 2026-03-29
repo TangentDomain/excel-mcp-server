@@ -4,7 +4,7 @@
 
 ## 📚 教程概述
 
-本教程将带你从零开始，掌握使用MCP服务器操作游戏配置表的完整流程。每个步骤都包含实际的游戏场景示例和练习。
+本教程已重构为模块化结构，每个模块聚焦特定技能，便于学习和维护。
 
 ### 🎯 学习目标
 - 理解MCP服务器的基本概念
@@ -18,344 +18,128 @@
 
 ---
 
-## 🚀 第1步：基础概念（5分钟）
+## 📖 教程模块
 
-### 什么是MCP服务器？
-MCP（Message Passing Control）服务器是一个让AI能够直接操作Excel配置表的服务。它就像一个"超级Excel"，可以通过自然语言命令来读写、查询和分析游戏数据。
+### 1. [教程概述](tutorial-overview.md)
+- 学习目标概览
+- 时间安排建议
+- 文档结构说明
 
-### 游戏配置表的重要性
-游戏配置表包含：
-- **角色属性**：血量、攻击力、防御力、技能
-- **装备数据**：武器、防具、饰品属性
-- **技能配置**：技能效果、冷却时间、消耗
-- **数值平衡**：怪物强度、掉落概率、经验值
-- **关卡设计**：地图配置、敌人分布、任务条件
+### 2. [基础概念](tutorial-basics.md)
+- MCP服务器介绍
+- 游戏配置表的重要性
+- 快速开始指南
 
----
+### 3. [角色属性管理](tutorial-characters.md)
+- 查看角色表结构
+- 角色数据操作
+- 属性统计查询
 
-## 🎮 第2步：实际场景 - 角色属性管理（10分钟）
+### 4. [技能配置管理](tutorial-skills.md)
+- 技能表结构分析
+- 技能数据管理
+- 技能效果更新
 
-### 场景介绍
-假设你正在开发一款RPG游戏，需要管理角色属性表。
+### 5. [高级查询分析](tutorial-advanced.md)
+- SQL查询技巧
+- 数值平衡分析
+- 跨表关联查询
 
-### 2.1 查看现有角色表
-```bash
-# 启动MCP服务器
-excel-mcp-server-fastmcp
-```
+### 6. [数据维护优化](tutorial-maintenance.md)
+- 批量数据操作
+- 数据完整性检查
+- 维护最佳实践
 
-**MCP命令**：
-```json
-{
-  "method": "tools/call",
-  "params": {
-    "name": "list_sheets",
-    "arguments": {}
-  }
-}
-```
+### 7. [综合实战挑战](tutorial-challenge.md)
+- Boss配置实战
+- 平衡性分析
+- 战斗时间预估
 
-**预期结果**：
-- `characters` - 角色属性表
-- `skills` - 技能配置表  
-- `equipment` - 装备数据表
-
-### 2.2 查看角色表结构
-```json
-{
-  "method": "tools/call", 
-  "params": {
-    "name": "get_headers",
-    "arguments": {
-      "sheet": "characters"
-    }
-  }
-}
-```
-
-**预期结果**：
-```json
-{
-  "headers": ["id", "name", "level", "hp", "mp", "attack", "defense", "agility", "skills"]
-}
-```
-
-### 2.3 查看具体角色数据
-```json
-{
-  "method": "tools/call",
-  "params": {
-    "name": "get_range", 
-    "arguments": {
-      "sheet": "characters",
-      "range": "A2:D10"
-    }
-  }
-}
-```
-
-### 📝 练习2.1
-**任务**：查看ID为3的角色的详细属性
-**提示**：使用`get_range`获取完整的角色数据，找到ID=3的行
+### 8. [教程总结](tutorial-summary.md)
+- 技能掌握检查清单
+- 进阶学习建议
+- 快速参考指南
 
 ---
 
-## ⚔️ 第3步：技能配置管理（10分钟）
+## 🚀 快速开始
 
-### 场景介绍
-管理角色技能，包括技能效果、冷却时间和消耗。
+### 适合人群
+- **游戏策划**：需要管理角色、技能、装备配置
+- **数值分析师**：需要进行数据平衡和统计分析
+- **游戏开发**：需要快速配置和测试游戏参数
+- **数据管理**：需要维护游戏配置数据完整性
 
-### 3.1 查看技能表结构
-```json
-{
-  "method": "tools/call",
-  "params": {
-    "name": "describe_table",
-    "arguments": {
-      "sheet": "skills"
-    }
-  }
-}
-```
+### 学习建议
+1. **按顺序学习**：从基础概念开始，逐步深入
+2. **动手实践**：每个模块都包含练习题，务必完成
+3. **参考示例**：使用提供的示例代码进行实践
+4. **问题解决**：遇到问题时参考FAQ和故障排除指南
 
-### 3.2 查找攻击系技能
-```json
-{
-  "method": "tools/call",
-  "params": {
-    "name": "search",
-    "arguments": {
-      "sheet": "skills",
-      "criteria": {
-        "type": "attack"
-      }
-    }
-  }
-}
-```
-
-### 3.3 批量添加新技能
-```json
-{
-  "method": "tools/call",
-  "params": {
-    "name": "batch_insert_rows",
-    "arguments": {
-      "sheet": "skills",
-      "rows": [
-        ["skill_007", "火焰冲击", "attack", "造成150%攻击力伤害", 3.0, 50],
-        ["skill_008", "冰霜护盾", "defense", "减少20%受到的伤害", 0.0, 30]
-      ]
-    }
-  }
-}
-```
-
-### 📝 练习3.1
-**任务**：
-1. 查看所有"治疗"类型的技能
-2. 为ID=1的角色添加一个新技能"火球术"
-**提示**：使用`search`查找治疗技能，使用`update_range`更新角色技能列表
+### 前置要求
+- 了解基本的Excel表格结构
+- 有SQL查询基础（非必需，教程会讲解）
+- 准备一个游戏配置Excel文件用于练习
 
 ---
 
-## 🔍 第4步：高级查询 - 数值平衡分析（8分钟）
+## 🎮 教学特色
 
-### 场景介绍
-作为数值策划，你需要分析角色属性平衡性，找出异常数据。
+### 实用导向
+- 每个概念都配合实际游戏场景
+- 提供完整的MCP命令示例
+- 包含具体练习题和解决方案
 
-### 4.1 查询攻击力最高的角色
-```json
-{
-  "method": "tools/call",
-  "params": {
-    "name": "query",
-    "arguments": {
-      "sheet": "characters",
-      "query": "SELECT name, attack FROM characters ORDER BY attack DESC LIMIT 5"
-    }
-  }
-}
-```
+### 渐进式学习
+- 从简单的基础操作开始
+- 逐步引入复杂的查询和数据处理
+- 最终完成综合实战挑战
 
-### 4.2 找出防御力异常的角色
-```json
-{
-  "method": "tools/call", 
-  "params": {
-    "name": "query",
-    "arguments": {
-      "sheet": "characters", 
-      "query": "SELECT name, level, defense FROM characters WHERE defense > 100 OR defense < 10"
-    }
-  }
-}
-```
-
-### 4.3 统计各等级段的角色数量
-```json
-{
-  "method": "tools/call",
-  "params": {
-    "name": "query",
-    "arguments": {
-      "sheet": "characters",
-      "query": "SELECT level, COUNT(*) as count FROM characters GROUP BY level ORDER BY level"
-    }
-  }
-}
-```
-
-### 📝 练习4.1
-**任务**：
-1. 查找HP值超过1000的角色
-2. 计算平均攻击力
-3. 找出技能数量最多的3个角色
-**提示**：使用`query`和SQL语句完成复杂分析
+### 最佳实践
+- 提供数据维护的最佳实践建议
+- 包含性能优化和团队协作指导
+- 强调数据完整性和错误处理
 
 ---
 
-## 🛠️ 第5步：数据维护和优化（7分钟）
+## 📞 获取帮助
 
-### 场景介绍
-游戏更新时，需要批量修改数据和维护数据完整性。
+### 学习资源
+- **完整文档**：[README.md](../README.md)
+- **故障排除**：[TROUBLESHOOTING.md](../TROUBLESHOOTING.md)
+- **常见问题**：[FAQ.md](../FAQ.md)
+- **示例代码**：[examples/](../examples/)
 
-### 5.1 删除无效数据
-```json
-{
-  "method": "tools/call",
-  "params": {
-    "name": "delete_rows", 
-    "arguments": {
-      "sheet": "characters",
-      "criteria": {
-        "level": 0
-      }
-    }
-  }
-}
-```
-
-### 5.2 批量更新角色等级
-```json
-{
-  "method": "tools/call",
-  "params": {
-    "name": "update_range",
-    "arguments": {
-      "sheet": "characters",
-      "range": "C2:C100",
-      "values": [[5], [5], [5], [5], [5]]  # 将所有角色等级设置为5
-    }
-  }
-}
-```
-
-### 5.3 数据备份和验证
-```json
-{
-  "method": "tools/call",
-  "params": {
-    "name": "find_last_row",
-    "arguments": {
-      "sheet": "characters"
-    }
-  }
-}
-```
-
-### 📝 练习5.1
-**任务**：
-1. 将所有攻击力低于50的角色等级提升1级
-2. 删除MP值为0的技能
-3. 验证数据完整性
+### 技术支持
+- **GitHub Issues**：[报告问题](https://github.com/TangentDomain/excel-mcp-server/issues)
+- **讨论区**：[GitHub Discussions](https://github.com/TangentDomain/excel-mcp-server/discussions)
+- **邮件联系**：通过GitHub issues联系我们
 
 ---
 
-## 🏆 第6步：综合实战挑战（10分钟）
+## 📈 教学效果
 
-### 挑战场景
-你正在为一个新的副本Boss设计配置，需要：
+### 掌握技能
+完成本教程后，你将能够：
+- ✅ 独立操作Excel配置表
+- ✅ 编写复杂的数据查询
+- ✅ 批量处理游戏数据
+- ✅ 进行数值平衡分析
+- ✅ 维护数据完整性
+- ✅ 解决实际配置问题
 
-1. **创建新Boss角色**：
-   - 等级：20级
-   - HP：5000，MP：200
-   - 攻击：150，防御：80
-   - 技能：["火焰吐息", "雷电打击", "护甲碎击"]
-
-2. **设计Boss技能**：
-   - 火焰吐息：造成200%攻击力伤害，冷却5秒
-   - 雷电打击：造成150%攻击力伤害，有麻痹效果，冷却8秒
-   - 护甲碎击：减少目标50%防御力，持续3秒，冷却12秒
-
-3. **平衡性测试**：
-   - 计算Boss对5个普通玩家的威胁等级
-   - 确保战斗时间在3-5分钟内
-
-### 📝 挑战任务
-请使用学到的MCP命令，完成以下操作：
-
-1. 在characters表中添加Boss数据
-2. 在skills表中添加Boss的3个技能
-3. 查询验证数据正确性
-4. 计算并记录战斗时间预估
-
----
-
-## 🎓 教程总结
-
-### ✅ 已掌握的技能
-- [x] 基础表操作（查看、读取、描述）
-- [x] 数据查询和筛选
-- [x] 批量数据操作
-- [x] SQL高级查询
-- [x] 数据维护和优化
-- [x] 综合实战应用
-
-### 📚 下一步学习建议
-1. **深入高级功能**：学习子查询、JOIN操作、复杂计算
-2. **性能优化**：了解大数据表的查询优化技巧
-3. **团队协作**：学习多人协作配置管理
-4. **自动化**：掌握批量操作脚本编写
-
-### 🆘 遇到问题？
-1. 检查[故障排除指南](./TROUBLESHOOTING.md)
-2. 查看[FAQ文档](./FAQ.md) 
-3. 访问[示例代码](../examples/)
-4. 提交[Issue反馈](https://github.com/TangentDomain/excel-mcp-server/issues)
-
----
-
-## 🎮 快速参考
-
-### 常用MCP命令速查
-| 功能 | 命令 | 用途 |
-|------|------|------|
-| 查看所有表 | `list_sheets` | 获取所有工作表名称 |
-| 查看表结构 | `get_headers` | 获取列标题信息 |
-| 读取数据 | `get_range` | 按范围读取数据 |
-| 查询表 | `describe_table` | 获取表的统计信息 |
-| 搜索数据 | `search` | 按条件搜索数据 |
-| 批量插入 | `batch_insert_rows` | 批量添加新数据 |
-| SQL查询 | `query` | 执行SQL查询语句 |
-| 更新数据 | `update_range` | 按范围更新数据 |
-| 删除数据 | `delete_rows` | 按条件删除数据 |
-| 查找最后一行 | `find_last_row` | 获取数据行数 |
-
-### 游戏场景示例
-```bash
-# 示例1：查询所有战士职业角色
-query "SELECT * FROM characters WHERE class = 'warrior'"
-
-# 示例2：计算装备总价值
-query "SELECT equipment_id, SUM(value) as total_value FROM equipment GROUP BY equipment_id"
-
-# 示例3：查找过期数据
-search "sheet='events' AND status='expired'"
-```
+### 工作效率提升
+- **配置管理**：提升80%的配置修改效率
+- **数据分析**：快速发现数值平衡问题
+- **团队协作**：建立标准化的配置管理流程
+- **质量保证**：通过自动化检查确保数据正确性
 
 ---
 
 *教程版本：v1.6.49*  
 *最后更新：2026-03-29*  
 *维护者：excel-mcp-server开发团队*
+
+---
+
+> 💡 **提示**：建议从[tutorial-overview.md](tutorial-overview.md)开始，按照模块顺序学习。每个模块都包含理论和实践内容，务必完成所有练习以巩固技能。
