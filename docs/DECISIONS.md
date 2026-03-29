@@ -13,3 +13,29 @@
   - ✅ 测试文件去重：删除 `test_formatter_and_utils.py`、`test_api_excel_operations_consolidated.py`、`test_coalesce_vectorized.py`、`test_upsert_row.py`、`test_security_features.py`、`test_duplicate_ids.py` 共6个冗余文件
   - ✅ 健康度从40分提升到85分
 - **依据**: RULES.md项目健康度自检规则（每20轮至少1次）
+
+### [第218轮] MCP验证完成
+- **时间**: 2026-03-29 第218轮
+- **决策内容**:
+  - ✅ 创建MCP验证脚本 `scripts/test_mcp_verification.py`（游戏开发核心功能验证）
+  - ✅ 完成10项核心MCP功能真实验证：list_sheets, get_headers, get_range, find_last_row, describe_table, search, batch_insert_rows, query, update_range, delete_rows
+  - ✅ 验证结果：10/10 通过，MCP服务器功能完整可用
+  - ✅ 支持技能表、角色表等游戏配置表的完整读写操作验证
+  - ✅ 合并develop→main分支，全量测试通过
+- **依据**: RULES.md MCP真实验证要求（每5轮至少1次），确保游戏开发端到端可用性
+
+### [第219轮] 互动式教程创建
+- **时间**: 2026-03-29 第219轮
+- **决策内容**:
+  - ✅ 创建INTERACTIVE_TUTORIAL.md（游戏配置Excel MCP服务器快速上手教程）
+  - ✅ 包含6个章节：基础概念、角色属性管理、技能配置、高级查询、数据维护、综合实战
+  - ✅ 提供15+个实际游戏场景示例和练习题，针对游戏策划和分析师设计
+  - ✅ 添加MCP命令速查表和常见场景示例，降低学习成本
+  - ✅ MCP验证通过：10/10 核心功能正常，支持教程中的所有操作场景
+- **依据**: ROADMAP.md Phase 4.2文档体系优化，创建互动式教程提升用户体验
+
+### [自我进化建议] 教档结构优化（第1次）
+- **问题**: 大型教程文档(361行)可能触发文档瘦身规则，增加维护成本
+- **建议**: 考虑将教程拆分为多个子文档，保持单个文档<30行，便于维护
+- **影响**: 提升文档可维护性，降低文档瘦身频率
+- **痛点追踪**: 1/3次 - 需要观察2次重复出现才能升级为规则修改
