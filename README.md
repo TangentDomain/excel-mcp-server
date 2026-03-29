@@ -50,6 +50,8 @@
 
 ## 🚀 快速开始(2分钟)
 
+> 💡 **需要快速查找命令？** → 查看 [📋 快速参考指南](docs/QUICK_REFERENCE.md) - 30秒找到你需要操作
+
 ### 🔥 超简单安装(任选一种)
 
 #### 🎯 推荐:uvx(最简单,无安装)
@@ -241,6 +243,7 @@ pip install excel-mcp-server-fastmcp
 ## 📚 文档资源
 
 ### 📖 快速上手
+- [📋 快速参考指南](docs/QUICK_REFERENCE.md) - 30秒找到你需要命令（新！）
 - [基础教程](docs/README-gaming.md) - 游戏开发入门指南
 - [性能优化](docs/README-performance.md) - 大文件处理技巧
 - [SQL 参考](docs/README-sql.md) - 高级查询语法
