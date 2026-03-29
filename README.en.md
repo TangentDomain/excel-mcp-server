@@ -243,6 +243,7 @@ See Excel data? 🎉 **Setup complete!**
 
 ### 📖 Quick Start Guides
 - [📋 Quick Reference Guide](docs/QUICK_REFERENCE.md) - Find what you need in 30 seconds (New!)
+- [Interactive Tutorial](docs/INTERACTIVE_TUTORIAL.md) - Modular game configuration tutorials (New!)
 - [Basic Tutorial](docs/README-gaming.md) - Game development getting started
 - [Performance Optimization](docs/README-performance.md) - Large file handling techniques
 - [SQL Reference](docs/README-sql.md) - Advanced query syntax

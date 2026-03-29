@@ -244,6 +244,7 @@ pip install excel-mcp-server-fastmcp
 
 ### 📖 快速上手
 - [📋 快速参考指南](docs/QUICK_REFERENCE.md) - 30秒找到你需要命令（新！）
+- [互动式教程](docs/INTERACTIVE_TUTORIAL.md) - 分模块游戏配置实战教程（新！）
 - [基础教程](docs/README-gaming.md) - 游戏开发入门指南
 - [性能优化](docs/README-performance.md) - 大文件处理技巧
 - [SQL 参考](docs/README-sql.md) - 高级查询语法
