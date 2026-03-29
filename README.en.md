@@ -105,6 +105,63 @@ See Excel data? 🎉 **Setup complete!**
 
 ---
 
+## 🚀 3-Minute Quick Start
+
+### 🎯 New Users Guide (3-Minute Quick Start)
+
+#### Step 1: Prepare Excel Files
+Put your game configuration tables on desktop:
+```
+~/Desktop/skills_table.xlsx
+~/Desktop/equipment_table.xlsx  
+~/Desktop/monsters_config.xlsx
+```
+
+#### Step 2: Install Tool (1 minute)
+```bash
+# Install uv (if not installed)
+curl -LsSf https://astral.sh/uv/install.sh | sh
+
+# Install ExcelMCP
+uvx excel-mcp-server-fastmcp
+```
+
+#### Step 3: Start Using (1 minute)
+Open your AI client (Claude Desktop/Cursor/Cherry Studio), configure MCP, then directly say:
+```
+# Basic operations
+"Read skills table"
+"Increase mage skill damage by 20%" 
+"Find all epic equipment"
+
+# Advanced operations  
+"Link skills table and classes table, count skills per class"
+"Analyze skill balance, find unbalanced skills"
+```
+
+#### ✅ Success Indicator
+When you receive replies like this, configuration is successful:
+```
+✅ Successfully read skills table
+📊 Table info: 3 sheets, 127 rows of data
+💡 Found skill data, can start analysis...
+```
+
+---
+
+## 📱 Mobile View (Simplified Feature Comparison)
+
+| Use Case | ExcelMCP | Traditional Way |
+|----------|----------|-----------------|
+| **Designer wants to adjust values** | Just say "increase damage" | Manually edit 100 cells |
+| **Cross-table statistics** | "Link tables and count" | VLOOKUP + formulas |
+| **Find problem data** | "Find anomalies" | Manual visual inspection |
+| **Batch modifications** | "Batch update" | Copy-paste repetitive operations |
+
+> 💡 **One-Sentence Summary**: You describe needs in natural language, ExcelMCP handles Excel operations
+
+---
+
 ## 🎮 Game Development Scenarios
 
 ### 🎯 Game Designer Daily Work
@@ -257,20 +314,62 @@ See Excel data? 🎉 **Setup complete!**
 
 ## 🔧 Troubleshooting
 
-### 💡 Quick Diagnosis
-When encountering problems, try these first:
-```bash
-# Check if Excel file is corrupted
-"Open Excel file, check if data displays normally"
+### 🚨 90% Common Issues (Must Read)
 
-# Verify file format support
-"Confirm file is .xlsx format, not .xls or .csv"
-
-# Check data integrity
-"Read headers, confirm data format is correct"
+#### 1. MCP Connection Failed
+```
+Problem: AI client says "Tool unavailable"
+Solution:
+1. Check if uv is installed: uv --version
+2. Reinstall: uvx excel-mcp-server-fastmcp --force-reinstall
+3. Restart AI client
 ```
 
-### 🚨 Common Error Handling
+#### 2. Excel File Read Failed
+```
+Problem: Shows "Cannot open Excel file"
+Solution:
+1. Use full file path: /Users/xxx/Desktop/skills.xlsx (don't use ~/Desktop)
+2. Confirm file is .xlsx format (not .xls/.csv)
+3. Ensure file is not opened by Excel software
+```
+
+#### 3. Data Format Error
+```
+Problem: Data shows abnormally after modification
+Solution:
+1. Check for merged cells (recommend unmerging)
+2. Ensure numeric columns contain pure numbers, no text mixed
+3. Use consistent date format (recommend YYYY-MM-DD)
+```
+
+#### 4. Large File Lag
+```
+Problem: Processing 100K+ rows is slow
+Solution:
+1. Process in batches: "First read 1000 rows for testing"
+2. Use WHERE filtering: "Only process skills with damage > 100"
+3. Close other memory-intensive programs
+```
+
+#### 5. Chinese Character Garbled
+```
+Problem: Chinese characters show as question marks or garbled
+Solution:
+1. Ensure Excel file saved as UTF-8 encoding
+2. Check system language settings
+3. Use English column names to avoid encoding issues
+```
+
+### 🛠️ Quick Self-Check List
+When encountering problems, check in order:
+1. ✅ Is Excel file closed?
+2. ✅ Is file path complete?
+3. ✅ Is file format .xlsx?
+4. ✅ Is MCP configuration correct?
+5. ✅ Is uvx command available?
+
+### 💡 Quick Diagnosis
 
 #### Large File Processing Optimization
 ```bash
@@ -294,6 +393,34 @@ When encountering problems, try these first:
 "Confirm association values exist in both tables"
 "Use fuzzy matching to find possible inconsistencies"
 ```
+
+---
+
+## 🎮 Try Now (Copy & Paste Ready)
+
+### 🚀 New User Experience (3-Second Start)
+```bash
+# Copy this to AI client to test:
+"Read my skills table, show first 5 skills"
+```
+
+### 📊 Quick Analysis Experience
+```bash
+# Copy this to test data analysis:
+"Analyze skills table, find top 3 highest damage skills"
+```
+
+### 🔧 Batch Operation Experience
+```bash
+# Copy this to test batch modification:
+"Reduce all mage skill cooldowns by 20%"
+```
+
+### 🎯 Expected Results
+- ✅ Success: See Excel data correctly read and modified
+- ❌ Failed: Check if Excel file is closed, file path is correct
+
+---
 
 ### ⚡ Performance Optimization Tips
 
