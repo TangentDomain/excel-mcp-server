@@ -1,5 +1,18 @@
 {
   "REQUIREMENTS_ARCHIVED": {
+    "REQ-031": {
+      "title": "版本一致性检查与自动化修复脚本",
+      "description": "创建check-version-sync.py脚本，自动检测并修复版本不一致问题，确保pyproject.toml、__init__.py、README.md、README.en.md、CHANGELOG.md之间的版本信息同步",
+      "priority": "high",
+      "status": "DONE",
+      "acceptance": [
+        "创建scripts/check-version-sync.py脚本",
+        "脚本自动检测所有版本文件的一致性",
+        "发现不一致时自动修复到正确版本",
+        "修复过程记录到DECISIONS.md",
+        "集成到每轮自动化流程中"
+      ]
+    },
     "REQ-029": {
       "title": "Excel操作异常处理优化",
       "description": "将excel_operations.py中的通用异常处理替换为具体的自定义异常类，提升错误处理的精确性和用户体验",
@@ -34,8 +47,7 @@
       "completed_at": "2026-03-28 14:15 UTC",
       "notes": "错误处理机制优化完成，PyPI发布成功"
     }
-  }
-},
+  },
   "REQUIREMENTS": {
     "REQ-030": {
       "title": "CI CTE测试失败修复",
@@ -47,4 +59,3 @@
     }
   }
 }
-

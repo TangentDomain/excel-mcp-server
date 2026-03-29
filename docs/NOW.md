@@ -1,26 +1,28 @@
-# NOW.md - 第210轮
+# NOW.md - 第211轮
 
 ## 当前状态
-- **轮次**: 第210轮（需求状态同步）
-- **时间**: 2026-03-28 17:30 UTC
-- **需求**: REQ-031 状态确认 ✅ 已完成
+- **轮次**: 第211轮（测试合并修复）
+- **时间**: 2026-03-29 07:00 UTC
+- **需求**: 测试文件合并后断言修复
+
+## 进行中
+- 🔄 修复 test_sql_operations_consolidated.py（子代理处理中）
+- 🔄 修复 test_streaming_operations_consolidated.py（子代理处理中）
 
 ## 完成工作
-- ✅ 确认 REQ-031 版本一致性检查脚本正常运行
-- ✅ 版本检查脚本执行：所有文件保持 v1.6.48 一致
-- ✅ 更新 REQUIREMENTS.md：REQ-031 状态 OPEN→DONE
-- ✅ 更新 DECISIONS.md：记录 REQ-031 完成状态
-- ✅ 验证自动化流程：每轮自动检查版本同步机制运行正常
+- ✅ 合并21个冗余测试文件为3个 consolidated 文件
+- ✅ 修复 test_api_excel_operations_consolidated.py：15→0 失败（34/34 passed）
+- ✅ 修复模式：affected_rows → data.actual_count/inserted_count、metadata.mode、copy_sheet自动重命名行为
+- ✅ 删除垃圾文件：test_analysis.py、test_duplicates_analysis.json
+- ✅ 删除恢复的 tests/test_api_excel_operations.py
 
-## 需求池
-- **OPEN**: 无（需创建新需求继续迭代）
-- **DONE**: REQ-031（自动化版本一致性检查）、REQ-030（CTE测试）、REQ-029（异常处理）、REQ-028（错误处理）、REQ-026（文档门面）
+## 待办
+- [ ] 等待子代理完成 SQL + Streaming consolidated 修复
+- [ ] 全量测试通过后 commit + merge + push
+- [ ] 更新 DECISIONS.md 记录测试合并决策
 
 ## 关键指标
 - **版本**: v1.6.48
-- **测试**: 全量测试通过
-- **脚本**: check-version-sync.py 运行正常，版本同步机制完善
-
-## 自我进化记录
-- **需求状态管理**：确保 OPEN/DONE 状态与实际实现一致，提升文档准确性
-- **自动化流程验证**：确认版本检查机制每轮正常运行，保障项目维护效率
+- **API测试**: 34/34 passed ✅
+- **SQL测试**: 修复中
+- **Streaming测试**: 修复中
