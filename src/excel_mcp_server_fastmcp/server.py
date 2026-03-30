@@ -650,14 +650,20 @@ def _strip_defaults(obj: Any, depth: int = 0) -> Any:
         'indent', 'shrink_to_fit', 'merge_cells'
     }
     
+    # 有语义的空列表字段名，即使为空也不应移除
+    semantic_list_fields = {
+        'headers', 'sheets', 'sheets_with_headers', 'field_names',
+        'descriptions', 'data', 'columns', 'rows'
+    }
+    
     cleaned = {}
     for k, v in obj.items():
         # 移除空值
         if v is None or v == '':
             continue
         
-        # 移除空容器
-        if isinstance(v, (list, dict)) and len(v) == 0:
+        # 移除空容器（但有语义的列表字段除外）
+        if isinstance(v, (list, dict)) and len(v) == 0 and k not in semantic_list_fields:
             continue
         
         # 基于字段名的默认值处理
@@ -706,6 +712,15 @@ def _wrap(result: dict, meta: dict = None) -> dict:
     # Token优化：过滤默认值和空值，减少响应体积
     if result.get('success') is True and 'data' in result and isinstance(result['data'], dict):
         result['data'] = _strip_defaults(result['data'])
+        # 向后兼容：将data内的字段展平到顶层（避免破坏已有测试/客户端）
+        for k, v in result['data'].items():
+            if k not in result:
+                result[k] = v
+    # 向后兼容：将meta内的字段也展平到顶层（meta优先级低于data和已有顶层字段）
+    if result.get('success') is True and 'meta' in result and isinstance(result['meta'], dict):
+        for k, v in result['meta'].items():
+            if k not in result:
+                result[k] = v
 
     # 对Operations层返回的错误也附加集中式提示（Operations层无error_code）
     if result.get('success') is False:

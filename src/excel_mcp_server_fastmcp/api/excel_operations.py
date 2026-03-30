@@ -726,16 +726,20 @@ class ExcelOperations:
 
             # 步骤2: 获取每个工作表的双行表头
             sheets_with_headers = []
-            sheets = sheets_result.get('sheets', [])
+            # Operations层内部调用，从data中取sheets列表
+            sheets_data = sheets_result.get('data', {}).get('sheets', sheets_result.get('sheets', []))
+            sheets = [s['name'] if isinstance(s, dict) else s for s in sheets_data]
 
             for sheet_name in sheets:
                 try:
                     header_result = cls.get_headers(file_path, sheet_name, header_row=header_row, max_columns=max_columns)
 
                     if header_result.get('success'):
-                        headers = header_result.get('headers', [])
-                        descriptions = header_result.get('descriptions', [])
-                        field_names = header_result.get('field_names', [])
+                        # Operations层内部调用，优先从data取
+                        hdr_data = header_result.get('data', header_result)
+                        headers = hdr_data.get('headers', [])
+                        descriptions = hdr_data.get('descriptions', [])
+                        field_names = hdr_data.get('field_names', [])
 
                         # 如果没有获取到field_names，使用headers作为fallback
                         if not field_names and headers:

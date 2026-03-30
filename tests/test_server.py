@@ -555,7 +555,7 @@ class TestServerInterfaces:
         # 获取第一个工作表名称
         sheets_result = excel_list_sheets(sample_excel_file)
         assert sheets_result['success']
-        sheet_name = sheets_result['sheets'][0]
+        sheet_name = sheets_result['sheets'][0]['name'] if isinstance(sheets_result['sheets'][0], dict) else sheets_result['sheets'][0]
 
         # 测试查找整个工作表的最后一行
         result = excel_find_last_row(sample_excel_file, sheet_name)
@@ -583,7 +583,7 @@ class TestServerInterfaces:
         """Test excel_find_last_row with column name - specific column functionality"""
         sheets_result = excel_list_sheets(sample_excel_file)
         assert sheets_result['success']
-        sheet_name = sheets_result['sheets'][0]
+        sheet_name = sheets_result['sheets'][0]['name'] if isinstance(sheets_result['sheets'][0], dict) else sheets_result['sheets'][0]
 
         # 测试查找A列的最后一行
         result = excel_find_last_row(sample_excel_file, sheet_name, "A")
@@ -598,7 +598,7 @@ class TestServerInterfaces:
         """Test excel_find_last_row with column index - specific column functionality"""
         sheets_result = excel_list_sheets(sample_excel_file)
         assert sheets_result['success']
-        sheet_name = sheets_result['sheets'][0]
+        sheet_name = sheets_result['sheets'][0]['name'] if isinstance(sheets_result['sheets'][0], dict) else sheets_result['sheets'][0]
 
         # 测试查找第1列的最后一行
         result = excel_find_last_row(sample_excel_file, sheet_name, 1)
@@ -678,7 +678,7 @@ class TestServerInterfaces:
         """Test excel_set_formula with basic formula setting"""
         # First get the sheet name from the sample file
         sheets_result = excel_list_sheets(sample_excel_file)
-        sheet_name = sheets_result['sheets'][0] if sheets_result['success'] and sheets_result['sheets'] else "Sheet1"
+        _s0 = sheets_result['sheets'][0]; sheet_name = _s0['name'] if isinstance(_s0, dict) else _s0 if sheets_result['success'] and sheets_result['sheets'] else "Sheet1"
 
         # Test setting a simple SUM formula
         result = excel_set_formula(sample_excel_file, sheet_name, "A1", "SUM(1,2,3)")
@@ -692,7 +692,7 @@ class TestServerInterfaces:
         """Test excel_set_formula with cell reference formula"""
         # First get the sheet name from the sample file
         sheets_result = excel_list_sheets(sample_excel_file)
-        sheet_name = sheets_result['sheets'][0] if sheets_result['success'] and sheets_result['sheets'] else "Sheet1"
+        _s0 = sheets_result['sheets'][0]; sheet_name = _s0['name'] if isinstance(_s0, dict) else _s0 if sheets_result['success'] and sheets_result['sheets'] else "Sheet1"
 
         # Test setting formula that references other cells
         result = excel_set_formula(sample_excel_file, sheet_name, "B1", "=A1*2")
@@ -726,7 +726,7 @@ class TestServerInterfaces:
         """Test excel_set_formula with empty formula - error handling"""
         # First get the sheet name from the sample file
         sheets_result = excel_list_sheets(sample_excel_file)
-        sheet_name = sheets_result['sheets'][0] if sheets_result['success'] and sheets_result['sheets'] else "Sheet1"
+        _s0 = sheets_result['sheets'][0]; sheet_name = _s0['name'] if isinstance(_s0, dict) else _s0 if sheets_result['success'] and sheets_result['sheets'] else "Sheet1"
 
         # Test with empty formula
         result = excel_set_formula(sample_excel_file, sheet_name, "A1", "")
