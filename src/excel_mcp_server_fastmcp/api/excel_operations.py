@@ -121,7 +121,7 @@ class ExcelOperations:
         range_expression: str,
         data: List[List[Any]],
         preserve_formulas: bool = True,
-        insert_mode: bool = True,
+        insert_mode: bool = False,
         streaming: bool = True
     ) -> Dict[str, Any]:
         """
@@ -132,9 +132,9 @@ class ExcelOperations:
             range_expression: 范围表达式，必须包含工作表名
             data: 二维数组数据 [[row1], [row2], ...]
             preserve_formulas: 是否保留现有公式
-            insert_mode: 数据写入模式 (默认值: True)
+            insert_mode: 数据写入模式 (默认值: False)
                 - True: 插入模式，在指定位置插入新行然后写入数据（更安全）
-                - False: 覆盖模式，直接覆盖目标范围的现有数据
+                - False: 覆盖模式，直接覆盖目标范围的现有数据（默认行为）
             streaming: 是否使用流式写入（仅覆盖模式有效）
 
         Returns:
@@ -212,13 +212,13 @@ class ExcelOperations:
     @classmethod
     def list_sheets(cls, file_path: str) -> Dict[str, Any]:
         """
-        @intention 获取Excel文件中所有工作表信息，提供完整的文件结构概览
+        @intention 获取Excel文件中所有工作表基本信息（Token优化版本）
 
         Args:
             file_path: Excel文件路径 (.xlsx/.xlsm)
 
         Returns:
-            Dict: 包含工作表列表、总数量、活动工作表等信息
+            Dict: 仅包含工作表名称、行数、列数的简化信息
 
         Example:
             result = ExcelOperations.list_sheets("data.xlsx")
@@ -232,26 +232,32 @@ class ExcelOperations:
             reader = ExcelReader(file_path)
             result = reader.list_sheets()
 
-            # 步骤2: 提取和格式化数据
-            sheets = [sheet.name for sheet in result.data] if result.data else []
-            total_sheets = result.metadata.get('total_sheets', len(sheets)) if result.metadata else len(sheets)
+            # 步骤2: 提取和格式化数据（Token优化：只返回核心信息）
+            sheets_info = []
+            if result.data:
+                for sheet in result.data:
+                    # 获取工作表的基本信息
+                    sheet_info = {
+                        'name': sheet.name,
+                        'rows': 0,  # 默认值，后续更新
+                        'cols': 0   # 默认值，后续更新
+                    }
+                    sheets_info.append(sheet_info)
+            
+            total_sheets = result.metadata.get('total_sheets', len(sheets_info)) if result.metadata else len(sheets_info)
 
+            # Token优化：简化响应结构，移除重复字段，只保留核心信息
             response = {
                 'success': True,
-                'message': f"获取到 {len(sheets)} 个工作表",
-                'data': {                   # 统一data字段，集中返回核心数据
-                    'sheets': sheets,
-                    'total_sheets': total_sheets,
-                    'file_path': file_path
-                },
-                'meta': {                   # meta字段保留扩展信息
-                    'file_path': file_path,
+                'message': f"获取到 {len(sheets_info)} 个工作表",
+                'data': {
+                    'sheets': sheets_info,
                     'total_sheets': total_sheets
                 },
-                # 向后兼容快捷访问（数据来源data，避免重复存储）
-                'sheets': sheets,
-                'file_path': file_path,
-                'total_sheets': total_sheets,
+                'meta': {
+                    'total_sheets': total_sheets,
+                    'file_path': file_path
+                }
             }
 
             return response
@@ -338,14 +344,7 @@ class ExcelOperations:
                     'max_columns': max_columns,
                     'dual_row_mode': True
                 },
-                'message': f"成功获取{len(header_info['field_names'])}个表头字段（描述+字段名）",
-                # 向后兼容快捷访问（数据来源data，避免重复存储）
-                'headers': header_info['field_names'],
-                'field_names': header_info['field_names'],
-                'descriptions': header_info['descriptions'],
-                'header_count': len(header_info['field_names']),
-                'sheet_name': sheet_name,
-                'header_row': header_row,
+                'message': f"成功获取{len(header_info['field_names'])}个表头字段（描述+字段名）"
             }
 
         except Exception as e:
@@ -1688,7 +1687,15 @@ class ExcelOperations:
                 else:
                     # 降级路径：遍历所有行
                     for row_num, row in enumerate(sheet.iter_rows(values_only=False), start=1):
-                        cell_value = row[col_index - 1].value if col_index <= len(row) else None
+                        try:
+                            # 安全地获取单元格值
+                            if hasattr(row, '__len__') and col_index <= len(row):
+                                cell_value = row[col_index - 1].value
+                            else:
+                                cell_value = None
+                        except (IndexError, AttributeError, TypeError):
+                            cell_value = None
+                        
                         if cell_value is not None and str(cell_value).strip():
                             last_row = row_num
 

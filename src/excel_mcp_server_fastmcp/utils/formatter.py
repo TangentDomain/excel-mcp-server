@@ -22,6 +22,115 @@ from typing import Any, Dict, List, Optional, Union
 
 # ==================== 主干 ====================
 
+def _strip_defaults(obj: Any) -> Any:
+    """
+    递归移除数据中的默认值：None、空字符串、空容器
+    
+    @intention 进一步减少响应数据体积，过滤掉无意义的默认值
+    
+    Args:
+        obj: 待清理的任意类型对象
+    
+    Returns:
+        Any: 清理后的对象，移除了None/空字符串/空容器
+    
+    Rules:
+        - None值 → 移除
+        - 空字符串 "" → 移除  
+        - 空列表 [] → 移除
+        - 空字典 {} → 移除
+        - 假值但有意义的数据（如False、0）→ 保留
+        - 递归处理嵌套结构
+        - 特例：data、matches等重要字段即使为空也保留
+    """
+    if obj is None:
+        return None
+    elif isinstance(obj, str):
+        return obj if obj.strip() != "" else None
+    elif isinstance(obj, dict):
+        cleaned = {}
+        for key, value in obj.items():
+            if key in ['data', 'matches', 'differences', 'results', 'row_differences', 'headers']:
+                # 重要字段即使为空也要保留
+                cleaned[key] = _strip_defaults(value)
+            else:
+                # 普通字段过滤掉空值
+                stripped_value = _strip_defaults(value)
+                if stripped_value is not None and stripped_value != {} and stripped_value != []:
+                    cleaned[key] = stripped_value
+        return cleaned
+    elif isinstance(obj, list):
+        cleaned = []
+        for item in obj:
+            stripped_item = _strip_defaults(item)
+            if stripped_item is not None and stripped_item != {} and stripped_item != []:
+                cleaned.append(stripped_item)
+        return cleaned
+    else:
+        return obj
+
+
+def _optimize_excel_data(obj: Any) -> Any:
+    """
+    Excel数据专项优化：移除冗余字段，简化数据结构
+    
+    @intention 专门针对Excel操作的响应数据进行进一步优化，移除冗余信息
+    
+    Args:
+        obj: Excel操作响应数据
+    
+    Returns:
+        Any: 优化后的数据
+        
+    Optimizations:
+        - 移除get_headers中的冗余字段（field_names/headers重复）
+        - 移除单元格数据中的coordinate字段（与位置信息冗余）
+        - 简化元数据结构
+    """
+    if isinstance(obj, dict):
+        cleaned = {}
+        
+        # 专门处理headers数据中的冗余
+        if obj.get('success') and obj.get('data') and isinstance(obj.get('data'), dict):
+            data = obj['data']
+            
+            # 如果是headers响应，移除field_names与headers的重复
+            if 'headers' in data and 'field_names' in data:
+                if data['headers'] == data['field_names']:
+                    # 保留headers，移除field_names
+                    cleaned_data = data.copy()
+                    cleaned_data.pop('field_names', None)
+                    cleaned['data'] = cleaned_data
+                else:
+                    cleaned['data'] = data
+            else:
+                cleaned['data'] = data
+        else:
+            cleaned['data'] = obj.get('data')
+        
+        # 处理其他字段
+        for key, value in obj.items():
+            if key != 'data':
+                cleaned[key] = value
+                
+        return cleaned
+    elif isinstance(obj, list):
+        # 如果是单元格数据列表，移除coordinate字段
+        if len(obj) > 0 and isinstance(obj[0], dict) and 'coordinate' in obj[0]:
+            optimized_list = []
+            for item in obj:
+                if isinstance(item, dict):
+                    # 移除coordinate字段，只保留value
+                    optimized_item = {'value': item.get('value')}
+                    optimized_list.append(optimized_item)
+                else:
+                    optimized_list.append(item)
+            return optimized_list
+        else:
+            return obj
+    else:
+        return obj
+
 def _normalize_error_key(result_dict: Dict[str, Any]) -> None:
     """
     统一错误信息键名：将error字段映射到message，确保MCP客户端只需检查message键。
@@ -53,6 +162,7 @@ def format_operation_result(result) -> Dict[str, Any]:
         - JSON序列化：自动处理dataclass和枚举类型
         - 紧凑转换：结构化比较数据转换为数组格式，减少60-80%体积
         - null清理：递归移除空值、空字典、空列表
+        - 默认值清理：移除None、空字符串、空容器
         - 错误回退：序列化失败时自动切换到原始转换方案
     """
     # 步骤1：尝试JSON序列化方案（推荐）
@@ -66,13 +176,20 @@ def format_operation_result(result) -> Dict[str, Any]:
         # 步骤3：应用深度null清理
         cleaned_dict = _deep_clean_nulls(serialized_dict)
 
-        # 步骤4：统一错误键 — 将error映射到message，确保MCP客户端只需检查message
-        _normalize_error_key(cleaned_dict)
-        return cleaned_dict
+        # 步骤4：应用默认值清理（REQ-027新功能）
+        stripped_dict = _strip_defaults(cleaned_dict)
+
+        # 步骤5：Excel数据专项优化（REQ-027优化功能）
+        optimized_dict = _optimize_excel_data(stripped_dict)
+
+        # 步骤6：统一错误键 — 将error映射到message，确保MCP客户端只需检查message
+        _normalize_error_key(optimized_dict)
+        return optimized_dict
 
     except Exception as e:
-        # 步骤5：JSON方案失败，使用回退方案
+        # 步骤6：JSON方案失败，使用回退方案
         fallback = _fallback_format_result(result, e)
+        _strip_defaults(fallback)  # 回退方案也应用默认值清理
         _normalize_error_key(fallback)
         return fallback
 
@@ -152,7 +269,8 @@ def _fallback_format_result(result, original_exception: Exception) -> Dict[str, 
     else:
         response['error'] = result.error
 
-    return response
+    # 应用默认值清理（REQ-027新功能）
+    return _strip_defaults(response)
 
 
 # --- 紧凑数组格式转换 ---
