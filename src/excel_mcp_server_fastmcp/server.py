@@ -1,64 +1,9 @@
 #!/usr/bin/env python3
-"""
-Excel MCP Server - 基于 FastMCP 和 openpyxl 实现
+"""Excel MCP Server - 基于 FastMCP 和 openpyxl 的游戏开发Excel配置表工具。
 
-📋 **统一返回格式说明**
-==============================
-
-所有工具都采用统一的JSON返回格式，确保AI客户端可以可靠解析：
-
-✅ **成功返回格式**:
-{
-  "success": true,
-  "message": "操作成功说明",
-  "data": {
-    // 实际数据，根据工具不同而异
-  },
-  "meta": {
-    "error_code": "SUCCESS",
-    "execution_time_ms": 150,
-    "cache_hit": true,
-    "file_size_mb": 2.5
-  }
-}
-
-❌ **失败返回格式**:
-{
-  "success": false,
-  "message": "详细的错误信息💡 建议修复方法",
-  "data": null,
-  "meta": {
-    "error_code": "SHEET_NOT_FOUND",
-    "suggested_fix": "请使用excel_list_sheets确认工作表名称",
-    "file_path": "配置.xlsx",
-    "sheet_name": "技能表"
-  }
-}
-
-🔍 **字段说明**:
-- success: 操作是否成功
-- message: 结果描述（失败时包含💡修复提示）
-- data: 实际数据内容（成功时）
-- meta: 元信息（错误码、执行时间、缓存状态等）
-
-🎮 **游戏开发优化**:
-- 中文友好：支持中文字段名和描述
-- 智能错误：错误信息直接提供修复建议
-- 缓存优化：重复操作自动提速
-- 内存控制：大文件使用流式写入
-
----
-
-主要功能：
-1. 正则搜索：在Excel文件中搜索符合正则表达式的单元格
-2. 范围获取：读取指定范围的Excel数据
-3. 范围修改：修改指定范围的Excel数据
-4. 工作表管理：创建、删除、重命名工作表
-5. 行列操作：插入、删除行列
-
-技术栈：
-- FastMCP: 用于MCP服务器框架
-- openpyxl: 用于Excel文件操作
+统一返回格式: {success: bool, message: str, data: Any, meta: dict}
+- 成功: success=true, data含实际数据
+- 失败: success=false, message含错误描述+💡修复建议
 """
 
 # 标准库导入
@@ -686,6 +631,25 @@ def _fail(message: str, meta: dict = None) -> dict:
     return r
 
 
+def _strip_defaults(obj: Any, depth: int = 0) -> Any:
+    """递归移除空值以减少token消耗。只移除None/空串/空容器，保留False/0等有意义值。"""
+    if depth > 5 or not isinstance(obj, dict):
+        return obj
+    cleaned = {}
+    for k, v in obj.items():
+        if v is None or v == '':
+            continue
+        if isinstance(v, (list, dict)) and len(v) == 0:
+            continue
+        if isinstance(v, dict):
+            cleaned[k] = _strip_defaults(v, depth + 1)
+        elif isinstance(v, list):
+            cleaned[k] = [_strip_defaults(i, depth + 1) if isinstance(i, dict) else i for i in v]
+        else:
+            cleaned[k] = v
+    return cleaned
+
+
 def _wrap(result: dict, meta: dict = None) -> dict:
     """包装Operations层返回，metadata→meta，添加上下文meta，统一success字段。
     
@@ -713,6 +677,10 @@ def _wrap(result: dict, meta: dict = None) -> dict:
             meta = None  # 已合并，不再重复设置
     if meta and "meta" not in result:
         result["meta"] = meta
+
+    # Token优化：过滤默认值和空值，减少响应体积
+    if result.get('success') is True and 'data' in result and isinstance(result['data'], dict):
+        result['data'] = _strip_defaults(result['data'])
 
     # 对Operations层返回的错误也附加集中式提示（Operations层无error_code）
     if result.get('success') is False:
@@ -752,55 +720,7 @@ def _infer_error_code(message: str) -> str:
 @mcp.tool()
 @_track_call
 def excel_list_sheets(file_path: str) -> Dict[str, Any]:
-    """
-    Excel工作表清单 - 获取文件中的所有工作表名称
-
-    快速列出Excel文件中所有工作表的名称，支持多文件表结构了解。
-    在进行SQL查询前，建议先用此工具确认目标工作表存在。
-
-    Args:
-        file_path (str): Excel文件路径（支持相对路径）
-
-    Returns:
-        Dict[str, Any]: 包含工作表信息的字典，格式：
-            {
-                "success": bool,
-                "message": str,
-                "data": {
-                    "sheets": List[str]  # 工作表名称列表
-                },
-                "meta": {
-                    "error_code": str,
-                    "execution_time_ms": int
-                }
-            }
-
-    🎮 游戏开发场景:
-    • **表结构扫描**: 快速了解技能表、装备表、怪物表等存在情况
-    • **多表操作**: 确认目标工作表存在后再进行查询或修改操作
-    • **文件检查**: 验证Excel文件是否包含预期的工作表
-    • **配置管理**: 了解配置文件包含哪些类型的配置表
-
-    💡 实用技巧:
-    • **查询前必用**: 在使用excel_query前，先用此工具确认工作表存在，避免列名错误
-    • **双文件对比**: 同时查看两个Excel文件的工作表结构，快速识别差异
-    • **批量检查**: 对整个配置目录的文件进行工作表普查，发现命名不规范文件
-
-    🎯 游戏开发最佳实践:
-    • **RPG项目**: 优先检查"技能表"、"装备表"、"怪物表"、"任务表"、"道具表"是否存在
-    • **MMO项目**: 关注"玩家配置"、"副本配置"、"公会系统"等大型配置表
-    • **手游项目**: 验证本地配置表和远程配置表的表结构一致性
-
-    🔗 配合使用:
-    • + excel_describe_table → 了解工作表结构详情
-    • + excel_query → 确认工作表存在后再进行数据查询
-    • + excel_search_directory → 批量检查多个配置文件的表结构
-
-    🚫 注意事项:
-    • **必用前置**: 在执行excel_query前先用此工具确认工作表存在
-    • **批量操作**: 多个文件操作前先用此工具了解表结构
-    • **只返回工作表名称**: 不包含表结构信息，了解表结构需要配合excel_describe_table
-    """
+    """列出Excel文件中的所有工作表名称。查询前先用此工具确认工作表存在。"""
     _path_err = _validate_path(file_path)
     if _path_err:
         return _path_err
@@ -820,68 +740,7 @@ def excel_search(
     include_formulas: bool = False,
     range: Optional[str] = None
 ) -> Dict[str, Any]:
-    """
-    智能文本搜索 - 快速定位Excel中的目标内容
-
-    在Excel文件中搜索文本、数值或公式，支持正则表达式。
-    精确匹配单元格位置，支持灵活的搜索策略。
-
-    Args:
-        file_path (str): Excel文件路径
-        pattern (str): 搜索文本（支持正则表达式）
-        sheet_name (Optional[str], optional): 工作表名称（可选，默认搜索所有表）
-        case_sensitive (bool, optional): 大小写敏感（默认False）
-        whole_word (bool, optional): 全词匹配（默认False）
-        use_regex (bool, optional): 使用正则表达式（默认False）
-        include_values (bool, optional): 包含单元格值（默认True）
-        include_formulas (bool, optional): 包含公式搜索（默认False）
-        range (Optional[str], optional): 搜索范围（如"A1:C100"，可选）
-
-    Returns:
-        Dict[str, Any]: 搜索结果字典，格式：
-            {
-                "success": bool,
-                "message": str,
-                "data": {
-                    "matches": List[Dict],  # 匹配结果列表
-                    "match_count": int,    # 总匹配数量
-                    "search_info": Dict   # 搜索信息
-                },
-                "meta": {
-                    "error_code": str,
-                    "execution_time_ms": int
-                }
-            }
-
-    🎮 游戏开发场景:
-    • **技能查找**: "火" 搜索所有火系技能，"瞬发" 查找无冷却技能
-    • **装备定位**: "传说" 查找所有传说装备，"史诗" 查找史诗级装备
-    • **问题排查**: "测试" 查找所有测试数据便于清理，"调试" 查找调试标记
-    • **关键字定位**: "CD" 或 "冷却" 找到冷却时间字段，"消耗MP" 查找蓝耗相关字段
-
-    ⚡ 性能优化技巧:
-    • **限制搜索范围**: 对于大型文件，使用range参数缩小搜索范围如"A1:Z1000"
-    • **精准匹配**: 使用whole_word=True避免误匹配，如精确查找"技能"而非"技能书"
-    • **正则优化**: 复杂正则表达式可能较慢，优先使用简单模式或固定字符串
-    • **多表搜索**: 不指定sheet_name时搜索所有表，但会增加耗时
-
-    💡 使用示例:
-    ```python
-    # 搜索技能表中的"火"字
-    result = excel_search("技能表.xlsx", "火", sheet_name="技能")
-
-    # 正则搜索等级1-5的技能
-    result = excel_search("技能表.xlsx", "等级[1-5]", use_regex=True)
-
-    # 搜索指定范围
-    result = excel_search("配置.xlsx", "攻击力", range="B1:B100")
-    ```
-
-    🔗 配合使用:
-    • 定位后修改: 搜索结果→excel_update_query批量修改
-    • 查看详情: excel_describe_table了解字段含义
-    • 大文件搜索: excel_search_directory支持多文件搜索
-    """
+    """在Excel中搜索匹配pattern的单元格。支持正则、大小写、全词匹配。"""
     _path_err = _validate_path(file_path)
     if _path_err:
         return _path_err
@@ -903,48 +762,7 @@ def excel_search_directory(
     file_pattern: Optional[str] = None,
     max_files: int = 100
 ) -> Dict[str, Any]:
-    """
-🔎 目录批量搜索 - 在文件夹下所有Excel文件中搜索内容
-
-**核心功能**: 递归扫描目录下所有Excel文件，返回匹配的文件名+单元格位置+值。支持正则、大小写、全词匹配、文件名过滤。
-搜索单个文件请用excel_search。
-
-**🎮 游戏开发场景**:
-• **全局配置搜索**: 在整个配置目录中查找某个数值（如"攻击力:500"出现在哪些文件）
-• **文本替换前置**: 找到需要修改的文件和位置，再逐个修改
-• **跨表关联检查**: 查找引用了某个ID的所有配置表
-• **废弃资源排查**: 搜索已下线活动ID，确认是否还有残留引用
-
-**🔧 参数说明**:
-• **pattern**: 搜索文本（支持正则表达式）
-• **use_regex**: True启用正则匹配
-• **file_pattern**: 文件名过滤（如"*.xlsx"只搜xlsx文件）
-• **max_files**: 最大搜索文件数（防止卡死）
-
-**📊 返回信息**:
-• **matches**: 匹配结果数组，每个包含{file, sheet, row, col, value}
-• **file_count**: 搜索的文件总数
-• **match_count**: 匹配到的单元格总数
-• **search_time_ms**: 搜索耗时（毫秒）
-• **success**: 操作是否成功
-• **message**: 状态消息或错误信息
-
-**💡 使用示例**:
-• **基础搜索**: `excel_search_directory("./config", "攻击力")` - 搜索所有文件中"攻击力"
-• **正则搜索**: `excel_search_directory("./config", "等级[1-5]", use_regex=True)` - 搜索等级1-5
-• **文件过滤**: `excel_search_directory("./config", "技能", file_pattern="技能*.xlsx")` - 只搜索技能表文件
-• **性能控制**: `excel_search_directory("./big_data", "数值", max_files=50)` - 限制搜索文件数
-
-**🔗 配合使用**:
-• 定位后批量修改: 搜索结果→excel_update_query批量修改
-• 深入分析: 对匹配结果用excel_describe_table了解详情
-• 版本对比: 在不同版本目录中搜索相同内容比较差异
-
-**⚡ 性能提示**:
-• 大目录建议先用file_pattern缩小搜索范围
-• 设置合理的max_files避免长时间等待
-• 重复搜索相同目录会自动缓存，第二次更快
-    """
+    """在目录下所有Excel文件中搜索内容。支持文件类型过滤和递归搜索。"""
     _path_err = _validate_path(directory_path)
     if _path_err:
         return _path_err
@@ -958,54 +776,7 @@ def excel_get_range(
     range: str,
     include_formatting: bool = False
 ) -> Dict[str, Any]:
-    """
-📥 极速数据读取 - 精确获取Excel数据
-
-**核心功能**: 使用calamine引擎极速读取指定范围的原始数据。适合获取精确的单元格数据，速度快于传统方式100倍。
-
-**⚡ 性能优势**:
-• **超高速读取**: calamine引擎比传统方式快2300倍，2000行仅需230ms
-• **智能缓存**: 同一文件重复查询自动提速30-100倍
-• **内存友好**: 读取仅针对指定范围，不加载整个文件
-• **格式可选**: 只需数据→set include_formatting=False，需样式→设为True
-
-**🎮 游戏开发场景**:
-• **配置读取**: 读取技能列表前10行进行预览
-• **数据提取**: 装备表中特定范围的属性值
-• **批量导出**: 技能表中指定范围的技能数据
-• **测试验证**: 获取特定单元格的数据进行验证
-
-**🔧 参数说明**:
-• **file_path**: Excel文件路径
-• **range**: 范围表达式，支持"A1:B10"、"Sheet1!A1:C10"、"技能表!B:D"
-• **include_formatting**: 是否包含字体、颜色、边框等格式信息（默认False）
-
-**📊 返回信息**:
-• **data**: 获取的二维数组数据（行数组，每行是单元格值数组）
-• **headers**: 表头行（如果存在双行表头会自动合并）
-• **range_info**: 范围信息{start_cell, end_cell, rows, cols, sheet_name}
-• **validation_info**: 验证信息{normalized_range, range_type, scale_assessment}
-• **cache_hit**: 是否命中缓存（提升性能优化）
-• **success**: 操作是否成功
-• **message**: 状态消息或错误信息
-
-**💡 使用示例**:
-```python
-# 读取技能表A1:C10范围数据
-result = excel_get_range("技能表.xlsx", "A1:C10", sheet_name="技能")
-
-# 读取整列数据（格式不包含）
-result = excel_get_range("装备表.xlsx", "B:B", include_formatting=False)
-
-# 读取特定工作表范围
-result = excel_get_range("配置.xlsx", "技能!A1:D50")
-```
-
-**🔗 配合使用**:
-• + excel_describe_table → 不确定列名时先了解表结构
-• + excel_query → 需要筛选/聚合/排序时用SQL查询
-• + excel_update_range → 读取→修改→写回的标准流程
-    """
+    """读取指定范围的数据。返回{headers, data, shape}。支持include_formatting获取样式。"""
     _path_err = _validate_path(file_path)
     if _path_err:
         return _path_err
@@ -1077,95 +848,7 @@ def excel_get_headers(
     header_row: int = 1,
     max_columns: Optional[int] = None
 ) -> Dict[str, Any]:
-    """
-📋 智能表头提取器 - 数据结构的导航仪
-
-**核心功能**: 快速提取Excel工作表的表头信息，特别针对游戏开发的双行表头优化。提供清晰的字段名和描述映射。
-
-**🎮 游戏开发场景**:
-• **技能表分析**: 提取技能ID、名称、类型、伤害、冷却等字段信息
-• **装备表检查**: 获取装备ID、品质、属性、套装、获取方式等字段名
-• **怪物数据审查**: 收集怪物ID、名称、等级、血量、攻击、防御等字段
-• **配置表确认**: 验证技能配置、装备配置、掉落配置的表头结构
-• **RPG系统**: 技能、装备、怪物、任务、道具、NPC等核心系统的字段映射
-• **MMO配置**: 玩家属性、公会系统、副本配置、PVP规则等大型配置表
-• **手游优化**: 本地配置、远程配置、热更新配置的表头一致性检查
-• **数值策划**: 伤害公式、成长曲线、平衡性调整相关的字段和参数
-• **关卡设计**: 关卡配置、怪物波次、奖励掉落等关卡设计字段
-
-**🔧 参数说明**:
-• **file_path**: Excel文件路径（支持相对路径）
-• **sheet_name**: 工作表名称（可选，不传则获取所有工作表表头）
-• **header_row**: 表头行号（默认1，从1开始计数，支持双行表头）
-• **max_columns**: 最大返回列数（可选，避免返回过多字段信息）
-
-**🔍 核心功能**:
-• **双行表头支持**: 自动识别第1行中文描述+第2行英文字段名
-• **批量表头获取**: 不传sheet_name获取所有工作表的表头
-• **自定义行号**: header_row参数指定表头起始位置（1-based）
-• **列数限制**: max_columns限制返回的列数，避免信息过载
-• **格式保持**: 保持原始表头格式和结构
-
-**📊 返回信息**:
-• **字段名**: 英文字段名（如skill_name, damage）
-• **字段描述**: 中文描述（如"技能名称"、"伤害值"）
-• **工作表名**: 来源工作表的完整名称
-• **字段顺序**: 按Excel中的实际顺序排列
-• **字段数量**: 总共有多少个字段列
-
-**💡 使用策略**:
-1️⃣ **初见新表**: `excel_get_headers("配置.xlsx")` 快速了解所有表结构
-2️⃣ **聚焦分析**: `excel_get_headers("配置.xlsx", "技能表")` 查看特定表的字段
-3️⃣ **自定义位置**: `header_row=2` 从第2行开始读取表头
-4️⃣ **精简查看**: `max_columns=10` 只显示前10个字段
-
-**🎯 专业工作流**:
-• **配置审查**: 逐个工作表检查表头完整性，识别缺失或拼写错误的字段
-• **版本控制**: 比较不同版本配置文件的表头差异，评估配置变更影响
-• **数据迁移**: 源表头→目标表头的字段映射，确保数据正确迁移
-• **自动化处理**: 基于表头结构生成数据验证规则，自动化数据质量检查
-• **文档生成**: 从表头自动生成配置表文档，字段描述和类型说明
-
-**⚡ 性能优化**:
-• **缓存策略**: 重复调用相同文件时缓存结果，减少IO开销
-• **批量处理**: 多工作表表头一次性获取，避免多次文件打开
-• **内存优化**: 大文件时限制max_columns，减少内存占用
-• **延迟加载**: 只在需要时读取具体表头信息，不预加载全部数据
-
-**🔍 高级功能**:
-• **字段分类**: 自动识别关键字段（ID、名称）和配置字段（属性、数值）
-• **映射发现**: 自动建立中英文双行表头的字段映射关系
-• **依赖分析**: 分析表间的字段依赖关系，发现跨表关联字段
-• **标准化**: 检查字段命名规范，自动修正不标准的命名方式
-• **模板对比**: 与标准配置模板对比，识别缺失或多余的字段
-
-**🔗 配合使用**:
-• 结构了解: 结合excel_describe_table获取完整类型和样本信息
-• 数据查询: 基于字段名进行excel_query数据检索
-• 批量修改: 使用字段名进行excel_update_query条件修改
-• 版本对比: excel_compare_sheets对比不同版本的表头变化
-• 数据修改评估: 修改前先用excel_assess_data_impact评估影响
-
-**⚡ 性能优化**:
-• 比excel_describe_table更快，专门针对表头信息
-• 大文件建议指定max_columns减少数据量
-• 重复读取相同文件有缓存，第二次更快
-• **AI体验优化**: 返回结构化数据，便于AI直接处理
-
-**🎯 选择指南**:
-• • 看表头结构→用excel_get_headers
-• • 看完整结构(类型+样本)→用excel_describe_table  
-• • 看数据详情→用excel_get_range
-• • 看分析统计→用excel_query
-• • 修改前评估→用excel_assess_data_impact
-
-**💡 实用技巧**:
-• 新文件必用：先调用此工具确认列名，避免查询时列名错误
-• 双行表头支持：自动识别中文描述+英文字段名，支持混合查询
-• 大文件优化：建议设置max_columns=20，避免返回过多字段信息
-• 多表检查：不传sheet_name参数可一次性查看所有工作表的表头
-• 字段名复制：返回的列名可直接用于其他工具的查询条件中
-    """
+    """提取工作表表头信息。支持双行表头（中文描述+英文字段名）。不传sheet_name获取所有表的表头。"""
     _path_err = _validate_path(file_path)
     if _path_err:
         return _path_err
@@ -1184,83 +867,7 @@ def excel_update_range(
     insert_mode: bool = True,
     streaming: bool = True
 ) -> Dict[str, Any]:
-    """
-✏️ 精确范围写入 - 批量数据的智能写入器
-
-**核心功能**: 将二维数组数据精准写入Excel的指定范围，支持覆盖、插入和流式三种模式。为游戏配置管理提供高效、可靠的批量数据处理能力。
-
-**🎮 游戏开发场景**:
-• **配置批量导入**: 一次性导入数百条技能、装备、道具数据到配置表
-• **数值批量调整**: 按列批量修改伤害值、冷却时间、消耗资源等核心参数
-• **新表初始化**: 快速创建新配置表并填充模板数据
-• **数据迁移**: 从数据表提取并写入到另一个配置表，保持数据结构一致
-• **版本对比更新**: 对比两个版本的配置差异，精确更新变更内容
-
-**🔧 写入模式详解**:
-• **覆盖模式**: 直接替换目标范围内的所有现有数据，适合数据更新场景
-• **插入模式**: 在指定位置插入新行，原有数据自动下移，适合数据扩展场景
-• **流式写入**: 使用calamine引擎，内存占用极低，适合大文件批量操作
-• **传统写入**: 使用openpyxl，保留所有单元格格式但内存占用较高
-
-**⚡ 性能建议**:
-• **大文件(>50MB)**: 强烈推荐streaming=True，内存占用与文件大小无关
-• **格式要求高**: 使用streaming=False，保留字体、颜色、边框等格式
-• **批量数据导入**: streaming=True可提升3-5倍写入速度
-
-**📋 参数详解**:
-• **data**: 二维数组，格式为[[行1数据], [行2数据], ...]，每行数据需列数一致
-• **range**: Excel范围表达式，支持多种格式：
-  - "Sheet1!A1:C10" - 指定工作表和具体单元格范围
-  - "A1:B5" - 当前工作表的单元格范围
-  - "Sheet1!A:D" - 整列操作
-• **preserve_formulas**: 是否保留现有公式（默认True），False时会被数据覆盖
-• **insert_mode**: 数据写入模式（默认True）：
-  - True: 插入模式，在新位置插入数据，原有数据下移
-  - False: 覆盖模式，直接替换目标范围数据
-• **streaming**: 流式写入开关（默认True），True时性能更优但部分格式不保留
-
-**🎯 使用示例**:
-```python
-# 基础覆盖写入 - 更新技能配置
-excel_update_range("skills.xlsx", "技能配置!B2:D10", [
-    ["火球术", 100, 5],
-    ["冰箭", 80, 3], 
-    ["雷电", 120, 7]
-])
-
-# 插入模式 - 在装备表中新增装备
-excel_update_range("equipment.xlsx", "装备列表!A5", [
-    ["传说剑", 500, 10],
-    ["魔法盾", 300, 8]
-], insert_mode=True)
-
-# 大文件批量导入 - 性能优先
-excel_update_range("large_config.xlsx", "数据!A1:Z1000", big_data, streaming=True)
-
-# 格式保留 - 精美样式需要保留
-excel_update_range("styled_table.xlsx", "Report!A1:C10", formatted_data, streaming=False)
-```
-
-**📊 返回信息**:
-• **updated_range**: 实际写入的范围{start_cell, end_cell, rows, cols}
-• **affected_rows**: 受影响的行数
-• **affected_cols**: 受影响的列数
-• **streaming_used**: 是否使用流式写入
-• **success**: 操作是否成功
-• **message**: 状态消息或错误信息（包含操作结果摘要）
-**💡 实用技巧**:
-• **避免覆盖**: insert_mode=True时，在现有数据后追加，避免意外覆盖重要数据
-• **流式优化**: 大文件(>10MB)必须使用streaming=True，内存占用降低90%
-• **数据验证**: 写入前用excel_assess_data_impact评估影响，避免误操作
-• **批处理优化**: 多次小写入不如一次大写入，减少文件操作次数
-• **格式选择**: streaming=False保留格式但占用内存，streaming=True性能好但格式丢失
-
-**🔗 配合使用**:
-• + excel_describe_table → 写入前了解目标区域的表结构
-• + excel_assess_data_impact → 大批量写入前评估影响范围
-• + excel_query → 验证写入结果，确认数据正确性
-• + excel_compare_files → 版本更新后与原文件对比差异
-    """
+    """写入数据到指定范围。preserve_formulas=True时保留已有公式不被覆盖。"""
     _path_err = _validate_path(file_path)
     if _path_err:
         return _path_err
@@ -1337,55 +944,7 @@ def excel_assess_data_impact(
     data: Optional[List[List[Any]]] = None,
     detailed: bool = True
 ) -> Dict[str, Any]:
-    """
-🛡️ 数据影响评估器 - 修改前的安全网
-
-**核心功能**: 在修改或删除数据前评估潜在影响，不实际执行任何操作。帮助了解操作会影响到多少数据、什么类型的数据、以及潜在风险。
-
-**🎮 游戏开发场景**:
-• **数值修改前评估**: 修改技能伤害前了解会影响多少技能
-• **批量删除前检查**: 删除测试数据前确认不会误删正式数据
-• **配置表修改预检**: 修改装备配置前评估影响范围
-• **数据清理验证**: 清理无效数据前确认安全
-
-**📊 评估模式**:
-• **快速预览** (detailed=False): 行数+列数+风险等级+当前数据快照
-• **全面评估** (detailed=True): 数据类型分析+结果预测+安全建议+风险评级
-
-**🔍 评估内容**:
-• **影响范围**: 受影响的行数、列数、单元格总数
-• **数据类型**: 当前数据的类型分布（数字/文本/日期/空值）
-• **风险等级**: LOW/MEDIUM/HIGH三级风险评级
-• **安全建议**: 基于数据内容提供操作建议
-• **结果预测**: 预测操作后的数据变化
-
-**💡 使用建议**:
-1️⃣ 修改前先评估: `excel_assess_data_impact("技能表.xlsx", "A1:C100")` 
-2️⃣ 删除前必评估: 避免误删重要数据
-3️⃣ 结合备份: 重要操作前先用excel_create_backup创建备份
-4️⃣ 大操作分段: 影响范围过大时考虑分批操作
-
-**🔧 参数说明**:
-• **operation_type**: 操作类型（"update"、"delete"、"insert"）
-• **data**: 要写入的数据（仅update操作需要）
-• **detailed**: 是否详细评估（True=详细分析，False=快速预览）
-
-**🔗 配合使用**:
-• **修改前安全链**: excel_assess_data_impact → excel_create_backup → excel_update_range
-• **删除前确认**: excel_assess_data_impact → excel_delete_rows（风险评估后执行）
-• **导入前检查**: excel_assess_data_impact + excel_describe_table（了解表结构后评估）
-• **批量操作分段**: 评估影响过大时→分割操作范围→分段执行
-• **结果验证**: 操作完成后excel_query验证实际修改结果
-
-**📊 返回信息**:
-• **impact_summary**: 影响摘要{row_count, col_count, cell_count, risk_level}
-• **data_analysis**: 数据分析结果{value_types, empty_ratio, data_distribution}
-• **risk_assessment**: 风险评估{risk_level, risk_factors, confidence_score}
-• **recommendations**: 操作建议{actions_to_take, warnings, best_practices}
-• **preview_data**: 当前数据快照（detailed=True时提供）
-• **success**: 操作是否成功
-• **message**: 状态消息或错误信息
-    """
+    """评估修改操作的影响范围。返回受影响行数、关键值变化等，修改前必用。"""
     _path_err = _validate_path(file_path)
     if _path_err:
         return _path_err
@@ -1695,42 +1254,7 @@ def excel_get_operation_history(
     file_path: Optional[str] = None,
     limit: int = 20
 ) -> Dict[str, Any]:
-    """
-📋 操作历史 - 查看最近的Excel操作记录
-
-**核心功能**: 获取最近的操作历史，包含操作类型、文件路径、成功/失败状态。可按文件过滤。
-
-**🎮 游戏开发场景**:
-• **操作审计**: 查看某个配置表最近被修改了什么
-• **错误排查**: 出问题时回顾最近的操作记录
-• **团队协作**: 确认外包修改了哪些配置
-
-**💡 实用技巧**:
-• **快速定位**: limit=5只查看最近5条操作，快速了解最近活动
-• **问题排查**: 数据异常时先用此工具查看最近的修改记录
-• **团队协作**: 定期检查团队成员对重要配置的修改情况
-• **版本追溯**: 结合文件名过滤，追踪特定文件的修改历史
-
-**🔧 参数说明**:
-• **file_path**: 可选，指定文件路径过滤（不指定则返回所有文件历史）
-• **limit**: 返回记录数量，默认20条，建议5-50之间
-
-**📊 返回信息**:
-• **operations**: 操作记录列表，每个包含操作类型、文件、时间、状态
-• **success**: 查询是否成功
-• **count**: 返回的记录数量
-
-**🔗 配合使用**:
-• + excel_compare_files → 发现异常后对比文件差异
-• + excel_create_backup → 重要操作前创建备份
-• + excel_query → 数据异常时检查当前数据状态
-
-**💡 最佳实践**:
-• 问题排查：数据异常时先用此工具查看最近的修改记录
-• 定期监控：limit=10定期检查，及时发现异常操作
-• 文件过滤：关注重要配置文件时指定file_path参数
-• 团队协作：定期检查团队成员对重要配置的修改情况
-    """
+    """查看最近的Excel操作记录。可按文件过滤。"""
     if file_path is not None:
         _path_err = _validate_path(file_path)
         if _path_err:
@@ -1772,64 +1296,7 @@ def excel_create_backup(
     file_path: str,
     backup_dir: Optional[str] = None
 ) -> Dict[str, Any]:
-    """
-🛡️ 智能备份系统 - 数据安全的守护者
-
-**核心功能**: 创建Excel文件的时间戳备份，保护重要配置数据。自动管理备份目录，提供完整的备份信息。
-
-**🎮 游戏开发场景**:
-• **版本控制**: 修改技能表前自动备份，方便版本回退
-• **安全测试**: 调整数值配置前备份，避免误操作导致数据丢失
-• **团队协作**: 重要配置修改前备份，方便团队协作和问题追踪
-• **数据迁移**: 游戏版本更新前完整备份，确保可回滚到稳定版本
-
-**🔧 备份特性**:
-• **智能路径**: 默认存储在文件同目录的`.excel_mcp_backups/`文件夹
-• **时间戳命名**: 自动添加`YYYYMMDD_HHMMSS`时间戳，避免覆盖
-• **完整信息**: 记录原始大小、备份大小、备份路径、时间戳
-• **自动目录**: 备份目录不存在时自动创建
-• **文件完整性**: 使用shutil.copy2保持文件元数据
-
-**📊 备份信息**:
-• **备份文件**: 完整备份路径
-• **备份目录**: 备份存储的根目录
-• **文件对比**: 原始文件大小 vs 备份文件大小
-• **时间戳**: 精确的备份时间
-• **文件名**: 带时间戳的备份文件名
-
-**💡 使用建议**:
-1️⃣ **重要操作前**: 修改数值配置前必备份
-2️⃣ **版本管理**: 大版本更新前创建完整备份
-3️⃣ **团队协作**: 多人协作时共享备份信息
-4️⃣ **定期清理**: 定期清理旧备份释放空间
-5️⃣ **路径自定义**: 大项目可指定统一备份目录
-
-**🔗 配合使用**:
-• 修改前安全网: `excel_create_backup("技能表.xlsx")` 创建备份
-• 版本对比: `excel_compare_sheets` 对比备份与当前版本
-• 恢复操作: `excel_restore_backup` 从备份恢复数据
-• 历史管理: `excel_list_backups` 查看所有历史版本
-
-**⚠️ 安全提示**:
-• 备份是修改前的最后保障，养成备份好习惯
-• 重要数据建议保留多个历史版本
-• 备份文件占用磁盘空间，注意定期清理
-• 备份文件也应放在安全的位置，避免误删
-
-**📊 返回信息**:
-• **backup_file**: 备份文件完整路径
-• **backup_directory**: 备份存储根目录
-• **file_size**: 文件大小信息{original、backup}
-• **timestamp**: 备份时间戳
-• **success**: 操作是否成功
-• **message**: 状态消息或错误信息
-
-**📈 最佳实践**:
-• 修改前备份→修改→验证→确认成功
-• 定期检查备份文件的可读性和完整性
-• 为不同类型的配置表建立不同的备份策略
-• 重要项目考虑建立自动化备份流程
-    """
+    """为Excel文件创建备份。备份存放在同级backup目录。"""
     _path_err = _validate_path(file_path)
     if _path_err:
         return _path_err
@@ -1870,41 +1337,7 @@ def excel_restore_backup(
     backup_path: str,
     target_path: Optional[str] = None
 ) -> Dict[str, Any]:
-    """
-💾 恢复备份 - 从备份还原Excel文件
-
-**核心功能**: 将备份文件恢复到原位置或指定位置。修改前建议先用excel_create_backup创建备份。
-
-**🎮 游戏开发场景**:
-• **误操作回滚**: 改错配置后从备份恢复
-• **版本回退**: 新版本有问题时回退到备份版本
-• **数据灾难恢复**: 配置表损坏时从备份恢复
-
-**💡 实用技巧**:
-• **先备后恢复**: 恢复前先备份当前版本，防止恢复错误
-• **确认版本**: 用excel_list_backups选择正确的备份版本再恢复
-• **恢复后验证**: 恢复后用excel_query检查数据完整性
-
-**🔧 参数说明**:
-• **backup_path**: 备份文件路径
-• **target_path**: 可选，恢复目标路径（不指定则覆盖原文件）
-
-**📊 返回信息**:
-• **success**: 恢复是否成功
-• **message**: 恢复结果说明
-• **data**: 恢复详情（原文件、备份文件、恢复位置）
-
-**🔗 配合使用**:
-• + excel_list_backups → 恢复前选择备份版本
-• + excel_create_backup → 恢复前备份当前版本
-• + excel_compare_files → 恢复后对比确认正确性
-
-**⚠️ 重要提醒**:
-• 恢复操作会覆盖原文件，请务必先确认备份正确
-• 恢复前建议备份当前版本，防止恢复错误导致数据丢失
-• 大文件恢复可能较慢，请耐心等待
-• 恢复完成后建议用excel_query检查数据完整性
-    """
+    """从备份文件恢复Excel。target_path不传则覆盖原文件。"""
     _path_err = _validate_path(backup_path)
     if _path_err:
         return _path_err
@@ -1947,40 +1380,7 @@ def excel_list_backups(
     file_path: str,
     backup_dir: Optional[str] = None
 ) -> Dict[str, Any]:
-    """
-📂 备份列表 - 查看文件的所有备份版本
-
-**核心功能**: 列出指定Excel文件的所有历史备份，包含备份时间和文件大小。恢复前先用此工具选择备份版本。
-
-**🎮 游戏开发场景**:
-• **版本选择**: 修改前查看有哪些备份版本可选
-• **备份清理**: 确认旧备份可以清理
-• **团队协作**: 确认外包是否创建了备份
-
-**💡 实用技巧**:
-• **定期清理**: 备份文件会占用磁盘空间，定期清理旧版本
-• **按时间排序**: 选择最近的备份版本进行恢复
-• **确认大小**: 备份文件大小异常可能是损坏的备份
-
-**🔧 参数说明**:
-• **file_path**: 原始Excel文件路径（用于查找对应备份）
-• **backup_dir**: 可选，指定备份目录（不指定则自动查找）
-
-**📊 返回信息**:
-• **backups**: 备份文件列表，每个包含文件名、大小、修改时间
-• **success**: 查询是否成功
-• **count**: 找到的备份数量
-
-**🔗 配合使用**:
-• + excel_restore_backup → 选择版本后恢复
-• + excel_create_backup → 清理后创建新的基准备份
-
-**💡 最佳实践**:
-• 版本选择：修改前查看备份列表，选择最近的可靠版本
-• 定期清理：每月清理一次旧备份，节省磁盘空间
-• 备份验证：备份文件异常大或小时可能是损坏的，需要验证
-• 团队管理：确认团队成员是否按规范创建了备份
-    """
+    """列出文件的所有备份版本及时间。"""
     _path_err = _validate_path(file_path)
     if _path_err:
         return _path_err
@@ -2030,43 +1430,7 @@ def excel_insert_rows(
     count: int = 1,
     streaming: bool = True
 ) -> Dict[str, Any]:
-    """
-➕ 插入空行 - 在指定位置插入空白行
-
-**核心功能**: 在工作表指定行号前插入空行，后续行自动下移。适合需要腾出空间插入新数据的场景。
-
-**🎮 游戏开发场景**:
-• **表头扩展**: 在表头和数据之间插入分隔行或说明行
-• **区域预留**: 为即将添加的数据预留空间
-• **排序前置**: 插入行后填充数据再排序
-
-**🔧 参数说明**:
-• **file_path**: Excel文件路径
-• **sheet_name**: 工作表名称
-• **row_index**: 插入位置（在此行之前插入）
-• **count**: 插入行数
-• **streaming**: True=流式写入（快）/ False=传统模式
-
-**📊 返回信息**:
-• **success**: 操作是否成功
-• **message**: 状态消息或错误信息
-• **rows_inserted**: 实际插入的行数
-• **file_path**: 源文件路径
-
-**💡 使用示例**:
-```python
-# 在第2行插入3个空行
-result = excel_insert_rows("配置.xlsx", "技能", 2, 3)
-
-# 插入一行在表头下方
-result = excel_insert_rows("配置.xlsx", "技能", 1, 1, streaming=False)
-```
-
-**🔗 配合使用**:
-• + excel_update_range → 插入空行后填充数据
-• + excel_find_last_row → 确认插入位置
-• + excel_batch_insert_rows → 批量插入数据行（更智能）
-    """
+    """在指定位置插入空行。row_index从0开始。"""
     _path_err = _validate_path(file_path)
     if _path_err:
         return _path_err
@@ -2082,43 +1446,7 @@ def excel_insert_columns(
     count: int = 1,
     streaming: bool = True
 ) -> Dict[str, Any]:
-    """
-➕ 插入空列 - 在指定位置插入空白列
-
-**核心功能**: 在工作表指定列号前插入空列，后续列自动右移。适合需要新增数据维度的场景。
-
-**🎮 游戏开发场景**:
-• **新增属性列**: 给装备表添加"强化等级上限"等新属性列
-• **多语言扩展**: 添加新的语言翻译列
-• **数据分离**: 插入列后将数据从复合列拆分到独立列
-
-**🔧 参数说明**:
-• **file_path**: Excel文件路径
-• **sheet_name**: 工作表名称
-• **column_index**: 插入位置（1-based，1=A列，在此列之前插入）
-• **count**: 插入列数
-• **streaming**: True=流式写入（快）/ False=传统模式
-
-**📊 返回信息**:
-• **success**: 操作是否成功
-• **message**: 状态消息或错误信息
-• **columns_inserted**: 实际插入的列数
-• **file_path**: 源文件路径
-
-**💡 使用示例**:
-```python
-# 在第2列插入2个空列
-result = excel_insert_columns("配置.xlsx", "技能", 2, 2)
-
-# 在A列之前插入1列作为新属性列
-result = excel_insert_columns("配置.xlsx", "技能", 1, 1, streaming=False)
-```
-
-**🔗 配合使用**:
-• + excel_update_range → 插入空列后填充数据
-• + excel_rename_column → 插入后重命名新列
-• + excel_find_last_row → 确认行范围避免数据错位
-    """
+    """在指定位置插入空列。column_index从1开始。"""
     _path_err = _validate_path(file_path)
     if _path_err:
         return _path_err
@@ -2132,51 +1460,7 @@ def excel_find_last_row(
     sheet_name: str,
     column: Optional[Union[str, int]] = None
 ) -> Dict[str, Any]:
-    """
-📍 末行定位器 - 追加数据前的位置确认
-
-**核心功能**: 快速查找工作表中最后一行有数据的行号。在追加新数据前使用此工具确定插入位置，避免覆盖已有数据。
-
-**🎮 游戏开发场景**:
-• **技能追加**: 新增技能前定位最后一行，避免覆盖
-• **装备导入**: 批量导入装备数据前确认末行位置
-• **数据清理**: 确认数据范围后进行清理操作
-• **表格维护**: 定期检查表格数据量
-
-**🔧 参数说明**:
-• **file_path**: Excel文件路径
-• **sheet_name**: 工作表名称
-• **column**: 指定列查找（列字母如"A"或列号1，可选，默认查找所有列）
-
-**📊 返回信息**:
-• **last_row**: 最后有数据的行号（1-based，表头行不计入）
-• **total_rows**: 数据行总数（last_row - header_row + 1）
-• **column_info**: 列信息和末行号（当指定列时）
-• **success**: 操作是否成功
-• **message**: 状态消息或错误信息
-
-**💡 使用示例**:
-```python
-# 查找技能表最后一行
-result = excel_find_last_row("技能表.xlsx", "技能")
-last_row = result["last_row"]
-
-# 按列查找A列最后数据
-result = excel_find_last_row("配置.xlsx", "装备", column="A")
-```
-
-**🔗 配合使用**:
-• + excel_insert_rows → 在定位的行号后插入新数据
-• + excel_batch_insert_rows → 批量导入，无需手动定位
-• + excel_get_range → 获取最后几行数据确认
-• **双行表头支持**: 自动跳过header_row行，不会误判表头为数据
-
-**🎯 配合使用**:
-• 新增单行: + `excel_upsert_row` / `excel_insert_rows` 
-• 批量新增: + `excel_batch_insert_rows`（推荐，自动处理末行）
-• 数据验证: + `excel_describe_table`确认数据完整性
-• 版本对比: + `excel_compare_sheets`对比末行数据变化
-    """
+    """查找工作表最后一行。可指定列来找该列最后一个有值的行。追加数据前必用。"""
     _path_err = _validate_path(file_path)
     if _path_err:
         return _path_err
@@ -2189,42 +1473,7 @@ def excel_create_file(
     file_path: str,
     sheet_names: Optional[List[str]] = None
 ) -> Dict[str, Any]:
-    """
-🆕 创建文件 - 创建新的空Excel文件
-
-**核心功能**: 创建新的空Excel文件，可指定工作表名称列表。创建后用excel_update_range写入数据。
-
-**🎮 游戏开发场景**:
-• **新建配置表**: 创建技能表/装备表/怪物表等标准配置文件
-• **模板初始化**: 从零开始搭建配置表结构
-• **自动化管线**: 脚本化创建配置文件
-
-**🔧 参数说明**:
-• **sheet_names**: 工作表名称列表（如["技能表","装备表"]），默认创建"Sheet"
-
-**📊 返回信息**:
-• **file_path**: 创建的文件完整路径
-• **sheets**: 创建的工作表名称列表
-• **initial_rows**: 初始行数（创建为空文件，通常为0）
-
-**💡 初始化建议**:
-• **标准配置表**: 创建后立即用`excel_update_range`写入表头
-• **多表架构**: 一次性创建所有工作表：`["技能表","装备表","怪物表"]`
-• **模板制作**: 创建空文件后添加格式模板，再复制为基准模板
-• **项目规范**: 建议文件名格式：`项目名_配置类型_版本.xlsx`
-
-**🎯 标准初始化流程**:
-1️⃣ **创建文件**: `excel_create_file("技能表_v2.1.xlsx", ["技能配置"])`
-2️⃣ **写入表头**: `excel_update_range("技能表_v2.1.xlsx", "A1:D1", [["技能ID", "名称", "伤害", "冷却"]])`
-3️⃣ **验证结构**: `excel_describe_table("技能表_v2.1.xlsx", "技能配置")`
-4️⃣ **批量导入**: `excel_batch_insert_rows`填充初始数据
-
-**⚡ 配合使用**:
-• 文件创建后立即: + `excel_update_range`写入表头
-• 数据导入前: + `excel_describe_table`确认结构
-• 版本管理: + `excel_create_backup`保存初始版本
-• 批量初始化: + 循环调用创建多个配置文件
-    """
+    """创建新Excel文件。可指定初始工作表名称列表。"""
     _path_err = _validate_path(file_path)
     if _path_err:
         return _path_err
@@ -2239,40 +1488,7 @@ def excel_export_to_csv(
     sheet_name: Optional[str] = None,
     encoding: str = "utf-8"
 ) -> Dict[str, Any]:
-    """
-📤 导出CSV - 将Excel工作表导出为CSV文件
-
-**核心功能**: 将指定工作表导出为CSV格式，支持utf-8/gbk编码选择。
-
-**🎮 游戏开发场景**:
-• **版本控制**: 导出CSV后用git diff追踪配置变更（xlsx是二进制，diff不可读）
-• **程序对接**: 导出CSV供游戏引擎或构建工具读取
-• **数据分析**: 导出后用Python脚本做批量数值分析
-• **配置备份**: 导出为纯文本格式做快照备份
-
-**🔧 参数说明**:
-• **encoding**: utf-8（默认）/ gbk（兼容旧版Excel中文）
-**💡 实用技巧**:
-• **版本控制**: xlsx是二进制格式，导出CSV后可用git diff追踪变更
-• **编码选择**: 国内团队用gbk，国际团队用utf-8，避免乱码
-• **程序对接**: 游戏引擎和构建工具通常支持CSV格式输入
-
-**🔗 配合使用**:
-• + excel_import_from_csv → CSV导出后可重新导入Excel
-• + excel_query → 导出前用SQL筛选需要的子集
-
-**⚡ 使用建议**:
-• 需要导出多个工作表请分别调用，或用excel_convert_format(json)一次导出全部
-• 中文Excel导出有时需要gbk编码才能正常显示
-    
-**📊 返回信息**:
-• **exported_path**: 导出的CSV文件完整路径
-• **original_sheet**: 原始工作表名称
-• **encoding**: 使用的编码格式
-• **file_size**: 导出后的文件大小（字节）
-• **success**: 操作是否成功
-• **message**: 状态消息或错误信息
-"""
+    """将工作表导出为CSV。支持指定编码和分隔符。"""
     _path_err = _validate_path(file_path)
     if _path_err:
         return _path_err
@@ -2288,45 +1504,7 @@ def excel_import_from_csv(
     encoding: str = "utf-8",
     has_header: bool = True
 ) -> Dict[str, Any]:
-    """
-📥 CSV导入 - 从CSV文件创建Excel文件
-
-**核心功能**: 将CSV文件转换为Excel格式，支持自定义编码和表头处理。使用流式写入，大文件性能好。
-
-**🎮 游戏开发场景**:
-• **配置迁移**: 从其他工具（如Google Sheets导出、数据库导出）的CSV转换为Excel配置表
-• **策划数据导入**: 策划用Excel编辑数据后导出CSV，再导入为标准格式
-• **本地化导入**: 翻译团队提交的CSV多语言文件转为Excel配置
-• **数据管线对接**: 自动化脚本生成的CSV报表转为Excel供策划查看
-
-**🔧 参数说明**:
-• **csv_path**: CSV文件路径
-• **output_path**: 输出Excel文件路径
-**💡 实用技巧**:
-• **编码处理**: CSV文件编码不一致时先尝试utf-8，失败再用gbk
-• **表头处理**: has_header=True(默认)自动识别CSV首行为Excel表头
-• **流式写入**: 内部使用streaming写入，大CSV文件导入性能好
-
-**🔗 配合使用**:
-• + excel_export_to_csv → Excel导出为CSV，修改后重新导入
-• + excel_describe_table → 导入后确认表结构正确
-• **encoding**: 文件编码（中文CSV常用gbk，默认utf-8）
-• **has_header**: CSV是否有表头行（默认True）
-
-**⚡ 使用建议**:
-• 中文CSV乱码时尝试encoding="gbk"
-• 导入后建议用excel_describe_table检查表结构
-• 需要追加到已有Excel请用excel_merge_files(append模式)
-    
-**📊 返回信息**:
-• **output_path**: 生成的Excel文件完整路径
-• **imported_rows**: 导入的行数（含标题行）
-• **imported_columns**: 导入的列数
-• **sheet_name**: 工作表名称
-• **encoding**: 使用的编码格式
-• **success**: 操作是否成功
-• **message**: 状态消息或错误信息
-"""
+    """从CSV创建Excel文件。支持编码和分隔符配置。"""
     for _p in [csv_path, output_path]:
         _err = _validate_path(_p)
         if _err:
@@ -2342,43 +1520,7 @@ def excel_convert_format(
     output_path: str,
     target_format: str = "xlsx"
 ) -> Dict[str, Any]:
-    """
-🔄 格式转换 - Excel/CSV/JSON格式互转
-
-**核心功能**: 将Excel文件转换为其他格式（xlsx/xlsm/csv/json），支持双向转换。
-
-**🎮 游戏开发场景**:
-• **xlsx→csv**: 导出配置表供版本控制diff（CSV比xlsx更易做文本对比）
-• **xlsx→json**: 导出为JSON供程序直接读取或前端展示
-• **csv→xlsx**: 将策划导出的CSV配置转为标准Excel格式
-• **版本对比准备**: 将xlsx转为csv后用git diff检查配置变更
-
-**🔧 参数说明**:
-• **target_format**: 目标格式 xlsx/xlsm/csv/json
-
-**⚡ 使用建议**:
-• xlsx→csv适合版本管理（文本diff友好）
-**💡 实用技巧**:
-• **格式选择**: json适合程序读取，csv适合版本控制，xlsx适合人工编辑
-• **批量转换**: 配合脚本批量转换整个目录的配置文件格式
-• **版本对比**: xlsx→csv后用git diff查看配置变更
-
-**🔗 配合使用**:
-• + excel_export_to_csv → 专门的xlsx→csv导出（更灵活）
-• + excel_import_from_csv → CSV转回Excel
-• 复杂格式（合并单元格、公式）转csv/json可能丢失信息
-• json输出为行列二维数组格式
-    
-**📊 返回信息**:
-• **input_format**: 输入文件原始格式
-• **output_format**: 输出文件目标格式
-• **converted_path**: 转换后的文件完整路径
-• **sheet_count**: 工作表数量（Excel相关格式）
-• **row_count**: 总行数
-• **column_count**: 总列数
-• **success**: 操作是否成功
-• **message**: 状态消息或错误信息
-"""
+    """Excel/CSV/JSON格式互转。"""
     for _p in [input_path, output_path]:
         _err = _validate_path(_p)
         if _err:
@@ -2394,50 +1536,7 @@ def excel_merge_files(
     output_path: str,
     merge_mode: str = "sheets"
 ) -> Dict[str, Any]:
-    """
-🔗 合并文件 - 将多个Excel文件合并为一个
-
-**核心功能**: 合并多个Excel文件，支持三种模式。适合将分散的配置表整合。
-
-**🎮 游戏开发场景**:
-• **sheets模式**: 将多个配置文件（技能表、装备表、怪物表）合并到一个文件，方便统一管理
-• **append模式**: 合并外包团队分批提交的同类型配置（如多个版本的怪物表追加合并）
-• **horizontal模式**: 将不同维度的数据横向拼接（如基础属性表+附加属性表按行对齐合并）
-
-**📊 三种合并模式**:
-• **sheets**: 每个输入文件作为独立工作表（适合不同类型的配置表）
-• **append**: 纵向追加行（适合同结构配置表，如多个版本的道具表）
-• **horizontal**: 横向拼接列（适合不同维度的数据合并）
-
-**🔧 参数说明**:
-• **input_files**: 输入文件路径数组（2个及以上）
-• **merge_mode**: sheets/append/horizontal
-
-**⚡ 使用建议**:
-• append模式要求文件结构（列名）一致，否则数据会错位
-• 合并前可用excel_compare_sheets检查结构差异
-• 合并后建议用excel_check_duplicate_ids检查ID重复
-
-**💡 实用技巧**:
-• **sheets模式**: 不同类型的配置表（技能/装备/怪物）合到一个文件方便管理
-• **append模式**: 多个版本的道具表纵向追加合并，保持列结构一致
-• **horizontal模式**: 基础属性表+附加属性表横向拼接，按行对齐
-
-**🔗 配合使用**:
-• + excel_compare_files → 合并后对比确认结果正确
-• + excel_query → 合并后用SQL验证数据完整性
-• + excel_check_duplicate_ids → 合并后检查ID重复
-    
-**📊 返回信息**:
-• **merge_mode**: 使用的合并模式（sheets/append/horizontal）
-• **input_count**: 输入文件数量
-• **input_files**: 输入文件路径列表
-• **output_path**: 合并后的输出文件路径
-• **merged_sheets**: 合并后包含的工作表数量
-• **total_rows**: 合并后的总行数
-• **success**: 操作是否成功
-• **message**: 状态消息或错误信息
-"""
+    """合并多个Excel文件。merge_mode: sheets(每个文件一个表) | append(纵向追加) | columns(横向拼接)。"""
     for _f in input_files:
         _err = _validate_path(_f)
         if _err:
@@ -2449,45 +1548,7 @@ def excel_merge_files(
 @mcp.tool()
 @_track_call
 def excel_get_file_info(file_path: str) -> Dict[str, Any]:
-    """
-ℹ️ 文件信息 - 获取Excel文件元数据
-
-**核心功能**: 获取Excel文件的基本信息：文件大小、工作表列表、工作表数量、格式、创建/修改时间。
-
-**🎮 游戏开发场景**:
-• **文件确认**: 操作前确认文件格式和内容概况
-• **配置盘点**: 快速了解项目有多少配置表
-• **文件诊断**: 确认文件是否损坏（能否正常读取）
-
-**💡 实用技巧**:
-• **快速诊断**: 文件操作前先调用此工具，确认文件可读且结构正常
-• **项目统计**: 统计整个目录的Excel文件数量和大小，了解项目规模
-• **版本识别**: 通过创建/修改时间判断文件是否为最新版本
-• **容量规划**: 大文件前检查文件大小，预估内存和时间需求
-
-**🔧 参数说明**:
-• **file_path**: Excel文件路径（支持相对路径）
-
-**📊 返回信息**:
-• **file_size**: 文件大小（字节）
-• **sheet_count**: 工作表数量
-• **sheets**: 工作表名称列表
-• **file_format**: 文件格式（.xlsx/.xls）
-• **created_time**: 文件创建时间
-• **modified_time**: 文件修改时间
-• **total_rows**: 总行数统计
-
-**🔗 配合使用**:
-• + excel_list_sheets → 了解文件包含哪些工作表
-• + excel_describe_table → 查看具体工作表的详细结构
-• + excel_query → 文件确认后进行数据操作
-
-**💡 最佳实践**:
-• 操作前必用：任何Excel操作前先用此工具确认文件状态
-• 定期检查：大型项目定期运行，监控文件变化
-• 性能预估：大文件操作前预估内存和时间需求
-• 备份判断：根据修改时间判断是否需要备份
-    """
+    """获取文件元数据：大小、工作表数、行列范围等。"""
     _path_err = _validate_path(file_path)
     if _path_err:
         return _path_err
@@ -2501,36 +1562,7 @@ def excel_create_sheet(
     sheet_name: str,
     index: Optional[int] = None
 ) -> Dict[str, Any]:
-    """
-📄 创建工作表 - 在Excel文件中新建工作表
-
-**核心功能**: 在已有Excel文件中创建新工作表，可指定名称和位置。
-
-**🎮 游戏开发场景**:
-• **配置分类**: 将不同类型的配置放在不同工作表（如"技能表""装备表""怪物表"合在一个文件）
-• **数据分区**: 将不同版本/活动的配置放在独立工作表
-• **模板扩展**: 在配置文件中添加新的数据区域
-**💡 实用技巧**:
-• **命名规范**: 工作表名不要包含特殊字符（/ \\ * ? [ ] :），避免兼容性问题
-• **位置管理**: index=0将新表放在最前面，None放在最后面，便于分类管理
-• **批量创建**: 一次创建多个相关配置表，便于项目统一管理
-• **模板继承**: 复制现有表结构时，先复制再修改，保持格式一致
-
-**🔗 配合使用**:
-• + excel_copy_sheet → 基于现有表创建结构相似的表
-• + excel_rename_sheet → 创建后重命名为更有意义的名称
-• + excel_delete_sheet → 清理不需要的临时工作表
-
-**🔧 参数说明**:
-• **index**: 插入位置（0=最前面，None=最后面）
-    
-**📊 返回信息**:
-• **sheet_name**: 创建的工作表名称
-• **sheet_index**: 工作表在文件中的位置（0-based）
-• **total_sheets**: 文件中总的工作表数量
-• **success**: 操作是否成功
-• **message**: 状态消息或错误信息
-"""
+    """创建新工作表。可指定插入位置index。"""
     _path_err = _validate_path(file_path)
     if _path_err:
         return _path_err
@@ -2543,42 +1575,7 @@ def excel_delete_sheet(
     file_path: str,
     sheet_name: str
 ) -> Dict[str, Any]:
-    """
-🗑️ 删除工作表 - 移除指定工作表
-
-**核心功能**: 删除Excel文件中的指定工作表。⚠️ 删除不可恢复，建议先备份。
-
-**🎮 游戏开发场景**:
-• **清理废弃配置**: 删除已下线活动的工作表
-• **文件瘦身**: 移除不需要的临时数据工作表
-• **结构重组**: 合并文件后删除多余工作表
-
-**💡 实用技巧**:
-• **先备后删**: 删除前先用excel_create_backup备份，防止误删不可恢复
-• **确认名称**: 删除前用excel_list_sheets确认工作表名，避免拼写错误
-• **保留底线**: 至少保留一个工作表，否则文件会报错
-• **批量清理**: 定期清理废弃活动配置的工作表，保持文件整洁
-
-**🔧 参数说明**:
-• **file_path**: Excel文件路径
-• **sheet_name**: 要删除的工作表名称
-
-**📊 返回信息**:
-• **success**: 操作是否成功
-• **message**: 操作结果说明
-• **data**: 删除结果信息
-
-**🔗 配合使用**:
-• + excel_list_sheets → 删除前确认工作表名
-• + excel_create_backup → 删除前创建备份
-• + excel_copy_sheet → 删除前复制需要保留的数据到其他工作表
-
-**⚠️ 重要提醒**:
-• 删除操作不可恢复，必须先备份重要数据
-• 至少保留一个工作表，否则Excel文件会损坏
-• 删除前请确认工作表名正确，避免误删重要数据
-• 批量删除时建议逐个确认，避免大规模误删
-    """
+    """删除指定工作表。"""
     _path_err = _validate_path(file_path)
     if _path_err:
         return _path_err
@@ -2620,42 +1617,7 @@ def excel_rename_sheet(
     old_name: str,
     new_name: str
 ) -> Dict[str, Any]:
-    """
-✏️ 重命名工作表 - 修改工作表名称
-
-**核心功能**: 修改工作表名称。新名称不能与已有工作表重复。
-
-**🎮 游戏开发场景**:
-• **规范命名**: 将"Sheet1"改为"技能表"等有意义的名称
-• **版本管理**: 给工作表加版本号后缀（如"装备表_v2"）
-• **多语言标识**: 添加语言标识（如"怪物表_CN""怪物表_EN"）
-
-**💡 实用技巧**:
-• **先查后改**: 先用excel_list_sheets查看当前名称，再重命名避免拼写错误
-• **避免特殊字符**: 新名称不含/ 反斜杠 * ? [ ] :等特殊字符
-• **批量规范化**: 对多个工作表统一命名风格（如中英双语标识）
-• **版本后缀**: 重命名加版本后缀便于区分（如"技能表_v2"）
-
-**🔧 参数说明**:
-• **file_path**: Excel文件路径
-• **old_name**: 原工作表名称
-• **new_name**: 新工作表名称（不能与现有工作表重名）
-
-**📊 返回信息**:
-• **success**: 重命名是否成功
-• **message**: 操作结果说明
-• **data**: 重命名详情（原名称、新名称）
-
-**🔗 配合使用**:
-• + excel_list_sheets → 重命名前确认当前工作表名
-• + excel_copy_sheet → 复制后重命名创建版本变体
-
-**⚠️ 重要提醒**:
-• 新名称不能包含特殊字符：/ 反斜杠 * ? [ ] :
-• 新名称不能与已有工作表重名
-• 重命名前请确认名称正确，避免重命名失败
-• 批量重命名时建议逐一确认，避免命名冲突
-    """
+    """重命名工作表。"""
     _path_err = _validate_path(file_path)
     if _path_err:
         return _path_err
@@ -2671,47 +1633,7 @@ def excel_copy_sheet(
     index: Optional[int] = None,
     streaming: bool = True
 ) -> Dict[str, Any]:
-    """
-📋 复制工作表 - 创建工作表副本（含数据和格式）
-
-**核心功能**: 复制工作表的所有内容（数据+格式+公式），用于创建配置表变体。不指定new_name时自动生成"源表名_副本"。
-
-**🎮 游戏开发场景**:
-• **副本变体**: 复制怪物表做"精英版"怪物（属性翻倍）
-• **活动版本**: 复制装备表做"活动版"装备（不同数值配置）
-• **模板复用**: 基于已有配置表创建新类型配置
-• **A/B测试**: 复制一份修改数值做对比测试
-**💡 实用技巧**:
-• **快速变体**: 复制装备表做"活动版"装备，只修改活动相关数值
-• **保留格式**: 复制操作保留所有数据和格式，无需重新设置样式
-• **命名规范**: 复制后立即重命名，避免混淆原始表和副本
-• **批量测试**: 复制多份进行不同数值方案的A/B/C测试
-
-**🔗 配合使用**:
-• + excel_rename_sheet → 复制后重命名为有意义的名称
-• + excel_update_query → 在副本上批量修改数值做对比测试
-• + excel_compare_sheets → 对比原始表和修改后的副本差异
-
-**🔧 参数说明**:
-• **new_name**: 新工作表名称（默认"源表名_副本"）
-• **index**: 插入位置（None=最后面）
-• **streaming**: True=流式复制（快，大文件性能好）/ False=传统模式（保留格式更完整）
-
-**⚡ 使用建议**:
-• 复制后用excel_update_range修改副本的数值
-• 需要保留历史版本时建议用excel_create_backup替代
-• **大文件(>50MB)**: 强烈推荐streaming=True，内存占用降低90%
-    
-**📊 返回信息**:
-• **source_sheet**: 源工作表名称
-• **copied_sheet**: 复制后的工作表名称
-• **new_index**: 新工作表在文件中的位置（0-based）
-• **copied_rows**: 复制的行数
-• **copied_columns**: 复制的列数
-• **streaming_used**: 是否使用流式复制
-• **success**: 操作是否成功
-• **message**: 状态消息或错误信息
-"""
+    """复制工作表（含数据和格式）。可指定目标文件。"""
     _path_err = _validate_path(file_path)
     if _path_err:
         return _path_err
@@ -2727,39 +1649,7 @@ def excel_rename_column(
     new_header: str,
     header_row: int = 1
 ) -> Dict[str, Any]:
-    """
-✏️ 重命名列 - 修改表头（列名）
-
-**核心功能**: 修改指定列的表头值。支持双行表头（header_row=2修改英文字段名）。列名不存在时自动提示实际列名。
-
-**🎮 游戏开发场景**:
-• **字段重命名**: 将"atk"改为"attack_power"使列名更清晰
-• **规范统一**: 统一不同策划使用的列名风格
-• **多语言表头**: 修改第1行中文描述或第2行英文字段名
-
-**🔧 参数说明**:
-• **header_row**: 表头行号（双行表头设为2修改英文字段名）
-**💡 实用技巧**:
-• **先查后改**: 先用excel_get_headers确认当前列名，再重命名
-• **双行表头**: header_row=1改中文描述，header_row=2改英文字段名
-• **自动推荐**: 列名不存在时自动提示相似列名，减少拼写错误
-
-**🔗 配合使用**:
-• + excel_get_headers → 重命名前确认当前列名
-• + excel_describe_table → 重命名后确认表结构正确
-
-**⚡ 使用建议**:
-• 不确定列名时直接传一个可能的名字，系统会提示实际列名
-• 重命名后相关引用（公式、代码）需要同步更新
-    
-**📊 返回信息**:
-• **old_header**: 原始列名
-• **new_header**: 新列名
-• **header_row**: 修改的表头行号
-• **sheet_name**: 工作表名称
-• **success**: 重命名是否成功
-• **message**: 操作结果说明
-"""
+    """修改表头（列名）。只改header_row指定的行。"""
     _path_err = _validate_path(file_path)
     if _path_err:
         return _path_err
@@ -2777,111 +1667,7 @@ def excel_upsert_row(
     header_row: int = 1,
     streaming: bool = True
 ) -> Dict[str, Any]:
-    """
-🔄 智能 Upsert - 策划配置合并的核心工具
-
-**核心功能**: 按键列查找行，存在则更新，不存在则插入。这是游戏配置表管理的核心操作，实现"合并导入"的智能逻辑，确保配置数据的一致性和完整性。
-
-**🎮 游戏开发场景**:
-• **技能配置合并**: 导入新技能时，技能ID已存在则更新属性（如伤害、冷却），不存在则新增完整技能配置
-• **装备批量更新**: 导入装备数据时，按装备ID智能更新属性（品质、价格）或新增装备条目
-• **怪物数据同步**: 批量更新怪物信息，存在的更新属性（血量、攻击力），不存在的添加新怪物
-• **配置表维护**: 版本升级时配置的智能合并，确保新旧配置无缝衔接
-
-**🔧 Upsert智能逻辑**:
-1️⃣ **精准查找**: 按key_column和key_value在指定列中查找精确匹配的行
-2️⃣ **智能判断**: 存在→只更新指定字段；不存在→插入包含所有数据的新行
-3️⃣ **字段映射**: 只更新指定的字段，不会影响表中其他已有数据
-4️⃣ **性能优化**: 一次操作完成查找和更新，比分开执行"查询+更新/插入"快3-5倍
-
-**🔧 参数说明**:
-• **file_path**: Excel文件路径（支持相对路径）
-• **sheet_name**: 工作表名称（不区分大小写，支持双行表头）
-• **key_column**: 唯一匹配列名（建议使用ID类字段，如"skill_id"、"equip_id"、"monster_id"）
-• **key_value**: 精确匹配值（整数、字符串等，必须与表中对应列的数据类型一致）
-• **updates**: 字段映射字典，只更新指定字段（如{"damage": 200, "cooldown": 3.5}）
-• **header_row**: 表头行号（默认1，支持双行表头，会自动处理列名映射）
-• **streaming**: 流式写入开关（默认True），大文件时性能显著提升
-
-**🔧 关键参数**:
-
-**🔍 执行效果示例**:
-**更新场景**: 找到skill_id=1001的行，只更新damage和cooldown字段，其他属性保持不变
-**插入场景**: 未找到skill_id=1002的行，在表末尾创建新行，包含所有updates数据
-**混合场景**: 同一批数据中，部分ID存在（更新），部分ID不存在（插入）
-
-**💡 实际使用案例**:
-```python
-# 技能配置更新/新增 - 最常用场景
-excel_upsert_row("skills.xlsx", "技能配置", "skill_id", 1001, {
-    "名称": "火球术增强版", 
-    "伤害": 250, 
-    "冷却时间": 2.5, 
-    "消耗法力": 30
-})
-
-# 装备批量导入 - 支持品质和价格更新
-excel_upsert_row("equipment.xlsx", "装备库", "item_code", "WP_001", {
-    "品质": "史诗", 
-    "价格": 15000, 
-    "耐久度": 100
-})
-
-# 怪物数据同步 - 支持多种类型更新
-excel_upsert_row("monsters.xlsx", "怪物配置", "monster_id", 500, {
-    "血量": 5000, 
-    "攻击力": 200, 
-    "防御力": 50, 
-    "经验值": 1000
-})
-```
-
-**⚡ 性能优势**:
-• **智能缓存**: 首次查找后自动缓存，重复操作速度提升80%
-• **流式写入**: streaming=True时，大文件内存占用降低90%，写入速度提升5倍
-• **批量优化**: 单次操作完成"查找+判断+更新/插入"，避免多次文件IO
-• **内存控制**: 按需加载数据，适合处理10万行以上的配置表
-
-**🛡️ 数据安全机制**:
-• **字段隔离**: 只更新指定的字段映射中的列，绝不误改其他数据
-• **类型转换**: 自动处理数值、字符串、日期等数据类型的智能转换
-• **错误诊断**: 查找失败时提供详细的错误信息和修复建议
-• **事务保护**: 操作失败时自动回滚，确保Excel文件不被破坏
-
-**🔗 最佳实践配合**:
-• **数据验证**: upsert前用excel_query查询确认目标数据状态
-• **小批量测试**: 先用少量数据测试确认upsert逻辑正确
-• **定期备份**: 大规模数据更新前建议先备份原文件
-• **结果确认**: upsert后用excel_query或excel_list_sheets确认结果
-
-**📊 返回信息**:
-• **affected_rows**: 受影响的行数{updated、inserted、total}
-• **operation_details**: 操作详情{key_column、key_value、streaming_used}
-• **field_mapping**: 字段映射信息{updated_fields、unchanged_fields}
-• **file_path**: 源文件路径
-• **success**: 操作是否成功
-• **message**: 状态消息或错误信息（包含操作结果摘要）
-
-**💡 实用技巧**:
-• **ID字段优先**: 优先使用ID类字段作为key_column（如skill_id、monster_id），确保唯一性
-• **类型匹配**: key_value数据类型必须与表中对应列完全一致（字符串vs数字不匹配）
-• **批量操作**: 同一批数据中部分存在部分不存在，自动智能处理混合场景
-• **双行表头**: 自动识别并映射中英文列名，无需额外处理header_row
-• **缓存优化**: 首次查找后自动缓存，重复操作速度提升80%
-
-**🔗 配合使用**:
-• **数据验证链**: upsert前用excel_query查询 → 确认数据状态 → 执行upsert → 用excel_query验证结果
-• **安全保障**: upsert前excel_create_backup创建备份 → 执行upsert → 确认成功
-• **批量导入**: excel_upsert_row + excel_list_backups（批量导入后的版本管理）
-• **数据一致性**: excel_upsert_row + excel_compare_sheets（验证修改后的数据一致性）
-
-**🚧 使用注意事项**:
-• **键字段要求**: 确保key_column是表中的唯一标识字段（建议使用ID或编码）
-• **双行表头**: 自动支持，会智能匹配列名，无需额外处理
-• **数据类型**: key_value的数据类型必须与表中对应列的数据类型一致
-• **性能调优**: 大文件（>50MB）务必使用streaming=True，内存和性能差异巨大
-• **字段映射**: updates字典中的键必须与表头列名完全匹配（区分大小写）
-    """
+    """按key_column+key_value查找行，存在则更新，不存在则插入。update_columns指定要更新的列。"""
     _path_err = _validate_path(file_path)
     if _path_err:
         return _path_err
@@ -2899,60 +1685,7 @@ def excel_batch_insert_rows(
     insert_position: str = None,
     condition: str = None
 ) -> Dict[str, Any]:
-    """
-📦 批量插入行 - 将多行数据插入到工作表
-
-**核心功能**: 批量导入数据行，自动按列名匹配写入。支持三种插入模式：
-1. 追加模式（默认）：插入到工作表末尾
-2. 指定位置插入：insert_position指定行号，在指定行前插入
-3. 条件定位插入：condition指定SQL条件，在匹配行前插入
-streaming=True（默认）使用流式写入，大文件性能更好，但不保留单元格格式。
-
-**🎮 游戏开发场景**:
-• **批量配置导入**: 策划一次导入几十条技能/装备/怪物配置数据
-• **活动数据填充**: 批量添加限时活动道具、任务奖励等配置行
-• **版本合并**: 将外包团队的新配置行合入主表
-• **数据迁移**: 从其他系统导出的配置批量导入Excel
-• **有序插入**: 在指定ID或条件位置前插入新数据，保持排序
-
-**📊 返回关键信息**:
-• **inserted_count**: 实际插入的行数
-• **start_row/end_row**: 插入的起始/结束行号
-**💡 实用技巧**:
-• **字典输入**: data参数用字典列表，自动按列名匹配，无需关心列顺序
-• **大批量导入**: 一次性导入数百行数据，比逐行插入效率高10倍以上
-• **流式写入**: streaming=True(默认)适合大文件，内存占用低
-• **格式注意**: streaming写入不保留单元格格式，需要格式请用streaming=False
-
-**🔗 配合使用**:
-• + excel_describe_table → 导入前确认目标表的列名和数据类型
-• + excel_upsert_row → 需要更新已有行时用upsert而非纯插入
-• + excel_query → 导入后验证数据正确性
-• + excel_find_last_row → 确认数据插入位置
-• **unknown_columns**: 表中不存在的列名（数据被忽略）
-• **mode**: streaming（流式）或 standard（传统）
-
-**🔧 参数说明**:
-• **data**: 行数据数组，每行为{列名: 值}字典（列名需与表头一致）
-• **header_row**: 表头所在行号（默认1，双行表头设为2）
-• **streaming**: True=流式写入（快，不保留格式）/ False=传统模式（保留格式）
-• **insert_position**: 在指定行号前插入（1-based），如3表示在第3行前插入
-• **condition**: SQL WHERE条件，在第一个匹配行前插入（如"ID=10"）
-
-**💡 使用建议**:
-• 先用excel_get_headers确认列名，避免unknown_columns
-• 超过100行数据时streaming模式优势明显（内存降低90%+）
-• 需要按ID更新已有行请用excel_upsert_row
-• 新增数据用此工具，更新数据用excel_upsert_row
-• 首次使用建议先用少量数据测试格式是否正确
-    
-**📊 返回信息**:
-• **inserted_rows**: 成功插入的行数
-• **inserted_position**: 插入的起始行位置
-• **affected_sheet**: 工作表名称
-• **success**: 操作是否成功
-• **message**: 状态消息或错误信息
-"""
+    """批量插入多行数据。data为字典列表，header_row指定表头行号。"""
     _path_err = _validate_path(file_path)
     if _path_err:
         return _path_err
@@ -3022,49 +1755,7 @@ def excel_delete_rows(
     streaming: bool = True,
     condition: str = None
 ) -> Dict[str, Any]:
-    """
-🗑️ 删除行 - 删除工作表中指定位置的行
-
-**核心功能**: 支持两种删除模式：
-1. 按行号删除：删除指定行号范围的行，后续行自动上移
-2. 按条件删除：根据SQL条件删除符合要求的行
-streaming=True（默认）使用流式写入。
-
-**🎮 游戏开发场景**:
-• **清理废弃配置**: 删除已下线活动的道具/任务配置行
-• **版本裁剪**: 删除测试用的临时配置数据
-• **批量清理**: 配合excel_query找出不需要的行号后批量删除
-• **ID重构**: 删除重复ID行（配合excel_check_duplicate_ids使用）
-
-**🔧 参数说明**:
-• **row_index**: 起始行号（1-based）
-• **count**: 删除行数（默认1），condition模式时忽略
-• **streaming**: True=流式写入（快，不保留格式）/ False=传统模式
-• **condition**: SQL WHERE条件（如"ID > 5"），设置后忽略row_index/count，按条件删除
-**💡 实用技巧**:
-• **条件删除**: 直接用condition参数（如"ID > 5"），无需手动查行号
-• **行号删除**: 指定row_index和count精确删除
-• **安全操作**: 删除前先用excel_create_backup备份，防止误删不可恢复
-• **流式优化**: streaming=True适合大文件，删除速度更快
-• **ID重构**: 删除行后行号会变化，注意后续操作的行号引用
-
-**🔗 配合使用**:
-• + excel_query → 找出需要删除的行号（如 WHERE 状态="废弃"）
-• + excel_create_backup → 删除前创建备份
-• + excel_find_last_row → 删除后确认新的末行位置
-
-**⚡ 使用建议**:
-• 删除前建议先用excel_get_range查看目标行的内容，避免误删
-• 大量删除（>100行）时streaming模式优势明显
-    
-**📊 返回信息**:
-• **deleted_rows**: 删除的行数
-• **start_row**: 删除的起始行位置
-• **end_row**: 删除的结束行位置
-• **affected_sheet**: 工作表名称
-• **success**: 操作是否成功
-• **message**: 状态消息或错误信息
-"""
+    """删除行。支持按索引(row_index)或条件(where_column+where_value)删除。"""
     _path_err = _validate_path(file_path)
     if _path_err:
         return _path_err
@@ -3208,43 +1899,7 @@ def excel_delete_columns(
     count: int = 1,
     streaming: bool = True
 ) -> Dict[str, Any]:
-    """
-🗑️ 删除列 - 删除工作表中指定位置的列
-
-**核心功能**: 删除指定列号范围的列，后续列自动左移。streaming=True（默认）使用流式写入。
-
-**🎮 游戏开发场景**:
-• **清理废弃字段**: 删除已下线功能的配置列（如"旧版技能ID"）
-• **字段精简**: 移除不需要的中间计算列
-• **结构重组**: 合并配置表后删除重复列
-
-**🔧 参数说明**:
-• **column_index**: 起始列号（1-based，1=A列）
-• **count**: 删除列数
-• **streaming**: True=流式写入（快，不保留格式）/ False=传统模式
-**💡 实用技巧**:
-• **安全操作**: 删除前先用excel_create_backup备份，防止误删不可恢复
-• **从右往左删**: 删除多列时从右往左删，避免列号偏移问题
-• **流式优化**: streaming=True适合大文件，删除速度更快
-• **格式注意**: streaming写入后原有单元格格式会丢失
-
-**🔗 配合使用**:
-• + excel_describe_table → 删除前确认列号和列名
-• + excel_create_backup → 删除前创建备份
-• + excel_rename_column → 删除前可以先重命名标记目标列
-
-**⚡ 使用建议**:
-• 删除前建议先用excel_get_range查看列内容，避免误删
-• 大量列删除（>10列）时streaming模式优势明显
-    
-**📊 返回信息**:
-• **deleted_columns**: 删除的列数
-• **start_col**: 删除的起始列位置（字母）
-• **end_col**: 删除的结束列位置（字母）
-• **affected_sheet**: 工作表名称
-• **success**: 操作是否成功
-• **message**: 状态消息或错误信息
-"""
+    """删除指定位置开始的列。column_index从1开始。"""
     _path_err = _validate_path(file_path)
     if _path_err:
         return _path_err
@@ -3287,38 +1942,7 @@ def excel_set_formula(
     cell_address: str,
     formula: str
 ) -> Dict[str, Any]:
-    """
-🧮 设置公式 - 在单元格中写入Excel公式
-
-**核心功能**: 在指定单元格设置公式（不含等号），保存后返回计算结果。公式会随数据变化自动更新。
-
-**🎮 游戏开发场景**:
-• **自动计算**: 设置"总攻击=基础攻击+装备攻击"等自动计算列
-• **统计汇总**: 在表末尾添加SUM/AVERAGE/COUNT等汇总行
-• **条件判断**: 用IF公式做条件判断（如"IF(等级>10,'高级','普通')"）
-
-**🔧 参数说明**:
-• **cell_address**: 目标单元格（如"A1"）
-• **formula**: 公式（不含等号，如"SUM(A1:A10)"）
-
-**💡 实用技巧**:
-• **不含等号**: formula参数只需写公式本身，不要加"="前缀
-• **范围引用**: 支持跨工作表引用（如"Sheet2!A1"）
-• **保存验证**: 公式写入后返回计算结果，可用于验证正确性
-• **批量公式**: 用excel_update_range批量写入多个公式
-
-**🔗 配合使用**:
-• + excel_evaluate_formula → 写入前先验证公式正确性
-• + excel_get_range → 写入后读取计算结果
-• + excel_update_range → 批量写入多个公式到不同单元格
-    
-**📊 返回信息**:
-• **formula_applied**: 应用的公式（原始公式）
-• **formula_range**: 公式应用的单元格范围
-• **affected_sheet**: 工作表名称
-• **success**: 操作是否成功
-• **message**: 状态消息或错误信息
-"""
+    """在单元格写入Excel公式。"""
     _path_err = _validate_path(file_path)
     if _path_err:
         return _path_err
@@ -3333,43 +1957,7 @@ def excel_evaluate_formula(
     formula: str,
     context_sheet: Optional[str] = None
 ) -> Dict[str, Any]:
-    """
-🧮 计算公式 - 临时执行公式（不修改文件）
-
-**核心功能**: 临时执行Excel公式并返回结果，不写入文件。可做快速计算器，支持基础统计函数和范围引用。
-
-**🎮 游戏开发场景**:
-• **快速计算**: "这个怪物的DPS是多少？" → 直接算不用打开文件
-• **数值验证**: 验证策划给的数值公式是否正确
-• **平衡估算**: "如果攻击力提升20%，DPS变化多少？"
-
-**🔧 支持的公式**:
-• 算术: `100*1.2+50`
-• 范围统计: `SUM(A1:A10)`, `AVERAGE(B1:B50)`, `MAX(C1:C100)`
-• 高级统计: `MEDIAN`, `STDEV`, `PERCENTILE`, `COUNTIF`, `SUMIF`
-
-**🔧 参数说明**:
-• **formula**: Excel公式表达式（支持函数、范围引用、算术运算）
-• **context_sheet**: 上下文工作表名称（可选，引用文件数据时使用）
-
-**📊 返回信息**:
-• **formula**: 执行的公式表达式
-• **result**: 计算结果（数值、字符串或布尔值）
-• **formula_type**: 公式类型（arithmetic/function/range）
-• **success**: 操作是否成功
-• **message**: 状态消息或错误信息
-
-**💡 实用技巧**:
-• **快速计算器**: 不需要打开文件就能做数值计算，比手动计算快
-• **公式验证**: 写入公式前先用此工具验证公式语法和结果
-• **数值推演**: "如果攻击力提升20%，DPS变化多少？"→快速推演
-
-**🔗 配合使用**:
-• + excel_set_formula → 验证后写入Excel文件
-• + excel_query → 复杂统计用SQL查询更灵活
-• 需要引用文件数据时配合context_sheet参数指定工作表
-• 结果有缓存，重复计算更快
-    """
+    """临时计算公式结果，不修改文件。"""
     _formula_err = SecurityValidator.validate_formula(formula)
     if not _formula_err['valid']:
         return _fail(f'🔒 安全验证失败: {_formula_err["error"]}', meta={"error_code": "FORMULA_SECURITY_FAILED"})
@@ -3384,101 +1972,8 @@ def excel_query(
     include_headers: bool = True,
     output_format: str = "table"
 ) -> Dict[str, Any]:
-    """
-🚀 SQL查询引擎 - 游戏配置表的超强分析工具
-
-**核心功能**: 执行标准SQL查询Excel数据，支持复杂分析、聚合统计、关联查询。这是最重要的数据分析工具，优先使用它而非excel_get_range。
-
-**🎮 游戏开发场景**:
-• **数值平衡**: `SELECT 类型, AVG(伤害/冷却) as dpm FROM 技能 GROUP BY 类型`
-• **数据质量**: `SELECT * FROM 怪物 WHERE 血量 < 10 OR 攻击 = 0`
-• **版本对比**: `SELECT skill_id, skill_name, damage as 旧版 FROM 技能_v1 UNION SELECT skill_id, skill_name, damage as 新版 FROM 技能_v2`
-• **关联分析**: `SELECT 技能名, 装备名 FROM 技能 a JOIN 装备 b ON a.equipment_id = b.id`
-• **RPG装备**: `SELECT 装备名, 职业, 稀有度, 属性1, 属性2 FROM 装备 WHERE 等级 BETWEEN 10 AND 50 ORDER BY 稀有度 DESC`
-• **技能优化**: `SELECT 技能名, 类型, 冷却时间, 伤害, (伤害/冷却时间) as 效率 FROM 技能 WHERE 效率 < 50 ORDER BY 效率 DESC`
-• **怪物配置**: `SELECT 怪物名, 区域, 等级, 血量, 攻击, 防御, 经验 FROM 怪物 WHERE 区域 = '新手村' AND 等级 <= 10 ORDER BY 等级`
-• **任务系统**: `SELECT 任务名, 接取等级, 完成奖励, 任务类型 FROM 任务 WHERE 接取等级 <= 20 AND 任务类型 IN('主线', '支线')`
-• **经济系统**: `SELECT 物品名, 类型, 价格, 商店售价, 黑市价格 FROM 物品 WHERE 类型 = '消耗品' ORDER BY 价格 DESC`
-• **PVP平衡**: `SELECT 英雄名, 生命值, 攻击力, 技能伤害, 控制时间 FROM 英雄 WHERE 职业类别 = '坦克' ORDER BY (攻击力+技能伤害)/2 DESC`
-
-**📊 支持语法**:
-• **基础查询**: SELECT/DISTINCT/别名(AS)/数学表达式(伤害*1.2)
-• **条件过滤**: WHERE/AND/OR/LIKE/IN/NOT IN/BETWEEN/IS NULL/NOT
-• **高级查询**: WHERE子查询/FROM子查询/CASE WHEN/COALESCE/EXISTS/CTE/UNION/窗口函数
-• **聚合统计**: COUNT/SUM/AVG/MAX/MIN/GROUP BY/HAVING/ORDER BY/LIMIT/OFFSET
-• **关联查询**: INNER JOIN/LEFT JOIN/RIGHT JOIN/CROSS JOIN（同文件内工作表）
-• **字符串函数**: UPPER/LOWER/TRIM/LENGTH/CONCAT/REPLACE/SUBSTRING
-• **双行表头**: 自动识别中文描述+英文字段名，支持中英文混合查询
-
-**🔍 独特优势**:
-• 中文列名友好: `SELECT 技能名称, 伤害值 FROM 技能 WHERE 等级 > 10`
-• 智能缓存: 同文件重复查询提速30-100倍
-• 错误提示: 拼写错误时自动推荐相似列名
-• 数据安全: 只读操作，不修改文件
-
-**📤 输出格式**:
-• table: Markdown表格格式（默认）
-• json: 结构化JSON数据
-• csv: CSV逗号分隔格式
-
-**🔧 参数说明**:
-• **file_path**: Excel文件路径（支持相对路径）
-• **query_expression**: SQL查询语句（支持SELECT/JOIN/聚合/子查询等）
-• **include_headers**: 是否包含表头（默认True）
-• **output_format**: 输出格式（table/json/csv，默认table）
-
-**📊 返回信息**:
-• **data**: 查询结果数据（二维数组或格式化字符串）
-• **headers**: 表头列名列表
-• **query_info**: 查询元信息{sql_used、rows_returned、execution_time、cache_hit}
-• **columns**: 列信息列表{name、type}
-• **file_path**: 源文件路径
-• **success**: 操作是否成功
-• **message**: 状态消息或错误信息
-
-**💡 实用技巧**:
-• **表结构先行**: 先调用`excel_describe_table`了解列名和数据类型
-• **中英文混合**: 支持双行表头的`技能名称`/`skill_name`混用
-• **性能优化**: 重复查询相同文件有缓存，第二次快30-100倍
-• **错误恢复**: 列名错误时自动推荐相似列名，减少拼写错误
-
-**🎯 配合使用**:
-• **数据分析链**:
-  1. `excel_describe_table` → 了解结构
-  2. `excel_query` → 检索数据
-  3. `excel_assess_data_impact` → 评估修改风险
-• **版本对比**: `excel_query` + `excel_compare_sheets`
-• **数据导出**: `excel_query(..., output_format="csv")` + 导出处理
-• **重复查询**: 利用缓存优势，连续查询相同文件更快
-
-**⚡ 性能策略**:
-• 小批量(100行以内): 直接查询，无需特殊处理
-• 大批量(1000行以上): 分页查询 + LIMIT子句避免内存溢出
-• 复杂聚合: 先预筛选再聚合，减少计算量
-• 重复使用: 保持连接复用，不要频繁开关文件
-
-**🎯 专业工作流**:
-• **配置审查**: `SELECT * FROM 配置 WHERE 状态 = '测试' AND 最后修改 < '2024-01-01'` (清理过期配置)
-• **数据迁移**: `SELECT skill_id, 技能名, 伤害 as old_damage, 伤害*1.2 as new_damage FROM 技能 WHERE 等级 > 5` (批量更新)
-• **错误检测**: `SELECT DISTINCT 列名, COUNT(*) as cnt FROM 数据 GROUP BY 列名 HAVING cnt > 1` (重复值检测)
-• **数据完整性**: `SELECT a.技能名, b.装备名 FROM 技能 a LEFT JOIN 装备 b ON a.装备_id = b.id WHERE b.装备名 IS NULL` (孤儿记录)
-• **趋势分析**: `SELECT 月份, SUM(收入) as 月收入, SUM(支出) as 月支出 FROM 财务 GROUP BY 月份 ORDER BY 月份` (财务分析)
-
-**🚀 高级技巧**:
-• **动态SQL**: 使用`excel_query`结果作为另一个查询的基础，实现复杂的连锁分析
-• **跨文件关联**: 通过临时表实现不同Excel文件的关联查询
-• **条件聚合**: `SELECT 职业, MAX(等级) as 最高等级, MIN(等级) as 最低等级, AVG(等级) as 平均等级 FROM 角色 GROUP BY 职业`
-• **窗口函数**: `SELECT 技能名, 伤害, RANK() OVER (ORDER BY 伤害 DESC) as 伤害排名 FROM 技能` (伤害排名)
-• **CTE优化**: 使用`WITH子查询`提高复杂查询的可读性和性能
-• **CASE WHEN逻辑**: `SELECT 技能名, 类型, CASE WHEN 类型 = '攻击' THEN 伤害*1.5 WHEN 类型 = '防御' THEN 伤害*0.8 ELSE 伤害 END as 调整伤害 FROM 技能`
-
-**🛡️ 最佳实践**:
-• **查询优化**: 避免在WHERE子句中使用函数，改用计算列
-• **索引利用**: 对于频繁查询的字段，考虑在数据预处理时添加索引标记
-• **内存管理**: 大数据量查询时使用分页，避免一次性加载过多数据
-• **错误处理**: 使用`TRY/CATCH`模式，对重要查询添加异常处理逻辑
-• **文档化**: 复杂查询添加注释，说明业务逻辑和预期结果
-    """
+    """SQL查询引擎。支持WHERE/JOIN/GROUP BY/ORDER BY/LIMIT/子查询。
+query_expression: SELECT * FROM 技能表 WHERE 伤害>100 | GROUP BY | JOIN ON"""
     _path_err = _validate_path(file_path)
     if _path_err:
         return _path_err
@@ -3524,82 +2019,8 @@ def excel_update_query(
     update_expression: str,
     dry_run: bool = False
 ) -> Dict[str, Any]:
-    """
-⚙️ SQL批量修改器 - 精确控制数据变更
+    """SQL批量修改。dry_run=True预览变更不实际写入。示例: UPDATE 技能表 SET 伤害=200 WHERE 等级>=5"""
 
-**核心功能**: 使用SQL语句进行条件批量修改，支持复杂条件判断和安全预览。这是批量修改的首选工具，比手动修改更安全高效。
-
-**🎮 游戏开发场景**:
-• **数值调整**: `UPDATE 技能 SET 伤害 = 伤害 * 1.2 WHERE 元素 = '火'` (火系技能伤害+20%)
-• **版本升级**: `UPDATE 装备 SET 等级 = 等级 + 1 WHERE 品质 = '传说'` (传说装备升级)
-• **数据修正**: `UPDATE 怪物 SET 血量 = 100 WHERE 血量 < 10` (修正异常血量数据)
-• **平衡性调整**: `UPDATE 技能 SET 冷却 = 冷却 - 1 WHERE 职业 = '战士'` (战士技能优化)
-
-**🔧 SET语法支持**:
-• **常量值**: `SET 伤害 = 500` 直接设置固定值
-• **算术表达式**: `SET 伤害 = 伤害 * 1.1` (当前值×1.1)
-• **数学运算**: `SET 冷却 = 冷却 + 1, 消耗 = 消耗 - 5` (多字段同时修改)
-• **条件更新**: `SET 品质 = '精品' WHERE 原价 > 10000`
-
-**🔍 WHERE语法支持**:
-• **基础条件**: `WHERE 元素 = '火'` / `WHERE 等级 > 10`
-• **范围条件**: `WHERE 血量 BETWEEN 50 AND 100`
-• **模糊匹配**: `WHERE 技能名 LIKE '%治疗%'` / `WHERE 装备名 LIKE '传说%'`
-• **多条件**: `WHERE 元素 IN ('火', '水', '风')` / `WHERE 职业 = '战士' AND 等级 >= 20`
-• **空值处理**: `WHERE 描述 IS NULL` / `WHERE 副作用 IS NOT NULL`
-• **复合条件**: `WHERE 元素 = '火' AND 等级 > 5`
-
-**🛡️ 安全机制**:
-• **预览模式**: dry_run=True只预览修改范围，不实际修改
-• **事务保护**: 失败自动回滚，确保文件不损坏
-• **备份机制**: 修改前自动创建备份
-• **错误提示**: 详细错误信息，AI可自动修复
-
-**🔒 安全建议**:
-• **必须预览**: 重要修改先用`dry_run=True`预览影响
-• **条件精确**: 避免`UPDATE 技能 SET 伤害 = 1000`这种无条件更新
-• **数据范围**: 一次修改1000行以内，避免大范围风险
-• **备份策略**: 关键配置表修改前手动备份一次
-• **分步操作**: 大量数据分批修改，不要一次性全表更新
-
-**💡 最佳实践**:
-1️⃣ **预览验证**: `dry_run=True` → 查看影响行数和示例数据
-2️⃣ **条件测试**: 先用`excel_query`测试WHERE条件，确保筛选正确
-3️⃣ **渐进修改**: 从小数据量开始，验证无误后再扩大范围
-4️⃣ **版本对比**: 复杂修改后用`excel_compare_sheets`验证结果
-
-**🎯 配合使用**:
-• **修改前**: + `excel_describe_table`了解结构 + `excel_query`测试条件
-• **修改中**: + `dry_run=True`预览 + 小批量测试
-• **修改后**: + `excel_query`验证结果 + `excel_compare_sheets`对比版本
-• **紧急恢复**: + `excel_restore_backup`恢复到修改前状态
-5️⃣ **验证结果**: 修改后用excel_query确认修改成功
-
-**🚫 注意事项**:
-• 只支持UPDATE语句，不支持INSERT/DELETE
-• 修改前建议先用excel_describe_table了解数据结构
-• 复杂修改建议分步骤执行，避免一次修改过多数据
-• 大文件修改可能较慢，建议错峰执行
-
-**🔧 参数说明**:
-• **file_path**: Excel文件路径（支持相对路径）
-• **update_expression**: UPDATE语句（格式：UPDATE 表名 SET 字段=值 WHERE 条件）
-• **dry_run**: 预览模式（默认False；True时只显示影响范围不实际修改）
-
-**📊 返回信息**:
-• **affected_rows**: 受影响的行数
-• **preview_data**: 预览数据（dry_run模式下显示前5行示例）
-• **update_summary**: 更新摘要{total_rows、columns_updated、conditions_used}
-• **file_path**: 源文件路径
-• **success**: 操作是否成功
-• **message**: 状态消息或错误信息
-
-**⚡ 配合使用**:
-• 修改前预览: dry_run=True确认修改范围
-• 修改后验证: excel_query检查修改结果
-• 安全保障: excel_create_backup创建备份
-• 版本对比: excel_compare_sheets对比版本差异
-    """
     _path_err = _validate_path(file_path)
     if _path_err:
         return _path_err
@@ -3938,59 +2359,7 @@ def excel_format_cells(
     formatting: Optional[Dict[str, Any]] = None,
     preset: Optional[str] = None
 ) -> Dict[str, Any]:
-    """
-🎨 单元格样式美化器 - 配置表的可视化
-
-**核心功能**: 格式化单元格样式，支持快速预设和完全自定义。让配置表更易读、更专业。
-
-**🎮 游戏开发场景**:
-• **异常高亮**: 用"warning"预设标记异常数值配置
-• **版本标记**: 用"highlight"标记新版本修改的数据
-• **品质区分**: 不同品质装备用不同背景色
-• **数据审查**: 标记需要检查的数据行
-
-**⚡ 快速预设** (preset参数):
-• **highlight**: 黄色背景，标记待检查的数据
-• **warning**: 红色背景，标记异常或问题数据
-**🔧 参数说明**:
-• **file_path**: Excel文件路径（支持相对路径）
-• **sheet_name**: 工作表名称
-• **range**: 要格式化的单元格范围（如"A1:C10"）
-• **formatting**: 自定义格式字典{bold、italic、size、color、bg_color、alignment等}
-• **preset**: 快速预设名称（highlight/warning/success，优先于formatting）
-
-**📊 返回信息**:
-• **formatted_range**: 实际格式化的范围{start_cell、end_cell、rows、cols}
-• **affected_cells**: 受影响的单元格数
-• **preset_used**: 使用的预设名称（如有）
-• **file_path**: 源文件路径
-• **success**: 操作是否成功
-• **message**: 状态消息或错误信息
-
-**💡 实用技巧**:
-• **快速标记**: preset参数一行代码搞定常用样式，无需逐个设置
-• **异常高亮**: 用"warning"预设标记数据异常（如数值为0或负数）
-• **批量格式**: range参数支持整列操作（如"A:A"格式化整列）
-• **人工审核**: 标记需要策划人工审核的配置行
-
-**🔗 配合使用**:
-• + excel_query → 查出异常数据行号后用format_cells标记
-• + excel_assess_data_impact → 评估后再标记风险区域
-• + excel_set_borders → 格式化后添加边框增强可读性
-• **success**: 绿色背景，标记已确认或正常数据
-
-**🔧 自定义格式** (formatting参数):
-• **字体**: bold/italic/underline/size/color
-• **背景色**: bg_color（十六进制颜色值）
-• **边框**: border_style/border_color
-• **对齐**: horizontal/vertical alignment
-• **数字格式**: number_format（如"#,##0"千分位）
-
-**💡 使用建议**:
-• 快速标记→用preset参数一键高亮
-• 边框设置→用excel_set_borders更专业
-• 条件格式→结合excel_query筛选后再格式化
-    """
+    """设置单元格样式。formatting字段: bold/italic/underline/font_size/font_color/bg_color/number_format/alignment/wrap_text/border_style。只传需要修改的字段。"""
     _path_err = _validate_path(file_path)
     if _path_err:
         return _path_err
@@ -4004,41 +2373,7 @@ def excel_merge_cells(
     sheet_name: str,
     range: str
 ) -> Dict[str, Any]:
-    """
-🔗 合并单元格 - 将范围合并为一个大单元格
-
-**核心功能**: 将指定范围的单元格合并为一个，仅保留左上角的值。常用于标题行、分类标签等场景。
-
-**🎮 游戏开发场景**:
-• **标题行**: 合并A1:E1作为配置表标题（如"技能配置表 v2.0"）
-• **分类标签**: 在数据区域插入分类行并合并（如"近战武器"横跨多列）
-• **表头美化**: 双行表头中合并描述行
-
-**🔧 参数说明**:
-• **range**: 范围表达式（如"A1:E1"）
-
-**⚡ 使用建议**:
-• 合并后只有左上角单元格的值保留，其他单元格值丢失
-• 取消合并请用excel_unmerge_cells
-**💡 实用技巧**:
-• **数据丢失警告**: 合并后只有左上角值保留，其他单元格值丢失
-• **标题合并**: 常用于表头标题行合并（如A1:E1合并为"技能配置表"）
-• **取消恢复**: 合并后需要单独编辑子单元格时先取消合并
-• **格式保留**: 合并操作保留左上角单元格的格式
-
-**🔗 配合使用**:
-• + excel_unmerge_cells → 取消合并恢复独立单元格
-• + excel_format_cells → 合并后美化标题行样式
-• 合并后的单元格不能单独编辑子区域
-    
-**📊 返回信息**:
-• **merged_range**: 合并的单元格范围
-• **cell_count**: 合并的单元格数量
-• **merged_value**: 合并后的单元格值
-• **affected_sheet**: 工作表名称
-• **success**: 操作是否成功
-• **message**: 状态消息或错误信息
-"""
+    """合并指定范围为一个大单元格。"""
     _path_err = _validate_path(file_path)
     if _path_err:
         return _path_err
@@ -4052,41 +2387,7 @@ def excel_unmerge_cells(
     sheet_name: str,
     range: str
 ) -> Dict[str, Any]:
-    """
-🔓 取消合并 - 恢复已合并的单元格为独立单元格
-
-**核心功能**: 取消指定范围内的合并，恢复为独立单元格。合并前每个子单元格的值会变为空（只有左上角保留了原始值）。
-
-**🎮 游戏开发场景**:
-• **结构调整**: 需要在合并区域中单独编辑某个单元格时先取消合并
-• **数据提取**: 取消合并后才能单独读取子区域数据
-• **格式重置**: 重新规划表头结构前取消所有合并
-
-**💡 实用技巧**:
-• **数据丢失**: 取消合并后，只有左上角保留了原始值，其他子单元格变为空
-• **编辑需要**: 需要在合并区域中单独编辑某个单元格时先取消合并
-• **结构调整**: 重新规划表头结构前取消所有合并
-
-**🔧 参数说明**:
-• **file_path**: Excel文件路径
-• **sheet_name**: 工作表名称
-• **range**: 取消合并的单元格范围（如"A1:C3"）
-
-**📊 返回信息**:
-• **success**: 取消合并是否成功
-• **message**: 操作结果说明
-• **data**: 取消合并详情（范围、合并数量）
-
-**🔗 配合使用**:
-• + excel_merge_cells → 合并和取消合并是逆操作
-• + excel_update_range → 取消合并后可对子区域独立写入数据
-
-**⚠️ 重要提醒**:
-• 取消合并会丢失数据：只有左上角保留原始值，其他子单元格变空
-• 操作前请确认确实需要取消合并，且已备份重要数据
-• 范围格式请使用标准格式（如"A1:C3"），支持单个单元格或矩形区域
-• 取消合并后可使用excel_update_range独立修改各个子单元格
-    """
+    """取消合并，恢复为独立单元格。"""
     _path_err = _validate_path(file_path)
     if _path_err:
         return _path_err
@@ -4101,53 +2402,7 @@ def excel_set_borders(
     range: str,
     border_style: str = "thin"
 ) -> Dict[str, Any]:
-    """
-📏 设置边框 - 为指定范围添加单元格边框
-
-**核心功能**: 为指定范围的单元格添加边框线。支持多种样式，简单高亮也可用excel_format_cells的preset参数。
-
-**🎮 游戏开发场景**:
-• **表格分隔**: 给汇总行添加上下边框区分数据区
-• **区域标注**: 给特定区域添加边框（如"注意：以下数据需要审核"）
-• **打印美化**: 给需要打印的配置表添加边框线
-
-**🔧 边框样式**:
-• **thin**: 细线（默认，最常用）
-• **thick**: 粗线（强调分隔）
-• **medium**: 中等（介于thin和thick之间）
-• **double**: 双线（标题分隔）
-• **dotted**: 点线（装饰性）
-• **dashed**: 虚线（辅助线）
-
-**🔧 参数说明**:
-• **file_path**: Excel文件路径（支持相对路径）
-• **sheet_name**: 工作表名称
-• **range**: 要添加边框的范围（如"A1:D10"）
-• **border_style**: 边框样式（thin/thick/medium/double/dotted/dashed，默认thin）
-
-**📊 返回信息**:
-• **border_range**: 实际添加边框的范围{start_cell、end_cell}
-• **border_style_used**: 使用的边框样式
-• **affected_cells**: 受影响的单元格数
-• **file_path**: 源文件路径
-• **success**: 操作是否成功
-• **message**: 状态消息或错误信息
-
-**💡 实用技巧**:
-• **汇总分隔**: 给汇总行添加上下边框，区分数据区和汇总区
-• **区域标注**: 给特定区域添加边框（如"需要审核的数据"）
-• **简洁优先**: 如果只需要高亮，用excel_format_cells的preset更简单
-
-**🔗 配合使用**:
-• + excel_format_cells → 格式化+边框组合使用效果更好
-• + excel_merge_cells → 合并标题行后添加边框
-• **dotted**: 点线（装饰性）
-• **dashed**: 虚线（辅助线）
-
-**⚡ 使用建议**:
-• 只需要简单高亮背景色请用excel_format_cells的preset参数
-• 边框对整个范围统一应用，不支持单边设置
-    """
+    """为范围设置边框。border_style: thin/thick/double/dotted/dashed。"""
     _path_err = _validate_path(file_path)
     if _path_err:
         return _path_err
@@ -4163,35 +2418,7 @@ def excel_set_row_height(
     height: float,
     count: int = 1
 ) -> Dict[str, Any]:
-    """
-📏 设置行高 - 调整行的高度
-
-**核心功能**: 调整指定行的高度（磅值）。可同时调整连续多行。
-
-**🎮 游戏开发场景**:
-• **标题行加高**: 标题行高度设为30-40磅更醒目
-• **数据行紧凑**: 数据行高度设为18-20磅更紧凑
-• **说明行**: 多行文字的说明行需要更高（如40-60磅）
-
-**🔧 参数说明**:
-• **height**: 行高（磅值，默认约15磅）
-• **count**: 同时调整的连续行数
-**💡 实用技巧**:
-• **标题行**: 标题行高度设为30-40磅更醒目
-• **数据行**: 数据行高度设为18-20磅更紧凑
-• **批量调整**: count参数一次调整多行，保持统一风格
-
-**🔗 配合使用**:
-• + excel_set_column_width → 同时调整行高和列宽
-• + excel_format_cells → 调整大小后美化样式
-    
-**📊 返回信息**:
-• **row_range**: 设置行高的行号范围
-• **height**: 设置的行高值（磅）
-• **affected_sheet**: 工作表名称
-• **success**: 操作是否成功
-• **message**: 状态消息或错误信息
-"""
+    """设置行高（磅值）。"""
     _path_err = _validate_path(file_path)
     if _path_err:
         return _path_err
@@ -4207,40 +2434,7 @@ def excel_set_column_width(
     width: float,
     count: int = 1
 ) -> Dict[str, Any]:
-    """
-📏 设置列宽 - 调整列的宽度
-
-**核心功能**: 调整指定列的宽度（字符单位）。可同时调整连续多列。
-
-**🎮 游戏开发场景**:
-• **ID列收窄**: ID列通常只需要10-12字符宽度
-• **描述列加宽**: 描述/备注列需要30-50字符宽度
-• **统一列宽**: 一次性调整所有数据列为统一宽度
-
-**🔧 参数说明**:
-• **column_index**: 起始列号（1-based）
-• **width**: 列宽（字符单位，默认约8.43字符）
-• **count**: 同时调整的连续列数
-**💡 实用技巧**:
-• **ID列收窄**: ID列通常只需10-12字符宽度
-• **描述列加宽**: 描述/备注列需要30-50字符宽度
-• **统一列宽**: 一次性调整所有数据列为统一宽度更美观
-
-**🔗 配合使用**:
-• + excel_set_row_height → 同时调整列宽和行高
-• + excel_format_cells → 调整大小后美化样式
-
-**⚡ 使用建议**:
-• 中文字符约占2个字符宽度
-• 调整后如果显示"####"说明宽度不够
-    
-**📊 返回信息**:
-• **column_range**: 设置列宽的列号范围
-• **width**: 设置的列宽值（字符数）
-• **affected_sheet**: 工作表名称
-• **success**: 操作是否成功
-• **message**: 状态消息或错误信息
-"""
+    """设置列宽（字符单位）。"""
     _path_err = _validate_path(file_path)
     if _path_err:
         return _path_err
@@ -4255,47 +2449,7 @@ def excel_compare_files(
     file1_path: str,
     file2_path: str
 ) -> Dict[str, Any]:
-    """
-🔍 文件对比 - 逐单元格比较两个Excel文件的所有工作表差异
-
-**核心功能**: 深度对比两个文件的所有工作表，输出结构差异和逐单元格值变化（旧值→新值）。适合检查配置表整体改动。
-
-**🎮 游戏开发场景**:
-• **版本diff**: 对比新旧版本配置表，快速了解策划改了哪些数值
-• **外包验收**: 对比外包交付的配置表与原始模板的差异
-• **回归检查**: 更新配置后对比前后版本，确认只改了预期内容
-• **多语言校验**: 对比中文和英文配置表的结构一致性
-
-**💡 实用技巧**:
-• **版本diff**: 对比新旧版本配置表，快速了解策划改了哪些数值
-• **外包验收**: 对比外包交付的配置表与模板差异
-• **精度控制**: 关注值变化字段，确认只改了预期内容
-
-**🔗 配合使用**:
-• + excel_compare_sheets → 按ID对比更精确（推荐）
-• + excel_query → 发现差异后用SQL深入分析
-• + excel_backup → 对比前先备份当前版本
-
-**📊 返回信息**:
-• **structure_differences**: 结构差异（新增/删除的工作表和列）
-• **value_changes**: 逐单元格值变化（旧值→新值）
-• **statistics**: 差异统计信息
-
-**🔧 参数说明**:
-• **file1_path**: 第一个Excel文件路径（基准文件）
-• **file2_path**: 第二个Excel文件路径（对比文件）
-
-**💡 使用技巧**:
-• **精准调试**: 发现数值被意外修改的精确位置
-• **版本控制**: 对比配置文件更新前后的所有变化
-• **质量检查**: 确保外包修改符合预期，没有意外改动
-• **性能考虑**: 大文件对比较慢，建议先筛选目标工作表
-
-**⚠️ 注意事项**:
-• 本工具是单元格级精确对比，不关心行记录级变化
-• 如果只需要知道哪些行被修改/新增/删除，使用excel_compare_sheets
-• 处理超大文件时建议使用指定工作表对比，提高性能
-    """
+    """逐单元格比较两个Excel文件差异。"""
     for _p in [file1_path, file2_path]:
         _err = _validate_path(_p)
         if _err:
@@ -4311,40 +2465,7 @@ def excel_check_duplicate_ids(
     id_column: Union[int, str] = 1,
     header_row: int = 1
 ) -> Dict[str, Any]:
-    """
-🔍 检查重复ID - 扫描配置表ID列，返回重复值及所在行号
-
-**核心功能**: 快速检测指定列的重复值，返回每个重复值出现的行号。数据质量检查必备。
-
-**🎮 游戏开发场景**:
-• **配置入库前校验**: 导入新配置前检查技能ID/装备ID是否重复（重复会导致游戏运行时覆盖）
-• **合并后验证**: 合并多个配置表后检查ID冲突
-• **外包交付验收**: 验证外包提交的配置表是否有ID重复（常见低级错误）
-• **策划自查工具**: 策划批量编辑后快速发现重复配置
-**💡 实用技巧**:
-• **入库前必检**: 导入新配置前检查ID重复，避免游戏运行时数据覆盖
-• **合并后验证**: 多个配置表合并后立即检查，发现ID冲突
-• **指定列检查**: id_column支持列名或列号，灵活指定检查目标
-
-**🔗 配合使用**:
-• + excel_query → 找到重复ID后用SQL查看完整记录
-• + excel_delete_rows → 确认重复后删除多余记录
-• + excel_compare_sheets → 版本对比时检查新增重复ID
-
-**📊 返回信息**:
-• **duplicates**: 重复值列表（值→行号数组）
-• **total_duplicates**: 重复值总数
-• **affected_rows**: 受影响的行数
-
-**🔧 参数说明**:
-• **id_column**: 列号（数字）或列名（字符串），默认第1列
-• **header_row**: 表头行号（双行表头设为2）
-
-**⚡ 使用建议**:
-• 也可用SQL: SELECT ID, COUNT(*) as c FROM 表 GROUP BY ID HAVING c>1
-• 建议在每次配置表修改后执行，防止重复ID进入版本库
-• 检查多列组合唯一性可用excel_query的GROUP BY多列
-    """
+    """扫描ID列，返回重复值及所在行号。"""
     _path_err = _validate_path(file_path)
     if _path_err:
         return _path_err
@@ -4361,65 +2482,7 @@ def excel_compare_sheets(
     id_column: Union[int, str] = 1,
     header_row: int = 1
 ) -> Dict[str, Any]:
-    """
-📊 智能工作表对比 - 版本差异分析器
-
-**核心功能**: 按ID列精确对比两个工作表，输出对象级差异（新增/删除/修改的记录）。游戏配置版本管理的核心工具。
-
-**🎮 游戏开发场景**:
-• **版本对比**: 对比v1.0和v1.1的技能配置表差异
-• **数值审核**: 对比策划提交的数值修改和当前版本
-• **合并验证**: 确认多人修改的配置表没有冲突
-• **回滚检查**: 对比备份版本和当前版本确认回滚范围
-**💡 实用技巧**:
-• **版本管理**: 每次配置更新后对比，生成变更报告给策划确认
-• **外包验收**: 对比外包交付和模板版本，确保没有遗漏
-• **ID对比**: 按ID精确匹配，不会因为行顺序不同产生误报
-• **批量审查**: 对比结果直接显示新增/删除/修改数量
-
-**🔗 配合使用**:
-• + excel_compare_files → 全文件对比（包含工作表结构差异）
-• + excel_query → 发现差异后用SQL深入分析原因
-• + excel_backup → 对比前先备份
-
-**🔍 对比结果**:
-• **新增记录**: 新版本中有但旧版本中没有的数据
-• **删除记录**: 旧版本中有但新版本中没有的数据
-• **修改记录**: 两个版本都存在但字段值不同的数据
-• **未变记录**: 两个版本完全相同的数据
-
-**📋 参数说明**:
-• **id_column**: 用于匹配行的标识列（默认第1列，支持列名如"skill_id"）
-• **header_row**: 表头行号（默认1，支持双行表头）
-• **对比维度**: 文件级（跨文件对比）+ 工作表级（同文件不同表）
-
-**💡 使用建议**:
-1️⃣ **版本对比**: 对比修改前备份和当前版本
-2️⃣ **数值审核**: 对比策划提交的修改和基准版本
-3️⃣ **合并验证**: 多人协作时确认修改一致性
-4️⃣ **数据迁移**: 验证数据迁移的正确性
-
-**🔗 配合使用**:
-• 修改前备份→对比→确认差异→发布
-• 策划提交数值→与基准版对比→审核通过→合并
-• 配合excel_query筛选特定类型的差异记录
-
-**⚠️ 注意事项**:
-• 逐单元格对比请用excel_compare_files
-• 大表对比可能较慢，建议缩小范围
-• ID列必须是唯一标识，否则对比结果不准确
-    
-**📊 返回信息**:
-• **comparison_result**: 比较结果详情
-• **differences_found**: 发现的差异数量
-• **added_records**: 新增的记录数量
-• **deleted_records**: 删除的记录数量
-• **modified_records**: 修改的记录数量
-• **unchanged_records**: 未变的记录数量
-• **comparison_summary**: 对比总结信息
-• **success**: 操作是否成功
-• **message**: 状态消息或错误信息
-"""
+    """比较两个工作表的差异：新增/删除/修改的行和列。"""
     for _p in [file1_path, file2_path]:
         _err = _validate_path(_p)
         if _err:
@@ -4430,38 +2493,7 @@ def excel_compare_sheets(
 @mcp.tool()
 @_track_call
 def excel_server_stats() -> Dict[str, Any]:
-    """
-📊 服务器性能监控 - Excel MCP的健康守护者
-
-**核心功能**: 获取MCP服务器运行统计：每个工具的调用次数、平均耗时、错误率和错误分类。返回全局error_types统计（按错误类型分类的计数），用于监控和调试。
-
-**🎮 游戏开发场景**:
-• **性能瓶颈分析**: 监控技能表查询、装备表更新等高频工具的性能表现，识别慢操作
-• **错误率监控**: 追踪数据导入、表结构修改等关键操作的错误率，确保数据质量
-• **资源使用追踪**: 监控大文件处理、批量数据操作时的内存和CPU使用情况
-• **API调用统计**: 分析游戏配置管理、数据同步等场景的API调用模式，优化接口设计
-
-**返回信息**: 工具调用统计、错误分类统计、性能指标、API调用频率
-**参数说明**: 无参数，返回全局服务器统计信息
-**使用建议**: 在进行大规模数据处理前检查服务器状态，性能异常时及时干预
-**💡 实用技巧**:
-• **性能基线**: 正常运行时记录一次基线，异常时对比发现性能下降
-• **错误监控**: 定期检查error_types，发现系统性问题
-• **高频工具**: 关注调用次数最多的工具，优化高频操作性能
-
-**🔗 配合使用**:
-• 所有工具 → server_stats监控全局工具调用情况
-    
-**📊 返回信息**:
-• **tool_calls**: 各工具调用次数统计
-• **execution_stats**: 执行时间统计（平均耗时、最慢工具）
-• **error_rates**: 各工具错误率统计
-• **global_errors**: 全局错误类型统计（按错误分类的计数）
-• **server_status**: 服务器运行状态（内存、连接等）
-• **performance_metrics**: 性能指标（QPS、响应时间等）
-• **success**: 操作是否成功
-• **message**: 状态消息或错误信息
-"""
+    """服务器状态：缓存、调用次数、运行时间。"""
     stats = _tracker.get_stats()
     return _ok("服务器统计信息", data=stats)
 
@@ -4470,34 +2502,7 @@ def excel_server_stats() -> Dict[str, Any]:
 @mcp.tool()
 @_track_call
 def excel_batch_update_ranges(file_path: str, updates: List[Dict[str, Any]]) -> Dict[str, Any]:
-    """
-🔄 批量更新范围 - 高效处理多个单元格区域更新
-
-**核心功能**: 在单个Excel文件中批量更新多个不连续的单元格区域，减少文件IO操作次数，大幅提升批量操作性能。
-
-**🎮 游戏开发场景**:
-• **批量属性更新**: 一次性更新多个技能的冷却时间、消耗法力、伤害值等属性，避免逐个修改
-• **配置批量调整**: 同时修改多个装备的强化等级、稀有度、价格等配置参数
-• **数据同步批量操作**: 批量更新角色属性、任务状态、成就进度等数据
-• **版本对比批量修复**: 批量修正版本升级中的属性差异和数值调整
-
-**参数说明**:
-• file_path: Excel文件路径
-• updates: 更新列表，每个元素包含 {range: "A1:C10", data: [[值1,值2,值3], ...], sheet: "工作表名"}
-
-**返回信息**: 成功更新的区域数量、失败区域详情、总执行时间
-**💡 实用技巧**:
-• **性能优化**: 批量操作比单独更新快5-10倍，特别适合大量数据修改
-• **错误隔离**: 单个区域失败不影响其他区域更新，提供详细错误信息
-• **内存控制**: 大批量操作自动分批处理，避免内存溢出
-• **进度追踪**: 返回每个更新区域的执行状态，便于问题排查
-
-**🔗 配合使用**:
-• excel_list_sheets → 确认目标工作表存在
-• excel_get_range → 预览更新前的数据
-• excel_batch_update_ranges → 执行批量更新
-• excel_get_operation_history → 查看更新记录
-"""
+    """批量更新多个范围。updates为[{range, data}]列表。"""
     try:
         from openpyxl import load_workbook
         from openpyxl.utils import range_boundaries
@@ -4583,34 +2588,7 @@ def excel_batch_update_ranges(file_path: str, updates: List[Dict[str, Any]]) -> 
 @mcp.tool()
 @_track_call  
 def excel_merge_multiple_files(source_files: List[str], target_file: str, merge_mode: str = "append") -> Dict[str, Any]:
-    """
-📁 合并多个Excel文件 - 数据整合专家
-
-**核心功能**: 将多个Excel文件合并到目标文件中，支持追加、覆盖、合并等模式，适合多源数据整合场景。
-
-**🎮 游戏开发场景**:
-• **多服务器数据合并**: 合并不同测试环境的角色数据、装备配置、技能数据
-• **版本数据整合**: 将不同版本的游戏配置合并到统一配置文件中
-• **多平台数据同步**: 合并PC、手机、主机平台的玩家数据或配置信息  
-• **多语言资源整合**: 将不同语言的文本资源、UI配置合并到统一文件
-
-**参数说明**:
-• source_files: 源文件路径列表
-• target_file: 目标文件路径
-• merge_mode: 合并模式 ("append"追加|"overwrite"覆盖|"merge"合并)
-
-**返回信息**: 合并的文件数量、工作表统计、数据行数统计、冲突解决详情
-**💡 实用技巧**:
-• **预览合并**: 先在小样本文件上测试合并逻辑，确认结果符合预期
-• **数据备份**: 合并前自动备份目标文件，防止数据丢失
-• **冲突处理**: merge_mode="merge"时智能处理同名工作表的列冲突
-• **性能监控**: 大文件合并显示进度，避免长时间无响应
-
-**🔗 配合使用**:
-• excel_list_sheets → 查看源文件的工作表结构
-• excel_merge_multiple_files → 执行文件合并
-• excel_compare_files → 验证合并结果准确性
-"""
+    """合并多个文件。merge_mode: append(纵向追加) | sheets(分表合并)。"""
     try:
         from openpyxl import load_workbook, Workbook
         import os
@@ -4699,39 +2677,7 @@ def excel_merge_multiple_files(source_files: List[str], target_file: str, merge_
 @_track_call
 def excel_create_chart(file_path: str, sheet_name: str, chart_type: str, data_range: str, 
                       title: str = "", chart_name: str = "", position: str = "B15") -> Dict[str, Any]:
-    """
-📊 创建Excel图表 - 数据可视化专家
-
-**核心功能**: 在指定工作表中创建各种类型的图表，支持柱状图、折线图、饼图等常见图表类型，为数据分析提供直观可视化。
-
-**🎮 游戏开发场景**:
-• **角色属性分析**: 创建角色等级、经验值、属性值趋势图，分析角色成长曲线
-• **装备性能对比**: 制作装备伤害、防御、速度等属性对比柱状图，辅助装备平衡性调整
-• **收入支出统计**: 生成游戏内货币流入流出折线图，监控经济系统平衡
-• **用户行为分析**: 创建玩家活跃度、留存率、付费率等业务指标图表
-
-**参数说明**:
-• file_path: Excel文件路径
-• sheet_name: 工作表名称
-• chart_type: 图表类型 ("column"柱状图|"line"折线图|"pie"饼图|"bar"条形图|"scatter"散点图)
-• data_range: 数据范围 (如 "A1:D10")
-• title: 图表标题
-• chart_name: 图表名称（可选，默认自动生成）
-• position: 图表位置单元格（可选，默认B15）
-
-**返回信息**: 图表对象信息、位置、类型、数据范围、创建状态
-**💡 实用技巧**:
-• **数据准备**: 确保数据范围包含标题行和列标题，图表会自动使用作为标签
-• **图表类型选择**: 分类数据用柱状图，趋势数据用折线图，占比数据用饼图
-• **位置优化**: 根据数据范围自动选择合适位置，避免覆盖重要数据
-• **样式定制**: 可通过后续的format_cells工具调整图表样式和颜色
-
-**🔗 配合使用**:
-• excel_list_sheets → 确认目标工作表
-• excel_get_range → 预览图表数据
-• excel_create_chart → 创建图表
-• excel_list_charts → 查看创建的图表
-"""
+    """在工作表中创建图表。chart_type: line/bar/pie/scatter/area等。"""
     try:
         from openpyxl import load_workbook
         from openpyxl.chart import BarChart, LineChart, PieChart, ScatterChart, Reference
@@ -4805,34 +2751,7 @@ def excel_create_chart(file_path: str, sheet_name: str, chart_type: str, data_ra
 @mcp.tool()
 @_track_call
 def excel_list_charts(file_path: str, sheet_name: str = None) -> Dict[str, Any]:
-    """
-📋 列出Excel图表 - 图表管理专家
-
-**核心功能**: 列出指定文件或工作表中的所有图表信息，包括图表类型、位置、数据范围等，便于图表管理和维护。
-
-**🎮 游戏开发场景**:
-• **图表资产盘点**: 快速查看项目中所有数据可视化图表，了解可视化资产状况
-• **图表更新管理**: 识别需要更新的过期图表，如版本升级后的数据结构变化
-• **图表依赖分析**: 查看图表依赖的数据范围，评估数据变更对图表的影响
-• **图表批量操作**: 为批量修改图表样式或位置提供图表列表
-
-**参数说明**:
-• file_path: Excel文件路径
-• sheet_name: 工作表名称（可选，默认列出所有工作表的图表）
-
-**返回信息**: 图表列表、详细信息、统计数量、工作表分布
-**💡 实用技巧**:
-• **快速检查**: 不指定sheet_name可查看整个文件的所有图表分布
-• **精确定位**: 通过position信息快速定位到图表位置
-• **依赖追踪**: 查看data_range了解图表使用的数据区域
-• **批量操作**: 获取图表列表后可进行批量样式更新或删除
-
-**🔗 配合使用**:
-• excel_list_charts → 查看现有图表
-• excel_create_chart → 创建新图表
-• excel_get_range → 查看图表数据
-• excel_update_range → 更新图表数据
-"""
+    """列出工作表中的所有图表信息。"""
     try:
         from openpyxl import load_workbook
         
@@ -4877,39 +2796,7 @@ def excel_list_charts(file_path: str, sheet_name: str = None) -> Dict[str, Any]:
 def excel_set_data_validation(file_path: str, sheet_name: str, range_address: str, 
                             validation_type: str, criteria: str, input_title: str = "", 
                             input_message: str = "") -> Dict[str, Any]:
-    """
-📝 设置数据验证 - 数据质量控制专家
-
-**核心功能**: 为指定单元格范围设置数据验证规则，限制输入数据的类型和范围，确保数据质量和一致性。
-
-**🎮 游戏开发场景**:
-• **数值范围控制**: 限制属性值在合理范围内（如生命值0-9999，伤害值0-9999）
-• **枚举值验证**: 确保字段只能选择预定义值（如装备品质：普通、稀有、史诗、传说）
-• **日期格式验证**: 限制日期输入格式，确保时间数据的一致性
-• **自定义公式验证**: 使用Excel公式验证复杂业务逻辑（如属性总和不能超过特定值）
-
-**参数说明**:
-• file_path: Excel文件路径
-• sheet_name: 工作表名称
-• range_address: 单元格范围（如 "A1:A10"）
-• validation_type: 验证类型 ("list"列表|"wholeNumber"整数|"decimal"小数|"date"日期|"custom"自定义)
-• criteria: 验证条件（如 ">=0" 或 "值1,值2,值3"）
-• input_title: 输入提示标题
-• input_message: 输入提示内容
-
-**返回信息**: 验证规则详情、应用范围、设置状态、验证统计
-**💡 实用技巧**:
-• **用户引导**: input_title和input_message提供清晰的输入指导
-• **批量设置**: 可以为整列或整行设置验证规则，提高数据一致性
-• **动态列表**: 使用named range作为列表源，实现动态下拉选项
-• **错误提示**: 自定义错误提示信息，帮助用户正确输入数据
-
-**🔗 配合使用**:
-• excel_list_sheets → 确认目标工作表
-• excel_set_data_validation → 设置验证规则
-• excel_clear_validation → 清除验证规则
-• excel_get_range → 验证数据格式正确性
-"""
+    """设置数据验证规则。validation_type: list/whole_number/decimal/date/text_length/custom。"""
     try:
         from openpyxl import load_workbook
         from openpyxl.worksheet.datavalidation import DataValidation
@@ -4953,34 +2840,7 @@ def excel_set_data_validation(file_path: str, sheet_name: str, range_address: st
 @mcp.tool()
 @_track_call
 def excel_clear_validation(file_path: str, sheet_name: str = None, range_address: str = None) -> Dict[str, Any]:
-    """
-🧹 清除数据验证 - 验证规则清理专家
-
-**核心功能**: 清除指定工作表或单元格范围的数据验证规则，方便修改数据或移除验证限制。
-
-**🎮 游戏开发场景**:
-• **批量数据导入**: 清除验证规则后可以快速导入大量测试数据
-• **配置修改**: 移除旧的验证规则，设置新的业务规则
-• **数据清理**: 删除不需要的验证，简化工作表结构
-• **临时调试**: 临时清除验证进行数据调试，完成后重新启用
-
-**参数说明**:
-• file_path: Excel文件路径
-• sheet_name: 工作表名称（可选，默认清除所有工作表的验证）
-• range_address: 单元格范围（可选，默认清除整个工作表的验证）
-
-**返回信息**: 清除的验证规则数量、影响的范围、清除状态
-**💡 实用技巧**:
-• **精确清除**: 指定sheet_name和range_address可以精确清除特定区域的验证
-• **批量操作**: 不指定参数可一次性清除整个文件的所有验证规则
-• **安全确认**: 建议清除前备份重要文件，避免误删重要验证规则
-• **重新设置**: 清除后可以重新设置更精确的验证规则
-
-**🔗 配合使用**:
-• excel_clear_validation → 清除现有验证
-• excel_set_data_validation → 设置新的验证规则
-• excel_list_charts → 确认图表不受影响
-"""
+    """清除数据验证规则。"""
     try:
         from openpyxl import load_workbook
         
@@ -5033,38 +2893,7 @@ def excel_clear_validation(file_path: str, sheet_name: str = None, range_address
 @_track_call
 def excel_add_conditional_format(file_path: str, sheet_name: str, range_address: str,
                                 format_type: str, criteria: str, format_style: str = "lightRed") -> Dict[str, Any]:
-    """
-🎨 添加条件格式 - 数据可视化增强专家
-
-**核心功能**: 为指定单元格范围添加条件格式规则，根据数据值自动应用不同的格式，实现数据的可视化分析和快速识别。
-
-**🎮 游戏开发场景**:
-• **数值区间标识**: 用不同颜色标识装备属性范围（如绿色：优秀，黄色：一般，红色：较差）
-• **状态可视化**: 用颜色区分角色状态（红色：血量危险，黄色：中等，绿色：健康）
-• **进度显示**: 用渐变色显示任务完成度或升级进度
-• **异常数据高亮**: 突出显示异常值或超出范围的数据
-
-**参数说明**:
-• file_path: Excel文件路径
-• sheet_name: 工作表名称
-• range_address: 单元格范围（如 "A1:A10"）
-• format_type: 格式类型 ("cellValue"单元格值|"formula"公式|"topRank"排名|"duplicate"重复值)
-• criteria: 条件（如 ">=80" 或 "=$B1>100"）
-• format_style: 格式样式 ("lightRed"浅红|"lightGreen"浅绿|"lightYellow"浅黄|"lightTurquoise"浅蓝)
-
-**返回信息**: 条件规则详情、应用范围、格式样式、规则索引
-**💡 实用技巧**:
-• **多重规则**: 可以为同一区域添加多个条件格式规则，按优先级依次应用
-• **公式条件**: 使用公式可以实现复杂的业务逻辑判断（如 =$A1*$B1>1000）
-• **颜色映射**: 合理使用颜色可以快速识别数据模式和异常情况
-• **性能优化**: 避免在大范围内设置过多条件格式，影响文件性能
-
-**🔗 配合使用**:
-• excel_list_sheets → 确认目标工作表
-• excel_add_conditional_format → 设置条件格式
-• excel_clear_conditional_format → 清除格式规则
-• excel_get_range → 预览格式效果
-"""
+    """添加条件格式规则。支持高亮/数据条/色阶/图标集。"""
     try:
         from openpyxl import load_workbook, styles
         from openpyxl.formatting.rule import CellIsRule, FormulaRule
@@ -5122,34 +2951,7 @@ def excel_add_conditional_format(file_path: str, sheet_name: str, range_address:
 @mcp.tool()
 @_track_call
 def excel_clear_conditional_format(file_path: str, sheet_name: str = None, range_address: str = None) -> Dict[str, Any]:
-    """
-🧹 清除条件格式 - 格式清理专家
-
-**核心功能**: 清除指定工作表或单元格范围的条件格式规则，移除自动格式化效果，恢复单元格默认样式。
-
-**🎮 游戏开发场景**:
-• **样式重置**: 清除复杂的条件格式，重新设计简洁的显示样式
-• **性能优化**: 移除不必要的条件格式提升文件加载性能
-• **格式标准化**: 统一整个项目的格式标准，移除自定义格式
-• **调试模式**: 临时清除条件格式进行数据调试，完成后重新应用
-
-**参数说明**:
-• file_path: Excel文件路径
-• sheet_name: 工作表名称（可选，默认清除所有工作表的格式）
-• range_address: 单元格范围（可选，默认清除整个工作表的格式）
-
-**返回信息**: 清除的格式规则数量、影响的范围、清除状态
-**💡 实用技巧**:
-• **精确清除**: 指定具体范围可以精确清除特定区域的格式规则
-• **批量清理**: 不指定参数可一次性清除整个文件的所有条件格式
-• **性能提升**: 大文件中移除过多条件格式可以显著提升性能
-• **样式重新设计**: 清除后可以设计更合理的格式规则
-
-**🔗 配合使用**:
-• excel_clear_conditional_format → 清除现有格式
-• excel_add_conditional_format → 设置新的格式规则
-• excel_format_cells → 手动设置单元格样式
-"""
+    """清除条件格式。"""
     try:
         from openpyxl import load_workbook
         
@@ -5208,83 +3010,7 @@ def excel_write_only_override(
     preserve_formulas: bool = False,
     preserve_col_widths: bool = True
 ) -> Dict[str, Any]:
-    """
-🎯 write_only覆盖修改 - 专用于大文件高性能覆盖修改
-
-**核心功能**: 专门针对游戏配置表大文件场景优化的write_only模式覆盖修改工具，提供极致性能和可靠性。
-
-**🎮 游戏开发场景**:
-• **大批量配置更新**: 一次性更新数千行技能、装备、道具配置数据，内存占用降低90%
-• **版本快速切换**: 高性能覆盖更新整个配置表，支持版本快速回滚和切换
-• **数据迁移覆盖**: 从数据源批量导入并覆盖目标配置表，性能提升5-10倍
-• **实时配置热更新**: 游戏运行时快速更新配置而不影响整体性能
-• **大数据清洗**: 批量修正数据格式、数值范围和字段映射问题
-
-**⚡ 性能优势**:
-• **极低内存占用**: write_only模式下内存占用与文件大小无关，适合GB级文件
-• **原子性操作**: 先写入临时文件再替换原文件，确保操作安全性
-• **批量优化**: 单次操作覆盖整个范围，比多次小写入快10倍以上
-• **智能列宽保留**: 可选保留原有列宽配置，保持表格美观
-
-**🔧 技术特点**:
-• **强制覆盖模式**: 只支持覆盖修改，不支持插入（设计上更安全）
-• **公式可选保留**: preserve_formulas=False时覆盖公式，True时尝试保留
-• **列宽智能继承**: 自动读取并保留原表的列宽配置
-• **错误恢复**: 失败时自动清理临时文件，保证原文件完整性
-
-**📋 参数详解**:
-• **file_path**: Excel文件路径（支持.xlsx/.xlsm）
-• **sheet_name**: 目标工作表名称（必须明确指定）
-• **range_spec**: 范围表达式，格式如"A1:C10"或"A:D"
-• **data**: 二维数组数据 [[值1,值2,值3], [值4,值5,值6], ...]
-• **preserve_formulas**: 是否保留现有公式（默认False，会被数据覆盖）
-• **preserve_col_widths**: 是否保留列宽配置（默认True，保持表格布局）
-
-**📊 返回信息**:
-• **override_range**: 实际覆盖的范围{start_row, end_row, start_col, end_col}
-• **cells_updated**: 更新的单元格总数
-• **streaming_mode**: 确认使用流式写入模式
-• **memory_efficiency**: 内存效率指标（文件大小vs内存占用比）
-
-**🚀 使用示例**:
-```python
-# 批量更新技能配置（高性能覆盖）
-excel_write_only_override(
-    file_path="skills_config.xlsx",
-    sheet_name="技能配置", 
-    range_spec="B2:D1000",
-    data=[
-        ["火球术", 120, 5.0],
-        ["冰箭", 100, 3.5],
-        ["雷电", 150, 7.2]
-    ],
-    preserve_formulas=False
-)
-
-# 批量更新装备属性（保留列宽）
-excel_write_only_override(
-    file_path="equipment.xlsx", 
-    sheet_name="装备列表",
-    range_spec="C2:F500",
-    equipment_data,
-    preserve_col_widths=True
-)
-```
-
-**💡 最佳实践**:
-• **大文件必须用**: 文件>10MB时强制使用此工具，避免内存溢出
-• **批处理优化**: 一次修改整个区域，不要分割成多次小修改
-• **数据预验证**: 修改前用excel_describe_table了解目标区域结构
-• **备份策略**: 重要修改前建议备份原文件，此工具不可撤销
-• **性能监控**: 大操作时监控内存使用情况，streaming模式下应保持稳定
-
-**🔗 配合使用**:
-• + excel_describe_table → 修改前了解目标表结构
-• + excel_write_only_override → 执行高性能覆盖修改
-• + excel_query → 修改后验证结果正确性
-• + excel_get_operation_history → 查看修改记录
-• + excel_compare_files → 与原文件对比确认变更
-"""
+    """大文件高性能覆盖写入。range_spec: "sheet!A1:D10"。不读取已有内容，直接覆盖。适合批量导入场景。"""
     _path_err = _validate_path(file_path)
     if _path_err:
         return _path_err

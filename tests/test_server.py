@@ -564,12 +564,11 @@ class TestServerInterfaces:
         assert 'data' in result
         assert 'last_row' in result['data']
         assert 'sheet_name' in result['data']
-        assert 'column' in result['data']
         assert 'search_scope' in result['data']
         assert isinstance(result['data']['last_row'], int)
         assert result['data']['last_row'] >= 0
         assert result['data']['sheet_name'] == sheet_name
-        assert result['data']['column'] is None  # 没有指定列
+        # column字段在未指定时被strip（token优化），指定时存在
         assert result['data']['search_scope'] == "整个工作表"
 
         # 兼容性字段检查
