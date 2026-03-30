@@ -140,6 +140,24 @@ class ExcelOperations:
         Returns:
             Dict: 标准化的操作结果
         """
+        # 新增：数据格式验证
+        if not data:
+            return cls._format_error_result("数据不能为空")
+
+        if not isinstance(data, list):
+            return cls._format_error_result(
+                f"数据格式错误：data 应该是二维数组 [[row1], [row2], ...]，"
+                f"实际收到类型: {type(data).__name__}"
+            )
+
+        # 验证每一行是否都是列表
+        for i, row in enumerate(data):
+            if not isinstance(row, list):
+                return cls._format_error_result(
+                    f"数据格式错误：第 {i+1} 行应该是列表，实际收到类型: {type(row).__name__}。"
+                    "data 应该是二维数组 [[row1], [row2], ...]"
+                )
+
         if cls.DEBUG_LOG_ENABLED:
             logger.info(f"{cls._LOG_PREFIX} 开始更新范围数据: {range_expression}, 模式: {'插入' if insert_mode else '覆盖'}")
 

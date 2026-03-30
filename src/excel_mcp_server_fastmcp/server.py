@@ -814,13 +814,58 @@ def excel_search_directory(
 def excel_get_range(
     file_path: str,
     range: str,
-    include_formatting: bool = False
+    include_formatting: bool = False,
+    sheet_name: Optional[str] = None,
+    start_cell: Optional[str] = None,
+    end_cell: Optional[str] = None
 ) -> Dict[str, Any]:
-    """读取指定范围的数据。返回{headers, data, shape}。支持include_formatting获取样式。"""
+    """读取指定范围的数据。返回{headers, data, shape}。支持include_formatting获取样式。
+    
+    Args:
+        file_path: Excel文件路径
+        range: 单元格范围，如 "Sheet1!A1:C10" 或 "A1:C10"
+        include_formatting: 是否包含格式信息
+        sheet_name: 工作表名称（可选，如果range不包含工作表名时可指定）
+        start_cell: 起始单元格（可选，与end_cell配合使用）
+        end_cell: 结束单元格（可选，与start_cell配合使用）
+    """
     _path_err = _validate_path(file_path)
     if _path_err:
         return _path_err
-    # 增强参数验证
+    
+    # 参数兼容性处理：如果提供了start_cell和end_cell，构建range表达式
+    if start_cell and end_cell:
+        if sheet_name:
+            range = f"{sheet_name}!{start_cell}:{end_cell}"
+        else:
+            # 如果没有指定sheet_name，尝试自动推断
+            if '!' not in range:
+                try:
+                    from openpyxl import load_workbook
+                    wb = load_workbook(file_path, read_only=True)
+                    sheet_names = wb.sheetnames
+                    wb.close()
+                    if len(sheet_names) == 1:
+                        range = f"{sheet_names[0]}!{start_cell}:{end_cell}"
+                    else:
+                        return _fail(
+                            f"需要指定工作表名，文件有多个工作表({', '.join(sheet_names)})。"
+                            f"请使用sheet_name参数或格式: '工作表名!A1:C10'",
+                            meta={"error_code": "VALIDATION_FAILED", "available_sheets": sheet_names}
+                        )
+                except Exception:
+                    return _fail(
+                        "无法自动推断工作表名，请指定sheet_name参数或使用完整范围表达式",
+                        meta={"error_code": "VALIDATION_FAILED"}
+                    )
+            else:
+                range = f"{range}!{start_cell}:{end_cell}"  # 这种情况应该不会发生
+    
+    # 如果range不包含工作表名但指定了sheet_name，添加工作表名
+    if sheet_name and '!' not in range:
+        range = f"{sheet_name}!{range}"
+    
+    # 原有的参数验证逻辑
 
     try:
         # 验证范围表达式格式
@@ -905,23 +950,59 @@ def excel_update_range(
     data: List[List[Any]],
     preserve_formulas: bool = True,
     insert_mode: bool = False,
-    streaming: bool = True
+    streaming: bool = True,
+    sheet_name: Optional[str] = None,
+    start_cell: Optional[str] = None,
+    end_cell: Optional[str] = None
 ) -> Dict[str, Any]:
     """写入数据到指定范围。
     
     Args:
         file_path: Excel文件路径
-        range: 单元格范围，如 "A1:C10"
+        range: 单元格范围，如 "Sheet1!A1:C10" 或 "A1:C10"
         data: 要写入的数据，二维数组格式
         preserve_formulas: 是否保留已有公式不被覆盖，默认True
         insert_mode: 数据写入模式，默认False(覆盖模式)
             - False: 覆盖模式，直接替换目标单元格数据
             - True: 插入模式，在目标位置插入新行，原有数据下移
         streaming: 是否使用流式写入，默认True
+        sheet_name: 工作表名称（可选，如果range不包含工作表名时可指定）
+        start_cell: 起始单元格（可选，与end_cell配合使用）
+        end_cell: 结束单元格（可选，与start_cell配合使用）
     """
     _path_err = _validate_path(file_path)
     if _path_err:
         return _path_err
+    
+    # 参数兼容性处理：如果提供了start_cell和end_cell，构建range表达式
+    if start_cell and end_cell:
+        if sheet_name:
+            range = f"{sheet_name}!{start_cell}:{end_cell}"
+        else:
+            # 如果没有指定sheet_name，尝试自动推断
+            if '!' not in range:
+                try:
+                    from openpyxl import load_workbook
+                    wb = load_workbook(file_path, read_only=True)
+                    sheet_names = wb.sheetnames
+                    wb.close()
+                    if len(sheet_names) == 1:
+                        range = f"{sheet_names[0]}!{start_cell}:{end_cell}"
+                    else:
+                        return _fail(
+                            f"需要指定工作表名，文件有多个工作表({', '.join(sheet_names)})。"
+                            f"请使用sheet_name参数或格式: '工作表名!A1:C10'",
+                            meta={"error_code": "VALIDATION_FAILED", "available_sheets": sheet_names}
+                        )
+                except Exception:
+                    return _fail(
+                        "无法自动推断工作表名，请指定sheet_name参数或使用完整范围表达式",
+                        meta={"error_code": "VALIDATION_FAILED"}
+                    )
+    
+    # 如果range不包含工作表名但指定了sheet_name，添加工作表名
+    if sheet_name and '!' not in range:
+        range = f"{sheet_name}!{range}"
 
     try:
         # 验证范围表达式格式
@@ -1994,6 +2075,13 @@ def excel_set_formula(
     formula: str
 ) -> Dict[str, Any]:
     """在单元格写入Excel公式。"""
+    # 参数验证：formula 不能为空
+    if not formula or not formula.strip():
+        return _fail(
+            '公式不能为空，请提供有效的Excel公式（如 "=A1+B1"）',
+            meta={"error_code": "MISSING_FORMULA"}
+        )
+
     _path_err = _validate_path(file_path)
     if _path_err:
         return _path_err
@@ -2408,12 +2496,32 @@ def excel_format_cells(
     sheet_name: str,
     range: str,
     formatting: Optional[Dict[str, Any]] = None,
-    preset: Optional[str] = None
+    preset: Optional[str] = None,
+    start_cell: Optional[str] = None,
+    end_cell: Optional[str] = None
 ) -> Dict[str, Any]:
-    """设置单元格样式。formatting字段: bold/italic/underline/font_size/font_color/bg_color/number_format/alignment/wrap_text/border_style。只传需要修改的字段。"""
+    """设置单元格样式。formatting字段: bold/italic/underline/font_size/font_color/bg_color/number_format/alignment/wrap_text/border_style。只传需要修改的字段。
+    
+    Args:
+        file_path: Excel文件路径
+        sheet_name: 工作表名称
+        range: 单元格范围，如 "A1:C10"
+        formatting: 样式配置
+        preset: 预设样式名称
+        start_cell: 起始单元格（可选，与end_cell配合使用）
+        end_cell: 结束单元格（可选，与start_cell配合使用）
+    """
     _path_err = _validate_path(file_path)
     if _path_err:
         return _path_err
+    
+    # 参数兼容性处理：如果提供了start_cell和end_cell，构建range表达式
+    if start_cell and end_cell:
+        range = f"{start_cell}:{end_cell}"
+    
+    # 确保range包含工作表名
+    if '!' not in range:
+        range = f"{sheet_name}!{range}"
     return _wrap(ExcelOperations.format_cells(file_path, sheet_name, range, formatting, preset))
 
 
@@ -2547,6 +2655,157 @@ def excel_server_stats() -> Dict[str, Any]:
     """服务器状态：缓存、调用次数、运行时间。"""
     stats = _tracker.get_stats()
     return _ok("服务器统计信息", data=stats)
+
+
+# ==================== 用户友好的参数兼容工具 ====================
+@mcp.tool()
+@_track_call
+def excel_get_range_user_friendly(
+    file_path: str,
+    sheet_name: str,
+    start_cell: str,
+    end_cell: str,
+    include_formatting: bool = False
+) -> Dict[str, Any]:
+    """读取指定范围的数据（用户友好版本）。支持单独指定工作表、起始和结束单元格。
+    
+    Args:
+        file_path: Excel文件路径
+        sheet_name: 工作表名称
+        start_cell: 起始单元格，如 "A1"
+        end_cell: 结束单元格，如 "C10"
+        include_formatting: 是否包含格式信息
+    """
+    _path_err = _validate_path(file_path)
+    if _path_err:
+        return _path_err
+    
+    # 构建范围表达式
+    range_expression = f"{sheet_name}!{start_cell}:{end_cell}"
+    
+    try:
+        # 调用原有的excel_get_range函数
+        from openpyxl import load_workbook
+        wb = load_workbook(file_path, read_only=True)
+        sheet_names = wb.sheetnames
+        wb.close()
+        
+        if sheet_name not in sheet_names:
+            return _fail(
+                f"工作表 '{sheet_name}' 不存在。可用工作表: {', '.join(sheet_names)}",
+                meta={"error_code": "SHEET_NOT_FOUND", "available_sheets": sheet_names}
+            )
+        
+        # 调用原有的API
+        result = ExcelOperations.get_range(file_path, range_expression, include_formatting)
+        return _wrap(result)
+        
+    except Exception as e:
+        return _wrap(ExcelOperations.get_range(file_path, range_expression, include_formatting))
+
+
+@mcp.tool()
+@_track_call
+def excel_format_cells_user_friendly(
+    file_path: str,
+    sheet_name: str,
+    start_cell: str,
+    end_cell: str,
+    formatting: Optional[Dict[str, Any]] = None,
+    preset: Optional[str] = None
+) -> Dict[str, Any]:
+    """格式化单元格（用户友好版本）。支持单独指定工作表、起始和结束单元格。
+    
+    Args:
+        file_path: Excel文件路径
+        sheet_name: 工作表名称
+        start_cell: 起始单元格，如 "A1"
+        end_cell: 结束单元格，如 "C10"
+        formatting: 样式配置，包含bold/italic/underline等字段
+        preset: 预设样式名称
+    """
+    _path_err = _validate_path(file_path)
+    if _path_err:
+        return _path_err
+    
+    # 构建范围表达式
+    range_expression = f"{sheet_name}!{start_cell}:{end_cell}"
+    
+    try:
+        # 验证工作表存在
+        from openpyxl import load_workbook
+        wb = load_workbook(file_path, read_only=True)
+        sheet_names = wb.sheetnames
+        wb.close()
+        
+        if sheet_name not in sheet_names:
+            return _fail(
+                f"工作表 '{sheet_name}' 不存在。可用工作表: {', '.join(sheet_names)}",
+                meta={"error_code": "SHEET_NOT_FOUND", "available_sheets": sheet_names}
+            )
+        
+        # 调用原有的API
+        result = ExcelOperations.update_range_format(
+            file_path, range_expression, formatting, preset
+        )
+        return _wrap(result)
+        
+    except Exception as e:
+        return _fail(f"格式化失败: {str(e)}")
+
+
+@mcp.tool()
+@_track_call
+def excel_update_range_user_friendly(
+    file_path: str,
+    sheet_name: str,
+    start_cell: str,
+    end_cell: str,
+    data: List[List[Any]],
+    preserve_formulas: bool = True,
+    insert_mode: bool = False,
+    streaming: bool = True
+) -> Dict[str, Any]:
+    """写入数据到指定范围（用户友好版本）。支持单独指定工作表、起始和结束单元格。
+    
+    Args:
+        file_path: Excel文件路径
+        sheet_name: 工作表名称
+        start_cell: 起始单元格，如 "A1"
+        end_cell: 结束单元格，如 "C10"
+        data: 要写入的数据，二维数组格式
+        preserve_formulas: 是否保留已有公式不被覆盖，默认True
+        insert_mode: 数据写入模式，默认False(覆盖模式)
+        streaming: 是否使用流式写入，默认True
+    """
+    _path_err = _validate_path(file_path)
+    if _path_err:
+        return _path_err
+    
+    # 构建范围表达式
+    range_expression = f"{sheet_name}!{start_cell}:{end_cell}"
+    
+    try:
+        # 验证工作表存在
+        from openpyxl import load_workbook
+        wb = load_workbook(file_path, read_only=True)
+        sheet_names = wb.sheetnames
+        wb.close()
+        
+        if sheet_name not in sheet_names:
+            return _fail(
+                f"工作表 '{sheet_name}' 不存在。可用工作表: {', '.join(sheet_names)}",
+                meta={"error_code": "SHEET_NOT_FOUND", "available_sheets": sheet_names}
+            )
+        
+        # 调用原有的API
+        result = ExcelOperations.update_range(
+            file_path, range_expression, data, preserve_formulas, insert_mode, streaming
+        )
+        return _wrap(result)
+        
+    except Exception as e:
+        return _fail(f"数据写入失败: {str(e)}")
 
 
 # ==================== 批量操作工具 ====================
