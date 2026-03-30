@@ -1,8 +1,10 @@
-[简体中文](README.md) | [English](README.en.md)
+[简体中文](README.md) | [English](README.en.md) | [📱 移动端友好版](mobile-friendly-version.html)
 
 # 🎮 ExcelMCP: 游戏开发专用 Excel 配置表管理器
 
-[![PyPI](https://img.shields.io/pypi/v/excel-mcp-server-fastmcp.svg)](https://pypi.org/project/excel-mcp-server-fastmcp/v1.6.48)
+> 📱 **移动端优化完成** - 新增响应式设计、一键复制、快捷导航等移动端友好功能
+
+[![PyPI](https://img.shields.io/pypi/v/excel-mcp-server-fastmcp.svg)](https://pypi.org/project/excel-mcp-server-fastmcp/1.6.49)
 [![CI](https://github.com/TangentDomain/excel-mcp-server/actions/workflows/ci.yml/badge.svg)](https://github.com/TangentDomain/excel-mcp-server/actions/workflows/ci.yml)
 ![Tests](https://img.shields.io/badge/tests-1171-brightgreen.svg)
 ![Tools](https://img.shields.io/badge/tools-53-green.svg)
@@ -14,7 +16,7 @@
 
 ---
 
-## 🚀 最新更新 (v1.6.48)
+## 🚀 最新更新 (1.6.49)
 
 ### ✨ 新增功能
 - **智能配置推荐系统**：基于游戏类型自动分析Excel结构，提供配置优化建议
@@ -243,9 +245,10 @@ pip install excel-mcp-server-fastmcp
 
 ## 📚 文档资源
 
-### 📖 快速上手
+### 🎯 新手上路
+- [🎥 视频教程](docs/VIDEO_TUTORIALS.md) - 多媒体学习资源，视频+文档结合（新！）
+- [🎮 互动式教程](docs/INTERACTIVE_TUTORIAL.md) - 分模块游戏配置实战教程（新！）
 - [📋 快速参考指南](docs/QUICK_REFERENCE.md) - 30秒找到你需要命令（新！）
-- [互动式教程](docs/INTERACTIVE_TUTORIAL.md) - 分模块游戏配置实战教程（新！）
 - [基础教程](docs/README-gaming.md) - 游戏开发入门指南
 - [性能优化](docs/README-performance.md) - 大文件处理技巧
 - [SQL 参考](docs/README-sql.md) - 高级查询语法
@@ -254,6 +257,10 @@ pip install excel-mcp-server-fastmcp
 - [游戏开发示例](examples/README.md) - 完整技能系统、装备管理案例
 - [批量操作示例](examples/进阶操作/) - 数据批处理、版本对比
 - [实战案例](examples/实战案例/) - 完整游戏数值平衡方案
+
+### 📱 移动端
+- [📱 移动端友好版](mobile-friendly-version.html) - 响应式设计、一键复制、快捷导航
+- [📱 移动端优化指南](docs/mobile-friendly-optimization.md) - 移动端使用优化详解
 
 ---
 

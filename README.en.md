@@ -1,8 +1,10 @@
-[简体中文](README.md) | [English](README.en.md)
+[简体中文](README.md) | [English](README.en.md) | [📱 Mobile Friendly Version](mobile-friendly-version.html)
 
 # 🎮 ExcelMCP: Game Development Specific Excel Configuration Table Manager
 
-[![PyPI](https://img.shields.io/pypi/v/excel-mcp-server-fastmcp.svg)](https://pypi.org/project/excel-mcp-server-fastmcp/v1.6.48)
+> 📱 **Mobile Optimization Complete** - Added responsive design, one-click copy, quick navigation and other mobile-friendly features
+
+[![PyPI](https://img.shields.io/pypi/v/excel-mcp-server-fastmcp.svg)](https://pypi.org/project/excel-mcp-server-fastmcp/1.6.49)
 [![CI](https://github.com/TangentDomain/excel-mcp-server/actions/workflows/ci.yml/badge.svg)](https://github.com/TangentDomain/excel-mcp-server/actions/workflows/ci.yml)
 ![Tests](https://img.shields.io/badge/tests-1171-brightgreen.svg)
 ![Tools](https://img.shields.io/badge/tools-53-green.svg)
@@ -14,7 +16,7 @@
 
 ---
 
-## 🚀 Latest Updates (v1.6.48)
+## 🚀 Latest Updates (1.6.49)
 
 ### ✨ New Features
 - **Smart Error Handling**: Automatically detect and fix common Excel data issues
@@ -241,9 +243,10 @@ See Excel data? 🎉 **Setup complete!**
 
 ## 📚 Documentation Resources
 
-### 📖 Quick Start Guides
+### 🎯 Getting Started
+- [🎥 Video Tutorials](docs/VIDEO_TUTORIALS.md) - Multimedia learning resources, video + doc combination (New!)
+- [🎮 Interactive Tutorial](docs/INTERACTIVE_TUTORIAL.md) - Modular game configuration tutorials (New!)
 - [📋 Quick Reference Guide](docs/QUICK_REFERENCE.md) - Find what you need in 30 seconds (New!)
-- [Interactive Tutorial](docs/INTERACTIVE_TUTORIAL.md) - Modular game configuration tutorials (New!)
 - [Basic Tutorial](docs/README-gaming.md) - Game development getting started
 - [Performance Optimization](docs/README-performance.md) - Large file handling techniques
 - [SQL Reference](docs/README-sql.md) - Advanced query syntax
@@ -252,6 +255,10 @@ See Excel data? 🎉 **Setup complete!**
 - [Game Development Examples](examples/README.md) - Complete skill systems, equipment management cases
 - [Batch Operations](examples/进阶操作/) - Data batch processing, version comparison
 - [Real Cases](examples/实战案例/) - Complete game numerical balance solutions
+
+### 📱 Mobile
+- [📱 Mobile Friendly Version](mobile-friendly-version.html) - Responsive design, one-click copy, quick navigation
+- [📱 Mobile Optimization Guide](docs/mobile-friendly-optimization.md) - Mobile usage optimization details
 
 ---
 

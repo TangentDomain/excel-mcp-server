@@ -5,6 +5,23 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## v1.6.49 - 2026-03-29
+
+### Added
+- 📱 **移动端友好性优化**: 新增响应式设计、一键复制、快捷导航功能
+- 🎨 **用户体验提升**: 完善移动端浏览体验，支持触摸操作
+- 🔧 **交互功能增强**: 添加返回顶部按钮、代码块复制、导航菜单
+- 📚 **文档优化**: 创建移动端专门版本，改善文档可读性
+
+### Changed
+- 📖 **文档体系**: 同步中英文版本更新，移动端优化
+- 🚀 **性能优化**: 改进文档加载速度和渲染性能
+- 🎯 **导航结构**: 添加快速导航和内部链接优化
+
+### Fixed
+- 📱 **移动端显示**: 解决表格和代码块在手机上的显示问题
+- 🔗 **链接优化**: 改善文档间导航和用户体验
+
 ## v1.6.48
 
 ## [v1.6.45] - 2026-03-28

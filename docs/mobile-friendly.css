@@ -1,0 +1,64 @@
+
+/* 移动端友好样式 */
+@media (max-width: 768px) {
+    /* 表格响应式处理 */
+    .markdown-table {
+        display: block;
+        overflow-x: auto;
+        white-space: nowrap;
+        -webkit-overflow-scrolling: touch;
+    }
+    
+    /* 代码块滚动 */
+    .code-block {
+        max-height: 300px;
+        overflow-y: auto;
+        border-radius: 8px;
+    }
+    
+    /* 导航优化 */
+    .nav-menu {
+        position: sticky;
+        top: 10px;
+        background: rgba(255, 255, 255, 0.9);
+        padding: 10px;
+        border-radius: 8px;
+    }
+    
+    /* 字体适配 */
+    body {
+        font-size: 16px;
+        line-height: 1.6;
+    }
+    
+    /* 按钮优化 */
+    .mobile-button {
+        min-width: 44px;
+        min-height: 44px;
+        padding: 12px 20px;
+        font-size: 16px;
+    }
+}
+
+/* 通用优化 */
+.readable-content {
+    max-width: 1200px;
+    margin: 0 auto;
+    padding: 20px;
+}
+
+.highlight-box {
+    background: #f0f4ff;
+    border-left: 4px solid #4f46e5;
+    padding: 16px;
+    margin: 16px 0;
+    border-radius: 0 8px 8px 0;
+}
+
+.interactive-tip {
+    background: #fef3c7;
+    border: 1px solid #f59e0b;
+    border-radius: 8px;
+    padding: 12px;
+    margin: 12px 0;
+}
