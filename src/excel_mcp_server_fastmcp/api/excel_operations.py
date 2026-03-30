@@ -234,6 +234,7 @@ class ExcelOperations:
 
             # 步骤2: 提取和格式化数据（Token优化：只返回核心信息）
             sheets_info = []
+            sheet_names = []  # 向后兼容：简单的工作表名称列表
             if result.data:
                 for sheet in result.data:
                     # 获取工作表的基本信息
@@ -243,15 +244,19 @@ class ExcelOperations:
                         'cols': 0   # 默认值，后续更新
                     }
                     sheets_info.append(sheet_info)
+                    sheet_names.append(sheet.name)  # 向后兼容：简单名称列表
             
             total_sheets = result.metadata.get('total_sheets', len(sheets_info)) if result.metadata else len(sheets_info)
 
             # Token优化：简化响应结构，移除重复字段，只保留核心信息
+            # 保持向后兼容：提供两种格式，旧格式直接在顶层，新格式在data中
             response = {
                 'success': True,
                 'message': f"获取到 {len(sheets_info)} 个工作表",
+                'sheets': sheet_names,  # 向后兼容：简单的工作表名称列表
+                'total_sheets': total_sheets,  # 向后兼容：直接提供total_sheets字段
                 'data': {
-                    'sheets': sheets_info,
+                    'sheets': sheets_info,  # Token优化：详细信息列表
                     'total_sheets': total_sheets
                 },
                 'meta': {
@@ -330,11 +335,17 @@ class ExcelOperations:
 
             return {
                 'success': True,
+                # 向后兼容：直接提供核心字段在顶层
+                'field_names': header_info['field_names'],    # 字段名（第2行）
+                'descriptions': header_info['descriptions'],  # 字段描述（第1行）
+                'headers': header_info['field_names'],        # 向后兼容别名
+                'header_count': len(header_info['field_names']),  # 向后兼容
+                'sheet_name': sheet_name,  # 向后兼容
                 # 统一data字段，集中核心数据
                 'data': {
-                    'field_names': header_info['field_names'],    # 字段名（第2行）
-                    'descriptions': header_info['descriptions'],  # 字段描述（第1行）
-                    'headers': header_info['field_names'],        # 向后兼容别名
+                    'field_names': header_info['field_names'],
+                    'descriptions': header_info['descriptions'],
+                    'headers': header_info['field_names'],
                     'dual_rows': True  # 标识使用了双行模式
                 },
                 'meta': {
