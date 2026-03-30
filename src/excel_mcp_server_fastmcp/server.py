@@ -518,7 +518,7 @@ SELECT skill_name, skill_type, ROW_NUMBER() OVER (PARTITION BY skill_type ORDER 
 - 双行表头: 第1行中文描述+第2行英文字段名，中英文列名均可查询
 - 1-based索引: 第1行=1, 第1列=1
 - 范围格式: "工作表名!A1:Z100"（必须含工作表名）
-- 默认覆盖: update_range默认覆盖，保留数据用insert_mode=True
+- 默认覆盖: update_range默认为覆盖模式(insert_mode=False)，保留数据需显式设置insert_mode=True
 
 ## 🎮 游戏配置表示例
 技能统计: SELECT 技能类型, AVG(伤害), COUNT(*) FROM 技能表 GROUP BY 技能类型

@@ -47,7 +47,7 @@ class ExcelWriter:
         range_expression: str,
         data: List[List[Any]],
         preserve_formulas: bool = True,
-        insert_mode: bool = True
+        insert_mode: bool = False
     ) -> OperationResult:
         """
         修改Excel文件中指定范围的数据
@@ -56,9 +56,9 @@ class ExcelWriter:
             range_expression: 范围表达式
             data: 要写入的二维数据数组
             preserve_formulas: 是否保留现有的公式
-            insert_mode: 数据写入模式 (默认值: True)
+            insert_mode: 数据写入模式 (默认值: False)
                 - True: 插入模式，在指定位置插入新行然后写入数据（更安全）
-                - False: 覆盖模式，直接覆盖目标范围的现有数据
+                - False: 覆盖模式，直接覆盖目标范围的现有数据（默认行为）
 
         Returns:
             OperationResult: 修改操作的结果

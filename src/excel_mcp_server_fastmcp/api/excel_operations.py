@@ -132,9 +132,9 @@ class ExcelOperations:
             range_expression: 范围表达式，必须包含工作表名
             data: 二维数组数据 [[row1], [row2], ...]
             preserve_formulas: 是否保留现有公式
-            insert_mode: 数据写入模式 (默认值: True)
+            insert_mode: 数据写入模式 (默认值: False)
                 - True: 插入模式，在指定位置插入新行然后写入数据（更安全）
-                - False: 覆盖模式，直接覆盖目标范围的现有数据
+                - False: 覆盖模式，直接覆盖目标范围的现有数据（默认行为）
             streaming: 是否使用流式写入（仅覆盖模式有效）
 
         Returns:
