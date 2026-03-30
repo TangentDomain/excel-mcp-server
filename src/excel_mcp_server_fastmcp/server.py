@@ -632,21 +632,46 @@ def _fail(message: str, meta: dict = None) -> dict:
 
 
 def _strip_defaults(obj: Any, depth: int = 0) -> Any:
-    """递归移除空值以减少token消耗。只移除None/空串/空容器，保留False/0等有意义值。"""
+    """递归移除默认值和空值以减少token消耗。
+    
+    移除规则：
+    - None, 空字符串, 空列表, 空字典
+    - 常见Excel默认值：False, 0, None（基于字段名判断）
+    - 保留有意义的值
+    """
     if depth > 5 or not isinstance(obj, dict):
         return obj
+    
+    # 常见Excel默认值字段名（这些字段通常不需要返回False/0/None）
+    excel_default_fields = {
+        'bold', 'italic', 'underline', 'wrap_text', 'auto_filter',
+        'border_top', 'border_bottom', 'border_left', 'border_right',
+        'horizontal_alignment', 'vertical_alignment', 'text_rotation',
+        'indent', 'shrink_to_fit', 'merge_cells'
+    }
+    
     cleaned = {}
     for k, v in obj.items():
+        # 移除空值
         if v is None or v == '':
             continue
+        
+        # 移除空容器
         if isinstance(v, (list, dict)) and len(v) == 0:
             continue
+        
+        # 基于字段名的默认值处理
+        if k.lower() in excel_default_fields and v in [False, 0, None]:
+            continue
+        
+        # 递归处理嵌套对象
         if isinstance(v, dict):
             cleaned[k] = _strip_defaults(v, depth + 1)
         elif isinstance(v, list):
             cleaned[k] = [_strip_defaults(i, depth + 1) if isinstance(i, dict) else i for i in v]
         else:
             cleaned[k] = v
+    
     return cleaned
 
 
