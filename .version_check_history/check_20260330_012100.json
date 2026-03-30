@@ -1,0 +1,15 @@
+{
+  "timestamp": "2026-03-30T01:21:00.843363",
+  "checks": {
+    "pyproject.toml": "1.6.50",
+    "__init__.py": "1.6.50",
+    "README.md": null,
+    "README.en.md": null,
+    "CHANGELOG.md": "v1.6.49"
+  },
+  "inconsistencies": [
+    "CHANGELOG.md版本与主版本不一致: 1.6.50 vs v1.6.49"
+  ],
+  "auto_fixes": [],
+  "current_version": "1.6.50"
+}
