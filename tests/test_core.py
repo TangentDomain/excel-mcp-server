@@ -569,7 +569,7 @@ class TestFormulaDispatch:
         # 在数据末尾之后写入（min_row > max_row）
         target_row = max_row + 2
         target_range = f"Sheet1!A{target_row}:C{target_row}"
-        result = writer.update_range(target_range, [["追加行1", "追加行2", "追加行3"]])
+        result = writer.update_range(target_range, [["追加行1", "追加行2", "追加行3"]], insert_mode=True)
 
         assert result.success
         assert result.metadata.get('smart_append') is True
@@ -597,7 +597,7 @@ class TestFormulaDispatch:
             ["行3-A", "行3-B"],
         ]
         result = writer.update_range(
-            f"Sheet1!A{target_row}:B{target_row + 2}", data
+            f"Sheet1!A{target_row}:B{target_row + 2}", data, insert_mode=True
         )
 
         assert result.success
