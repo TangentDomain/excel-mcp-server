@@ -1,29 +1,26 @@
-# NOW.md - 第226轮
+# NOW.md - 第227轮
 
 ## 当前状态
-- **轮次**: 第226轮（REQ-027 Token节约优化）
-- **时间**: 2026-03-30 11:25 UTC
-
-## 进行中
-- ✅ REQ-027 Token节约优化（已完成）
+- **轮次**: 第227轮（REQ-027 格式回归修复 + REQ-028 测试修复）
+- **时间**: 2026-03-30 13:30 UTC
 
 ## 完成工作
-- ✅ 实现_strip_defaults()函数：移除None/空字符串/空容器
-- ✅ 实现_optimize_excel_data()函数：Excel数据专项优化
-- ✅ 更新format_operation_result()集成优化功能
-- ✅ Token节省95%（14582→598 tokens），远超30%目标
-- ✅ MCP验证：基础功能正常，格式化优化验证通过
-- ✅ 合并main分支：无冲突标记，版本同步
+- ✅ REQ-027 格式回归修复：20个 test_server.py 测试全部通过
+  - _wrap: data+meta 字段展平到顶层，保持向后兼容
+  - _strip_defaults: 有语义空列表不再被移除
+  - excel_operations.get_all_headers: 修复从 data 中取 sheets 的路径
+- ✅ REQ-028 测试修复：8个 test_insert_mode.py 测试全部通过
+  - 列映射修正（C列=类型，D列=消耗MP）
+  - 适配 get_range 返回 {coordinate, value} 格式
+  - 工作表名补全
 
 ## 关键指标
-- **版本**: v1.6.52（代码改动，需发布PyPI）
-- **API测试**: 基础功能通过
-- **MCP验证**: 优化功能验证通过
-- **代码变更**: 5个文件 / +473行，-11行删除
-- **优化效果**: Token节省95%，响应体积减少92%
-- **质量指标**: API响应速度提升，用户体验改善
+- **版本**: v1.6.53
+- **API测试**: 78/78 (server+insert_mode) ✅, 821/826 (全量)
+- **PyPI**: TestPyPI token过期，需更新
+- **合并**: main + develop 已推送，tag v1.6.53
 
-## 下一步
-- 按RULES.md发布PyPI
-- 更新DECISIONS.md记录完成状态
-- 推送飞书通知
+## 待处理
+- [ ] TestPyPI token 更新
+- [ ] 5个其他测试失败（test_core/test_integration_comprehensive，非本轮引入）
+- [ ] REQ-029 工程强化（P1，需 REQ-028 完成后开始）
