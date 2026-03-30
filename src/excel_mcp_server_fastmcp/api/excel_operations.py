@@ -121,7 +121,7 @@ class ExcelOperations:
         range_expression: str,
         data: List[List[Any]],
         preserve_formulas: bool = True,
-        insert_mode: bool = True,
+        insert_mode: bool = False,
         streaming: bool = True
     ) -> Dict[str, Any]:
         """
