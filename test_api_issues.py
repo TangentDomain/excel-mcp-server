@@ -1,168 +1,181 @@
 #!/usr/bin/env python3
 """
-复现监工发现的5个API问题
-使用MCP JSON-RPC调用方式
+Test script to reproduce the 5 API issues identified by supervisor
 """
 
-import subprocess
 import json
-import os
+import subprocess
+import sys
 import tempfile
+import os
 
-def run_mcp_command(command_name, arguments):
-    """运行MCP命令并返回结果"""
+def run_mcp_command(tool_name, args):
+    """Run an MCP command and return the result"""
+    cmd = [
+        "uvx", "excel-mcp-server-fastmcp", 
+        "stdio"
+    ]
+    
+    # Create MCP request
+    request = {
+        "jsonrpc": "2.0",
+        "id": 1,
+        "method": "tools/call",
+        "params": {
+            "name": tool_name,
+            "arguments": args
+        }
+    }
+    
     try:
-        # 构建JSON-RPC请求
-        jsonrpc = json.dumps({
-            "jsonrpc": "2.0",
-            "id": 1,
-            "method": "tools/call",
-            "params": {
-                "name": command_name,
-                "arguments": arguments
-            }
-        })
-        
-        # 运行MCP命令
-        result = subprocess.run(
-            f'echo \'{jsonrpc}\' | uvx excel-mcp-server-fastmcp',
-            shell=True,
-            capture_output=True,
-            text=True,
-            timeout=30
+        # Start the process
+        process = subprocess.Popen(
+            cmd,
+            stdin=subprocess.PIPE,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            text=True
         )
         
-        return {
-            "success": result.returncode == 0,
-            "stdout": result.stdout,
-            "stderr": result.stderr,
-            "returncode": result.returncode
-        }
-    except subprocess.TimeoutExpired:
-        return {
-            "success": False,
-            "stdout": "",
-            "stderr": "命令超时",
-            "returncode": -1
-        }
+        # Send request
+        stdout, stderr = process.communicate(input=json.dumps(request))
+        
+        if process.returncode != 0:
+            return {"error": f"Process failed: {stderr}"}
+        
+        # Parse response
+        response = json.loads(stdout)
+        if "error" in response:
+            return {"error": response["error"]}
+        
+        return response.get("result", {})
+        
     except Exception as e:
-        return {
-            "success": False,
-            "stdout": "",
-            "stderr": str(e),
-            "returncode": -1
-        }
+        return {"error": str(e)}
 
-def create_test_excel():
-    """创建测试用的Excel文件"""
-    import pandas as pd
+def test_issue_1_read_data_range_params():
+    """Test 1: read_data_from_excel range query - parameter order may be reversed"""
+    print("=== Testing Issue 1: read_data_from_excel range query ===")
     
-    # 创建测试数据
-    data = {
-        'A': [1, 2, 3, 4, 5],
-        'B': ['a', 'b', 'c', 'd', 'e'],
-        'C': [10.5, 20.5, 30.5, 40.5, 50.5]
-    }
-    df = pd.DataFrame(data)
-    
-    # 创建临时文件
-    temp_file = tempfile.NamedTemporaryFile(suffix='.xlsx', delete=False)
-    temp_file.close()
-    
-    # 写入Excel
-    df.to_excel(temp_file.name, index=False)
-    return temp_file.name
-
-def test_api_issues():
-    """测试5个API问题"""
-    excel_file = create_test_excel()
-    sheet_name = "Sheet1"
-    
-    print(f"测试文件: {excel_file}")
-    print("=" * 60)
-    
-    issues_found = []
-    
-    # 测试1: read_data_from_excel 范围查询（参数顺序颠倒）
-    print("\n1. 测试 read_data_from_excel 范围查询（参数顺序颠倒）...")
-    result = run_mcp_command("excel_read_data_from_excel", {
-        "file_path": excel_file,
-        "sheet_name": sheet_name,
-        "start_cell": "C1",  # 故意颠倒
-        "end_cell": "B3"     # start_cell和end_cell颠倒
-    })
-    
-    print(f"结果: {result}")
-    if not result["success"]:
-        issues_found.append("read_data_from_excel参数顺序问题")
-    
-    # 测试2: format_range 缺少必要参数
-    print("\n2. 测试 format_range 缺少必要参数...")
-    result = run_mcp_command("excel_format_range", {
-        "file_path": excel_file,
-        "sheet_name": sheet_name,
-        "start_cell": "A1:A5",
-        # 故意不传bold等参数，看看是否能正确处理
-    })
-    
-    print(f"结果: {result}")
-    if not result["success"]:
-        issues_found.append("format_range缺少参数处理不当")
-    
-    # 测试3: apply_formula 缺少formula参数
-    print("\n3. 测试 apply_formula 缺少formula参数...")
-    result = run_mcp_command("excel_apply_formula", {
-        "file_path": excel_file,
-        "sheet_name": sheet_name,
-        "cell": "A1",
-        # 故意不传formula参数
-    })
-    
-    print(f"结果: {result}")
-    if not result["success"]:
-        issues_found.append("apply_formula缺少参数校验")
-    
-    # 测试4: read_data_from_excel 搜索逻辑（sheet_name混淆）
-    print("\n4. 测试 read_data_from_excel 搜索逻辑（sheet_name混淆）...")
-    result = run_mcp_command("excel_read_data_from_excel", {
-        "file_path": excel_file,
-        # 故意不传sheet_name，看看会不会和其他参数混淆
+    # Test with normal parameters
+    result1 = run_mcp_command("read_data_from_excel", {
+        "filepath": "test_data.xlsx",
+        "sheet_name": "Sheet1",
         "start_cell": "A1",
-        "end_cell": "B3"
+        "end_cell": "C3"
     })
     
-    print(f"结果: {result}")
-    if not result["success"]:
-        issues_found.append("read_data_from_excel sheet_name参数混淆")
+    print("Normal parameters (A1 to C3):", result1)
     
-    # 测试5: write_data_to_excel 数据格式不匹配
-    print("\n5. 测试 write_data_to_excel 数据格式不匹配...")
-    result = run_mcp_command("excel_write_data_to_excel", {
-        "file_path": excel_file,
-        "sheet_name": sheet_name,
-        "start_cell": "D1",
-        # 故意传错误的数据格式
-        "data": "single_string_instead_of_list"
+    # Test with reversed parameters 
+    result2 = run_mcp_command("read_data_from_excel", {
+        "filepath": "test_data.xlsx", 
+        "sheet_name": "Sheet1",
+        "start_cell": "C3",
+        "end_cell": "A1"
     })
     
-    print(f"结果: {result}")
-    if not result["success"]:
-        issues_found.append("write_data_to_excel数据格式处理不当")
+    print("Reversed parameters (C3 to A1):", result2)
     
-    # 输出总结
-    print("\n" + "=" * 60)
-    print("问题总结:")
-    if issues_found:
-        for i, issue in enumerate(issues_found, 1):
-            print(f"{i}. {issue}")
-    else:
-        print("所有API都工作正常")
+    return result1, result2
+
+def test_issue_2_format_range_missing_params():
+    """Test 2: format_range - missing bold and other required parameters"""
+    print("\n=== Testing Issue 2: format_range missing parameters ===")
     
-    # 清理临时文件
-    os.unlink(excel_file)
+    # Test with minimal parameters
+    result = run_mcp_command("format_range", {
+        "filepath": "test_data.xlsx",
+        "sheet_name": "Sheet1", 
+        "start_cell": "A1",
+        "end_cell": "C1"
+        # Missing bold, font_size, etc.
+    })
     
-    return issues_found
+    print("Format range with minimal params:", result)
+    return result
+
+def test_issue_3_apply_formula_missing_params():
+    """Test 3: apply_formula - missing formula parameter"""
+    print("\n=== Testing Issue 3: apply_formula missing formula ===")
+    
+    # Test without formula parameter
+    result = run_mcp_command("apply_formula", {
+        "filepath": "test_data.xlsx",
+        "sheet_name": "Sheet1",
+        "cell": "A1"
+        # Missing formula parameter
+    })
+    
+    print("Apply formula without formula param:", result)
+    return result
+
+def test_issue_4_read_data_search_confusion():
+    """Test 4: read_data_from_excel search logic - may confuse sheet_name with other params"""
+    print("\n=== Testing Issue 4: read_data_from_excel search confusion ===")
+    
+    # Test with search-like parameters
+    result = run_mcp_command("read_data_from_excel", {
+        "filepath": "test_data.xlsx",
+        "sheet_name": "Sheet1",
+        "start_cell": "A1",
+        "end_cell": "C3",
+        # Potentially confusing parameters that might be treated as search
+    })
+    
+    print("Read data with potentially confusing params:", result)
+    return result
+
+def test_issue_5_write_data_format_mismatch():
+    """Test 5: write_data_to_excel - data format (list of lists) mismatch"""
+    print("\n=== Testing Issue 5: write_data_to_excel format mismatch ===")
+    
+    # Test with wrong data format
+    wrong_data = "invalid data format"  # Should be list of lists
+    
+    result = run_mcp_command("write_data_to_excel", {
+        "filepath": "test_data.xlsx",
+        "sheet_name": "Sheet1",
+        "data": wrong_data,
+        "start_cell": "A1"
+    })
+    
+    print("Write data with wrong format:", result)
+    return result
+
+def main():
+    print("Starting API issue reproduction tests...")
+    print("Test file: test_data.xlsx")
+    print("=" * 50)
+    
+    # Test all 5 issues
+    results = {}
+    
+    try:
+        results["issue_1"] = test_issue_1_read_data_range_params()
+        results["issue_2"] = test_issue_2_format_range_missing_params() 
+        results["issue_3"] = test_issue_3_apply_formula_missing_params()
+        results["issue_4"] = test_issue_4_read_data_search_confusion()
+        results["issue_5"] = test_issue_5_write_data_format_mismatch()
+        
+    except Exception as e:
+        print(f"Error during testing: {e}")
+        results["error"] = str(e)
+    
+    # Summary
+    print("\n" + "=" * 50)
+    print("TEST SUMMARY:")
+    print("=" * 50)
+    
+    for issue, result in results.items():
+        print(f"\n{issue}:")
+        if isinstance(result, tuple):
+            for i, r in enumerate(result):
+                print(f"  Test {i+1}: {r}")
+        else:
+            print(f"  Result: {result}")
+    
+    return results
 
 if __name__ == "__main__":
-    issues = test_api_issues()
-    print(f"\n发现 {len(issues)} 个API问题需要修复")
+    main()
