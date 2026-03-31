@@ -833,6 +833,52 @@ def excel_get_range(
     if _path_err:
         return _path_err
     
+    # 参数顺序问题修复：检查range参数是否可能是误传的sheet_name
+    if '!' not in range and not range.startswith(('A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J')) and len(range) <= 10:
+        # range看起来不像有效的单元格范围，可能是用户误将sheet_name传给了range参数
+        return _fail(
+            f"参数顺序可能错误：range参数值 '{range}' 看起来不像有效的单元格范围。\n"
+            f"请检查参数顺序：第二个参数应该是范围表达式（如 'A1:C10' 或 'Sheet1!A1:C10'），\n"
+            f"如果要以默认工作表读取，请明确指定: excel_get_range('{file_path}', 'A1:C10')",
+            meta={
+                "error_code": "PARAMETER_ORDER_ERROR",
+                "received_range": range,
+                "hint": "range参数应该是单元格范围，不是工作表名"
+            }
+        )
+    
+    # 参数兼容性处理：如果提供了start_cell和end_cell，构建range表达式
+    if start_cell and end_cell:
+        if sheet_name:
+            range = f"{sheet_name}!{start_cell}:{end_cell}"
+        else:
+            # 如果没有指定sheet_name，尝试自动推断
+            if '!' not in range:
+                try:
+                    from openpyxl import load_workbook
+                    wb = load_workbook(file_path, read_only=True)
+                    sheet_names = wb.sheetnames
+                    wb.close()
+                    if len(sheet_names) == 1:
+                        range = f"{sheet_names[0]}!{start_cell}:{end_cell}"
+                    else:
+                        return _fail(
+                            f"需要指定工作表名，文件有多个工作表({', '.join(sheet_names)})。"
+                            f"请使用sheet_name参数或格式: '工作表名!A1:C10'",
+                            meta={"error_code": "VALIDATION_FAILED", "available_sheets": sheet_names}
+                        )
+                except Exception:
+                    return _fail(
+                        "无法自动推断工作表名，请指定sheet_name参数或使用完整范围表达式",
+                        meta={"error_code": "VALIDATION_FAILED"}
+                    )
+            else:
+                range = f"{range}!{start_cell}:{end_cell}"  # 这种情况应该不会发生
+    
+    # 如果range不包含工作表名但指定了sheet_name，添加工作表名
+    if sheet_name and '!' not in range:
+        range = f"{sheet_name}!{range}"
+    
     # 参数兼容性处理：如果提供了start_cell和end_cell，构建range表达式
     if start_cell and end_cell:
         if sheet_name:
@@ -2078,8 +2124,19 @@ def excel_set_formula(
     # 参数验证：formula 不能为空
     if not formula or not formula.strip():
         return _fail(
-            '公式不能为空，请提供有效的Excel公式（如 "=A1+B1"）',
-            meta={"error_code": "MISSING_FORMULA"}
+            '📝 公式参数缺失：excel_set_formula() 需要一个有效的Excel公式。\n'
+            '✅ 正确用法：excel_set_formula("file.xlsx", "Sheet1", "A1", "=SUM(B1:C1)")\n'
+            '🔧 支持的公式类型：\n'
+            '  - 数学公式: "=A1+B1", "=SUM(A1:A10)"\n'
+            '  - 引用公式: "=B2", "=Sheet2!A1"\n'
+            '  - 函数公式: "=VLOOKUP(A1, Sheet2!A:B, 2, FALSE)"\n'
+            '❌ 不要只传单元格地址，公式必须以等号 "=" 开头',
+            meta={
+                "error_code": "MISSING_FORMULA",
+                "received_formula": formula,
+                "expected_format": "Excel公式（以=开头）",
+                "example": "=SUM(A1:C1)"
+            }
         )
 
     _path_err = _validate_path(file_path)
@@ -2515,6 +2572,22 @@ def excel_format_cells(
     if _path_err:
         return _path_err
     
+    # 参数校验：当没有提供formatting和preset参数时，明确告知用户
+    if formatting is None and preset is None:
+        return _fail(
+            '未提供样式参数：formatting 和 preset 均为空。\n'
+            '请至少提供一种样式配置：\n'
+            '1. 使用 preset: "bold", "italic", "highlight", "header"\n'
+            '2. 使用 formatting: {"bold": true} 或 {"font_size": 12}\n'
+            '示例：excel_format_cells(file, "Sheet1", "A1:C1", preset="bold")',
+            meta={
+                "error_code": "MISSING_FORMATTING_PARAMS",
+                "received_formatting": formatting,
+                "received_preset": preset,
+                "hint": "需要指定样式才能执行格式化操作"
+            }
+        )
+    
     # 参数兼容性处理：如果提供了start_cell和end_cell，构建range表达式
     if start_cell and end_cell:
         range = f"{start_cell}:{end_cell}"
@@ -2522,7 +2595,15 @@ def excel_format_cells(
     # 确保range包含工作表名
     if '!' not in range:
         range = f"{sheet_name}!{range}"
-    return _wrap(ExcelOperations.format_cells(file_path, sheet_name, range, formatting, preset))
+    
+    # 调用原始函数
+    result = ExcelOperations.format_cells(file_path, sheet_name, range, formatting, preset)
+    
+    # 如果成功但data为null（无实际格式更改），添加说明
+    if result.get('success') and result.get('data') is None:
+        result['message'] += ' (注意：没有单元格需要格式化，可能是因为指定范围没有内容或样式无变化)'
+    
+    return _wrap(result)
 
 
 @mcp.tool()

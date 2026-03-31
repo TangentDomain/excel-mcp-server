@@ -1,192 +1,125 @@
 #!/usr/bin/env python3
 """
-Simple test script to reproduce the 5 API problems using direct MCP calls.
+测试监工报告中的5个API问题
 """
 
+import subprocess
 import json
-import sys
 import os
-import tempfile
-from pathlib import Path
 
-# Add src to path
-sys.path.insert(0, 'src')
-
-def create_test_excel():
-    """Create a simple test Excel file"""
-    from openpyxl import Workbook
-    import shutil
+def test_api_issues():
+    """测试5个API问题"""
     
-    # Create temp file
-    test_file = "/tmp/test_api.xlsx"
-    if os.path.exists(test_file):
-        os.remove(test_file)
-    
-    # Create workbook with test data
-    wb = Workbook()
-    ws = wb.active
-    ws.title = "Sheet1"
-    
-    # Add headers and data
-    headers = ["Name", "Age", "City", "Salary"]
-    data = [
-        ["Alice", 25, "Shenzhen", 10000],
-        ["Bob", 30, "Beijing", 12000],
-        ["Charlie", 35, "Shanghai", 15000]
-    ]
-    
-    for col, header in enumerate(headers, 1):
-        ws.cell(row=1, column=col, value=header)
-    
-    for row_idx, row_data in enumerate(data, 2):
-        for col_idx, cell_value in enumerate(row_data, 1):
-            ws.cell(row=row_idx, column=col_idx, value=cell_value)
-    
-    wb.save(test_file)
-    return test_file
-
-def test_1_range_query():
-    """Test 1: excel_get_range parameter order and validation"""
-    print("=== Test 1: excel_get_range validation ===")
-    test_file = create_test_excel()
-    
+    # 测试1: read_data_from_excel 范围查询 - 参数顺序可能颠倒
+    print("=== 测试1: read_data_from_excel 范围查询 ===")
     try:
-        from excel_mcp_server_fastmcp.server import excel_get_range
-        
-        # Test with valid parameters
-        result = excel_get_range(
-            file_path=test_file,
-            sheet_name="Sheet1", 
-            start_cell="A1",
-            end_cell="C3"
-        )
-        print(f"Result: {json.dumps(result, indent=2, ensure_ascii=False)}")
-        if result.get('success'):
-            print("✅ Range query passed")
-        else:
-            print(f"❌ Range query failed: {result.get('message')}")
-            
+        result = subprocess.run([
+            'python3', '-m', 'excel_mcp_server_fastmcp', 'read_data_from_excel',
+            '--filepath', 'test_api_issues.xlsx',
+            '--sheet_name', 'Sheet1',
+            '--start_cell', 'C1',
+            '--end_cell', 'C3'
+        ], capture_output=True, text=True, timeout=10)
+        print(f"正常调用: {result.returncode}")
+        print(f"输出: {result.stdout}")
+        if result.stderr:
+            print(f"错误: {result.stderr}")
     except Exception as e:
-        print(f"❌ Range query exception: {e}")
-    finally:
-        if os.path.exists(test_file):
-            os.remove(test_file)
-
-def test_2_format_cells_validation():
-    """Test 2: excel_format_cells parameter validation"""
-    print("\n=== Test 2: excel_format_cells parameter validation ===")
-    test_file = create_test_excel()
+        print(f"异常: {e}")
     
+    # 测试参数颠倒
     try:
-        from excel_mcp_server_fastmcp.server import excel_format_cells
-        
-        # Test without required formatting parameters
-        result = excel_format_cells(
-            file_path=test_file,
-            sheet_name="Sheet1",
-            start_cell="A1"
-            # Missing bold, italic, etc.
-        )
-        print(f"Result: {json.dumps(result, indent=2, ensure_ascii=False)}")
-        if result.get('success'):
-            print("✅ Format cells passed")
-        else:
-            print(f"❌ Format cells failed: {result.get('message')}")
-            
+        result = subprocess.run([
+            'python3', '-m', 'excel_mcp_server_fastmcp', 'read_data_from_excel',
+            '--filepath', 'test_api_issues.xlsx',
+            '--sheet_name', 'Sheet1',
+            '--start_cell', 'C3',
+            '--end_cell', 'C1'
+        ], capture_output=True, text=True, timeout=10)
+        print(f"参数颠倒调用: {result.returncode}")
+        print(f"输出: {result.stdout}")
+        if result.stderr:
+            print(f"错误: {result.stderr}")
     except Exception as e:
-        print(f"❌ Format cells exception: {e}")
-    finally:
-        if os.path.exists(test_file):
-            os.remove(test_file)
-
-def test_3_set_formula_validation():
-    """Test 3: excel_set_formula parameter validation"""
-    print("\n=== Test 3: excel_set_formula validation ===")
-    test_file = create_test_excel()
+        print(f"异常: {e}")
     
-    try:
-        from excel_mcp_server_fastmcp.server import excel_set_formula
-        
-        # Test without formula parameter
-        result = excel_set_formula(
-            file_path=test_file,
-            sheet_name="Sheet1",
-            cell_address="D1"
-            # Missing formula parameter
-        )
-        print(f"Result: {json.dumps(result, indent=2, ensure_ascii=False)}")
-        if result.get('success'):
-            print("✅ Set formula passed")
-        else:
-            print(f"❌ Set formula failed: {result.get('message')}")
-            
-    except Exception as e:
-        print(f"❌ Set formula exception: {e}")
-    finally:
-        if os.path.exists(test_file):
-            os.remove(test_file)
+    print("\n" + "="*50 + "\n")
 
-def test_4_search_confusion():
-    """Test 4: excel_search parameter confusion"""
-    print("\n=== Test 4: excel_search parameter confusion ===")
-    test_file = create_test_excel()
-    
+    # 测试2: format_range - 缺少必要参数
+    print("=== 测试2: format_range 缺少参数 ===")
     try:
-        from excel_mcp_server_fastmcp.server import excel_search
-        
-        # Test search with various parameter combinations
-        result = excel_search(
-            file_path=test_file,
-            pattern="Alice",
-            sheet_name="Sheet1",
-            case_sensitive=False,
-            whole_word=True
-        )
-        print(f"Result: {json.dumps(result, indent=2, ensure_ascii=False)}")
-        if result.get('success'):
-            print("✅ Search passed")
-        else:
-            print(f"❌ Search failed: {result.get('message')}")
-            
+        result = subprocess.run([
+            'python3', '-m', 'excel_mcp_server_fastmcp', 'format_range',
+            '--filepath', 'test_api_issues.xlsx',
+            '--sheet_name', 'Sheet1',
+            '--start_cell', 'A1',
+            '--end_cell', 'A5'
+        ], capture_output=True, text=True, timeout=10)
+        print(f"缺少bold等参数: {result.returncode}")
+        print(f"输出: {result.stdout}")
+        if result.stderr:
+            print(f"错误: {result.stderr}")
     except Exception as e:
-        print(f"❌ Search exception: {e}")
-    finally:
-        if os.path.exists(test_file):
-            os.remove(test_file)
+        print(f"异常: {e}")
+    
+    print("\n" + "="*50 + "\n")
 
-def test_5_write_data_format():
-    """Test 5: excel_update_range data format handling"""
-    print("\n=== Test 5: excel_update_range data format ===")
-    test_file = create_test_excel()
-    
+    # 测试3: apply_formula - 缺少formula参数
+    print("=== 测试3: apply_formula 缺少参数 ===")
     try:
-        from excel_mcp_server_fastmcp.server import excel_update_range
-        
-        # Test with different data formats
-        test_data = [["David", 40, "Hangzhou", 18000]]  # Single row list of lists
-        
-        result = excel_update_range(
-            file_path=test_file,
-            sheet_name="Sheet1",
-            data=test_data,
-            start_cell="A4",
-            # Missing insert_mode parameter
-        )
-        print(f"Result: {json.dumps(result, indent=2, ensure_ascii=False)}")
-        if result.get('success'):
-            print("✅ Update range passed")
-        else:
-            print(f"❌ Update range failed: {result.get('message')}")
-            
+        result = subprocess.run([
+            'python3', '-m', 'excel_mcp_server_fastmcp', 'apply_formula',
+            '--filepath', 'test_api_issues.xlsx',
+            '--sheet_name', 'Sheet1',
+            '--cell', 'A1'
+            # 故意不提供 --formula
+        ], capture_output=True, text=True, timeout=10)
+        print(f"缺少formula参数: {result.returncode}")
+        print(f"输出: {result.stdout}")
+        if result.stderr:
+            print(f"错误: {result.stderr}")
     except Exception as e:
-        print(f"❌ Update range exception: {e}")
-    finally:
-        if os.path.exists(test_file):
-            os.remove(test_file)
+        print(f"异常: {e}")
+    
+    print("\n" + "="*50 + "\n")
+
+    # 测试4: read_data_from_excel 搜索逻辑
+    print("=== 测试4: read_data_from_excel 搜索逻辑 ===")
+    try:
+        result = subprocess.run([
+            'python3', '-m', 'excel_mcp_server_fastmcp', 'read_data_from_excel',
+            '--filepath', 'test_api_issues.xlsx',
+            '--sheet_name', 'Sheet1',
+            '--start_cell', 'A1',
+            '--end_cell', 'C5',
+            '--search', 'b'  # 搜索参数
+        ], capture_output=True, text=True, timeout=10)
+        print(f"带搜索: {result.returncode}")
+        print(f"输出: {result.stdout}")
+        if result.stderr:
+            print(f"错误: {result.stderr}")
+    except Exception as e:
+        print(f"异常: {e}")
+    
+    print("\n" + "="*50 + "\n")
+
+    # 测试5: write_data_to_excel 数据格式不匹配
+    print("=== 测试5: write_data_to_excel 数据格式不匹配 ===")
+    try:
+        # 错误的数据格式 - 不是list of lists
+        result = subprocess.run([
+            'python3', '-m', 'excel_mcp_server_fastmcp', 'write_data_to_excel',
+            '--filepath', 'test_api_issues.xlsx',
+            '--sheet_name', 'Sheet1',
+            '--start_cell', 'D1',
+            '--data', '["wrong", "format"]'  # 错误格式
+        ], capture_output=True, text=True, timeout=10)
+        print(f"错误数据格式: {result.returncode}")
+        print(f"输出: {result.stdout}")
+        if result.stderr:
+            print(f"错误: {result.stderr}")
+    except Exception as e:
+        print(f"异常: {e}")
 
 if __name__ == "__main__":
-    test_1_range_query()
-    test_2_format_cells_validation()
-    test_3_set_formula_validation()
-    test_4_search_confusion()
-    test_5_write_data_format()
+    test_api_issues()
