@@ -2857,6 +2857,8 @@ def excel_update_range_user_friendly(
         data: 要写入的数据，二维数组格式
         preserve_formulas: 是否保留已有公式不被覆盖，默认True
         insert_mode: 数据写入模式，默认False(覆盖模式)
+            - False: 覆盖模式，直接替换目标单元格数据，适合修改现有数据
+            - True: 插入模式，在目标位置插入新行，原有数据下移，适合添加新数据
         streaming: 是否使用流式写入，默认True
     """
     _path_err = _validate_path(file_path)
