@@ -20,6 +20,7 @@ from src.excel_mcp_server_fastmcp.server import (
     excel_merge_files,
     excel_search_directory,
     excel_create_file,
+    excel_update_range,
 )
 
 
@@ -161,6 +162,55 @@ class TestExcelMergeFiles:
         result = excel_merge_files(["/nonexistent1.xlsx", "/nonexistent2.xlsx"], output_path)
 
         assert result['success'] is False
+
+    def test_merge_parallel_sheets_data_integrity(self, temp_dir):
+        """Test parallel merge (3+ files) preserves data correctly"""
+        files = []
+        for i in range(3):
+            path = os.path.join(str(temp_dir), f"pfile{i}.xlsx")
+            excel_create_file(path, sheet_names=[f"Sheet{i}"])
+            excel_update_range(path, f"Sheet{i}", "A1", [[f"id_{i}", f"val_{i}"]])
+            files.append(path)
+
+        output_path = os.path.join(str(temp_dir), "merged_parallel.xlsx")
+        result = excel_merge_files(files, output_path, merge_mode="sheets")
+
+        assert result['success'] is True
+        assert result['data']['merged_files'] == 3
+        assert result['data']['total_sheets'] == 3
+
+    def test_merge_sequential_sheets_data_integrity(self, temp_dir):
+        """Test sequential merge (1-2 files) works correctly"""
+        files = []
+        for i in range(2):
+            path = os.path.join(str(temp_dir), f"sfile{i}.xlsx")
+            excel_create_file(path, sheet_names=[f"Data{i}"])
+            excel_update_range(path, f"Data{i}", "A1", [[f"row_{i}", i * 10]])
+            files.append(path)
+
+        output_path = os.path.join(str(temp_dir), "merged_sequential.xlsx")
+        result = excel_merge_files(files, output_path, merge_mode="sheets")
+
+        assert result['success'] is True
+        assert result['data']['merged_files'] == 2
+        assert result['data']['total_sheets'] == 2
+
+    def test_merge_parallel_append_data_integrity(self, temp_dir):
+        """Test parallel append merge (3+ files) preserves all rows"""
+        files = []
+        for i in range(4):
+            path = os.path.join(str(temp_dir), f"afile{i}.xlsx")
+            excel_create_file(path)
+            for r in range(5):
+                excel_update_range(path, "Sheet", f"A{r+1}", [[f"f{i}_r{r}", i * 100 + r]])
+            files.append(path)
+
+        output_path = os.path.join(str(temp_dir), "merged_append.xlsx")
+        result = excel_merge_files(files, output_path, merge_mode="append")
+
+        assert result['success'] is True
+        assert result['data']['merged_files'] == 4
+        assert result['data']['total_sheets'] == 1
 
 
 class TestExcelSearchDirectory:
