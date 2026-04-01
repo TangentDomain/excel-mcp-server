@@ -7,6 +7,25 @@ on:
     branches: [main]
 
 jobs:
+  lint:
+    name: Lint checks
+    runs-on: ubuntu-latest
+    env:
+      FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "3.11"
+          cache: pip
+          cache-dependency-path: pyproject.toml
+      - name: Install dependencies
+        run: pip install -e ".[test]"
+      - name: Check docstring contracts
+        run: python3 scripts/lint_docstring_contract.py
+      - name: Run pre-commit checks
+        run: bash scripts/pre_commit_check.sh
+
   test:
     strategy:
       fail-fast: false

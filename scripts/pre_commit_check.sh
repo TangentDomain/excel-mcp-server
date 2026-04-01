@@ -1,5 +1,6 @@
 #!/bin/bash
 # scripts/pre_commit_check.sh
+# Pre-commit validation checks for the excel-mcp-server project
 
 set -e
 
@@ -37,6 +38,13 @@ if find . -name "*.py" -o -name "*.md" -o -name "*.yml" -o -name "*.yaml" -o -na
    grep -v "scripts/pre_commit_check.sh" | \
    xargs grep -l "AK.*=\|LTAI.*=\|ft522.*=\|admin.*=\|secret.*=" 2>/dev/null; then
     echo "ERROR: 发现可能的敏感信息"
+    exit 1
+fi
+
+# 检查docstring契约（REQ-029）
+echo "检查docstring契约..."
+if ! python3 scripts/lint_docstring_contract.py --quiet; then
+    echo "ERROR: Docstring契约验证失败，请运行 'python3 scripts/lint_docstring_contract.py' 查看详情"
     exit 1
 fi
 

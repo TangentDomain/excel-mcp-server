@@ -3069,7 +3069,7 @@ def excel_merge_multiple_files(source_files: List[str], target_file: str, merge_
 @_track_call
 def excel_create_chart(file_path: str, sheet_name: str, chart_type: str, data_range: str, 
                       title: str = "", chart_name: str = "", position: str = "B15") -> Dict[str, Any]:
-    """在工作表中创建图表。chart_type: line/bar/pie/scatter/area等。"""
+    """在工作表中创建图表。chart_type: line/bar/column/pie/scatter/area等。支持'column'作为'bar'的别名。"""
     try:
         from openpyxl import load_workbook
         from openpyxl.chart import BarChart, LineChart, PieChart, ScatterChart, Reference
@@ -3138,6 +3138,207 @@ def excel_create_chart(file_path: str, sheet_name: str, chart_type: str, data_ra
         
     except Exception as e:
         return _fail("图表创建失败", meta={"error_code": "OPERATION_FAILED"})
+
+
+def excel_create_pivot_table(file_path: str, sheet_name: str, data_range: str, 
+                            rows: List[str], values: List[str], 
+                            columns: Optional[List[str]] = None,
+                            agg_func: str = "sum", 
+                            pivot_sheet_name: str = None) -> Dict[str, Any]:
+    """
+    在Excel中创建数据透视表。支持多种聚合函数，包括'mean'作为'average'的别名。
+    
+    Args:
+        file_path: Excel文件路径
+        sheet_name: 数据所在工作表名称
+        data_range: 数据范围，如 "A1:D100"
+        rows: 行字段列表，如 ["类别", "子类别"]
+        values: 值字段列表，如 ["销售额", "利润"]
+        columns: 列字段列表（可选），如 ["月份"]
+        agg_func: 聚合函数，支持: sum/count/average/mean/max/min/std/var，其中'mean'是'average'的别名
+        pivot_sheet_name: 透视表工作表名称（可选，默认自动生成）
+    
+    Returns:
+        Dict: 透视表创建结果
+    """
+    try:
+        from openpyxl import load_workbook
+        from openpyxl.utils import range_boundaries, get_column_letter
+        import pandas as pd
+        import numpy as np
+        
+        wb = load_workbook(file_path)
+        
+        if sheet_name not in wb.sheetnames:
+            return _fail("数据工作表不存在", meta={"error_code": "OPERATION_FAILED"})
+        
+        # 处理聚合函数别名
+        agg_func_map = {
+            "sum": "sum",
+            "count": "count", 
+            "average": "mean",
+            "mean": "mean",  # 支持'mean'作为'average'的别名
+            "max": "max",
+            "min": "min",
+            "std": "std",
+            "var": "var"
+        }
+        
+        if agg_func not in agg_func_map:
+            return _fail("不支持的聚合函数", meta={"error_code": "INVALID_PARAMETER", 
+                                                   "hint": f"支持的函数: {list(agg_func_map.keys())}"})
+        
+        normalized_agg_func = agg_func_map[agg_func]
+        
+        ws = wb[sheet_name]
+        
+        # 解析数据范围
+        min_col, min_row, max_col, max_row = range_boundaries(data_range)
+        
+        # 读取表头和数据到DataFrame
+        headers = []
+        data_rows = []
+        
+        # 读取表头
+        for col in range(min_col, max_col + 1):
+            col_letter = get_column_letter(col)
+            header_cell = ws[f"{col_letter}{min_row}"]
+            headers.append(header_cell.value or f"列{col}")
+        
+        # 读取数据行
+        for row in range(min_row + 1, max_row + 1):
+            row_data = []
+            for col in range(min_col, max_col + 1):
+                col_letter = get_column_letter(col)
+                cell_value = ws[f"{col_letter}{row}"].value
+                row_data.append(cell_value if cell_value is not None else np.nan)
+            data_rows.append(row_data)
+        
+        # 创建DataFrame
+        df = pd.DataFrame(data_rows, columns=headers)
+        
+        # 移除全为NaN的行
+        df = df.dropna(how='all')
+        
+        # 创建透视表
+        index_cols = [col for col in rows if col in df.columns]
+        value_cols = [col for col in values if col in df.columns]
+        
+        if not index_cols or not value_cols:
+            return _fail("行字段或值字段不存在于数据中", meta={"error_code": "INVALID_PARAMETER"})
+        
+        # 创建透视表
+        if columns:
+            column_cols = [col for col in columns if col in df.columns]
+            pivot_df = df.pivot_table(
+                index=index_cols,
+                columns=column_cols,
+                values=value_cols,
+                aggfunc=normalized_agg_func,
+                fill_value=0
+            )
+        else:
+            pivot_df = df.pivot_table(
+                index=index_cols,
+                values=value_cols,
+                aggfunc=normalized_agg_func,
+                fill_value=0
+            )
+        
+        # 确定透视表工作表
+        if pivot_sheet_name:
+            if pivot_sheet_name not in wb.sheetnames:
+                pivot_ws = wb.create_sheet(pivot_sheet_name)
+            else:
+                pivot_ws = wb[pivot_sheet_name]
+                # 清空工作表
+                pivot_ws.delete_rows(1, pivot_ws.max_row)
+        else:
+            pivot_ws = wb.create_sheet(f"透视表_{len(wb.sheetnames) + 1}")
+        
+        # 写入透视表结果
+        row_idx = 1
+        
+        # 写入标题
+        if columns:
+            # 多级列标题的情况
+            header_row = []
+            first_col_headers = pivot_df.columns.get_level_values(0).unique()
+            
+            for i, first_col in enumerate(first_col_headers):
+                # 计算这个列跨多少个第二级列
+                second_cols_for_first = [col[1] for col in pivot_df.columns if col[0] == first_col]
+                col_span = len(second_cols_for_first)
+                
+                if col_span == 1:
+                    header_row.append(str(first_col))
+                else:
+                    # 写入合并的标题
+                    pivot_ws.merge_cells(f"{get_column_letter(min_col + i)}{row_idx}:{get_column_letter(min_col + i + col_span - 1)}{row_idx}")
+                    pivot_ws[f"{get_column_letter(min_col + i)}{row_idx}"] = str(first_col)
+                    header_row.extend([''] * (col_span - 1))
+            
+            # 写入第二级列标题
+            row_idx += 1
+            second_headers = []
+            for col in pivot_df.columns:
+                if len(col) == 2:
+                    second_headers.append(str(col[1]))
+                else:
+                    second_headers.append(str(col))
+            
+            for col_idx, header in enumerate(second_headers):
+                cell_col = min_col + col_idx
+                pivot_ws[f"{get_column_letter(cell_col)}{row_idx}"] = header
+        else:
+            # 单级列标题
+            row_idx += 1
+            for col_idx, header in enumerate(pivot_df.columns):
+                pivot_ws[f"{get_column_letter(min_col + col_idx)}{row_idx}"] = str(header)
+        
+        # 写入行索引和数据
+        row_idx += 1
+        for index, row_data in pivot_df.iterrows():
+            if isinstance(index, tuple):
+                # 多级行索引
+                for i, idx_val in enumerate(index):
+                    pivot_ws[f"{get_column_letter(min_col + i)}{row_idx}"] = str(idx_val)
+            else:
+                # 单级行索引
+                pivot_ws[f"{get_column_letter(min_col)}{row_idx}"] = str(index)
+            
+            # 写入数据值
+            for col_idx, (col_name, value) in enumerate(row_data.items()):
+                value_col = min_col + len(pivot_df.columns.get_level_values(0).unique()) + col_idx
+                pivot_ws[f"{get_column_letter(value_col)}{row_idx}"] = float(value) if pd.notna(value) else 0
+            
+            row_idx += 1
+        
+        # 添加说明信息
+        info_row = row_idx + 2
+        pivot_ws[f"A{info_row}"] = f"数据源: {sheet_name}!{data_range}"
+        pivot_ws[f"A{info_row + 1}"] = f"聚合函数: {agg_func}"
+        pivot_ws[f"A{info_row + 2}"] = f"创建时间: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}"
+        
+        # 保存文件
+        wb.save(file_path)
+        
+        return _ok("透视表创建成功", data={
+            'pivot_name': f"透视表_{pivot_ws.title}",
+            'sheet_name': pivot_ws.title,
+            'data_range': data_range,
+            'rows': rows,
+            'values': values,
+            'columns': columns or [],
+            'agg_func': agg_func,
+            'row_count': len(pivot_df),
+            'column_count': len(pivot_df.columns),
+            'pivot_rows': len(index_cols),
+            'pivot_cols': len(pivot_df.columns)
+        })
+        
+    except Exception as e:
+        return _fail("透视表创建失败", meta={"error_code": "OPERATION_FAILED", "error": str(e)})
 
 
 @mcp.tool()

@@ -164,4 +164,24 @@ src/excel_mcp_server_fastmcp/
 ### 上下文管理
 - **涉及 >5 个文件操作时，用 Claude Code 外包**（见 .cron-prompt.md 上下文减压章节）
 - **每轮开始先读 NOW.md**：知道上轮做到哪，接着做而不是从头开始
-- **commit message 用 Conventional Commits**：`[REQ-XXX] type: 简述`
+
+## Conventional Commits 规范（REQ-029）
+- **格式要求**：`[REQ-XXX] type: 简述`
+  - 必须包含需求编号前缀：`[REQ-XXX]`
+  - type 必须是以下之一：
+    - `feat`: 新功能
+    - `fix`: 修复 bug
+    - `refactor`: 重构（既不是新功能也不是修复 bug）
+    - `docs`: 文档更新
+    - `test`: 测试相关
+    - `chore`: 构建或辅助工具变动
+    - `perf`: 性能优化
+- **示例**：
+  - `[REQ-028] fix: insert_mode 默认值改为 false`
+  - `[REQ-029] feat(api): 添加 docstring 契约验证脚本`
+- **提交规则**：
+  1. 简短描述必须以动词开头（小写）
+  2. 详细描述可选，但建议超过50行代码时添加
+  3. 多个段落用空行分隔
+  4. 禁止使用 `Fixes #123` 或 `Closes #123`，改为使用 `Closes REQ-XXX`
+- **CI 验证**：违反规范的提交信息会被 CI 检查拒绝，必须使用 `git commit --amend` 修正
