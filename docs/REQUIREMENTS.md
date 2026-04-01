@@ -41,10 +41,10 @@
     "REQ-038": {
       "title": "BUG：工作表名称非法字符静默替换 + 超长名称静默截断",
       "priority": "P1",
-      "status": "OPEN",
+      "status": "DONE",
       "source": "边缘案例测试",
       "description": "_normalize_sheet_name()将方括号[]等非法字符静默替换为下划线（Data [2024]→Data _2024_），超长名称静默截断为25+...字符。用户不知情地创建了与预期不同的工作表名，后续引用会失败。",
-      "notes": "core/excel_manager.py:215-224，应拒绝非法名称并返回明确错误信息，或至少警告名称已修改"
+      "notes": "第244轮修复：拆分为_validate_sheet_name（严格校验）和_sanitize_sheet_name（静默清理），create_sheet/rename_sheet拒绝非法名称，copy_sheet允许静默清理"
     },
     "REQ-039": {
       "title": "功能缺失：list_sheets不区分隐藏工作表",
