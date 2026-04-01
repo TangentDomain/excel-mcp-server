@@ -114,6 +114,7 @@ structure-report.txt
 # Temporary Python cache for hooks
 .pre-commit-hooks-cache/
 temp_excel_files/
+test_large_files/
 .benchmark-history/
 .cron-focus.md
 .cron-prompt.md
@@ -133,3 +134,5 @@ DECISIONS-ARCHIVED.md
 FEISHU_SUMMARY.md
 runs/
 runs/latest
+.pypi-token
+.claude-task.md

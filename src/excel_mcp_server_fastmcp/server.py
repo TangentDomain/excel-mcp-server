@@ -813,7 +813,7 @@ def excel_search_directory(
 @_track_call
 def excel_get_range(
     file_path: str,
-    range: str,
+    range: Optional[str] = None,
     include_formatting: bool = False,
     sheet_name: Optional[str] = None,
     start_cell: Optional[str] = None,
@@ -823,7 +823,7 @@ def excel_get_range(
     
     Args:
         file_path: Excel文件路径
-        range: 单元格范围，如 "Sheet1!A1:C10" 或 "A1:C10"
+        range: 单元格范围，如 "Sheet1!A1:C10" 或 "A1:C10"（可选，可与start_cell/end_cell配合使用）
         include_formatting: 是否包含格式信息
         sheet_name: 工作表名称（可选，如果range不包含工作表名时可指定）
         start_cell: 起始单元格（可选，与end_cell配合使用）
@@ -833,8 +833,71 @@ def excel_get_range(
     if _path_err:
         return _path_err
     
+    # 参数兼容性处理：如果提供了start_cell和end_cell，构建range表达式（优先执行）
+    if start_cell and end_cell:
+        if sheet_name:
+            range = f"{sheet_name}!{start_cell}:{end_cell}"
+        else:
+            # 如果没有指定sheet_name，尝试自动推断
+            if range and '!' not in range:
+                try:
+                    from openpyxl import load_workbook
+                    wb = load_workbook(file_path, read_only=True)
+                    sheet_names = wb.sheetnames
+                    wb.close()
+                    if len(sheet_names) == 1:
+                        range = f"{sheet_names[0]}!{start_cell}:{end_cell}"
+                    else:
+                        return _fail(
+                            f"需要指定工作表名，文件有多个工作表({', '.join(sheet_names)})。"
+                            f"请使用sheet_name参数或格式: '工作表名!A1:C10'",
+                            meta={"error_code": "VALIDATION_FAILED", "available_sheets": sheet_names}
+                        )
+                except Exception:
+                    return _fail(
+                        "无法自动推断工作表名，请指定sheet_name参数或使用完整范围表达式",
+                        meta={"error_code": "VALIDATION_FAILED"}
+                    )
+            elif not range:
+                # 如果没有range且没有sheet_name，尝试自动推断
+                try:
+                    from openpyxl import load_workbook
+                    wb = load_workbook(file_path, read_only=True)
+                    sheet_names = wb.sheetnames
+                    wb.close()
+                    if len(sheet_names) == 1:
+                        range = f"{sheet_names[0]}!{start_cell}:{end_cell}"
+                    else:
+                        return _fail(
+                            f"需要指定工作表名，文件有多个工作表({', '.join(sheet_names)})。"
+                            f"请使用sheet_name参数或格式: '工作表名!A1:C10'",
+                            meta={"error_code": "VALIDATION_FAILED", "available_sheets": sheet_names}
+                        )
+                except Exception:
+                    return _fail(
+                        "无法自动推断工作表名，请指定sheet_name参数或使用完整范围表达式",
+                        meta={"error_code": "VALIDATION_FAILED"}
+                    )
+            else:
+                range = f"{range}!{start_cell}:{end_cell}"  # 这种情况应该不会发生
+    
+    # 如果既没有range也没有start_cell/end_cell，报错
+    if not range:
+        return _fail(
+            "必须指定范围参数，可通过以下方式之一：\n"
+            "1. 直接提供range参数：'Sheet1!A1:C10'\n"
+            "2. 提供 start_cell 和 end_cell 参数\n"
+            "3. 提供 range 参数和 sheet_name 参数",
+            meta={"error_code": "MISSING_RANGE_PARAMETER"}
+        )
+    
+    # 如果range不包含工作表名但指定了sheet_name，添加工作表名
+    if sheet_name and '!' not in range:
+        range = f"{sheet_name}!{range}"
+    
     # 参数顺序问题修复：检查range参数是否可能是误传的sheet_name
-    if '!' not in range and not range.startswith(('A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J')) and len(range) <= 10:
+    # 只有在range不为空且没有通过start_cell/end_cell构建时才执行此检查
+    if range and '!' not in range and not range.startswith(('A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J')) and len(range) <= 10:
         # range看起来不像有效的单元格范围，可能是用户误将sheet_name传给了range参数
         return _fail(
             f"参数顺序可能错误：range参数值 '{range}' 看起来不像有效的单元格范围。\n"
@@ -846,70 +909,6 @@ def excel_get_range(
                 "hint": "range参数应该是单元格范围，不是工作表名"
             }
         )
-    
-    # 参数兼容性处理：如果提供了start_cell和end_cell，构建range表达式
-    if start_cell and end_cell:
-        if sheet_name:
-            range = f"{sheet_name}!{start_cell}:{end_cell}"
-        else:
-            # 如果没有指定sheet_name，尝试自动推断
-            if '!' not in range:
-                try:
-                    from openpyxl import load_workbook
-                    wb = load_workbook(file_path, read_only=True)
-                    sheet_names = wb.sheetnames
-                    wb.close()
-                    if len(sheet_names) == 1:
-                        range = f"{sheet_names[0]}!{start_cell}:{end_cell}"
-                    else:
-                        return _fail(
-                            f"需要指定工作表名，文件有多个工作表({', '.join(sheet_names)})。"
-                            f"请使用sheet_name参数或格式: '工作表名!A1:C10'",
-                            meta={"error_code": "VALIDATION_FAILED", "available_sheets": sheet_names}
-                        )
-                except Exception:
-                    return _fail(
-                        "无法自动推断工作表名，请指定sheet_name参数或使用完整范围表达式",
-                        meta={"error_code": "VALIDATION_FAILED"}
-                    )
-            else:
-                range = f"{range}!{start_cell}:{end_cell}"  # 这种情况应该不会发生
-    
-    # 如果range不包含工作表名但指定了sheet_name，添加工作表名
-    if sheet_name and '!' not in range:
-        range = f"{sheet_name}!{range}"
-    
-    # 参数兼容性处理：如果提供了start_cell和end_cell，构建range表达式
-    if start_cell and end_cell:
-        if sheet_name:
-            range = f"{sheet_name}!{start_cell}:{end_cell}"
-        else:
-            # 如果没有指定sheet_name，尝试自动推断
-            if '!' not in range:
-                try:
-                    from openpyxl import load_workbook
-                    wb = load_workbook(file_path, read_only=True)
-                    sheet_names = wb.sheetnames
-                    wb.close()
-                    if len(sheet_names) == 1:
-                        range = f"{sheet_names[0]}!{start_cell}:{end_cell}"
-                    else:
-                        return _fail(
-                            f"需要指定工作表名，文件有多个工作表({', '.join(sheet_names)})。"
-                            f"请使用sheet_name参数或格式: '工作表名!A1:C10'",
-                            meta={"error_code": "VALIDATION_FAILED", "available_sheets": sheet_names}
-                        )
-                except Exception:
-                    return _fail(
-                        "无法自动推断工作表名，请指定sheet_name参数或使用完整范围表达式",
-                        meta={"error_code": "VALIDATION_FAILED"}
-                    )
-            else:
-                range = f"{range}!{start_cell}:{end_cell}"  # 这种情况应该不会发生
-    
-    # 如果range不包含工作表名但指定了sheet_name，添加工作表名
-    if sheet_name and '!' not in range:
-        range = f"{sheet_name}!{range}"
     
     # 原有的参数验证逻辑
 
@@ -2004,25 +2003,22 @@ def excel_delete_rows(
                 return _ok(f"条件 '{condition}' 未匹配到任何行",
                            data={'deleted_rows': 0, 'condition': condition})
 
-            row_numbers.sort(reverse=True)  # 从后往前删除
-            total_deleted = 0
-
-            for row_num in row_numbers:
-                result = ExcelOperations.delete_rows(file_path, sheet_name, row_num, 1, streaming)
-                if result.get('success', False):
-                    deleted = result.get('data', {}).get('deleted_rows', result.get('metadata', {}).get('deleted_rows', 1))
-                    total_deleted += deleted
-                else:
-                    logger.warning(f"删除行{row_num}失败: {result.get('message', '')}")
+            # 使用批量删除（一次文件I/O代替N次）- REQ-032 多线程优化
+            result = ExcelOperations.batch_delete_rows(file_path, sheet_name, row_numbers, streaming)
+            total_deleted = result.get('data', {}).get('deleted_rows', result.get('metadata', {}).get('deleted_rows', 0))
 
             operation_logger.log_operation("operation_result", {
-                "success": True,
+                "success": result.get('success', False),
                 "deleted_rows": total_deleted,
-                "message": f"按条件删除完成"
+                "message": f"按条件批量删除完成"
             })
 
-            return _ok(f"按条件 '{condition}' 删除了 {total_deleted} 行",
-                       data={'deleted_rows': total_deleted, 'condition': condition})
+            if result.get('success', False):
+                return _ok(f"按条件 '{condition}' 删除了 {total_deleted} 行",
+                           data={'deleted_rows': total_deleted, 'condition': condition})
+            else:
+                return _fail(f"按条件删除失败: {result.get('message', '')}",
+                             meta={"error_code": "BATCH_DELETE_FAILED"})
 
         except Exception as e:
             operation_logger.log_operation("operation_error", {
@@ -2899,20 +2895,45 @@ def excel_batch_update_ranges(file_path: str, updates: List[Dict[str, Any]]) -> 
     try:
         from openpyxl import load_workbook
         from openpyxl.utils import range_boundaries
-        
+
         results = []
         success_count = 0
         error_count = 0
-        
+
+        # 大批量并行预验证（>10个更新项时启用）- REQ-032
+        if len(updates) > 10:
+            from ..utils.concurrent_utils import parallel_validate_batch_data
+
+            def _validate_update(update):
+                range_spec = update.get('range', '')
+                data = update.get('data', [])
+                if not range_spec or not data:
+                    return '缺少range或data参数'
+                try:
+                    range_boundaries(range_spec)
+                except Exception as e:
+                    return f'范围格式无效: {e}'
+                return None
+
+            errors = parallel_validate_batch_data(updates, _validate_update)
+            for i, err in enumerate(errors):
+                if err:
+                    results.append({'index': i, 'success': False, 'error': err})
+                    error_count += 1
+
         # 加载工作簿
         wb = load_workbook(file_path, data_only=False)
-        
+
         for i, update in enumerate(updates):
+            # 跳过已预验证失败的项
+            if any(r['index'] == i and not r['success'] for r in results):
+                continue
+
             try:
                 range_spec = update.get('range', '')
                 data = update.get('data', [])
                 sheet_name = update.get('sheet', None)
-                
+
                 if not range_spec or not data:
                     results.append({
                         'index': i,
@@ -2921,7 +2942,7 @@ def excel_batch_update_ranges(file_path: str, updates: List[Dict[str, Any]]) -> 
                     })
                     error_count += 1
                     continue
-                
+
                 # 获取工作表
                 if sheet_name:
                     if sheet_name not in wb.sheetnames:
@@ -2935,19 +2956,19 @@ def excel_batch_update_ranges(file_path: str, updates: List[Dict[str, Any]]) -> 
                     ws = wb[sheet_name]
                 else:
                     ws = wb.active
-                
+
                 # 解析范围并更新数据
                 min_col, min_row, max_col, max_row = range_boundaries(range_spec)
-                
+
                 # 写入数据
                 for row_idx, row_data in enumerate(data):
                     for col_idx, cell_value in enumerate(row_data):
                         target_row = min_row + row_idx
                         target_col = min_col + col_idx
-                        
+
                         if target_row <= max_row and target_col <= max_col:
                             ws.cell(row=target_row, column=target_col, value=cell_value)
-                
+
                 results.append({
                     'index': i,
                     'success': True,
@@ -2955,7 +2976,7 @@ def excel_batch_update_ranges(file_path: str, updates: List[Dict[str, Any]]) -> 
                     'sheet': sheet_name or 'active'
                 })
                 success_count += 1
-                
+
             except Exception as e:
                 results.append({
                     'index': i,
@@ -2963,17 +2984,17 @@ def excel_batch_update_ranges(file_path: str, updates: List[Dict[str, Any]]) -> 
                     'error': str(e)
                 })
                 error_count += 1
-        
+
         # 保存文件
         wb.save(file_path)
-        
+
         return _ok(f"批量更新完成：成功{success_count}个区域，失败{error_count}个区域", data={
             'total_updates': len(updates),
             'success_count': success_count,
             'error_count': error_count,
             'results': results
         })
-        
+
     except Exception as e:
         return _fail("批量更新失败", meta={"error_code": "OPERATION_FAILED"})
 
@@ -3070,7 +3091,7 @@ def excel_merge_multiple_files(source_files: List[str], target_file: str, merge_
 @_track_call
 def excel_create_chart(file_path: str, sheet_name: str, chart_type: str, data_range: str, 
                       title: str = "", chart_name: str = "", position: str = "B15") -> Dict[str, Any]:
-    """在工作表中创建图表。chart_type: line/bar/pie/scatter/area等。"""
+    """在工作表中创建图表。chart_type: line/bar/column/pie/scatter/area等。支持'column'作为'bar'的别名。"""
     try:
         from openpyxl import load_workbook
         from openpyxl.chart import BarChart, LineChart, PieChart, ScatterChart, Reference
@@ -3139,6 +3160,207 @@ def excel_create_chart(file_path: str, sheet_name: str, chart_type: str, data_ra
         
     except Exception as e:
         return _fail("图表创建失败", meta={"error_code": "OPERATION_FAILED"})
+
+
+def excel_create_pivot_table(file_path: str, sheet_name: str, data_range: str, 
+                            rows: List[str], values: List[str], 
+                            columns: Optional[List[str]] = None,
+                            agg_func: str = "sum", 
+                            pivot_sheet_name: str = None) -> Dict[str, Any]:
+    """
+    在Excel中创建数据透视表。支持多种聚合函数，包括'mean'作为'average'的别名。
+    
+    Args:
+        file_path: Excel文件路径
+        sheet_name: 数据所在工作表名称
+        data_range: 数据范围，如 "A1:D100"
+        rows: 行字段列表，如 ["类别", "子类别"]
+        values: 值字段列表，如 ["销售额", "利润"]
+        columns: 列字段列表（可选），如 ["月份"]
+        agg_func: 聚合函数，支持: sum/count/average/mean/max/min/std/var，其中'mean'是'average'的别名
+        pivot_sheet_name: 透视表工作表名称（可选，默认自动生成）
+    
+    Returns:
+        Dict: 透视表创建结果
+    """
+    try:
+        from openpyxl import load_workbook
+        from openpyxl.utils import range_boundaries, get_column_letter
+        import pandas as pd
+        import numpy as np
+        
+        wb = load_workbook(file_path)
+        
+        if sheet_name not in wb.sheetnames:
+            return _fail("数据工作表不存在", meta={"error_code": "OPERATION_FAILED"})
+        
+        # 处理聚合函数别名
+        agg_func_map = {
+            "sum": "sum",
+            "count": "count", 
+            "average": "mean",
+            "mean": "mean",  # 支持'mean'作为'average'的别名
+            "max": "max",
+            "min": "min",
+            "std": "std",
+            "var": "var"
+        }
+        
+        if agg_func not in agg_func_map:
+            return _fail("不支持的聚合函数", meta={"error_code": "INVALID_PARAMETER", 
+                                                   "hint": f"支持的函数: {list(agg_func_map.keys())}"})
+        
+        normalized_agg_func = agg_func_map[agg_func]
+        
+        ws = wb[sheet_name]
+        
+        # 解析数据范围
+        min_col, min_row, max_col, max_row = range_boundaries(data_range)
+        
+        # 读取表头和数据到DataFrame
+        headers = []
+        data_rows = []
+        
+        # 读取表头
+        for col in range(min_col, max_col + 1):
+            col_letter = get_column_letter(col)
+            header_cell = ws[f"{col_letter}{min_row}"]
+            headers.append(header_cell.value or f"列{col}")
+        
+        # 读取数据行
+        for row in range(min_row + 1, max_row + 1):
+            row_data = []
+            for col in range(min_col, max_col + 1):
+                col_letter = get_column_letter(col)
+                cell_value = ws[f"{col_letter}{row}"].value
+                row_data.append(cell_value if cell_value is not None else np.nan)
+            data_rows.append(row_data)
+        
+        # 创建DataFrame
+        df = pd.DataFrame(data_rows, columns=headers)
+        
+        # 移除全为NaN的行
+        df = df.dropna(how='all')
+        
+        # 创建透视表
+        index_cols = [col for col in rows if col in df.columns]
+        value_cols = [col for col in values if col in df.columns]
+        
+        if not index_cols or not value_cols:
+            return _fail("行字段或值字段不存在于数据中", meta={"error_code": "INVALID_PARAMETER"})
+        
+        # 创建透视表
+        if columns:
+            column_cols = [col for col in columns if col in df.columns]
+            pivot_df = df.pivot_table(
+                index=index_cols,
+                columns=column_cols,
+                values=value_cols,
+                aggfunc=normalized_agg_func,
+                fill_value=0
+            )
+        else:
+            pivot_df = df.pivot_table(
+                index=index_cols,
+                values=value_cols,
+                aggfunc=normalized_agg_func,
+                fill_value=0
+            )
+        
+        # 确定透视表工作表
+        if pivot_sheet_name:
+            if pivot_sheet_name not in wb.sheetnames:
+                pivot_ws = wb.create_sheet(pivot_sheet_name)
+            else:
+                pivot_ws = wb[pivot_sheet_name]
+                # 清空工作表
+                pivot_ws.delete_rows(1, pivot_ws.max_row)
+        else:
+            pivot_ws = wb.create_sheet(f"透视表_{len(wb.sheetnames) + 1}")
+        
+        # 写入透视表结果
+        row_idx = 1
+        
+        # 写入标题
+        if columns:
+            # 多级列标题的情况
+            header_row = []
+            first_col_headers = pivot_df.columns.get_level_values(0).unique()
+            
+            for i, first_col in enumerate(first_col_headers):
+                # 计算这个列跨多少个第二级列
+                second_cols_for_first = [col[1] for col in pivot_df.columns if col[0] == first_col]
+                col_span = len(second_cols_for_first)
+                
+                if col_span == 1:
+                    header_row.append(str(first_col))
+                else:
+                    # 写入合并的标题
+                    pivot_ws.merge_cells(f"{get_column_letter(min_col + i)}{row_idx}:{get_column_letter(min_col + i + col_span - 1)}{row_idx}")
+                    pivot_ws[f"{get_column_letter(min_col + i)}{row_idx}"] = str(first_col)
+                    header_row.extend([''] * (col_span - 1))
+            
+            # 写入第二级列标题
+            row_idx += 1
+            second_headers = []
+            for col in pivot_df.columns:
+                if len(col) == 2:
+                    second_headers.append(str(col[1]))
+                else:
+                    second_headers.append(str(col))
+            
+            for col_idx, header in enumerate(second_headers):
+                cell_col = min_col + col_idx
+                pivot_ws[f"{get_column_letter(cell_col)}{row_idx}"] = header
+        else:
+            # 单级列标题
+            row_idx += 1
+            for col_idx, header in enumerate(pivot_df.columns):
+                pivot_ws[f"{get_column_letter(min_col + col_idx)}{row_idx}"] = str(header)
+        
+        # 写入行索引和数据
+        row_idx += 1
+        for index, row_data in pivot_df.iterrows():
+            if isinstance(index, tuple):
+                # 多级行索引
+                for i, idx_val in enumerate(index):
+                    pivot_ws[f"{get_column_letter(min_col + i)}{row_idx}"] = str(idx_val)
+            else:
+                # 单级行索引
+                pivot_ws[f"{get_column_letter(min_col)}{row_idx}"] = str(index)
+            
+            # 写入数据值
+            for col_idx, (col_name, value) in enumerate(row_data.items()):
+                value_col = min_col + len(pivot_df.columns.get_level_values(0).unique()) + col_idx
+                pivot_ws[f"{get_column_letter(value_col)}{row_idx}"] = float(value) if pd.notna(value) else 0
+            
+            row_idx += 1
+        
+        # 添加说明信息
+        info_row = row_idx + 2
+        pivot_ws[f"A{info_row}"] = f"数据源: {sheet_name}!{data_range}"
+        pivot_ws[f"A{info_row + 1}"] = f"聚合函数: {agg_func}"
+        pivot_ws[f"A{info_row + 2}"] = f"创建时间: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}"
+        
+        # 保存文件
+        wb.save(file_path)
+        
+        return _ok("透视表创建成功", data={
+            'pivot_name': f"透视表_{pivot_ws.title}",
+            'sheet_name': pivot_ws.title,
+            'data_range': data_range,
+            'rows': rows,
+            'values': values,
+            'columns': columns or [],
+            'agg_func': agg_func,
+            'row_count': len(pivot_df),
+            'column_count': len(pivot_df.columns),
+            'pivot_rows': len(index_cols),
+            'pivot_cols': len(pivot_df.columns)
+        })
+        
+    except Exception as e:
+        return _fail("透视表创建失败", meta={"error_code": "OPERATION_FAILED", "error": str(e)})
 
 
 @mcp.tool()

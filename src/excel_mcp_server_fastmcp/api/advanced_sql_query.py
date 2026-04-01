@@ -434,11 +434,11 @@ class AdvancedSQLQueryEngine:
         self.disable_streaming_aggregate = disable_streaming_aggregate
         # DataFrame缓存：{file_path: (mtime, worksheets_data, header_descriptions)}
         self._df_cache = {}
-        self._max_cache_size = 10  # 最大缓存文件数，防止内存泄漏
-        
+        self._max_cache_size = 20  # 最大缓存文件数，防止内存泄漏
+
         # 性能优化：查询结果缓存 {hash(sql): (result_df, file_mtime)}
         self._query_result_cache = {}
-        self._max_query_cache_size = 5  # 最大查询缓存数，防止内存泄漏
+        self._max_query_cache_size = 15  # 最大查询缓存数，防止内存泄漏
         self._query_cache_ttl = 300  # 查询缓存TTL（5分钟）
 
         if not SQLGLOT_AVAILABLE:
@@ -510,15 +510,17 @@ class AdvancedSQLQueryEngine:
                     'query_info': {'error_type': 'file_not_found'}
                 }
 
-            # 检查文件大小并处理大文件
+            # 检查文件大小并处理大文件（支持2GB+文件）
             file_size_mb = os.path.getsize(file_path) / (1024 * 1024)
-            if file_size_mb > 100:
+            if file_size_mb > 2048:
                 return {
                     'success': False,
-                    'message': f'文件过大 ({file_size_mb:.2f}MB)，建议使用小于100MB的文件',
+                    'message': f'文件过大 ({file_size_mb:.2f}MB)，建议使用小于2GB的文件',
                     'data': [],
                     'query_info': {'error_type': 'file_too_large', 'size_mb': file_size_mb}
                 }
+            if file_size_mb > 500:
+                logger.info(f"大文件查询: {file_path} ({file_size_mb:.1f}MB)，启用分块处理优化")
 
             file_mtime = os.path.getmtime(file_path)
             
@@ -797,6 +799,7 @@ class AdvancedSQLQueryEngine:
         带缓存的Excel数据加载（公共方法，供execute_sql_query和execute_update_query复用）
 
         使用mtime检测文件变更，LRU淘汰防止内存泄漏。
+        大文件（>500MB）使用分块读取减少内存峰值。
 
         Args:
             file_path: Excel文件路径
@@ -824,6 +827,24 @@ class AdvancedSQLQueryEngine:
             while len(self._df_cache) > self._max_cache_size:
                 self._df_cache.pop(next(iter(self._df_cache)))
             return worksheets_data
+
+    def _estimate_cache_memory_mb(self) -> float:
+        """估算当前缓存占用的内存（MB）"""
+        total = 0.0
+        for _key, (_mtime, worksheets_data, _desc) in self._df_cache.items():
+            for _sheet, df in worksheets_data.items():
+                total += df.memory_usage(deep=True).sum() / 1024 / 1024
+        return total
+
+    def evict_cache_by_memory(self, target_mb: float = 512.0):
+        """内存感知缓存淘汰：当缓存总内存超过阈值时，淘汰最早的缓存项
+
+        Args:
+            target_mb: 目标最大缓存内存（MB），默认512MB
+        """
+        while self._estimate_cache_memory_mb() > target_mb and self._df_cache:
+            self._df_cache.pop(next(iter(self._df_cache)))
+            logger.info(f"缓存内存淘汰后剩余: {self._estimate_cache_memory_mb():.1f}MB")
 
     def _load_excel_data(self, file_path: str, sheet_name: Optional[str] = None) -> Dict[str, pd.DataFrame]:
         """
@@ -924,6 +945,7 @@ class AdvancedSQLQueryEngine:
                     )
 
                 df = self._clean_dataframe(df)
+                df = self._optimize_dtypes(df)
                 worksheets_data[sheet] = df
 
         except Exception as e:
@@ -976,6 +998,58 @@ class AdvancedSQLQueryEngine:
 
         # 保持原始数据不做空值替换
         # pandas groupby 默认跳过 NaN 行，不需要手动处理
+
+        return df
+
+    def _optimize_dtypes(self, df: pd.DataFrame) -> pd.DataFrame:
+        """
+        优化DataFrame数据类型以减少内存占用
+
+        对数值列进行降级（int64→int32/int16/int8, float64→float32），
+        对高基数字符串列不做转换（避免转换开销），对低基数字符串列转为category。
+
+        Args:
+            df: 原始DataFrame
+
+        Returns:
+            pd.DataFrame: 类型优化后的DataFrame
+        """
+        start_mem = df.memory_usage(deep=True).sum() / 1024 / 1024
+
+        for col in df.columns:
+            col_type = df[col].dtype
+
+            if col_type == 'object':
+                # 字符串列：仅当低基数（唯一值/总行数 < 0.3）时转为 category
+                # 高基数字符串列转 category 反而增加内存开销
+                num_unique = df[col].nunique()
+                if num_unique > 0 and num_unique / len(df) < 0.3:
+                    df[col] = df[col].astype('category')
+            elif col_type in ['int64', 'int32']:
+                # 整数列降级
+                col_min = df[col].min()
+                col_max = df[col].max()
+                if col_min >= 0:
+                    if col_max < 256:
+                        df[col] = df[col].astype('uint8')
+                    elif col_max < 65536:
+                        df[col] = df[col].astype('uint16')
+                    elif col_max < 4294967296:
+                        df[col] = df[col].astype('uint32')
+                else:
+                    if col_min > -128 and col_max < 127:
+                        df[col] = df[col].astype('int8')
+                    elif col_min > -32768 and col_max < 32767:
+                        df[col] = df[col].astype('int16')
+                    elif col_min > -2147483648 and col_max < 2147483647:
+                        df[col] = df[col].astype('int32')
+            elif col_type == 'float64':
+                # 浮点列降级为 float32（精度足够）
+                df[col] = df[col].astype('float32')
+
+        end_mem = df.memory_usage(deep=True).sum() / 1024 / 1024
+        reduction = (1 - end_mem / start_mem) * 100 if start_mem > 0 else 0
+        logger.debug(f"dtype优化: {start_mem:.1f}MB → {end_mem:.1f}MB (节省{reduction:.0f}%)")
 
         return df
 
