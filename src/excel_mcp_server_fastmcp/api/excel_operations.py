@@ -259,7 +259,8 @@ class ExcelOperations:
                     sheet_info = {
                         'name': sheet.name,
                         'rows': 0,  # 默认值，后续更新
-                        'cols': 0   # 默认值，后续更新
+                        'cols': 0,  # 默认值，后续更新
+                        'state': sheet.sheet_state,
                     }
                     sheets_info.append(sheet_info)
                     sheet_names.append(sheet.name)  # 向后兼容：简单名称列表

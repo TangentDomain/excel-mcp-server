@@ -23,10 +23,17 @@ logger = logging.getLogger(__name__)
 
 # 尝试导入calamine，不可用时降级到openpyxl
 try:
-    from python_calamine import CalamineWorkbook
+    from python_calamine import CalamineWorkbook, SheetVisibleEnum
     _HAS_CALAMINE = True
+    # SheetVisibleEnum成员不可哈希，用int值映射
+    _CALAMINE_VISIBLE_MAP = {
+        int(SheetVisibleEnum.Visible): "visible",
+        int(SheetVisibleEnum.Hidden): "hidden",
+        int(SheetVisibleEnum.VeryHidden): "veryHidden",
+    }
 except ImportError:
     _HAS_CALAMINE = False
+    _CALAMINE_VISIBLE_MAP = {}
     logger.debug("python-calamine未安装，读取性能将受影响")
 
 # 大文件阈值：超过此值时自动切换到优化读取模式（50MB）
@@ -124,12 +131,19 @@ class ExcelReader:
                 sheets_info = []
                 for i, name in enumerate(wb.sheet_names):
                     ws = wb.get_sheet_by_name(name)
+                    # 读取工作表可见性
+                    state = "visible"
+                    if hasattr(wb, 'sheets_metadata') and i < len(wb.sheets_metadata):
+                        state = _CALAMINE_VISIBLE_MAP.get(
+                            int(wb.sheets_metadata[i].visible), "visible"
+                        )
                     sheet_info = SheetInfo(
                         index=i,
                         name=name,
                         max_row=ws.height or 0,
                         max_column=ws.width or 0,
-                        max_column_letter=get_column_letter(ws.width or 1)
+                        max_column_letter=get_column_letter(ws.width or 1),
+                        sheet_state=state,
                     )
                     sheets_info.append(sheet_info)
 
@@ -153,13 +167,16 @@ class ExcelReader:
             sheets_info = []
             for i, sheet_name in enumerate(workbook.sheetnames):
                 sheet = workbook[sheet_name]
+                # openpyxl sheet_state: 'visible', 'hidden', 'veryHidden'
+                state = getattr(sheet, 'sheet_state', 'visible') or 'visible'
 
                 sheet_info = SheetInfo(
                     index=i,
                     name=sheet_name,
                     max_row=sheet.max_row,
                     max_column=sheet.max_column,
-                    max_column_letter=get_column_letter(sheet.max_column)
+                    max_column_letter=get_column_letter(sheet.max_column),
+                    sheet_state=state,
                 )
                 sheets_info.append(sheet_info)
 
