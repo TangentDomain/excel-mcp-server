@@ -110,6 +110,15 @@
       "priority": "P1",
       "description": "处理大型Excel文件（2GB+）时遇到性能瓶颈，优化内存使用和数据处理速度",
       "archived_at": "2026-04-01"
+    },
+    "REQ-033": {
+      "title": "性能优化：iterrows替换为itertuples",
+      "status": "DONE",
+      "priority": "P2",
+      "source": "自审",
+      "description": "advanced_sql_query.py中多处使用df.iterrows()遍历DataFrame，性能较差。替换为itertuples()或向量化操作。",
+      "notes": "5处iterrows全部替换：advanced_sql_query.py结果序列化+条件过滤、server.py UPDATE/DELETE行匹配+透视表写入",
+      "archived_at": "2026-04-01"
     }
   }
 }
