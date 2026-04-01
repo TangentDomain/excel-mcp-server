@@ -72,7 +72,7 @@
     },
     "REQ-030": {
       "title": "API参数命名与常见术语对齐",
-      "status": "OPEN",
+      "status": "DONE",
       "priority": "P2",
       "acceptance_criteria": [
         "create_chart 的 chart_type 支持 'column' 作为 'bar' 的别名",
@@ -84,7 +84,7 @@
         "向后兼容：原有参数值继续有效",
         "新增别名不影响现有功能"
       ],
-      "notes": "来源：监工第3轮报告。'column' 和 'mean' 是 pandas/openpyxl 用户的常用术语，不支持会导致用户困惑。\n\n完成情况（2026-04-01）：\n✅ create_chart 的 chart_type 已支持 'column' 作为 'bar' 的别名（chart_map 中两者都映射到 BarChart）\n✅ docstring 已说明 'column' 作为 'bar' 的别名\n✅ 测试 test_create_column_chart 已存在并通过\n❌ create_pivot_table 函数不存在，无法实现 mean/average 别名功能\n\n注：pivot_table 功能未被实现，此部分验收标准不适用。如需此功能，应创建新需求先实现基础功能。"
+      "notes": "来源：监工第3轮报告。'column' 和 'mean' 是 pandas/openpyxl 用户的常用术语，不支持会导致用户困惑。\n\n完成情况（2026-04-01 验证关闭）：\n✅ create_chart 的 chart_type 已支持 'column' 作为 'bar' 的别名（chart_map 中两者都映射到 BarChart）\n✅ docstring 已说明 'column' 作为 'bar' 的别名\n✅ 测试 test_create_column_chart 已存在并通过\n✅ create_pivot_table 的 agg_func 已支持 'mean' 作为 'average' 的别名（agg_func_map 中两者都映射到 'mean'）\n✅ docstring 已说明 'mean' 作为 'average' 的别名\n✅ 测试 test_create_pivot_table_with_mean_alias 和 test_create_pivot_table_average 均通过\n✅ 全量测试 834 passed（1个无关的性能测试失败）"
     },
     "REQ-031": {
       "title": "修复测试文件语法错误",
@@ -100,6 +100,30 @@
         "修复后必须运行全量测试验证"
       ],
       "notes": "来源：Claude Code 健康检查发现。f-string 中嵌套的大括号未正确转义导致语法错误，pytest 无法正常运行。"
+    },
+    "REQ-032": {
+      "title": "性能优化：大型Excel文件处理提速（2GB+）",
+      "status": "IN-PROGRESS",
+      "priority": "P1",
+      "description": "处理大型Excel文件（2GB+）时遇到性能瓶颈，MCP调用响应缓慢。需要优化内存使用和数据处理速度，提升用户体验。",
+      "acceptance_criteria": [
+        "性能基准测试：创建 scripts/performance-benchmark.py",
+        "测试文件：生成 2GB+ 的测试文件，包含百万级数据行",
+        "测量当前性能：read_data_from_excel、write_data_to_excel 耗时",
+        "内存使用优化：减少 pandas DataFrame 内存占用",
+        "流式处理：实现大文件分块读取和写入",
+        "缓存机制：为重复查询添加智能缓存",
+        "并发处理：对批量操作使用多线程优化",
+        "性能目标：提升 3-5倍处理速度，内存占用降低 50%",
+        "MCP验证：使用真实的2GB+文件验证优化效果",
+        "全量测试通过，确保不影响小文件处理"
+      ],
+      "constraints": [
+        "向后兼容：不能影响现有API接口",
+        "稳定性：优化后必须通过所有测试",
+        "内存安全：不能因优化导致内存泄漏"
+      ],
+      "notes": "来源：用户反馈和监控数据。\n\n完成情况（2026-04-01 第一轮）：\n✅ 性能基准测试脚本 scripts/performance-benchmark.py\n✅ 文件大小检测 + 大文件优化读取（>50MB自动切换）\n✅ 7个新测试通过，全量842 passed\n⏳ 待做：2GB+真实文件验证、并发处理、缓存增强"
     }
   }
 }

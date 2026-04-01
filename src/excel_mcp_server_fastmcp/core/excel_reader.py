@@ -6,6 +6,7 @@ Excel MCP Server - Excel读取模块
 """
 
 import logging
+import os
 from typing import List, Dict, Any, Optional
 from openpyxl import load_workbook
 from openpyxl.utils import range_boundaries, column_index_from_string, get_column_letter
@@ -28,9 +29,29 @@ except ImportError:
     _HAS_CALAMINE = False
     logger.debug("python-calamine未安装，读取性能将受影响")
 
+# 大文件阈值：超过此值时自动切换到优化读取模式（50MB）
+_LARGE_FILE_THRESHOLD = 50 * 1024 * 1024
+
+
+def _get_file_size(file_path: str) -> int:
+    """获取文件大小（字节）"""
+    try:
+        return os.path.getsize(file_path)
+    except OSError:
+        return 0
+
+
+def _is_large_file(file_path: str) -> bool:
+    """判断是否为大文件"""
+    return _get_file_size(file_path) > _LARGE_FILE_THRESHOLD
+
 
 class ExcelReader:
-    """Excel文件读取器（calamine加速 + openpyxl后备）"""
+    """Excel文件读取器（calamine加速 + openpyxl后备）
+
+    大文件优化：自动检测文件大小，超过50MB时对范围查询使用
+    openpyxl read_only模式的iter_rows进行按需加载，避免全量读入内存。
+    """
 
     def __init__(self, file_path: str):
         """
@@ -42,6 +63,13 @@ class ExcelReader:
         self.file_path = ExcelValidator.validate_file_path(file_path)
         self._workbook_cache = {}  # 缓存不同参数的openpyxl工作簿
         self._calamine_wb = None   # calamine工作簿缓存（只缓存一个，因为不支持参数变体）
+        self._file_size = _get_file_size(file_path)
+        self._is_large = self._file_size > _LARGE_FILE_THRESHOLD
+        if self._is_large:
+            logger.info(
+                f"大文件检测: {file_path} ({self._file_size / 1024 / 1024:.1f}MB), "
+                f"将使用优化读取模式"
+            )
 
     def _get_calamine_workbook(self):
         """
@@ -110,7 +138,9 @@ class ExcelReader:
                     data=sheets_info,
                     metadata={
                         'file_path': self.file_path,
-                        'total_sheets': len(sheets_info)
+                        'total_sheets': len(sheets_info),
+                        'file_size_mb': round(self._file_size / 1024 / 1024, 1),
+                        'is_large_file': self._is_large,
                     }
                 )
             except Exception as e:
@@ -138,7 +168,9 @@ class ExcelReader:
                 data=sheets_info,
                 metadata={
                     'file_path': self.file_path,
-                    'total_sheets': len(sheets_info)
+                    'total_sheets': len(sheets_info),
+                    'file_size_mb': round(self._file_size / 1024 / 1024, 1),
+                    'is_large_file': self._is_large,
                 }
             )
 
@@ -167,6 +199,15 @@ class ExcelReader:
         # 解析范围表达式
         range_info = RangeParser.parse_range_expression(range_expression)
 
+        # 大文件优化：对范围查询使用 openpyxl read_only + iter_rows 按需加载
+        if self._is_large and not include_formatting and range_info.range_type == RangeType.CELL_RANGE:
+            try:
+                result = self._get_range_large_file(range_info, range_expression)
+                if result:
+                    return result
+            except Exception as e:
+                logger.debug(f"大文件优化读取失败，回退标准路径: {e}")
+
         # calamine快速路径（仅限纯数据读取）
         if not include_formatting and _HAS_CALAMINE:
             try:
@@ -176,6 +217,65 @@ class ExcelReader:
 
         # openpyxl路径（格式化读取或calamine不可用）
         return self._get_range_openpyxl(range_info, range_expression, include_formatting)
+
+    def _get_range_large_file(self, range_info: RangeInfo, range_expression: str) -> OperationResult:
+        """大文件优化读取：仅加载指定范围的行，避免全量读入内存
+
+        使用 openpyxl read_only 模式的 iter_rows 按需加载，
+        仅读取 min_row 到 max_row 之间的数据行。
+
+        Args:
+            range_info: 解析后的范围信息
+            range_expression: 原始范围表达式
+
+        Returns:
+            OperationResult: 范围数据结果，失败时返回 None
+        """
+        sheet_name = range_info.sheet_name
+        if not sheet_name or not sheet_name.strip():
+            return None
+
+        min_col, min_row, max_col, max_row = range_boundaries(range_info.cell_range)
+
+        workbook = self._get_workbook(read_only=True, data_only=True)
+        sheet = self._get_worksheet_openpyxl(workbook, sheet_name)
+
+        data = []
+        for row in sheet.iter_rows(
+            min_row=min_row, max_row=max_row,
+            min_col=min_col, max_col=max_col,
+            values_only=False
+        ):
+            row_data = []
+            for cell in row:
+                cell_info = CellInfo(
+                    coordinate=cell.coordinate,
+                    value=cell.value
+                )
+                row_data.append(cell_info)
+            data.append(row_data)
+
+        dimensions = ExcelDimensions(
+            rows=max_row - min_row + 1,
+            columns=max_col - min_col + 1,
+            start_row=min_row,
+            start_column=min_col
+        )
+
+        return OperationResult(
+            success=True,
+            data=data,
+            metadata={
+                'file_path': self.file_path,
+                'range': range_expression,
+                'range_type': range_info.range_type.value,
+                'sheet_name': sheet_name,
+                'dimensions': dimensions.__dict__,
+                'optimized': True,
+                'file_size_mb': round(self._file_size / 1024 / 1024, 1),
+                'rows_loaded': max_row - min_row + 1,
+            }
+        )
 
     def _get_range_calamine(self, range_info: RangeInfo, range_expression: str) -> OperationResult:
         """使用calamine快速读取范围数据（纯值，无格式）"""
