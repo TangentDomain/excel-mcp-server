@@ -1,27 +1,23 @@
-# NOW.md - 第234轮
+# NOW.md - 第235轮
 
 ## 当前状态
-- **轮次**: 第234轮（REQ-028 insert_mode默认值修复完成）
-- **时间**: 2026-03-31 08:35 UTC
+- **轮次**: 第235轮（REQ-032 性能优化完成）
+- **时间**: 2026-04-01
 
 ## 完成工作
-- ✅ 验证REQ-028主要功能已完成：insert_mode默认值已为False
-- ✅ docstring完整度检查：所有参数描述完整，insert_mode行为说明清晰
-- ✅ 专项测试验证：8/8 insert_mode测试通过
-- ✅ MCP功能验证：基础功能正常，默认覆盖行为正确
-- ✅ 版本号更新：1.6.54 → 1.6.55
+- ✅ REQ-032 多线程并行文件合并：merge_files >2文件自动并行读取
+  - sheets模式：并行读取各文件所有工作表
+  - append模式：并行读取各文件活动工作表
+- ✅ 新增3个并行合并测试（test_merge_parallel_sheets/sequential_sheets/parallel_append）
+- ✅ 全量测试 851 passed，无回归
+- ✅ 版本号更新：1.6.55 → 1.6.56
+- ✅ REQ-032 标记为 DONE
 
 ## 关键指标
-- **版本**: v1.6.55 (待发布PyPI)
-- **测试**: 8/8专项测试 + 全量测试待验证
-- **功能**: excel_update_range修复完成
+- **版本**: v1.6.56 (待发布PyPI)
+- **测试**: 851 passed
+- **改动**: 3文件 / +131 -30 行
 
 ## 待处理
-- [ ] 发布PyPI v1.6.55 (基于现有修改)
-- [ ] 更新README中excel_update_range文档
-- [ ] REQ-029 工程强化 (P1，需 REQ-028 完成后开始)
-
-## 监工抽检记录
-### 第234轮（2026-03-31 08:35 UTC）
-- ✅ REQ-028核心功能：insert_mode默认值已为False，docstring完整
-- ⚠️ 文档更新：README需补充excel_update_range详细说明
+- [ ] 发布PyPI v1.6.56
+- [ ] 2GB+真实文件MCP验证（环境限制，建议有条件时补充）

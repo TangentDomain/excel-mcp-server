@@ -8,7 +8,8 @@ import logging
 import csv
 import json
 import os
-from typing import List, Dict, Any, Optional
+import time
+from typing import List, Dict, Any, Optional, Tuple
 from pathlib import Path
 from openpyxl import Workbook, load_workbook
 from openpyxl.utils import get_column_letter
@@ -385,49 +386,98 @@ class ExcelConverter:
             merged_files = 0
             total_sheets = 0
 
+            # 多文件时使用并行读取（>2个文件启用线程池）
+            _use_parallel = len(input_files) > 2
+
+            if _use_parallel:
+                from ..utils.concurrent_utils import parallel_read_files
+
             if merge_mode == "sheets":
-                # 每个文件作为独立工作表
-                for file_index, file_path in enumerate(input_files):
-                    source_workbook = load_workbook(file_path, read_only=True)
+                if _use_parallel:
+                    # 并行读取所有文件数据
+                    def _read_file_data(fp):
+                        wb = load_workbook(fp, read_only=True)
+                        sheets_data = []
+                        for sn in wb.sheetnames:
+                            rows = list(wb[sn].iter_rows(values_only=True))
+                            sheets_data.append((sn, rows))
+                        wb.close()
+                        return sheets_data
 
-                    for sheet_name in source_workbook.sheetnames:
-                        source_sheet = source_workbook[sheet_name]
+                    file_results = parallel_read_files(input_files, _read_file_data)
 
-                        # 创建新工作表名称（避免重复）
-                        new_sheet_name = f"File{file_index+1}_{sheet_name}"
-                        # 如果名称太长，使用缩写形式
-                        if len(new_sheet_name) > 31:  # Excel工作表名称长度限制
-                            new_sheet_name = f"F{file_index+1}_{sheet_name[:20]}"[:31]
+                    for file_index, (file_path, sheets_data) in enumerate(file_results):
+                        if sheets_data is None:
+                            continue
+                        for sheet_name, rows in sheets_data:
+                            new_sheet_name = f"File{file_index+1}_{sheet_name}"
+                            if len(new_sheet_name) > 31:
+                                new_sheet_name = f"F{file_index+1}_{sheet_name[:20]}"[:31]
 
-                        target_sheet = output_workbook.create_sheet(title=new_sheet_name)
+                            target_sheet = output_workbook.create_sheet(title=new_sheet_name)
+                            for row in rows:
+                                target_sheet.append(row)
+                            total_sheets += 1
+                        merged_files += 1
+                else:
+                    # 少量文件：顺序读取（避免线程池开销）
+                    for file_index, file_path in enumerate(input_files):
+                        source_workbook = load_workbook(file_path, read_only=True)
 
-                        # 复制数据
-                        for row in source_sheet.iter_rows(values_only=True):
-                            target_sheet.append(row)
+                        for sheet_name in source_workbook.sheetnames:
+                            source_sheet = source_workbook[sheet_name]
 
-                        total_sheets += 1
+                            new_sheet_name = f"File{file_index+1}_{sheet_name}"
+                            if len(new_sheet_name) > 31:
+                                new_sheet_name = f"F{file_index+1}_{sheet_name[:20]}"[:31]
 
-                    source_workbook.close()
-                    merged_files += 1
+                            target_sheet = output_workbook.create_sheet(title=new_sheet_name)
+
+                            for row in source_sheet.iter_rows(values_only=True):
+                                target_sheet.append(row)
+
+                            total_sheets += 1
+
+                        source_workbook.close()
+                        merged_files += 1
 
             elif merge_mode == "append":
-                # 追加到单个工作表
-                output_sheet = output_workbook.create_sheet(title="合并数据")
+                if _use_parallel:
+                    # 并行读取所有文件的活动工作表数据
+                    def _read_active_sheet(fp):
+                        wb = load_workbook(fp, read_only=True)
+                        rows = list(wb.active.iter_rows(values_only=True))
+                        wb.close()
+                        return rows
 
-                for file_path in input_files:
-                    source_workbook = load_workbook(file_path, read_only=True)
+                    file_results = parallel_read_files(input_files, _read_active_sheet)
+                    output_sheet = output_workbook.create_sheet(title="合并数据")
 
-                    # 使用第一个工作表的数据
-                    source_sheet = source_workbook.active
+                    for file_path, rows in file_results:
+                        if rows is None:
+                            continue
+                        for row in rows:
+                            if any(cell is not None for cell in row):
+                                output_sheet.append(row)
+                        merged_files += 1
+                    total_sheets = 1
+                else:
+                    # 少量文件：顺序读取
+                    output_sheet = output_workbook.create_sheet(title="合并数据")
 
-                    for row in source_sheet.iter_rows(values_only=True):
-                        if any(cell is not None for cell in row):
-                            output_sheet.append(row)
+                    for file_path in input_files:
+                        source_workbook = load_workbook(file_path, read_only=True)
 
-                    source_workbook.close()
-                    merged_files += 1
+                        source_sheet = source_workbook.active
 
-                total_sheets = 1
+                        for row in source_sheet.iter_rows(values_only=True):
+                            if any(cell is not None for cell in row):
+                                output_sheet.append(row)
+
+                        source_workbook.close()
+                        merged_files += 1
+
+                    total_sheets = 1
 
             else:
                 raise DataValidationError(f"不支持的合并模式: {merge_mode}")

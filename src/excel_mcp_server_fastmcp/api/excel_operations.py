@@ -1309,6 +1309,91 @@ class ExcelOperations:
             return cls._format_error_result(error_msg)
 
     @classmethod
+    def batch_delete_rows(
+        cls,
+        file_path: str,
+        sheet_name: str,
+        row_numbers: List[int],
+        streaming: bool = True,
+    ) -> Dict[str, Any]:
+        """批量删除多个行号对应的行，仅一次文件I/O。
+
+        Args:
+            file_path: Excel文件路径
+            sheet_name: 工作表名称
+            row_numbers: 待删除的行号列表（1-based，调用方应确保从大到小排序或使用streaming）
+            streaming: 是否使用流式写入（默认True，推荐）
+
+        Returns:
+            Dict: 标准化的操作结果，包含 deleted_count
+        """
+        if not row_numbers:
+            return {'success': False, 'message': '行号列表为空', 'data': None}
+
+        try:
+            if streaming:
+                from excel_mcp_server_fastmcp.core.streaming_writer import StreamingWriter
+                if StreamingWriter.is_available():
+                    success, message, meta = StreamingWriter.batch_delete_rows(
+                        file_path, sheet_name, row_numbers
+                    )
+                    if success:
+                        return {
+                            'success': True,
+                            'message': message,
+                            'data': meta,
+                            'metadata': {
+                                'file_path': file_path,
+                                'sheet_name': sheet_name,
+                                **meta
+                            }
+                        }
+                    else:
+                        logger.warning(f"流式批量删除行失败，降级到openpyxl: {message}")
+
+            # openpyxl 降级路径：合并相邻行号为连续区间，逐区间删除
+            from excel_mcp_server_fastmcp.core.excel_writer import ExcelWriter
+            writer = ExcelWriter(file_path)
+            sorted_rows = sorted(set(row_numbers))
+
+            # 合并为连续区间以减少操作次数
+            ranges = []
+            start = sorted_rows[0]
+            prev = start
+            for r in sorted_rows[1:]:
+                if r == prev + 1:
+                    prev = r
+                else:
+                    ranges.append((start, prev - start + 1))
+                    start = r
+                    prev = r
+            ranges.append((start, prev - start + 1))
+
+            total_deleted = 0
+            for range_start, range_count in ranges:
+                result = writer.delete_rows(sheet_name, range_start, range_count)
+                if result.success:
+                    total_deleted += range_count
+                else:
+                    logger.warning(f"删除行 {range_start}+{range_count} 失败: {result.message}")
+
+            return {
+                'success': True,
+                'message': f"批量删除了{total_deleted}行（{len(ranges)}个区间）",
+                'data': {'deleted_rows': total_deleted, 'ranges': len(ranges)},
+                'metadata': {
+                    'file_path': file_path,
+                    'sheet_name': sheet_name,
+                    'deleted_rows': total_deleted,
+                }
+            }
+
+        except Exception as e:
+            error_msg = f"批量删除行失败: {str(e)}"
+            logger.error(f"{cls._LOG_PREFIX} {error_msg}")
+            return cls._format_error_result(error_msg)
+
+    @classmethod
     def delete_columns(
         cls,
         file_path: str,

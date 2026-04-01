@@ -516,6 +516,57 @@ class StreamingWriter:
         return cls._copy_modify_write(file_path, sheet_name, _modify, preserve_col_widths)
 
     @classmethod
+    def batch_delete_rows(
+        cls,
+        file_path: str,
+        sheet_name: str,
+        row_numbers: List[int],
+        preserve_col_widths: bool = True,
+    ) -> Tuple[bool, str, Dict[str, Any]]:
+        """流式批量删除多行：一次性删除所有指定行，仅一次文件I/O。
+
+        Args:
+            file_path: Excel文件路径
+            sheet_name: 目标工作表名
+            row_numbers: 待删除的行号列表（1-based，含表头）
+            preserve_col_widths: 是否保留列宽
+
+        Returns:
+            (success, message, metadata)
+        """
+        if not _HAS_CALAMINE:
+            return False, "calamine未安装", {}
+
+        if not row_numbers:
+            return False, "行号列表为空", {}
+
+        unique_rows = sorted(set(row_numbers))
+        if unique_rows[0] < 1:
+            return False, f"行号必须>=1，实际最小值: {unique_rows[0]}", {}
+
+        def _modify(rows, header_row, col_map):
+            if unique_rows[-1] > len(rows):
+                return False, (
+                    f"行号({unique_rows[-1]})超过工作表总行数({len(rows)})"
+                ), rows, {}
+            # 构建 0-based 索引集合，高效过滤
+            del_indices = {r - 1 for r in unique_rows}
+            new_rows = [
+                row for idx, row in enumerate(rows) if idx not in del_indices
+            ]
+            return True, (
+                f"流式批量删除{len(unique_rows)}行"
+                f"（{len(rows)}→{len(new_rows)}行）"
+            ), new_rows, {
+                'action': 'batch_delete_rows_streaming',
+                'deleted_count': len(unique_rows),
+                'original_rows': len(rows),
+                'new_rows': len(new_rows),
+            }
+
+        return cls._copy_modify_write(file_path, sheet_name, _modify, preserve_col_widths)
+
+    @classmethod
     def delete_columns(
         cls,
         file_path: str,
