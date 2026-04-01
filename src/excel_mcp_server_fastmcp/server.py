@@ -2065,10 +2065,13 @@ def excel_batch_insert_rows(
                         sql_row = qdata[1]
                         if isinstance(sql_row, (list, tuple)):
                             row_dict = dict(zip(sql_headers, sql_row))
-                            for idx, df_row in df.iterrows():
+                            col_names = list(df.columns)
+                            for row_tuple in df.itertuples(index=True, name=None):
+                                idx = row_tuple[0]
+                                row_vals = dict(zip(col_names, row_tuple[1:]))
                                 match = True
                                 for col, val in row_dict.items():
-                                    if col in df.columns and str(df_row.get(col, '')) != str(val):
+                                    if col in col_names and str(row_vals.get(col, '')) != str(val):
                                         match = False
                                         break
                                 if match:
@@ -2171,10 +2174,13 @@ def excel_delete_rows(
                         continue
                     row_dict = dict(zip(sql_headers, sql_row))
                     # 在df中找到匹配的行
-                    for idx, df_row in df.iterrows():
+                    col_names = list(df.columns)
+                    for row_tuple in df.itertuples(index=True, name=None):
+                        idx = row_tuple[0]
+                        row_vals = dict(zip(col_names, row_tuple[1:]))
                         match = True
                         for col, val in row_dict.items():
-                            if col in df.columns and str(df_row.get(col, '')) != str(val):
+                            if col in col_names and str(row_vals.get(col, '')) != str(val):
                                 match = False
                                 break
                         if match:
@@ -3619,7 +3625,8 @@ def excel_create_pivot_table(file_path: str, sheet_name: str, data_range: str,
         
         # 写入行索引和数据
         row_idx += 1
-        for index, row_data in pivot_df.iterrows():
+        for row_tuple in pivot_df.itertuples(index=True, name=None):
+            index = row_tuple[0]
             if isinstance(index, tuple):
                 # 多级行索引
                 for i, idx_val in enumerate(index):
@@ -3627,12 +3634,13 @@ def excel_create_pivot_table(file_path: str, sheet_name: str, data_range: str,
             else:
                 # 单级行索引
                 pivot_ws[f"{get_column_letter(min_col)}{row_idx}"] = str(index)
-            
+
             # 写入数据值
-            for col_idx, (col_name, value) in enumerate(row_data.items()):
+            values = row_tuple[1:]
+            for col_idx, value in enumerate(values):
                 value_col = min_col + len(pivot_df.columns.get_level_values(0).unique()) + col_idx
                 pivot_ws[f"{get_column_letter(value_col)}{row_idx}"] = float(value) if pd.notna(value) else 0
-            
+
             row_idx += 1
         
         # 添加说明信息
