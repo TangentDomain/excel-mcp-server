@@ -61,6 +61,14 @@
       "source": "边缘案例测试",
       "description": "当Excel列名含空格（如\"Player Name\"），_clean_column_names()将空格替换为下划线（Player_Name），但SQL中SELECT \"Player Name\"无法匹配清洗后的列名，导致返回列头字符串代替实际值。",
       "notes": "第245轮修复：新增_preprocess_quoted_identifiers方法，在SQL解析前将双引号引用的原始列名替换为清洗后的列名"
+    },
+    "REQ-042": {
+      "title": "BUG：_preprocess_quoted_identifiers未处理SQL转义引号",
+      "priority": "P2",
+      "status": "OPEN",
+      "source": "自审",
+      "description": "_preprocess_quoted_identifiers使用简单的字符串替换处理双引号列名，如果SQL中包含转义引号（如\"col\\\"name\"\"），可能导致错误替换。",
+      "notes": "涉及advanced_sql_query.py的_preprocess_quoted_identifiers方法"
     }
   }
 }
