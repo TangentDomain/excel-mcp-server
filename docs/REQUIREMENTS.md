@@ -72,7 +72,7 @@
     },
     "REQ-030": {
       "title": "API参数命名与常见术语对齐",
-      "status": "DONE",
+      "status": "OPEN",
       "priority": "P2",
       "acceptance_criteria": [
         "create_chart 的 chart_type 支持 'column' 作为 'bar' 的别名",
