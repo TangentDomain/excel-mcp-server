@@ -2003,25 +2003,22 @@ def excel_delete_rows(
                 return _ok(f"条件 '{condition}' 未匹配到任何行",
                            data={'deleted_rows': 0, 'condition': condition})
 
-            row_numbers.sort(reverse=True)  # 从后往前删除
-            total_deleted = 0
-
-            for row_num in row_numbers:
-                result = ExcelOperations.delete_rows(file_path, sheet_name, row_num, 1, streaming)
-                if result.get('success', False):
-                    deleted = result.get('data', {}).get('deleted_rows', result.get('metadata', {}).get('deleted_rows', 1))
-                    total_deleted += deleted
-                else:
-                    logger.warning(f"删除行{row_num}失败: {result.get('message', '')}")
+            # 使用批量删除（一次文件I/O代替N次）- REQ-032 多线程优化
+            result = ExcelOperations.batch_delete_rows(file_path, sheet_name, row_numbers, streaming)
+            total_deleted = result.get('data', {}).get('deleted_rows', result.get('metadata', {}).get('deleted_rows', 0))
 
             operation_logger.log_operation("operation_result", {
-                "success": True,
+                "success": result.get('success', False),
                 "deleted_rows": total_deleted,
-                "message": f"按条件删除完成"
+                "message": f"按条件批量删除完成"
             })
 
-            return _ok(f"按条件 '{condition}' 删除了 {total_deleted} 行",
-                       data={'deleted_rows': total_deleted, 'condition': condition})
+            if result.get('success', False):
+                return _ok(f"按条件 '{condition}' 删除了 {total_deleted} 行",
+                           data={'deleted_rows': total_deleted, 'condition': condition})
+            else:
+                return _fail(f"按条件删除失败: {result.get('message', '')}",
+                             meta={"error_code": "BATCH_DELETE_FAILED"})
 
         except Exception as e:
             operation_logger.log_operation("operation_error", {
@@ -2898,20 +2895,45 @@ def excel_batch_update_ranges(file_path: str, updates: List[Dict[str, Any]]) -> 
     try:
         from openpyxl import load_workbook
         from openpyxl.utils import range_boundaries
-        
+
         results = []
         success_count = 0
         error_count = 0
-        
+
+        # 大批量并行预验证（>10个更新项时启用）- REQ-032
+        if len(updates) > 10:
+            from ..utils.concurrent_utils import parallel_validate_batch_data
+
+            def _validate_update(update):
+                range_spec = update.get('range', '')
+                data = update.get('data', [])
+                if not range_spec or not data:
+                    return '缺少range或data参数'
+                try:
+                    range_boundaries(range_spec)
+                except Exception as e:
+                    return f'范围格式无效: {e}'
+                return None
+
+            errors = parallel_validate_batch_data(updates, _validate_update)
+            for i, err in enumerate(errors):
+                if err:
+                    results.append({'index': i, 'success': False, 'error': err})
+                    error_count += 1
+
         # 加载工作簿
         wb = load_workbook(file_path, data_only=False)
-        
+
         for i, update in enumerate(updates):
+            # 跳过已预验证失败的项
+            if any(r['index'] == i and not r['success'] for r in results):
+                continue
+
             try:
                 range_spec = update.get('range', '')
                 data = update.get('data', [])
                 sheet_name = update.get('sheet', None)
-                
+
                 if not range_spec or not data:
                     results.append({
                         'index': i,
@@ -2920,7 +2942,7 @@ def excel_batch_update_ranges(file_path: str, updates: List[Dict[str, Any]]) -> 
                     })
                     error_count += 1
                     continue
-                
+
                 # 获取工作表
                 if sheet_name:
                     if sheet_name not in wb.sheetnames:
@@ -2934,19 +2956,19 @@ def excel_batch_update_ranges(file_path: str, updates: List[Dict[str, Any]]) -> 
                     ws = wb[sheet_name]
                 else:
                     ws = wb.active
-                
+
                 # 解析范围并更新数据
                 min_col, min_row, max_col, max_row = range_boundaries(range_spec)
-                
+
                 # 写入数据
                 for row_idx, row_data in enumerate(data):
                     for col_idx, cell_value in enumerate(row_data):
                         target_row = min_row + row_idx
                         target_col = min_col + col_idx
-                        
+
                         if target_row <= max_row and target_col <= max_col:
                             ws.cell(row=target_row, column=target_col, value=cell_value)
-                
+
                 results.append({
                     'index': i,
                     'success': True,
@@ -2954,7 +2976,7 @@ def excel_batch_update_ranges(file_path: str, updates: List[Dict[str, Any]]) -> 
                     'sheet': sheet_name or 'active'
                 })
                 success_count += 1
-                
+
             except Exception as e:
                 results.append({
                     'index': i,
@@ -2962,17 +2984,17 @@ def excel_batch_update_ranges(file_path: str, updates: List[Dict[str, Any]]) -> 
                     'error': str(e)
                 })
                 error_count += 1
-        
+
         # 保存文件
         wb.save(file_path)
-        
+
         return _ok(f"批量更新完成：成功{success_count}个区域，失败{error_count}个区域", data={
             'total_updates': len(updates),
             'success_count': success_count,
             'error_count': error_count,
             'results': results
         })
-        
+
     except Exception as e:
         return _fail("批量更新失败", meta={"error_code": "OPERATION_FAILED"})
 

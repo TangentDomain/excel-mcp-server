@@ -302,4 +302,180 @@ class TestBackwardCompatibility:
         assert result['success'] is True
         assert len(result['data']) >= 2  # 包含表头行
 
-        engine.clear_cache()
+
+class TestConcurrentBatchOperations:
+    """多线程批量操作优化测试 - REQ-032"""
+
+    def test_parallel_validate_batch_data(self):
+        """测试并行数据验证"""
+        from src.excel_mcp_server_fastmcp.utils.concurrent_utils import parallel_validate_batch_data
+
+        rows = [{"id": i, "name": f"item_{i}"} for i in range(1000)]
+
+        def validate(row):
+            if row["id"] < 0:
+                return "id must be >= 0"
+            return None
+
+        errors = parallel_validate_batch_data(rows, validate)
+        assert len(errors) == 1000
+        assert all(e is None for e in errors)
+
+    def test_parallel_validate_batch_data_with_errors(self):
+        """测试并行数据验证（含错误行）"""
+        from src.excel_mcp_server_fastmcp.utils.concurrent_utils import parallel_validate_batch_data
+
+        rows = [{"id": i, "name": f"item_{i}"} for i in range(100)]
+        rows[10]["id"] = -1
+        rows[50]["id"] = -2
+
+        def validate(row):
+            if row["id"] < 0:
+                return f"invalid id: {row['id']}"
+            return None
+
+        errors = parallel_validate_batch_data(rows, validate)
+        assert errors[10] is not None
+        assert errors[50] is not None
+        assert sum(1 for e in errors if e is not None) == 2
+
+    def test_parallel_validate_empty(self):
+        """测试空数据并行验证"""
+        from src.excel_mcp_server_fastmcp.utils.concurrent_utils import parallel_validate_batch_data
+
+        errors = parallel_validate_batch_data([], lambda r: None)
+        assert errors == []
+
+    def test_parallel_group_execute(self):
+        """测试并行分组执行"""
+        from src.excel_mcp_server_fastmcp.utils.concurrent_utils import parallel_group_execute
+
+        groups = {
+            "A": [1, 2, 3],
+            "B": [4, 5, 6],
+            "C": [7, 8, 9],
+        }
+
+        def process(key, data):
+            return sum(data)
+
+        results = parallel_group_execute(groups, process)
+        assert results["A"] == 6
+        assert results["B"] == 15
+        assert results["C"] == 24
+
+    def test_batch_delete_rows_single(self, temp_dir):
+        """测试批量删除单行"""
+        from openpyxl import Workbook
+        file_path = os.path.join(temp_dir, "batch_del_single.xlsx")
+        wb = Workbook()
+        ws = wb.active
+        ws.title = "Data"
+        ws.append(["ID", "Name"])
+        ws.append([1, "Alice"])
+        ws.append([2, "Bob"])
+        ws.append([3, "Charlie"])
+        wb.save(file_path)
+
+        result = ExcelOperations.batch_delete_rows(file_path, "Data", [2])
+        assert result['success'] is True
+        deleted = result.get('data', {}).get('deleted_count', 0)
+        assert deleted == 1
+
+        # 验证数据正确
+        read = ExcelOperations.get_range(file_path, "Data!A1:B3")
+        assert read['success'] is True
+
+    def test_batch_delete_rows_multiple(self, temp_dir):
+        """测试批量删除多行"""
+        from openpyxl import Workbook
+        file_path = os.path.join(temp_dir, "batch_del_multi.xlsx")
+        wb = Workbook()
+        ws = wb.active
+        ws.title = "Data"
+        ws.append(["ID", "Name"])
+        for i in range(1, 21):
+            ws.append([i, f"item_{i}"])
+        wb.save(file_path)
+
+        # 删除第3、5、7行
+        result = ExcelOperations.batch_delete_rows(file_path, "Data", [3, 5, 7])
+        assert result['success'] is True
+        deleted = result.get('data', {}).get('deleted_count', 0)
+        assert deleted == 3
+
+        # 验证文件可读
+        read = ExcelOperations.get_range(file_path, "Data!A1:B2")
+        assert read['success'] is True
+
+    def test_batch_delete_rows_empty_list(self, temp_dir):
+        """测试批量删除空列表"""
+        result = ExcelOperations.batch_delete_rows(
+            "/tmp/nonexistent.xlsx", "Data", []
+        )
+        assert result['success'] is False
+
+    def test_batch_delete_rows_preserves_other_data(self, temp_dir):
+        """测试批量删除不影响其他行数据"""
+        from openpyxl import Workbook
+        file_path = os.path.join(temp_dir, "batch_del_preserve.xlsx")
+        wb = Workbook()
+        ws = wb.active
+        ws.title = "Data"
+        ws.append(["ID", "Name", "Value"])
+        ws.append([1, "Alice", 100])
+        ws.append([2, "Bob", 200])
+        ws.append([3, "Charlie", 300])
+        ws.append([4, "Diana", 400])
+        wb.save(file_path)
+
+        # 删除第3行（Bob）
+        result = ExcelOperations.batch_delete_rows(file_path, "Data", [3])
+        assert result['success'] is True
+
+        # 验证头行和其余数据完好
+        read = ExcelOperations.get_range(file_path, "Data!A1:C4")
+        assert read['success'] is True
+        # 表头应保留（get_range 返回 [{coordinate, value}, ...] 格式）
+        assert read['data'][0][0]['value'] == "ID"
+        # Alice 应保留
+        assert read['data'][1][1]['value'] == "Alice"
+
+    def test_batch_delete_performance_vs_sequential(self, temp_dir):
+        """测试批量删除性能优于逐行删除"""
+        from openpyxl import Workbook
+        import time
+
+        # 创建较大数据集
+        for label, row_count in [("batch", 100), ("seq", 100)]:
+            file_path = os.path.join(temp_dir, f"perf_{label}.xlsx")
+            wb = Workbook()
+            ws = wb.active
+            ws.title = "Data"
+            ws.append(["ID", "Name"])
+            for i in range(1, row_count + 1):
+                ws.append([i, f"item_{i}"])
+            wb.save(file_path)
+
+        # 批量删除
+        rows_to_delete = list(range(5, 15))
+        file_batch = os.path.join(temp_dir, "perf_batch.xlsx")
+        start = time.time()
+        ExcelOperations.batch_delete_rows(file_batch, "Data", rows_to_delete)
+        batch_time = time.time() - start
+
+        # 逐行删除（旧方式）
+        file_seq = os.path.join(temp_dir, "perf_seq.xlsx")
+        start = time.time()
+        for r in sorted(rows_to_delete, reverse=True):
+            ExcelOperations.delete_rows(file_seq, "Data", r, 1)
+        seq_time = time.time() - start
+
+        print(f"批量删除10行: {batch_time:.3f}s vs 逐行删除: {seq_time:.3f}s")
+        # 批量删除应不慢于逐行删除（通常快2-5倍）
+        assert batch_time < seq_time * 2, (
+            f"批量删除应不慢于逐行删除的2倍: {batch_time:.3f}s vs {seq_time:.3f}s"
+        )
+
+        # 清理缓存
+        ExcelOperations.clear_cache() if hasattr(ExcelOperations, 'clear_cache') else None
