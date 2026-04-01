@@ -2967,15 +2967,8 @@ class AdvancedSQLQueryEngine:
             raise ValueError(f"不支持的表达式类型: {type(expr)}")
 
     def _apply_row_filter(self, condition: exp.Expression, df: pd.DataFrame) -> pd.DataFrame:
-        """逐行应用过滤条件（备用方案）"""
-        mask = []
-
-        for _, row in df.iterrows():
-            if self._evaluate_condition_for_row(condition, row):
-                mask.append(True)
-            else:
-                mask.append(False)
-
+        """逐行应用过滤条件（备用方案），使用apply替代iterrows提升性能"""
+        mask = df.apply(lambda row: self._evaluate_condition_for_row(condition, row), axis=1)
         return df[mask]
 
     def _evaluate_condition_for_row(self, condition: exp.Expression, row: pd.Series) -> bool:
@@ -3777,7 +3770,7 @@ class AdvancedSQLQueryEngine:
         if include_headers:
             data.append(list(result_df.columns))
         if not result_df.empty:
-            for _, row in result_df.iterrows():
+            for row in result_df.itertuples(index=False, name=None):
                 data.append([self._serialize_value(val) for val in row])
 
         # 大结果自动截断：保护AI上下文窗口（MAX_RESULT_ROWS=500）
