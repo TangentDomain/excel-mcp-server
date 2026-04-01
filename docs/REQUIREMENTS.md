@@ -123,7 +123,7 @@
         "稳定性：优化后必须通过所有测试",
         "内存安全：不能因优化导致内存泄漏"
       ],
-      "notes": "来源：用户反馈和监控数据。\n\n完成情况（2026-04-01 第一轮）：\n✅ 性能基准测试脚本 scripts/performance-benchmark.py\n✅ 文件大小检测 + 大文件优化读取（>50MB自动切换）\n✅ 7个新测试通过，全量842 passed\n⏳ 待做：2GB+真实文件验证、并发处理、缓存增强"
+      "notes": "来源：用户反馈和监控数据。\n\n完成情况（2026-04-01 第二轮）：\n✅ 性能基准测试脚本 scripts/performance-benchmark.py\n  - dtype优化对比 + SQL查询基准\n✅ 文件大小检测 + 大文件优化读取（>50MB自动切换）\n✅ DataFrame dtype 优化（int/float降级，低基数string→category）\n✅ 缓存增强（df_cache 10→20, query_cache 5→15, 内存感知淘汰）\n✅ 文件大小限制 100MB→2GB\n✅ 14个新测试通过，全量839 passed，无回归\n⏳ 待做：2GB+真实文件MCP验证、多线程批量操作优化"
     }
   }
 }
