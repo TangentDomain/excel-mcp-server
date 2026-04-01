@@ -136,3 +136,5 @@ runs/
 runs/latest
 .pypi-token
 .claude-task.md
+.claude-verify.md
+.claude-progress.md
