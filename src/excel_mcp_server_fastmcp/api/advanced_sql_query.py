@@ -525,6 +525,8 @@ class AdvancedSQLQueryEngine:
             file_mtime = os.path.getmtime(file_path)
             
             # 加载Excel数据（带缓存）
+            # 重置列名映射（每次查询重新构建）
+            self._original_to_clean_cols = {}
             worksheets_data = self._load_data_with_cache(file_path, sheet_name)
 
             if not worksheets_data:
@@ -572,6 +574,10 @@ class AdvancedSQLQueryEngine:
             # 解析和执行SQL
             _query_start = time.time()
             try:
+                # 预处理：将双引号引用的原始列名替换为清洗后的列名
+                # 解决用户写 SELECT "Player Name" 但内部列名已变为 Player_Name 的问题
+                sql = self._preprocess_quoted_identifiers(sql)
+
                 parsed_sql = sqlglot.parse_one(sql, dialect="mysql")
 
                 # 验证SQL支持范围
@@ -996,10 +1002,47 @@ class AdvancedSQLQueryEngine:
 
         df = df.rename(columns=clean_columns)
 
+        # 保存原始列名到清洗后列名的映射，用于SQL预处理
+        if not hasattr(self, '_original_to_clean_cols') or self._original_to_clean_cols is None:
+            self._original_to_clean_cols = {}
+        self._original_to_clean_cols.update(clean_columns)
+
         # 保持原始数据不做空值替换
         # pandas groupby 默认跳过 NaN 行，不需要手动处理
 
         return df
+
+    def _preprocess_quoted_identifiers(self, sql: str) -> str:
+        """
+        预处理SQL中的双引号标识符，将原始列名替换为清洗后的列名
+
+        当Excel列名含空格或特殊字符时（如"Player Name"），_clean_column_names会将其
+        转换为下划线形式（Player_Name）。用户在SQL中使用双引号引用原始列名时，
+        sqlglot会将其解析为字面量而非列引用。此方法在SQL解析前将双引号引用的
+        原始列名替换为清洗后的列名，确保正确匹配。
+
+        Args:
+            sql: 原始SQL查询语句
+
+        Returns:
+            str: 预处理后的SQL语句
+        """
+        col_map = getattr(self, '_original_to_clean_cols', None)
+        if not col_map:
+            return sql
+
+        # 只处理原始名与清洗名不同的列（即含空格或特殊字符的列名）
+        changed_cols = {orig: clean for orig, clean in col_map.items() if orig != clean}
+        if not changed_cols:
+            return sql
+
+        # 按名称长度降序排列，优先匹配更长的名称（避免部分匹配）
+        for orig_name in sorted(changed_cols.keys(), key=len, reverse=True):
+            clean_name = changed_cols[orig_name]
+            # 替换双引号引用的原始列名为反引号引用的清洗列名
+            sql = sql.replace(f'"{orig_name}"', f'`{clean_name}`')
+
+        return sql
 
     def _optimize_dtypes(self, df: pd.DataFrame) -> pd.DataFrame:
         """
