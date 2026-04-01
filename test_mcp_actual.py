@@ -73,7 +73,7 @@ def test_mcp_tools():
         # Test 5: write_data_to_excel data format
         print("\n=== Test 5: write_data_to_excel data format ===")
         data = json.dumps([["Name", "Age"], ["Alice", "25"]])
-        cmd = f"echo '{{\"jsonrpc\":\"2.0\",\"id\":5,\"method\":\"tools/call\",\"params\":{{\"name\":\"write_data_to_excel\",\"arguments\":{{\"file_path\":\"{test_file}\",\"sheet_name\":\"Sheet1\",\"start_cell\":\"A1\",\"data\":{data}}}}}}}}' | nc localhost 8000"
+        cmd = f"echo '{{\"jsonrpc\":\"2.0\",\"id\":5,\"method\":\"tools/call\",\"params\":{{\"name\":\"write_data_to_excel\",\"arguments\":{{\"file_path\":\"{test_file}\",\"sheet_name\":\"Sheet1\",\"start_cell\":\"A1\",\"data\":{data}}}}}}}' | nc localhost 8000"
         print(f"Command: {cmd}")
         
         print("\nNote: These are the MCP tool calls that would reproduce the issues.")

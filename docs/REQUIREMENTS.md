@@ -88,7 +88,7 @@
     },
     "REQ-031": {
       "title": "修复测试文件语法错误",
-      "status": "OPEN",
+      "status": "DONE",
       "priority": "P1",
       "acceptance_criteria": [
         "test_mcp_actual.py 第76行 f-string 嵌套大括号转义修复",
