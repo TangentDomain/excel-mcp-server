@@ -57,10 +57,10 @@
     "REQ-041": {
       "title": "BUG：SQL含空格列名返回列头字符串而非实际值",
       "priority": "P1",
-      "status": "OPEN",
+      "status": "DONE",
       "source": "边缘案例测试",
       "description": "当Excel列名含空格（如\"Player Name\"），_clean_column_names()将空格替换为下划线（Player_Name），但SQL中SELECT \"Player Name\"无法匹配清洗后的列名，导致返回列头字符串代替实际值。",
-      "notes": "涉及advanced_sql_query.py:987，需维护原始列名到清洗列名的映射"
+      "notes": "第245轮修复：新增_preprocess_quoted_identifiers方法，在SQL解析前将双引号引用的原始列名替换为清洗后的列名"
     }
   }
 }
