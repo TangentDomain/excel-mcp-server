@@ -71,10 +71,45 @@
         "脚本执行时间<3秒，不影响正常开发流程",
         "通过所有现有测试，无回归"
       ],
-      "estimated_workload": "中等（约20分钟）",
+      "estimated_workload": "中（约20分钟）",
       "assignee": "self-evolution-agent",
       "created_at": "2026-03-28 16:00 UTC",
       "notes": "基于自我进化建议，解决版本同步依赖手动操作的问题"
+    },
+    "REQ-028": {
+      "title": "excel_update_range insert_mode 默认值改为 false",
+      "status": "DONE",
+      "priority": "P0",
+      "description": "excel_update_range 的 insert_mode 默认为 true，导致写入已有数据文件时会物理插入新行",
+      "archived_at": "2026-04-01"
+    },
+    "REQ-029": {
+      "title": "工程强化：约束可机器验证",
+      "status": "DONE",
+      "priority": "P1",
+      "description": "将靠LLM自觉遵守的规则升级为靠脚本验证的规则",
+      "archived_at": "2026-04-01"
+    },
+    "REQ-030": {
+      "title": "API参数命名与常见术语对齐",
+      "status": "DONE",
+      "priority": "P2",
+      "description": "create_chart的chart_type支持column别名，create_pivot_table的agg_func支持mean别名",
+      "archived_at": "2026-04-01"
+    },
+    "REQ-031_v2": {
+      "title": "修复测试文件语法错误",
+      "status": "DONE",
+      "priority": "P1",
+      "description": "test_mcp_actual.py和test_api_issues.py语法错误修复",
+      "archived_at": "2026-04-01"
+    },
+    "REQ-032": {
+      "title": "性能优化：大型Excel文件处理提速（2GB+）",
+      "status": "DONE",
+      "priority": "P1",
+      "description": "处理大型Excel文件（2GB+）时遇到性能瓶颈，优化内存使用和数据处理速度",
+      "archived_at": "2026-04-01"
     }
   }
 }

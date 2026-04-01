@@ -1127,6 +1127,11 @@ class AdvancedSQLQueryEngine:
 
         # 保护单引号字符串
         def protect_string(match):
+            """保护字符串字面量不被替换。
+
+            Args:
+                match: 正则匹配对象
+            """
             string_literals.append(match.group(0))
             return f'__PROTECTED_STR_{len(string_literals) - 1}__'
 
@@ -1730,6 +1735,11 @@ class AdvancedSQLQueryEngine:
             grouped = None  # 全表作为一个分区
 
         def assign_row_number(group):
+            """为分组内的行分配行号。
+
+            Args:
+                group: pandas分组对象
+            """
             if order_cols:
                 sorted_group = group.sort_values(order_cols, ascending=ascending)
                 result = pd.Series(range(1, len(sorted_group) + 1), index=sorted_group.index, dtype=int)
@@ -1759,6 +1769,11 @@ class AdvancedSQLQueryEngine:
             grouped = None
 
         def assign_rank(group):
+            """为分组内的行分配排名。
+
+            Args:
+                group: pandas分组对象
+            """
             sorted_group = group.sort_values(order_cols, ascending=ascending)
             # 使用pandas rank(method='first')模拟RANK行为
             # RANK: 相同值取相同排名，下一个排名跳过
@@ -1787,6 +1802,11 @@ class AdvancedSQLQueryEngine:
             grouped = None
 
         def assign_dense_rank(group):
+            """为分组内的行分配密集排名。
+
+            Args:
+                group: pandas分组对象
+            """
             sorted_group = group.sort_values(order_cols, ascending=ascending)
             # DENSE_RANK: 相同值取相同排名，下一个排名连续
             rank_series = sorted_group[order_cols[0]].rank(method='dense', ascending=ascending[0])
@@ -2627,6 +2647,14 @@ class AdvancedSQLQueryEngine:
             raise ValueError(f"JOIN ON条件格式不支持，请使用等值连接: ON a.id = b.id")
 
         def resolve_column(col_expr) -> str:
+            """解析列表达式，返回列名和表名。
+
+            Args:
+                col_expr: SQLGlot列表达式
+
+            Returns:
+                tuple: (列名, 表名或None)
+            """
             if isinstance(col_expr, exp.Column):
                 col_name = col_expr.name
                 # 检查是否有表限定符
@@ -4100,7 +4128,13 @@ class AdvancedSQLQueryEngine:
                     # change['row']: 1-based的Excel行号（execute_update_query中 int(idx)+2）
                     
                     def modify_fn(rows, header_row, col_map):
-                        """修改函数：应用UPDATE变更到行数据"""
+                        """修改函数：应用UPDATE变更到行数据
+
+                        Args:
+                            rows: 行数据列表
+                            header_row: 表头行
+                            col_map: 列名到列索引的映射
+                        """
                         modified_rows = [row[:] for row in rows]  # 深拷贝
                         
                         for change in changes:

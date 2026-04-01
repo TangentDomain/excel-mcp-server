@@ -760,7 +760,11 @@ def _infer_error_code(message: str) -> str:
 @mcp.tool()
 @_track_call
 def excel_list_sheets(file_path: str) -> Dict[str, Any]:
-    """列出Excel文件中的所有工作表名称。查询前先用此工具确认工作表存在。"""
+    """列出Excel文件中的所有工作表名称。查询前先用此工具确认工作表存在。
+
+    Args:
+        file_path: Excel文件路径
+    """
     _path_err = _validate_path(file_path)
     if _path_err:
         return _path_err
@@ -780,7 +784,19 @@ def excel_search(
     include_formulas: bool = False,
     range: Optional[str] = None
 ) -> Dict[str, Any]:
-    """在Excel中搜索匹配pattern的单元格。支持正则、大小写、全词匹配。"""
+    """在Excel中搜索匹配pattern的单元格。支持正则、大小写、全词匹配。
+
+    Args:
+        file_path: Excel文件路径
+        pattern: 搜索模式
+        sheet_name: 工作表名称，默认为None
+        case_sensitive: 是否区分大小写，默认为False
+        whole_word: 是否全词匹配，默认为False
+        use_regex: 是否使用正则表达式，默认为False
+        include_values: 是否包含单元格值，默认为True
+        include_formulas: 是否包含公式，默认为False
+        range: 搜索范围，默认为None
+    """
     _path_err = _validate_path(file_path)
     if _path_err:
         return _path_err
@@ -802,7 +818,21 @@ def excel_search_directory(
     file_pattern: Optional[str] = None,
     max_files: int = 100
 ) -> Dict[str, Any]:
-    """在目录下所有Excel文件中搜索内容。支持文件类型过滤和递归搜索。"""
+    """在目录下所有Excel文件中搜索内容。支持文件类型过滤和递归搜索。
+
+    Args:
+        directory_path: 搜索目录路径
+        pattern: 搜索模式
+        case_sensitive: 是否区分大小写，默认为False
+        whole_word: 是否全词匹配，默认为False
+        use_regex: 是否使用正则表达式，默认为False
+        include_values: 是否包含单元格值，默认为True
+        include_formulas: 是否包含公式，默认为False
+        recursive: 是否递归搜索子目录，默认为True
+        file_extensions: 文件扩展名过滤列表，默认为None
+        file_pattern: 文件名模式匹配，默认为None
+        max_files: 最大搜索文件数，默认为100
+    """
     _path_err = _validate_path(directory_path)
     if _path_err:
         return _path_err
@@ -978,7 +1008,14 @@ def excel_get_headers(
     header_row: int = 1,
     max_columns: Optional[int] = None
 ) -> Dict[str, Any]:
-    """提取工作表表头信息。支持双行表头（中文描述+英文字段名）。不传sheet_name获取所有表的表头。"""
+    """提取工作表表头信息。支持双行表头（中文描述+英文字段名）。不传sheet_name获取所有表的表头。
+
+    Args:
+        file_path: Excel文件路径
+        sheet_name: 工作表名称，默认为None表示获取所有表的表头
+        header_row: 表头行号，默认为1
+        max_columns: 最大列数限制，默认为None
+    """
     _path_err = _validate_path(file_path)
     if _path_err:
         return _path_err
@@ -1121,7 +1158,15 @@ def excel_assess_data_impact(
     data: Optional[List[List[Any]]] = None,
     detailed: bool = True
 ) -> Dict[str, Any]:
-    """评估修改操作的影响范围。返回受影响行数、关键值变化等，修改前必用。"""
+    """评估修改操作的影响范围。返回受影响行数、关键值变化等，修改前必用。
+
+    Args:
+        file_path: Excel文件路径
+        range: 单元格范围
+        operation_type: 操作类型，默认为"update"
+        data: 要写入的数据，默认为None
+        detailed: 是否返回详细信息，默认为True
+    """
     _path_err = _validate_path(file_path)
     if _path_err:
         return _path_err
@@ -1431,7 +1476,12 @@ def excel_get_operation_history(
     file_path: Optional[str] = None,
     limit: int = 20
 ) -> Dict[str, Any]:
-    """查看最近的Excel操作记录。可按文件过滤。"""
+    """查看最近的Excel操作记录。可按文件过滤。
+
+    Args:
+        file_path: 文件路径，默认为None表示不过滤
+        limit: 返回的最大记录数，默认为20
+    """
     if file_path is not None:
         _path_err = _validate_path(file_path)
         if _path_err:
@@ -1473,7 +1523,12 @@ def excel_create_backup(
     file_path: str,
     backup_dir: Optional[str] = None
 ) -> Dict[str, Any]:
-    """为Excel文件创建备份。备份存放在同级backup目录。"""
+    """为Excel文件创建备份。备份存放在同级backup目录。
+
+    Args:
+        file_path: Excel文件路径
+        backup_dir: 备份目录路径，默认为None表示同级backup目录
+    """
     _path_err = _validate_path(file_path)
     if _path_err:
         return _path_err
@@ -1514,7 +1569,12 @@ def excel_restore_backup(
     backup_path: str,
     target_path: Optional[str] = None
 ) -> Dict[str, Any]:
-    """从备份文件恢复Excel。target_path不传则覆盖原文件。"""
+    """从备份文件恢复Excel。target_path不传则覆盖原文件。
+
+    Args:
+        backup_path: 备份文件路径
+        target_path: 目标文件路径，默认为None表示覆盖原文件
+    """
     _path_err = _validate_path(backup_path)
     if _path_err:
         return _path_err
@@ -1557,7 +1617,12 @@ def excel_list_backups(
     file_path: str,
     backup_dir: Optional[str] = None
 ) -> Dict[str, Any]:
-    """列出文件的所有备份版本及时间。"""
+    """列出文件的所有备份版本及时间。
+
+    Args:
+        file_path: Excel文件路径
+        backup_dir: 备份目录路径，默认为None
+    """
     _path_err = _validate_path(file_path)
     if _path_err:
         return _path_err
@@ -1607,7 +1672,15 @@ def excel_insert_rows(
     count: int = 1,
     streaming: bool = True
 ) -> Dict[str, Any]:
-    """在指定位置插入空行。row_index从0开始。"""
+    """在指定位置插入空行。row_index从0开始。
+
+    Args:
+        file_path: Excel文件路径
+        sheet_name: 工作表名称
+        row_index: 插入位置的行索引（从0开始）
+        count: 插入的行数，默认为1
+        streaming: 是否使用流式写入，默认为True
+    """
     _path_err = _validate_path(file_path)
     if _path_err:
         return _path_err
@@ -1623,7 +1696,15 @@ def excel_insert_columns(
     count: int = 1,
     streaming: bool = True
 ) -> Dict[str, Any]:
-    """在指定位置插入空列。column_index从1开始。"""
+    """在指定位置插入空列。column_index从1开始。
+
+    Args:
+        file_path: Excel文件路径
+        sheet_name: 工作表名称
+        column_index: 插入位置的列索引（从1开始）
+        count: 插入的列数，默认为1
+        streaming: 是否使用流式写入，默认为True
+    """
     _path_err = _validate_path(file_path)
     if _path_err:
         return _path_err
@@ -1637,7 +1718,13 @@ def excel_find_last_row(
     sheet_name: str,
     column: Optional[Union[str, int]] = None
 ) -> Dict[str, Any]:
-    """查找工作表最后一行。可指定列来找该列最后一个有值的行。追加数据前必用。"""
+    """查找工作表最后一行。可指定列来找该列最后一个有值的行。追加数据前必用。
+
+    Args:
+        file_path: Excel文件路径
+        sheet_name: 工作表名称
+        column: 列名或列索引，默认为None
+    """
     _path_err = _validate_path(file_path)
     if _path_err:
         return _path_err
@@ -1650,7 +1737,12 @@ def excel_create_file(
     file_path: str,
     sheet_names: Optional[List[str]] = None
 ) -> Dict[str, Any]:
-    """创建新Excel文件。可指定初始工作表名称列表。"""
+    """创建新Excel文件。可指定初始工作表名称列表。
+
+    Args:
+        file_path: Excel文件路径
+        sheet_names: 初始工作表名称列表，默认为None
+    """
     _path_err = _validate_path(file_path)
     if _path_err:
         return _path_err
@@ -1665,7 +1757,14 @@ def excel_export_to_csv(
     sheet_name: Optional[str] = None,
     encoding: str = "utf-8"
 ) -> Dict[str, Any]:
-    """将工作表导出为CSV。支持指定编码和分隔符。"""
+    """将工作表导出为CSV。支持指定编码和分隔符。
+
+    Args:
+        file_path: Excel文件路径
+        output_path: CSV输出路径
+        sheet_name: 工作表名称，默认为None
+        encoding: 编码格式，默认为"utf-8"
+    """
     _path_err = _validate_path(file_path)
     if _path_err:
         return _path_err
@@ -1681,7 +1780,15 @@ def excel_import_from_csv(
     encoding: str = "utf-8",
     has_header: bool = True
 ) -> Dict[str, Any]:
-    """从CSV创建Excel文件。支持编码和分隔符配置。"""
+    """从CSV创建Excel文件。支持编码和分隔符配置。
+
+    Args:
+        csv_path: CSV文件路径
+        output_path: Excel输出路径
+        sheet_name: 工作表名称，默认为"Sheet1"
+        encoding: 编码格式，默认为"utf-8"
+        has_header: CSV是否有表头，默认为True
+    """
     for _p in [csv_path, output_path]:
         _err = _validate_path(_p)
         if _err:
@@ -1697,7 +1804,13 @@ def excel_convert_format(
     output_path: str,
     target_format: str = "xlsx"
 ) -> Dict[str, Any]:
-    """Excel/CSV/JSON格式互转。"""
+    """Excel/CSV/JSON格式互转。
+
+    Args:
+        input_path: 输入文件路径
+        output_path: 输出文件路径
+        target_format: 目标格式，默认为"xlsx"
+    """
     for _p in [input_path, output_path]:
         _err = _validate_path(_p)
         if _err:
@@ -1713,7 +1826,13 @@ def excel_merge_files(
     output_path: str,
     merge_mode: str = "sheets"
 ) -> Dict[str, Any]:
-    """合并多个Excel文件。merge_mode: sheets(每个文件一个表) | append(纵向追加) | columns(横向拼接)。"""
+    """合并多个Excel文件。merge_mode: sheets(每个文件一个表) | append(纵向追加) | columns(横向拼接)。
+
+    Args:
+        input_files: 输入文件路径列表
+        output_path: 输出文件路径
+        merge_mode: 合并模式，默认为"sheets"
+    """
     for _f in input_files:
         _err = _validate_path(_f)
         if _err:
@@ -1725,7 +1844,11 @@ def excel_merge_files(
 @mcp.tool()
 @_track_call
 def excel_get_file_info(file_path: str) -> Dict[str, Any]:
-    """获取文件元数据：大小、工作表数、行列范围等。"""
+    """获取文件元数据：大小、工作表数、行列范围等。
+
+    Args:
+        file_path: Excel文件路径
+    """
     _path_err = _validate_path(file_path)
     if _path_err:
         return _path_err
@@ -1739,7 +1862,13 @@ def excel_create_sheet(
     sheet_name: str,
     index: Optional[int] = None
 ) -> Dict[str, Any]:
-    """创建新工作表。可指定插入位置index。"""
+    """创建新工作表。可指定插入位置index。
+
+    Args:
+        file_path: Excel文件路径
+        sheet_name: 新工作表名称
+        index: 插入位置索引，默认为None
+    """
     _path_err = _validate_path(file_path)
     if _path_err:
         return _path_err
@@ -1752,7 +1881,12 @@ def excel_delete_sheet(
     file_path: str,
     sheet_name: str
 ) -> Dict[str, Any]:
-    """删除指定工作表。"""
+    """删除指定工作表。
+
+    Args:
+        file_path: Excel文件路径
+        sheet_name: 要删除的工作表名称
+    """
     _path_err = _validate_path(file_path)
     if _path_err:
         return _path_err
@@ -1794,7 +1928,13 @@ def excel_rename_sheet(
     old_name: str,
     new_name: str
 ) -> Dict[str, Any]:
-    """重命名工作表。"""
+    """重命名工作表。
+
+    Args:
+        file_path: Excel文件路径
+        old_name: 原工作表名称
+        new_name: 新工作表名称
+    """
     _path_err = _validate_path(file_path)
     if _path_err:
         return _path_err
@@ -1810,7 +1950,15 @@ def excel_copy_sheet(
     index: Optional[int] = None,
     streaming: bool = True
 ) -> Dict[str, Any]:
-    """复制工作表（含数据和格式）。可指定目标文件。"""
+    """复制工作表（含数据和格式）。可指定目标文件。
+
+    Args:
+        file_path: Excel文件路径
+        source_name: 源工作表名称
+        new_name: 新工作表名称，默认为None
+        index: 插入位置索引，默认为None
+        streaming: 是否使用流式写入，默认为True
+    """
     _path_err = _validate_path(file_path)
     if _path_err:
         return _path_err
@@ -1826,7 +1974,15 @@ def excel_rename_column(
     new_header: str,
     header_row: int = 1
 ) -> Dict[str, Any]:
-    """修改表头（列名）。只改header_row指定的行。"""
+    """修改表头（列名）。只改header_row指定的行。
+
+    Args:
+        file_path: Excel文件路径
+        sheet_name: 工作表名称
+        old_header: 原列名
+        new_header: 新列名
+        header_row: 表头行号，默认为1
+    """
     _path_err = _validate_path(file_path)
     if _path_err:
         return _path_err
@@ -1844,7 +2000,17 @@ def excel_upsert_row(
     header_row: int = 1,
     streaming: bool = True
 ) -> Dict[str, Any]:
-    """按key_column+key_value查找行，存在则更新，不存在则插入。update_columns指定要更新的列。"""
+    """按key_column+key_value查找行，存在则更新，不存在则插入。update_columns指定要更新的列。
+
+    Args:
+        file_path: Excel文件路径
+        sheet_name: 工作表名称
+        key_column: 键列名
+        key_value: 键值
+        updates: 要更新的字段字典
+        header_row: 表头行号，默认为1
+        streaming: 是否使用流式写入，默认为True
+    """
     _path_err = _validate_path(file_path)
     if _path_err:
         return _path_err
@@ -1862,7 +2028,17 @@ def excel_batch_insert_rows(
     insert_position: str = None,
     condition: str = None
 ) -> Dict[str, Any]:
-    """批量插入多行数据。data为字典列表，header_row指定表头行号。"""
+    """批量插入多行数据。data为字典列表，header_row指定表头行号。
+
+    Args:
+        file_path: Excel文件路径
+        sheet_name: 工作表名称
+        data: 要插入的数据字典列表
+        header_row: 表头行号，默认为1
+        streaming: 是否使用流式写入，默认为True
+        insert_position: 插入位置行号，默认为None
+        condition: 条件表达式，默认为None
+    """
     _path_err = _validate_path(file_path)
     if _path_err:
         return _path_err
@@ -1932,7 +2108,16 @@ def excel_delete_rows(
     streaming: bool = True,
     condition: str = None
 ) -> Dict[str, Any]:
-    """删除行。支持按索引(row_index)或条件(where_column+where_value)删除。"""
+    """删除行。支持按索引(row_index)或条件(where_column+where_value)删除。
+
+    Args:
+        file_path: Excel文件路径
+        sheet_name: 工作表名称
+        row_index: 要删除的行索引，默认为None
+        count: 删除的行数，默认为1
+        streaming: 是否使用流式写入，默认为True
+        condition: SQL条件表达式，默认为None
+    """
     _path_err = _validate_path(file_path)
     if _path_err:
         return _path_err
@@ -2073,7 +2258,15 @@ def excel_delete_columns(
     count: int = 1,
     streaming: bool = True
 ) -> Dict[str, Any]:
-    """删除指定位置开始的列。column_index从1开始。"""
+    """删除指定位置开始的列。column_index从1开始。
+
+    Args:
+        file_path: Excel文件路径
+        sheet_name: 工作表名称
+        column_index: 起始列索引（从1开始）
+        count: 删除的列数，默认为1
+        streaming: 是否使用流式写入，默认为True
+    """
     _path_err = _validate_path(file_path)
     if _path_err:
         return _path_err
@@ -2116,7 +2309,14 @@ def excel_set_formula(
     cell_address: str,
     formula: str
 ) -> Dict[str, Any]:
-    """在单元格写入Excel公式。"""
+    """在单元格写入Excel公式。
+
+    Args:
+        file_path: Excel文件路径
+        sheet_name: 工作表名称
+        cell_address: 单元格地址，如"A1"
+        formula: Excel公式，以等号开头
+    """
     # 参数验证：formula 不能为空
     if not formula or not formula.strip():
         return _fail(
@@ -2149,7 +2349,12 @@ def excel_evaluate_formula(
     formula: str,
     context_sheet: Optional[str] = None
 ) -> Dict[str, Any]:
-    """临时计算公式结果，不修改文件。"""
+    """临时计算公式结果，不修改文件。
+
+    Args:
+        formula: Excel公式
+        context_sheet: 上下文工作表名称，默认为None
+    """
     _formula_err = SecurityValidator.validate_formula(formula)
     if not _formula_err['valid']:
         return _fail(f'🔒 安全验证失败: {_formula_err["error"]}', meta={"error_code": "FORMULA_SECURITY_FAILED"})
@@ -2165,7 +2370,14 @@ def excel_query(
     output_format: str = "table"
 ) -> Dict[str, Any]:
     """SQL查询引擎。支持WHERE/JOIN/GROUP BY/ORDER BY/LIMIT/子查询。
-query_expression: SELECT * FROM 技能表 WHERE 伤害>100 | GROUP BY | JOIN ON"""
+query_expression: SELECT * FROM 技能表 WHERE 伤害>100 | GROUP BY | JOIN ON
+
+    Args:
+        file_path: Excel文件路径
+        query_expression: SQL查询语句
+        include_headers: 是否包含表头，默认为True
+        output_format: 输出格式，默认为"table"
+    """
     _path_err = _validate_path(file_path)
     if _path_err:
         return _path_err
@@ -2211,7 +2423,13 @@ def excel_update_query(
     update_expression: str,
     dry_run: bool = False
 ) -> Dict[str, Any]:
-    """SQL批量修改。dry_run=True预览变更不实际写入。示例: UPDATE 技能表 SET 伤害=200 WHERE 等级>=5"""
+    """SQL批量修改。dry_run=True预览变更不实际写入。示例: UPDATE 技能表 SET 伤害=200 WHERE 等级>=5
+
+    Args:
+        file_path: Excel文件路径
+        update_expression: UPDATE语句
+        dry_run: 是否仅预览不实际写入，默认为False
+    """
 
     _path_err = _validate_path(file_path)
     if _path_err:
@@ -2480,6 +2698,10 @@ def excel_describe_table(
 • **修改操作**: `excel_update_query`根据类型进行安全修改
 • **版本对比**: `excel_compare_sheets`对比不同版本的结构变化
 • **数据评估**: `excel_assess_data_impact`修改前结合describe评估影响
+
+    Args:
+        file_path: Excel文件路径
+        sheet_name: 工作表名称，默认为None表示第一个工作表
     """
     # 文件验证和加载
     _path_err = _validate_path(file_path)
@@ -2609,7 +2831,13 @@ def excel_merge_cells(
     sheet_name: str,
     range: str
 ) -> Dict[str, Any]:
-    """合并指定范围为一个大单元格。"""
+    """合并指定范围为一个大单元格。
+
+    Args:
+        file_path: Excel文件路径
+        sheet_name: 工作表名称
+        range: 单元格范围
+    """
     _path_err = _validate_path(file_path)
     if _path_err:
         return _path_err
@@ -2623,7 +2851,13 @@ def excel_unmerge_cells(
     sheet_name: str,
     range: str
 ) -> Dict[str, Any]:
-    """取消合并，恢复为独立单元格。"""
+    """取消合并，恢复为独立单元格。
+
+    Args:
+        file_path: Excel文件路径
+        sheet_name: 工作表名称
+        range: 单元格范围
+    """
     _path_err = _validate_path(file_path)
     if _path_err:
         return _path_err
@@ -2638,7 +2872,14 @@ def excel_set_borders(
     range: str,
     border_style: str = "thin"
 ) -> Dict[str, Any]:
-    """为范围设置边框。border_style: thin/thick/double/dotted/dashed。"""
+    """为范围设置边框。border_style: thin/thick/double/dotted/dashed。
+
+    Args:
+        file_path: Excel文件路径
+        sheet_name: 工作表名称
+        range: 单元格范围
+        border_style: 边框样式，默认为"thin"
+    """
     _path_err = _validate_path(file_path)
     if _path_err:
         return _path_err
@@ -2654,7 +2895,15 @@ def excel_set_row_height(
     height: float,
     count: int = 1
 ) -> Dict[str, Any]:
-    """设置行高（磅值）。"""
+    """设置行高（磅值）。
+
+    Args:
+        file_path: Excel文件路径
+        sheet_name: 工作表名称
+        row_index: 行索引
+        height: 行高（磅值）
+        count: 影响的行数，默认为1
+    """
     _path_err = _validate_path(file_path)
     if _path_err:
         return _path_err
@@ -2670,7 +2919,15 @@ def excel_set_column_width(
     width: float,
     count: int = 1
 ) -> Dict[str, Any]:
-    """设置列宽（字符单位）。"""
+    """设置列宽（字符单位）。
+
+    Args:
+        file_path: Excel文件路径
+        sheet_name: 工作表名称
+        column_index: 列索引
+        width: 列宽（字符单位）
+        count: 影响的列数，默认为1
+    """
     _path_err = _validate_path(file_path)
     if _path_err:
         return _path_err
@@ -2685,7 +2942,12 @@ def excel_compare_files(
     file1_path: str,
     file2_path: str
 ) -> Dict[str, Any]:
-    """逐单元格比较两个Excel文件差异。"""
+    """逐单元格比较两个Excel文件差异。
+
+    Args:
+        file1_path: 第一个文件路径
+        file2_path: 第二个文件路径
+    """
     for _p in [file1_path, file2_path]:
         _err = _validate_path(_p)
         if _err:
@@ -2701,7 +2963,14 @@ def excel_check_duplicate_ids(
     id_column: Union[int, str] = 1,
     header_row: int = 1
 ) -> Dict[str, Any]:
-    """扫描ID列，返回重复值及所在行号。"""
+    """扫描ID列，返回重复值及所在行号。
+
+    Args:
+        file_path: Excel文件路径
+        sheet_name: 工作表名称
+        id_column: ID列名或列索引，默认为1
+        header_row: 表头行号，默认为1
+    """
     _path_err = _validate_path(file_path)
     if _path_err:
         return _path_err
@@ -2718,7 +2987,16 @@ def excel_compare_sheets(
     id_column: Union[int, str] = 1,
     header_row: int = 1
 ) -> Dict[str, Any]:
-    """比较两个工作表的差异：新增/删除/修改的行和列。"""
+    """比较两个工作表的差异：新增/删除/修改的行和列。
+
+    Args:
+        file1_path: 第一个文件路径
+        sheet1_name: 第一个工作表名称
+        file2_path: 第二个文件路径
+        sheet2_name: 第二个工作表名称
+        id_column: ID列名或列索引，默认为1
+        header_row: 表头行号，默认为1
+    """
     for _p in [file1_path, file2_path]:
         _err = _validate_path(_p)
         if _err:
@@ -2729,7 +3007,7 @@ def excel_compare_sheets(
 @mcp.tool()
 @_track_call
 def excel_server_stats() -> Dict[str, Any]:
-    """服务器状态：缓存、调用次数、运行时间。"""
+    """服务器状态：缓存、调用次数、运行时间。无参数。"""
     stats = _tracker.get_stats()
     return _ok("服务器统计信息", data=stats)
 
@@ -2891,7 +3169,12 @@ def excel_update_range_user_friendly(
 @mcp.tool()
 @_track_call
 def excel_batch_update_ranges(file_path: str, updates: List[Dict[str, Any]]) -> Dict[str, Any]:
-    """批量更新多个范围。updates为[{range, data}]列表。"""
+    """批量更新多个范围。updates为[{range, data}]列表。
+
+    Args:
+        file_path: Excel文件路径
+        updates: 更新项列表，每项包含range和data
+    """
     try:
         from openpyxl import load_workbook
         from openpyxl.utils import range_boundaries
@@ -3002,7 +3285,13 @@ def excel_batch_update_ranges(file_path: str, updates: List[Dict[str, Any]]) -> 
 @mcp.tool()
 @_track_call  
 def excel_merge_multiple_files(source_files: List[str], target_file: str, merge_mode: str = "append") -> Dict[str, Any]:
-    """合并多个文件。merge_mode: append(纵向追加) | sheets(分表合并)。"""
+    """合并多个文件。merge_mode: append(纵向追加) | sheets(分表合并)。
+
+    Args:
+        source_files: 源文件路径列表
+        target_file: 目标文件路径
+        merge_mode: 合并模式，默认为"append"
+    """
     try:
         from openpyxl import load_workbook, Workbook
         import os
@@ -3091,7 +3380,17 @@ def excel_merge_multiple_files(source_files: List[str], target_file: str, merge_
 @_track_call
 def excel_create_chart(file_path: str, sheet_name: str, chart_type: str, data_range: str, 
                       title: str = "", chart_name: str = "", position: str = "B15") -> Dict[str, Any]:
-    """在工作表中创建图表。chart_type: line/bar/column/pie/scatter/area等。支持'column'作为'bar'的别名。"""
+    """在工作表中创建图表。chart_type: line/bar/column/pie/scatter/area等。支持'column'作为'bar'的别名。
+
+    Args:
+        file_path: Excel文件路径
+        sheet_name: 工作表名称
+        chart_type: 图表类型
+        data_range: 数据范围
+        title: 图表标题，默认为空字符串
+        chart_name: 图表名称，默认为空字符串
+        position: 图表位置，默认为"B15"
+    """
     try:
         from openpyxl import load_workbook
         from openpyxl.chart import BarChart, LineChart, PieChart, ScatterChart, Reference
@@ -3366,7 +3665,12 @@ def excel_create_pivot_table(file_path: str, sheet_name: str, data_range: str,
 @mcp.tool()
 @_track_call
 def excel_list_charts(file_path: str, sheet_name: str = None) -> Dict[str, Any]:
-    """列出工作表中的所有图表信息。"""
+    """列出工作表中的所有图表信息。
+
+    Args:
+        file_path: Excel文件路径
+        sheet_name: 工作表名称，默认为None表示所有工作表
+    """
     try:
         from openpyxl import load_workbook
         
@@ -3411,7 +3715,17 @@ def excel_list_charts(file_path: str, sheet_name: str = None) -> Dict[str, Any]:
 def excel_set_data_validation(file_path: str, sheet_name: str, range_address: str, 
                             validation_type: str, criteria: str, input_title: str = "", 
                             input_message: str = "") -> Dict[str, Any]:
-    """设置数据验证规则。validation_type: list/whole_number/decimal/date/text_length/custom。"""
+    """设置数据验证规则。validation_type: list/whole_number/decimal/date/text_length/custom。
+
+    Args:
+        file_path: Excel文件路径
+        sheet_name: 工作表名称
+        range_address: 单元格范围
+        validation_type: 验证类型
+        criteria: 验证条件
+        input_title: 输入提示标题，默认为空字符串
+        input_message: 输入提示内容，默认为空字符串
+    """
     try:
         from openpyxl import load_workbook
         from openpyxl.worksheet.datavalidation import DataValidation
@@ -3455,7 +3769,13 @@ def excel_set_data_validation(file_path: str, sheet_name: str, range_address: st
 @mcp.tool()
 @_track_call
 def excel_clear_validation(file_path: str, sheet_name: str = None, range_address: str = None) -> Dict[str, Any]:
-    """清除数据验证规则。"""
+    """清除数据验证规则。
+
+    Args:
+        file_path: Excel文件路径
+        sheet_name: 工作表名称，默认为None
+        range_address: 单元格范围，默认为None
+    """
     try:
         from openpyxl import load_workbook
         
@@ -3508,7 +3828,16 @@ def excel_clear_validation(file_path: str, sheet_name: str = None, range_address
 @_track_call
 def excel_add_conditional_format(file_path: str, sheet_name: str, range_address: str,
                                 format_type: str, criteria: str, format_style: str = "lightRed") -> Dict[str, Any]:
-    """添加条件格式规则。支持高亮/数据条/色阶/图标集。"""
+    """添加条件格式规则。支持高亮/数据条/色阶/图标集。
+
+    Args:
+        file_path: Excel文件路径
+        sheet_name: 工作表名称
+        range_address: 单元格范围
+        format_type: 格式类型
+        criteria: 条件表达式
+        format_style: 格式样式，默认为"lightRed"
+    """
     try:
         from openpyxl import load_workbook, styles
         from openpyxl.formatting.rule import CellIsRule, FormulaRule
@@ -3566,7 +3895,13 @@ def excel_add_conditional_format(file_path: str, sheet_name: str, range_address:
 @mcp.tool()
 @_track_call
 def excel_clear_conditional_format(file_path: str, sheet_name: str = None, range_address: str = None) -> Dict[str, Any]:
-    """清除条件格式。"""
+    """清除条件格式。
+
+    Args:
+        file_path: Excel文件路径
+        sheet_name: 工作表名称，默认为None
+        range_address: 单元格范围，默认为None
+    """
     try:
         from openpyxl import load_workbook
         
@@ -3625,7 +3960,16 @@ def excel_write_only_override(
     preserve_formulas: bool = False,
     preserve_col_widths: bool = True
 ) -> Dict[str, Any]:
-    """大文件高性能覆盖写入。range_spec: "sheet!A1:D10"。不读取已有内容，直接覆盖。适合批量导入场景。"""
+    """大文件高性能覆盖写入。range_spec: "sheet!A1:D10"。不读取已有内容，直接覆盖。适合批量导入场景。
+
+    Args:
+        file_path: Excel文件路径
+        sheet_name: 工作表名称
+        range_spec: 范围表达式，如"sheet!A1:D10"
+        data: 要写入的数据，二维数组
+        preserve_formulas: 是否保留公式，默认为False
+        preserve_col_widths: 是否保留列宽，默认为True
+    """
     _path_err = _validate_path(file_path)
     if _path_err:
         return _path_err
