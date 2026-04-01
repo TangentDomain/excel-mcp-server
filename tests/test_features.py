@@ -34,19 +34,29 @@ class TestExcelFeatures:
         """测试中文工作表名称处理优化"""
         manager = ExcelManager(sample_excel_file)
 
-        # 测试各种中文名称场景
-        test_cases = [
+        # 测试合法名称应成功创建
+        valid_cases = [
             ("数据分析", "数据分析"),  # 普通中文
             ("销售报表2024", "销售报表2024"),  # 中英文数字混合
-            ("测试/数据", "测试_数据"),  # 特殊字符替换
             ("  空格测试  ", "空格测试"),  # 空格处理
-            ("Sheet*Test", "Sheet_Test"),  # 非法字符替换
         ]
 
-        for input_name, expected_output in test_cases:
+        for input_name, expected_output in valid_cases:
             result = manager.create_sheet(input_name)
             assert result.success is True, f"创建工作表失败：{input_name}"
             assert result.data.name == expected_output, f"名称处理不正确：期望'{expected_output}'，实际'{result.data.name}'"
+
+        # 测试含非法字符的名称应被拒绝（REQ-038: 不再静默替换）
+        invalid_cases = [
+            "测试/数据",   # 含斜杠
+            "Sheet*Test",  # 含星号
+            "数据[2024]",  # 含方括号
+        ]
+
+        for input_name in invalid_cases:
+            result = manager.create_sheet(input_name)
+            assert result.success is False, f"含非法字符的名称应被拒绝：{input_name}"
+            assert "非法字符" in result.error, f"错误信息应提示非法字符：{result.error}"
 
     def test_chinese_sheet_long_name_handling(self, sample_excel_file):
         """测试超长中文工作表名称处理"""

@@ -137,8 +137,9 @@ class ExcelManager:
             if not sheet_name or not sheet_name.strip():
                 raise DataValidationError("工作表名称不能为空")
 
-            # 规范化工作表名称，处理中文字符
-            sheet_name = self._normalize_sheet_name(sheet_name.strip())
+            # 验证工作表名称合法性
+            sheet_name = sheet_name.strip()
+            self._validate_sheet_name(sheet_name)
 
             # 加载Excel文件
             workbook = load_workbook(self.file_path)
@@ -194,34 +195,66 @@ class ExcelManager:
                 error=str(e)
             )
 
-    def _normalize_sheet_name(self, name: str) -> str:
+    def _validate_sheet_name(self, name: str) -> None:
         """
-        规范化工作表名称，确保与Excel兼容
+        验证工作表名称是否合法，不合法则抛出 DataValidationError
+
+        Excel工作表名称限制：
+        1. 不能超过31个字符
+        2. 不能包含: / \\ ? * [ ] :
+        3. 不能为空
+
+        Args:
+            name: 待验证的工作表名称
+
+        Raises:
+            DataValidationError: 名称不合法时抛出，包含具体原因
+        """
+        import re
+
+        if not name or not name.strip():
+            raise DataValidationError("工作表名称不能为空")
+
+        # 检查非法字符
+        invalid_chars = r'[/\\?*\[\]:]'
+        illegal = re.findall(invalid_chars, name)
+        if illegal:
+            chars_str = ', '.join(sorted(set(illegal)))
+            raise DataValidationError(
+                f"工作表名称包含非法字符: {chars_str}。"
+                f"Excel工作表名称不能包含以下字符: / \\ ? * [ ] :"
+            )
+
+        # 检查长度限制（31字符是Excel硬限制）
+        if len(name) > 31:
+            raise DataValidationError(
+                f"工作表名称过长: {len(name)}个字符，"
+                f"Excel限制最多31个字符。请缩短名称或使用缩写。"
+            )
+
+    def _sanitize_sheet_name(self, name: str) -> str:
+        """
+        静默清理工作表名称，用于系统自动生成的名称（如复制工作表时的默认名）。
+        会替换非法字符、截断超长名称，不抛出异常。
 
         Args:
             name: 原始工作表名称
 
         Returns:
-            str: 规范化后的名称
+            str: 清理后的名称
         """
         import re
 
-        # Excel工作表名称限制：
-        # 1. 不能超过31个字符
-        # 2. 不能包含: / \ ? * [ ] :
-        # 3. 不能以单引号开头或结尾
-
-        # 移除或替换无效字符
+        # 替换非法字符
         invalid_chars = r'[/\\?*\[\]:]'
         name = re.sub(invalid_chars, '_', name)
 
-        # 移除首尾的单引号和空格
-        name = name.strip("' \t\n\r")
+        # 移除首尾空白
+        name = name.strip()
 
-        # 限制长度（考虑中文字符占用更多字节）
+        # 截断超长名称（留3字符给省略号）
         if len(name) > 31:
-            # 对于中文字符，保守截取到25个字符
-            name = name[:25] + "..."
+            name = name[:28] + "..."
 
         # 确保名称不为空
         if not name:
@@ -364,6 +397,9 @@ class ExcelManager:
             old_name = old_name.strip()
             new_name = new_name.strip()
 
+            # 验证新名称合法性
+            self._validate_sheet_name(new_name)
+
             if old_name == new_name:
                 raise DataValidationError("新名称与原名称相同，无需重命名")
 
@@ -474,8 +510,8 @@ class ExcelManager:
                 if counter > 100:
                     raise DataValidationError(f"无法生成唯一工作表名称: {base_name}")
 
-            # 规范化名称
-            new_name = self._normalize_sheet_name(new_name)
+            # 规范化名称（自动生成的名称允许静默清理）
+            new_name = self._sanitize_sheet_name(new_name)
 
             # openpyxl copy_worksheet 创建副本
             target = workbook.copy_worksheet(source_sheet)
@@ -572,6 +608,8 @@ class ExcelManager:
         # 处理名称冲突
         base_name = new_name
         counter = 1
+        # 自动生成的名称允许静默清理
+        new_name = self._sanitize_sheet_name(new_name)
         while new_name in all_sheets_data:
             new_name = f"{base_name}_{counter}"
             counter += 1
