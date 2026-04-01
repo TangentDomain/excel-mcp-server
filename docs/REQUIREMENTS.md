@@ -41,10 +41,10 @@
     "REQ-039": {
       "title": "功能缺失：list_sheets不区分隐藏工作表",
       "priority": "P2",
-      "status": "OPEN",
+      "status": "DONE",
       "source": "边缘案例测试",
       "description": "excel_list_sheets将visible/hidden/veryHidden工作表一视同仁列出，用户无法区分。应增加sheet_state字段标识可见性。",
-      "notes": "涉及server.py的excel_list_sheets工具"
+      "notes": "第245轮修复：SheetInfo新增sheet_state字段，calamine通过sheets_metadata读取，openpyxl通过sheet.sheet_state读取"
     },
     "REQ-040": {
       "title": "信息不准确：稀疏工作表file_info维度被格式化膨胀",
