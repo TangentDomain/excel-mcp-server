@@ -85,6 +85,21 @@
         "新增别名不影响现有功能"
       ],
       "notes": "来源：监工第3轮报告。'column' 和 'mean' 是 pandas/openpyxl 用户的常用术语，不支持会导致用户困惑。\n\n完成情况（2026-04-01）：\n✅ create_chart 的 chart_type 已支持 'column' 作为 'bar' 的别名（chart_map 中两者都映射到 BarChart）\n✅ docstring 已说明 'column' 作为 'bar' 的别名\n✅ 测试 test_create_column_chart 已存在并通过\n❌ create_pivot_table 函数不存在，无法实现 mean/average 别名功能\n\n注：pivot_table 功能未被实现，此部分验收标准不适用。如需此功能，应创建新需求先实现基础功能。"
+    },
+    "REQ-031": {
+      "title": "修复测试文件语法错误",
+      "status": "OPEN",
+      "priority": "P1",
+      "acceptance_criteria": [
+        "test_mcp_actual.py 第76行 f-string 嵌套大括号转义修复",
+        "test_api_issues.py 语法错误修复",
+        "pytest 全量测试通过（0 failures）"
+      ],
+      "constraints": [
+        "只修复语法错误，不改变测试逻辑",
+        "修复后必须运行全量测试验证"
+      ],
+      "notes": "来源：Claude Code 健康检查发现。f-string 中嵌套的大括号未正确转义导致语法错误，pytest 无法正常运行。"
     }
   }
 }
