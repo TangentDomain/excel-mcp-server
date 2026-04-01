@@ -1,23 +1,25 @@
-# NOW.md - 第244轮
+# NOW.md - 第245轮
 
 ## 当前状态
-- **轮次**: 第244轮
+- **轮次**: 第245轮
 - **时间**: 2026-04-01
 
 ## 完成工作
-- 文档维护检查通过（删除scripts/test_api_issues.py）
+- 文档维护检查通过（REQ-038移至ARCHIVED）
 - CI检查通过（green）
-- REQ-038: 工作表名称非法字符拒绝+超长截断改为报错
-  - 拆分_normalize_sheet_name为_validate_sheet_name+_sanitize_sheet_name
-  - create_sheet/rename_sheet拒绝非法名称，返回明确错误信息
-  - copy_sheet自动生成名称允许静默清理
-  - 更新测试适配新行为
-- v1.6.59发布到PyPI
+- REQ-036: 边缘案例测试（第2轮）
+  - 测试10个新案例：9通过1失败
+  - 发现REQ-041：SQL含空格列名返回列头字符串而非实际值
+- REQ-041: SQL列名映射修复
+  - 新增_preprocess_quoted_identifiers方法
+  - SQL解析前将"Original Name"替换为`cleaned_name`
+  - 用户现在可用SELECT "Player Name"正确查询含空格列
+- v1.6.60发布到PyPI
 
 ## 关键指标
-- **版本**: v1.6.59 (已发布PyPI)
+- **版本**: v1.6.60 (已发布PyPI)
 - **测试**: 851 passed + MCP冒烟测试通过
-- **Commit**: 951e065 (develop), c088acb (main)
+- **Commit**: 7734ad0 (develop), 359c0a6 (main)
 
 ## 待处理
 - [ ] REQ-036: 边缘案例自动化测试（每轮执行1个新案例）

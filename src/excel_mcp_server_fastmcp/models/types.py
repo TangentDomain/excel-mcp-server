@@ -88,6 +88,7 @@ class SheetInfo:
     max_row: int
     max_column: int
     max_column_letter: str
+    sheet_state: str = "visible"  # visible / hidden / veryHidden
 
 
 @dataclass
