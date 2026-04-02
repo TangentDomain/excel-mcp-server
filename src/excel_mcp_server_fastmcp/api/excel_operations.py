@@ -2155,7 +2155,7 @@ class ExcelOperations:
             headers = header_result.data[0] if header_result.data else []
 
             # 步骤3：逐行写入数据
-            from excel_mcp_server_fastmcp.api.excel_writer import ExcelWriter
+            from excel_mcp_server_fastmcp.core.excel_writer import ExcelWriter
             writer = ExcelWriter(file_path)
 
             for i, row_data in enumerate(data):
