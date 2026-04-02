@@ -2168,21 +2168,27 @@ class ExcelOperations:
                 return {'success': False, 'message': f'无法读取表头: 第{header_row}行', 'data': None}
 
             headers = header_result.data[0] if header_result.data else []
+            # 从CellInfo对象中提取value（get_range可能返回CellInfo而非原始值）
+            headers = [h.value if hasattr(h, 'value') else h for h in headers]
 
-            # 步骤3：逐行写入数据
+            # 步骤3：构建写入数据并使用update_range一次性写入
             from excel_mcp_server_fastmcp.core.excel_writer import ExcelWriter
             writer = ExcelWriter(file_path)
 
-            for i, row_data in enumerate(data):
+            num_cols = len(headers)
+            write_data = []
+            for row_data in data:
                 if not isinstance(row_data, dict):
                     continue
-                row_num = target_row + i
-                for col_idx, col_name in enumerate(headers):
-                    if col_name in row_data:
-                        col_letter = get_column_letter(col_idx + 1)
-                        writer.write_cell(sheet_name, f"{col_letter}{row_num}", row_data[col_name])
+                row_vals = [row_data.get(col_name, '') for col_name in headers]
+                write_data.append(row_vals)
 
-            writer.save()
+            if write_data:
+                start_cell = f"A{target_row}"
+                end_col = get_column_letter(num_cols)
+                end_row = target_row + len(write_data) - 1
+                range_expr = f"{sheet_name}!{start_cell}:{end_col}{end_row}"
+                writer.update_range(range_expr, write_data)
 
             return {
                 'success': True,
