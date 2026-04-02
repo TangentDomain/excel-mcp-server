@@ -1916,18 +1916,32 @@ class ExcelOperations:
 
             # 处理列索引
             if isinstance(id_column, str):
+                # 先尝试在表头行中搜索列名，找不到再按列字母解释
+                col_idx = None
                 try:
-                    col_idx = column_index_from_string(id_column)
+                    for row in ws.iter_rows(min_row=header_row, max_row=header_row, max_col=ws.max_column or 1000):
+                        for idx, cell in enumerate(row, start=1):
+                            if cell.value is not None and str(cell.value).strip() == id_column.strip():
+                                col_idx = idx
+                                break
+                        if col_idx is not None:
+                            break
                 except Exception:
-                    return {
-                        'success': False,
-                        'message': f'无效的列名: {id_column}',
-                        'has_duplicates': False,
-                        'duplicate_count': 0,
-                        'total_ids': 0,
-                        'unique_ids': 0,
-                        'duplicates': []
-                    }
+                    pass
+                if col_idx is None:
+                    # 回退：按列字母解释（如 'A'→1, 'B'→2）
+                    try:
+                        col_idx = column_index_from_string(id_column)
+                    except Exception:
+                        return {
+                            'success': False,
+                            'message': f'列名 "{id_column}" 未在表头行中找到，也不是有效的列字母',
+                            'has_duplicates': False,
+                            'duplicate_count': 0,
+                            'total_ids': 0,
+                            'unique_ids': 0,
+                            'duplicates': []
+                        }
             else:
                 col_idx = id_column
 
