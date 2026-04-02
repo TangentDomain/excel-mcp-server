@@ -1,23 +1,26 @@
-# NOW.md - 第257轮
+# NOW.md - 第258轮
 
 ## 当前状态
-- **轮次**: 第257轮
+- **轮次**: 第258轮
 - **时间**: 2026-04-02
 
 ## 完成工作
-- REQ-045: batch_insert_rows insert_position模块导入路径修正
-  - ExcelWriter导入路径从api.excel_writer改为core.excel_writer
-- REQ-046: delete_rows condition数值类型比较问题修复
-  - df.query前用pd.to_numeric(errors='ignore')转换数值列
-- REQ-044: find_last_row列名查找与check_duplicate_ids一致化
-  - 先查表头匹配列名，找不到再回退列字母解释
-- 发布 v1.7.7 到 PyPI
+- REQ-036: 边缘案例自动化测试（30个新案例 T181-T210，全部通过）
+  - Sheet名特殊字符（空格、中文、点号）
+  - 写入空值/None/布尔/超长文本/emoji
+  - SQL GROUP BY、HAVING、LIKE、空表查询
+  - 跨sheet公式引用
+  - 批量插入100行
+  - 错误场景：不存在的sheet/目录/列名
+  - check_duplicate_ids重复检测
+  - rename_column到已有列名
+- 无代码改动，无发布
 
 ## 关键指标
 - **版本**: v1.7.7
-- **测试**: 851 passed + MCP冒烟通过
-- **Commit**: 5bf92cd (develop)
+- **测试**: MCP冒烟通过，30边缘案例通过
+- **Commit**: f2eb2df (main)
 
 ## 待处理
-- [ ] REQ-036: 边缘案例自动化测试（持续执行）
+- [ ] REQ-036: 边缘案例自动化测试（持续执行，P1）
 - [ ] REQ-035: 硬编码常量提取为配置项（P2）
