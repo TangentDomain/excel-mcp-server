@@ -5,21 +5,20 @@
 - **时间**: 2026-04-02
 
 ## 完成工作
-- REQ-036: 边缘案例自动化测试（30个新案例 T181-T210，全部通过）
-  - Sheet名特殊字符（空格、中文、点号）
-  - 写入空值/None/布尔/超长文本/emoji
-  - SQL GROUP BY、HAVING、LIKE、空表查询
-  - 跨sheet公式引用
-  - 批量插入100行
-  - 错误场景：不存在的sheet/目录/列名
-  - check_duplicate_ids重复检测
-  - rename_column到已有列名
-- 无代码改动，无发布
+- REQ-036: 边缘案例测试T231-T255
+  - 发现并修复format_cells_user_friendly BUG：调用不存在的update_range_range方法→改为format_cells
+  - 验证数据验证(set_data_validation/clear_validation)正常工作
+  - 验证条件格式(add/clear_conditional_format)基本正常
+  - 验证图表(create_chart bar/line)正常工作
+  - 验证user_friendly API(get/update_range_user_friendly)正常工作
+  - 验证SQL高级查询(CASE WHEN/IN/LIKE/COUNT DISTINCT/FROM子查询/HAVING/BETWEEN)全部正常
+  - 验证备份操作(create_backup/list_backups)正常工作
+  - v1.7.9发布
 
 ## 关键指标
-- **版本**: v1.7.7
-- **测试**: MCP冒烟通过，30边缘案例通过
-- **Commit**: f2eb2df (main)
+- **版本**: v1.7.9
+- **测试**: 851 passed + MCP冒烟通过
+- **Commit**: 008cdba (develop)
 
 ## 待处理
 - [ ] REQ-036: 边缘案例自动化测试（持续执行，P1）

@@ -11,39 +11,6 @@
       "description": "多个硬编码值应提取为可配置常量：max_files=100, query_cache_ttl=300, target_mb=512.0, MAX_RESULT_ROWS=500等。",
       "notes": "分布在server.py和advanced_sql_query.py中"
     },
-    "REQ-044": {
-      "title": "find_last_row列名查找与check_duplicate_ids一致化",
-      "type": "fix",
-      "priority": "P2",
-      "status": "DONE",
-      "source": "自审",
-      "attempts": 1,
-      "last_failure": "",
-      "description": "find_last_row中使用column_index_from_string直接解释列参数，与check_duplicate_ids修复后的行为不一致。当用户传入列名(如'ID')时会被错误解释为列字母。应抽取公共列解析方法，统一先查表头再回退列字母的逻辑。",
-      "notes": "第257轮修复：先查表头匹配列名，找不到再回退列字母解释"
-    },
-    "REQ-045": {
-      "title": "batch_insert_rows insert_position模块导入错误",
-      "type": "fix",
-      "priority": "P2",
-      "status": "DONE",
-      "source": "边缘案例测试",
-      "attempts": 1,
-      "last_failure": "",
-      "description": "batch_insert_rows指定insert_position时报错：No module named 'excel_mcp_server_fastmcp.api.excel...'。模块路径可能有误。",
-      "notes": "第257轮修复：ExcelWriter导入路径从api.excel_writer改为core.excel_writer"
-    },
-    "REQ-046": {
-      "title": "delete_rows condition数值类型比较问题",
-      "type": "fix",
-      "priority": "P2",
-      "status": "DONE",
-      "source": "自审",
-      "attempts": 1,
-      "last_failure": "",
-      "description": "delete_rows使用condition参数（如'Score < 60'）时，对数值列返回0行删除。疑似条件解析将数值列作为字符串处理，导致比较失败。",
-      "notes": "第257轮修复：df.query前用pd.to_numeric(errors='ignore')转换数值列"
-    },
     "REQ-036": {
       "title": "边缘案例自动化测试：每轮自动搜索并验证奇怪场景",
       "type": "feature",
