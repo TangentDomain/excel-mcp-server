@@ -435,6 +435,9 @@ class AdvancedSQLQueryEngine:
         # DataFrame缓存：{file_path: (mtime, worksheets_data, header_descriptions)}
         self._df_cache = {}
         self._max_cache_size = 20  # 最大缓存文件数，防止内存泄漏
+        # 列名映射缓存：{file_path: {原始列名: 清洗列名}}
+        # 与_df_cache同步，避免缓存命中时_original_to_clean_cols为空
+        self._col_map_cache = {}
 
         # 性能优化：查询结果缓存 {hash(sql): (result_df, file_mtime)}
         self._query_result_cache = {}
@@ -820,18 +823,27 @@ class AdvancedSQLQueryEngine:
             cached_mtime, cached_data, cached_desc = self._df_cache[cache_key]
             if cached_mtime == mtime:
                 self._header_descriptions = cached_desc
+                # 缓存命中时恢复列名映射，避免_preprocess_quoted_identifiers因映射为空而跳过
+                if cache_key in self._col_map_cache:
+                    self._original_to_clean_cols.update(self._col_map_cache[cache_key])
                 return cached_data
             else:
                 # 文件已修改，重新加载
                 worksheets_data = self._load_excel_data(file_path, sheet_name)
                 self._df_cache[cache_key] = (mtime, worksheets_data, self._header_descriptions)
+                # 保存列名映射到缓存
+                self._col_map_cache[cache_key] = dict(self._original_to_clean_cols)
                 return worksheets_data
         else:
             worksheets_data = self._load_excel_data(file_path, sheet_name)
             self._df_cache[cache_key] = (mtime, worksheets_data, self._header_descriptions)
+            # 保存列名映射到缓存
+            self._col_map_cache[cache_key] = dict(self._original_to_clean_cols)
             # LRU淘汰：超过最大缓存数时删除最早缓存的文件
             while len(self._df_cache) > self._max_cache_size:
-                self._df_cache.pop(next(iter(self._df_cache)))
+                evicted_key = next(iter(self._df_cache))
+                self._df_cache.pop(evicted_key)
+                self._col_map_cache.pop(evicted_key, None)
             return worksheets_data
 
     def _estimate_cache_memory_mb(self) -> float:
@@ -1018,8 +1030,13 @@ class AdvancedSQLQueryEngine:
 
         当Excel列名含空格或特殊字符时（如"Player Name"），_clean_column_names会将其
         转换为下划线形式（Player_Name）。用户在SQL中使用双引号引用原始列名时，
-        sqlglot会将其解析为字面量而非列引用。此方法在SQL解析前将双引号引用的
-        原始列名替换为清洗后的列名，确保正确匹配。
+        sqlglot(MySQL方言)会将其解析为字符串字面量而非列引用。
+
+        使用AST方法精确替换：只在列引用位置（SELECT/ORDER BY/GROUP BY/HAVING、
+        WHERE比较左侧）替换，保留WHERE值位置的字符串字面量不变。
+        例如：SELECT "Player Name" FROM t WHERE type = "Player Name"
+        → SELECT `Player_Name` FROM t WHERE type = 'Player Name'
+        （SELECT中替换为列引用，WHERE值位置保留为字符串）
 
         Args:
             sql: 原始SQL查询语句
@@ -1036,12 +1053,152 @@ class AdvancedSQLQueryEngine:
         if not changed_cols:
             return sql
 
-        # 按名称长度降序排列，优先匹配更长的名称（避免部分匹配）
-        for orig_name in sorted(changed_cols.keys(), key=len, reverse=True):
-            clean_name = changed_cols[orig_name]
-            # 替换双引号引用的原始列名为反引号引用的清洗列名
-            sql = sql.replace(f'"{orig_name}"', f'`{clean_name}`')
+        try:
+            import sqlglot
+            from sqlglot import exp as sg_exp
 
+            parsed = sqlglot.parse_one(sql, dialect="mysql")
+            if parsed is None:
+                return self._fallback_preprocess(sql, changed_cols)
+
+            # 在SELECT表达式中替换：双引号字符串 → 列引用
+            select = parsed.find(sg_exp.Select)
+            if select:
+                new_exprs = []
+                for e in select.expressions:
+                    new_exprs.append(self._literal_to_column(e, changed_cols))
+                select.set("expressions", new_exprs)
+
+            # 在ORDER BY中替换
+            order = parsed.find(sg_exp.Order)
+            if order:
+                new_ordered = []
+                for o in order.expressions:
+                    new_ordered.append(self._literal_to_column(o, changed_cols))
+                order.set("expressions", new_ordered)
+
+            # 在GROUP BY中替换
+            group = parsed.find(sg_exp.Group)
+            if group:
+                new_group = []
+                for g in group.expressions:
+                    new_group.append(self._literal_to_column(g, changed_cols))
+                group.set("expressions", new_group)
+
+            # 在HAVING中替换
+            having = parsed.find(sg_exp.Having)
+            if having:
+                self._replace_having_literals(having.this, changed_cols)
+
+            # 在WHERE子句中：只替换比较操作左侧的字面量（列引用位置）
+            where = parsed.find(sg_exp.Where)
+            if where:
+                self._replace_where_left_literals(where.this, changed_cols)
+
+            result_sql = parsed.sql(dialect="mysql")
+            return result_sql
+
+        except Exception:
+            # AST解析失败，回退到简单替换（仅SELECT子句）
+            return self._fallback_preprocess(sql, changed_cols)
+
+    def _literal_to_column(self, node, changed_cols):
+        """
+        如果节点是匹配原始列名的字符串字面量，替换为列引用
+
+        Args:
+            node: sqlglot AST节点
+            changed_cols: 原始列名到清洗列名的映射
+
+        Returns:
+            替换后的节点（列引用或原始节点）
+        """
+        from sqlglot import exp as sg_exp
+        if isinstance(node, sg_exp.Literal) and node.is_string:
+            lit_val = node.this
+            if lit_val in changed_cols:
+                return sg_exp.Column(
+                    this=sg_exp.Identifier(this=changed_cols[lit_val])
+                )
+        return node
+
+    def _replace_where_left_literals(self, node, changed_cols):
+        """
+        替换WHERE子句中比较操作左侧的字符串字面量为列引用
+
+        只处理比较操作（=, !=, >, <, >=, <=）的左侧，保留右侧作为字符串值。
+        递归处理AND/OR组合条件。
+
+        Args:
+            node: WHERE子句的AST节点
+            changed_cols: 原始列名到清洗列名的映射
+        """
+        from sqlglot import exp as sg_exp
+        comparison_types = (sg_exp.EQ, sg_exp.NEQ, sg_exp.GT, sg_exp.GTE, sg_exp.LT, sg_exp.LTE)
+
+        if isinstance(node, comparison_types):
+            if isinstance(node.this, sg_exp.Literal) and node.this.is_string:
+                lit_val = node.this.this
+                if lit_val in changed_cols:
+                    node.set("this", sg_exp.Column(
+                        this=sg_exp.Identifier(this=changed_cols[lit_val])
+                    ))
+        elif isinstance(node, (sg_exp.And, sg_exp.Or)):
+            self._replace_where_left_literals(node.this, changed_cols)
+            self._replace_where_left_literals(node.expression, changed_cols)
+        elif isinstance(node, sg_exp.Paren):
+            self._replace_where_left_literals(node.this, changed_cols)
+        elif isinstance(node, sg_exp.Not):
+            self._replace_where_left_literals(node.this, changed_cols)
+
+    def _replace_having_literals(self, node, changed_cols):
+        """
+        替换HAVING子句中的字符串字面量为列引用
+
+        Args:
+            node: HAVING子句的AST节点
+            changed_cols: 原始列名到清洗列名的映射
+        """
+        from sqlglot import exp as sg_exp
+        comparison_types = (sg_exp.EQ, sg_exp.NEQ, sg_exp.GT, sg_exp.GTE, sg_exp.LT, sg_exp.LTE)
+
+        if isinstance(node, comparison_types):
+            # HAVING两侧都可能是列引用（HAVING "Player Name" > 100）
+            node.this = self._literal_to_column(node.this, changed_cols)
+        elif isinstance(node, (sg_exp.And, sg_exp.Or)):
+            self._replace_having_literals(node.this, changed_cols)
+            self._replace_having_literals(node.expression, changed_cols)
+
+    def _fallback_preprocess(self, sql: str, changed_cols: Dict[str, str]) -> str:
+        """
+        回退预处理：仅替换SELECT子句中的双引号列名（使用正则提取SELECT子句）
+
+        当AST解析失败时使用，避免全量字符串替换误伤WHERE字符串值。
+
+        Args:
+            sql: 原始SQL查询语句
+            changed_cols: 原始列名到清洗列名的映射
+
+        Returns:
+            str: 预处理后的SQL语句
+        """
+        # 提取SELECT子句（SELECT ... FROM），仅在此范围内替换
+        select_match = re.match(
+            r'(SELECT\s+)(.*?)(\s+FROM\s+)',
+            sql, re.IGNORECASE | re.DOTALL
+        )
+        if select_match:
+            prefix = select_match.group(1)
+            select_clause = select_match.group(2)
+            from_suffix = sql[select_match.end(2):]
+
+            for orig_name in sorted(changed_cols.keys(), key=len, reverse=True):
+                clean_name = changed_cols[orig_name]
+                select_clause = select_clause.replace(f'"{orig_name}"', f'`{clean_name}`')
+
+            return prefix + select_clause + from_suffix
+
+        # 无法提取SELECT子句，不替换（安全优先）
         return sql
 
     def _optimize_dtypes(self, df: pd.DataFrame) -> pd.DataFrame:

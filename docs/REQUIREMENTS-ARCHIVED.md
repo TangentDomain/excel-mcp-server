@@ -128,6 +128,24 @@
       "description": "_normalize_sheet_name()将方括号[]等非法字符静默替换为下划线（Data [2024]→Data _2024_），超长名称静默截断为25+...字符。用户不知情地创建了与预期不同的工作表名，后续引用会失败。",
       "notes": "第244轮修复：拆分为_validate_sheet_name（严格校验）和_sanitize_sheet_name（静默清理），create_sheet/rename_sheet拒绝非法名称，copy_sheet允许静默清理",
       "archived_at": "2026-04-01"
+    },
+    "REQ-039": {
+      "title": "功能缺失：list_sheets不区分隐藏工作表",
+      "status": "DONE",
+      "priority": "P2",
+      "source": "边缘案例测试",
+      "description": "excel_list_sheets将visible/hidden/veryHidden工作表一视同仁列出，用户无法区分。应增加sheet_state字段标识可见性。",
+      "notes": "第245轮修复：SheetInfo新增sheet_state字段，calamine通过sheets_metadata读取，openpyxl通过sheet.sheet_state读取",
+      "archived_at": "2026-04-02"
+    },
+    "REQ-041": {
+      "title": "BUG：SQL含空格列名返回列头字符串而非实际值",
+      "status": "DONE",
+      "priority": "P1",
+      "source": "边缘案例测试",
+      "description": "当Excel列名含空格（如\"Player Name\"），_clean_column_names()将空格替换为下划线（Player_Name），但SQL中SELECT \"Player Name\"无法匹配清洗后的列名，导致返回列头字符串代替实际值。",
+      "notes": "第245轮修复：新增_preprocess_quoted_identifiers方法，在SQL解析前将双引号引用的原始列名替换为清洗后的列名",
+      "archived_at": "2026-04-02"
     }
   }
 }
