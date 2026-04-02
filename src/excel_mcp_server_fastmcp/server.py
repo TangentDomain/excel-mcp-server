@@ -2133,6 +2133,13 @@ def excel_delete_rows(
             # condition中的列名对应表头，行号 = 数据行index + 2（1-based表头 + 1-based offset）
             header_row = 1  # 默认表头在第1行
 
+            # REQ-046: 尝试将可转换的列转为数值类型，避免字符串比较导致条件匹配失败
+            for col in df.columns:
+                try:
+                    df[col] = pd.to_numeric(df[col], errors='ignore')
+                except Exception:
+                    pass
+
             # 使用pandas query执行条件筛选
             try:
                 # pandas的query需要特殊处理中文列名
