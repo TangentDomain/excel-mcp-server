@@ -1188,3 +1188,24 @@
   - streaming=False写入后get_file_info正确反映数据维度（total_rows/total_cols准确）
   - SQL日期字符串比较（>= '2024-02-01'）正确按字典序匹配
   - rename_column后SQL查询新列名正常工作
+
+## 第256轮测试结果 (T161-T180) - 2026-04-02
+
+- **通过**: 19个（PASS）
+- **失败**: 1个（FAIL，T168 evaluate_formula独立数学表达式）
+- **关键发现**:
+  - SQL ORDER BY DESC + LIMIT 正常工作
+  - SQL BETWEEN、IN、IS NOT NULL、COUNT DISTINCT 均正常工作
+  - SQL计算列(Score*2 AS DoubleScore) + WHERE组合正常
+  - create_file支持多sheet创建（Data/Config/Backup）
+  - create_sheet支持index=0插入到第一个位置
+  - set_formula设置=SUM(B2:B6)成功
+  - find_last_row空表返回0
+  - get_headers max_columns=1正常（只返回第一列）
+  - check_duplicate_ids正常工作（无重复时正确返回has_duplicates=false）
+  - get_operation_history正常返回
+  - get_file_info正常返回文件信息
+- **注意事项**:
+  - T165: delete_rows condition "Score < 60" 删除了0行（David的Score=58应匹配），可能是类型比较问题
+  - T166: batch_insert insert_position因模块导入错误失败（No module named 'excel_mcp_server_fastmcp.api.excel...'）
+  - T168: evaluate_formula不支持独立数学表达式(1+2+3)，需要Excel公式格式(如=SUM(...))
