@@ -11,26 +11,26 @@
     "REQ-044": {
       "title": "find_last_row列名查找与check_duplicate_ids一致化",
       "priority": "P2",
-      "status": "OPEN",
+      "status": "DONE",
       "source": "自审",
       "description": "find_last_row中使用column_index_from_string直接解释列参数，与check_duplicate_ids修复后的行为不一致。当用户传入列名(如'ID')时会被错误解释为列字母。应抽取公共列解析方法，统一先查表头再回退列字母的逻辑。",
-      "notes": "涉及excel_operations.py的find_last_row(~L1786)和check_duplicate_ids(~L1934)"
+      "notes": "第257轮修复：先查表头匹配列名，找不到再回退列字母解释"
     },
     "REQ-045": {
       "title": "batch_insert_rows insert_position模块导入错误",
       "priority": "P2",
-      "status": "OPEN",
+      "status": "DONE",
       "source": "边缘案例测试",
       "description": "batch_insert_rows指定insert_position时报错：No module named 'excel_mcp_server_fastmcp.api.excel...'。模块路径可能有误。",
-      "notes": "T166发现，第256轮"
+      "notes": "第257轮修复：ExcelWriter导入路径从api.excel_writer改为core.excel_writer"
     },
     "REQ-046": {
       "title": "delete_rows condition数值类型比较问题",
       "priority": "P2",
-      "status": "OPEN",
+      "status": "DONE",
       "source": "自审",
       "description": "delete_rows使用condition参数（如'Score < 60'）时，对数值列返回0行删除。疑似条件解析将数值列作为字符串处理，导致比较失败。",
-      "notes": "T165发现，第256轮"
+      "notes": "第257轮修复：df.query前用pd.to_numeric(errors='ignore')转换数值列"
     },
     "REQ-036": {
       "title": "边缘案例自动化测试：每轮自动搜索并验证奇怪场景",
