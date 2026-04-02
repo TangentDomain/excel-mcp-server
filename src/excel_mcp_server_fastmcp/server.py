@@ -61,8 +61,7 @@ class OperationLogger:
         self.log_file = None
         self.current_session = []
 
-
-@_validate_file_path()
+    def start_session(self, file_path: str):
         """开始新的操作会话
         
         创建一个新的操作会话，初始化日志记录系统。
@@ -316,9 +315,7 @@ class SecurityValidator:
     ]
 
     @classmethod
-
-    @classmethod
-@_validate_file_path()
+    def validate_file_path(cls, file_path: str) -> Dict[str, Any]:
         """验证文件路径安全性，返回 {'valid': bool, 'error': str|None}"""
         if not file_path:
             return {'valid': False, 'error': '文件路径不能为空'}
@@ -353,9 +350,7 @@ class SecurityValidator:
         return {'valid': True, 'error': None}
 
     @classmethod
-
-    @classmethod
-@_validate_file_path()
+    def validate_file_size(cls, file_path: str) -> Dict[str, Any]:
         """验证文件大小是否在允许范围内"""
         try:
             size = os.path.getsize(file_path)

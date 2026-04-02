@@ -152,7 +152,7 @@
       "status": "DONE",
       "priority": "P2",
       "source": "自审",
-      "description": "_preprocess_quoted_identifiers使用简单的字符串替换处理双引号列名，如果SQL中包含转义引号，可能导致错误替换。",
+      "description": "_preprocess_quoted_identifiers使用简单的字符串替换处理双引号列名，如果SQL中包含转义引号（如\"col\\\"name\"\"），可能导致错误替换。",
       "notes": "第247轮修复：改用AST方法精确替换列引用位置（SELECT/ORDER BY/GROUP BY），WHERE值位置保持不变；新增_col_map_cache解决缓存命中时映射丢失问题",
       "archived_at": "2026-04-02"
     }
