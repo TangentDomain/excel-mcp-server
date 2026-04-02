@@ -795,6 +795,7 @@ def _infer_error_code(message: str) -> str:
 # ==================== MCP 工具定义 ====================
 
 @mcp.tool()
+@_validate_file_path()
 @_track_call
 def excel_list_sheets(file_path: str) -> Dict[str, Any]:
     """列出Excel文件中的所有工作表名称。查询前先用此工具确认工作表存在。
@@ -806,6 +807,7 @@ def excel_list_sheets(file_path: str) -> Dict[str, Any]:
 
 
 @mcp.tool()
+@_validate_file_path()
 @_track_call
 def excel_search(
     file_path: str,
@@ -871,6 +873,7 @@ def excel_search_directory(
 
 
 @mcp.tool()
+@_validate_file_path()
 @_track_call
 def excel_get_range(
     file_path: str,
@@ -1029,6 +1032,7 @@ def excel_get_range(
 
 
 @mcp.tool()
+@_validate_file_path()
 @_track_call
 def excel_get_headers(
     file_path: str,
@@ -1050,6 +1054,7 @@ def excel_get_headers(
 
 
 @mcp.tool()
+@_validate_file_path()
 @_track_call
 def excel_update_range(
     file_path: str,
@@ -1736,6 +1741,7 @@ def excel_find_last_row(
 
 
 @mcp.tool()
+@_validate_file_path()
 @_track_call
 def excel_create_file(
     file_path: str,
@@ -1751,6 +1757,7 @@ def excel_create_file(
 
 
 @mcp.tool()
+@_validate_file_path(['file_path', 'output_path'])
 @_track_call
 def excel_export_to_csv(
     file_path: str,
@@ -1770,6 +1777,7 @@ def excel_export_to_csv(
 
 
 @mcp.tool()
+@_validate_file_path(['csv_path', 'output_path'])
 @_track_call
 def excel_import_from_csv(
     csv_path: str,
@@ -1796,6 +1804,7 @@ def excel_import_from_csv(
 
 
 @mcp.tool()
+@_validate_file_path(['input_path', 'output_path'])
 @_track_call
 def excel_convert_format(
     input_path: str,
@@ -1835,11 +1844,15 @@ def excel_merge_files(
         _err = _validate_path(_f)
         if _err:
             return _err
+    _err = _validate_path(output_path)
+    if _err:
+        return _err
 
     return _wrap(ExcelOperations.merge_files(input_files, output_path, merge_mode))
 
 
 @mcp.tool()
+@_validate_file_path()
 @_track_call
 def excel_get_file_info(file_path: str) -> Dict[str, Any]:
     """获取文件元数据：大小、工作表数、行列范围等。
@@ -2881,6 +2894,7 @@ def excel_set_column_width(
 # ==================== Excel比较功能 ====================
 
 @mcp.tool()
+@_validate_file_path(['file1_path', 'file2_path'])
 @_track_call
 def excel_compare_files(
     file1_path: str,
@@ -3099,6 +3113,7 @@ def excel_update_range_user_friendly(
 
 # ==================== 批量操作工具 ====================
 @mcp.tool()
+@_validate_file_path()
 @_track_call
 def excel_batch_update_ranges(file_path: str, updates: List[Dict[str, Any]]) -> Dict[str, Any]:
     """批量更新多个范围。updates为[{range, data}]列表。
@@ -3215,7 +3230,7 @@ def excel_batch_update_ranges(file_path: str, updates: List[Dict[str, Any]]) -> 
 
 
 @mcp.tool()
-@_track_call  
+@_track_call
 def excel_merge_multiple_files(source_files: List[str], target_file: str, merge_mode: str = "append") -> Dict[str, Any]:
     """合并多个文件。merge_mode: append(纵向追加) | sheets(分表合并)。
 
@@ -3224,6 +3239,14 @@ def excel_merge_multiple_files(source_files: List[str], target_file: str, merge_
         target_file: 目标文件路径
         merge_mode: 合并模式，默认为"append"
     """
+    # 路径遍历安全验证
+    for _f in source_files:
+        _err = _validate_path(_f)
+        if _err:
+            return _err
+    _err = _validate_path(target_file)
+    if _err:
+        return _err
     try:
         from openpyxl import load_workbook, Workbook
         import os
@@ -3309,6 +3332,7 @@ def excel_merge_multiple_files(source_files: List[str], target_file: str, merge_
 
 # ==================== 图表生成工具 ====================
 @mcp.tool()
+@_validate_file_path()
 @_track_call
 def excel_create_chart(file_path: str, sheet_name: str, chart_type: str, data_range: str, 
                       title: str = "", chart_name: str = "", position: str = "B15") -> Dict[str, Any]:
@@ -3393,6 +3417,7 @@ def excel_create_chart(file_path: str, sheet_name: str, chart_type: str, data_ra
         return _fail("图表创建失败", meta={"error_code": "OPERATION_FAILED"})
 
 
+@_validate_file_path()
 def excel_create_pivot_table(file_path: str, sheet_name: str, data_range: str, 
                             rows: List[str], values: List[str], 
                             columns: Optional[List[str]] = None,
@@ -3597,6 +3622,7 @@ def excel_create_pivot_table(file_path: str, sheet_name: str, data_range: str,
 
 
 @mcp.tool()
+@_validate_file_path()
 @_track_call
 def excel_list_charts(file_path: str, sheet_name: str = None) -> Dict[str, Any]:
     """列出工作表中的所有图表信息。
@@ -3645,6 +3671,7 @@ def excel_list_charts(file_path: str, sheet_name: str = None) -> Dict[str, Any]:
 
 # ==================== 数据验证工具 ====================
 @mcp.tool()
+@_validate_file_path()
 @_track_call
 def excel_set_data_validation(file_path: str, sheet_name: str, range_address: str, 
                             validation_type: str, criteria: str, input_title: str = "", 
@@ -3701,6 +3728,7 @@ def excel_set_data_validation(file_path: str, sheet_name: str, range_address: st
 
 
 @mcp.tool()
+@_validate_file_path()
 @_track_call
 def excel_clear_validation(file_path: str, sheet_name: str = None, range_address: str = None) -> Dict[str, Any]:
     """清除数据验证规则。
@@ -3759,6 +3787,7 @@ def excel_clear_validation(file_path: str, sheet_name: str = None, range_address
 
 # ==================== 条件格式工具 ====================
 @mcp.tool()
+@_validate_file_path()
 @_track_call
 def excel_add_conditional_format(file_path: str, sheet_name: str, range_address: str,
                                 format_type: str, criteria: str, format_style: str = "lightRed") -> Dict[str, Any]:
@@ -3827,6 +3856,7 @@ def excel_add_conditional_format(file_path: str, sheet_name: str, range_address:
 
 
 @mcp.tool()
+@_validate_file_path()
 @_track_call
 def excel_clear_conditional_format(file_path: str, sheet_name: str = None, range_address: str = None) -> Dict[str, Any]:
     """清除条件格式。
@@ -3885,6 +3915,7 @@ def excel_clear_conditional_format(file_path: str, sheet_name: str = None, range
 
 
 @mcp.tool()
+@_validate_file_path()
 @_track_call
 def excel_write_only_override(
     file_path: str,
