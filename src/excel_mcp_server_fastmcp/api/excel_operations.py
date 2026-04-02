@@ -1732,7 +1732,7 @@ class ExcelOperations:
             column: 指定列来查找最后一行（可选）
                 - None: 查找整个工作表的最后一行
                 - 整数: 列索引 (1-based，1=A列)
-                - 字符串: 列名 (A, B, C...)
+                - 字符串: 列名（先在表头行中匹配，匹配不到再按列字母解释如A/B/C）
 
         Returns:
             Dict: 包含 success、last_row、message 等信息
@@ -1782,11 +1782,26 @@ class ExcelOperations:
             else:
                 # 转换列参数为列索引
                 if isinstance(column, str):
+                    # REQ-044: 先在表头行中搜索列名，找不到再按列字母解释（与check_duplicate_ids一致）
+                    col_index = None
                     try:
-                        col_index = column_index_from_string(column.upper())
-                    except ValueError:
-                        reader.close()
-                        return cls._format_error_result(f"无效的列名: {column}")
+                        max_col = sheet.max_column or 1000
+                        for row in sheet.iter_rows(min_row=1, max_row=1, max_col=max_col, values_only=False):
+                            for idx, cell in enumerate(row, start=1):
+                                if cell.value is not None and str(cell.value).strip() == column.strip():
+                                    col_index = idx
+                                    break
+                            if col_index is not None:
+                                break
+                    except Exception:
+                        pass
+                    if col_index is None:
+                        # 回退：按列字母解释（如 'A'→1, 'B'→2）
+                        try:
+                            col_index = column_index_from_string(column.upper())
+                        except ValueError:
+                            reader.close()
+                            return cls._format_error_result(f"列名 '{column}' 未在表头行中找到，也不是有效的列字母")
                 elif isinstance(column, int):
                     if column < 1:
                         reader.close()
