@@ -41,10 +41,10 @@
     "REQ-040": {
       "title": "信息不准确：稀疏工作表file_info维度被格式化膨胀",
       "priority": "P2",
-      "status": "OPEN",
+      "status": "DONE",
       "source": "边缘案例测试",
       "description": "当工作表在远端单元格（如Z100）仅有格式化而无数据时，excel_get_file_info返回total_rows=100、total_cols=26，与实际数据范围不符。",
-      "notes": "应区分data_range和formatted_range，或标注实际数据维度"
+      "notes": "第252轮修复：get_file_info区分实际数据维度和格式化维度，仅当两者不同时才额外报告formatted_rows/formatted_cols"
     },
   }
 }
