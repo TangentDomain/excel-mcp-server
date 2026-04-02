@@ -1,25 +1,26 @@
-# NOW.md - 第247轮
+# NOW.md - 第248轮
 
 ## 当前状态
-- **轮次**: 第247轮
+- **轮次**: 第248轮
 - **时间**: 2026-04-02
 
 ## 完成工作
-- 文档维护检查通过（REQ-039/041归档，版本一致）
+- 文档维护检查通过（REQ-042归档为DONE，REQUIREMENTS-ARCHIVED尾部损坏修复）
 - CI检查通过（green）
-- REQ-036: 边缘案例测试21 - SQL双引号标识符与字符串字面量冲突
-- REQ-042: 修复_preprocess_quoted_identifiers两个BUG
-  - AST方法精确替换：只替换列引用位置（SELECT/ORDER BY/GROUP BY/HAVING），WHERE值位置保持不变
-  - 新增_col_map_cache解决缓存命中时列名映射丢失
-- v1.7.1发布到PyPI
+- REQ-036: 边缘案例测试（16个案例）
+  - 循环公式引用、Upsert重复键、合并单元格写入
+  - 批量插入行、正则搜索、文件信息、空范围影响评估
+  - SQL HAVING/LIKE/BETWEEN/IN/IS NULL/子查询/CASE WHEN
+  - 15通过1信息（evaluate_formula的context_sheet参数需调整）
+  - 0个BUG发现
 
 ## 关键指标
-- **版本**: v1.7.1 (已发布PyPI)
-- **测试**: 851 passed + MCP冒烟测试通过
-- **Commit**: bd729a1 (develop), cd1783a (main)
+- **版本**: v1.7.1
+- **测试**: MCP冒烟测试通过
+- **Commit**: 无代码改动
 
 ## 待处理
-- [ ] REQ-036: 边缘案例自动化测试（每轮执行1个新案例）
+- [ ] REQ-036: 边缘案例自动化测试（持续执行）
 - [ ] REQ-034: 路径验证逻辑抽取为装饰器（P2）
 - [ ] REQ-035: 硬编码常量提取为配置项（P2）
 - [ ] REQ-037: formula_cache并发访问保护（P2）

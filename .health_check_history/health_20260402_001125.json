@@ -1,0 +1,25 @@
+{
+  "timestamp": "2026-04-02T00:11:25.525385",
+  "total_issues": 2,
+  "issues": [
+    {
+      "type": "test_redundancy",
+      "function": "test_file",
+      "files": [
+        "tests/test_offset.py",
+        "tests/test_api_excel_operations_consolidated.py"
+      ],
+      "issue": "测试函数 test_file 在 2 个文件中重复测试",
+      "severity": "medium"
+    },
+    {
+      "type": "document_bloat",
+      "document": "docs/DECISIONS.md",
+      "lines": 54,
+      "issue": "DECISIONS.md 超过40行 (54行)，需要文档瘦身",
+      "severity": "high"
+    }
+  ],
+  "fixes_applied": [],
+  "health_score": 85
+}

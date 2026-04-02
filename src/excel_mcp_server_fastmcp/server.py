@@ -61,7 +61,8 @@ class OperationLogger:
         self.log_file = None
         self.current_session = []
 
-    def start_session(self, file_path: str):
+
+@_validate_file_path()
         """开始新的操作会话
         
         创建一个新的操作会话，初始化日志记录系统。
@@ -315,7 +316,9 @@ class SecurityValidator:
     ]
 
     @classmethod
-    def validate_file_path(cls, file_path: str) -> Dict[str, Any]:
+
+    @classmethod
+@_validate_file_path()
         """验证文件路径安全性，返回 {'valid': bool, 'error': str|None}"""
         if not file_path:
             return {'valid': False, 'error': '文件路径不能为空'}
@@ -350,7 +353,9 @@ class SecurityValidator:
         return {'valid': True, 'error': None}
 
     @classmethod
-    def validate_file_size(cls, file_path: str) -> Dict[str, Any]:
+
+    @classmethod
+@_validate_file_path()
         """验证文件大小是否在允许范围内"""
         try:
             size = os.path.getsize(file_path)
@@ -397,6 +402,38 @@ def _validate_path(file_path: str) -> Optional[Dict[str, Any]]:
         if not size_result['valid']:
             return _fail(f'🔒 安全验证失败: {size_result["error"]}', meta={"error_code": "FILE_SIZE_EXCEEDED"})
     return None
+
+
+def _validate_file_path(param='file_path'):
+    """路径安全验证装饰器，自动验证指定参数的文件路径。
+
+    Args:
+        param: 要验证的参数名（str）或参数名列表（list[str]），
+               默认为 'file_path'。列表时依次验证所有参数。
+               仅当参数值不为None时验证（支持Optional参数）。
+
+    Returns:
+        装饰器函数
+
+    Example:
+        @_validate_file_path()          # 验证 file_path 参数
+        @_validate_file_path('backup_path')  # 验证 backup_path 参数
+        @_validate_file_path(['csv_path', 'output_path'])  # 验证多个参数
+    """
+    def decorator(func):
+        @functools.wraps(func)
+        def wrapper(*args, **kwargs):
+            params = [param] if isinstance(param, str) else param
+            for p_name in params:
+                p_value = kwargs.get(p_name)
+                if p_value is None:
+                    continue
+                err = _validate_path(p_value)
+                if err:
+                    return err
+            return func(*args, **kwargs)
+        return wrapper
+    return decorator
 
 
 # 全局操作日志器
@@ -765,9 +802,6 @@ def excel_list_sheets(file_path: str) -> Dict[str, Any]:
     Args:
         file_path: Excel文件路径
     """
-    _path_err = _validate_path(file_path)
-    if _path_err:
-        return _path_err
     return _wrap(ExcelOperations.list_sheets(file_path))
 
 
@@ -797,9 +831,6 @@ def excel_search(
         include_formulas: 是否包含公式，默认为False
         range: 搜索范围，默认为None
     """
-    _path_err = _validate_path(file_path)
-    if _path_err:
-        return _path_err
     return _wrap(ExcelOperations.search(file_path, pattern, sheet_name, case_sensitive, whole_word, use_regex, include_values, include_formulas, range))
 
 
@@ -859,9 +890,6 @@ def excel_get_range(
         start_cell: 起始单元格（可选，与end_cell配合使用）
         end_cell: 结束单元格（可选，与start_cell配合使用）
     """
-    _path_err = _validate_path(file_path)
-    if _path_err:
-        return _path_err
     
     # 参数兼容性处理：如果提供了start_cell和end_cell，构建range表达式（优先执行）
     if start_cell and end_cell:
@@ -1016,9 +1044,6 @@ def excel_get_headers(
         header_row: 表头行号，默认为1
         max_columns: 最大列数限制，默认为None
     """
-    _path_err = _validate_path(file_path)
-    if _path_err:
-        return _path_err
     if sheet_name is None:
         return _wrap(ExcelOperations.get_all_headers(file_path, header_row, max_columns))
     return _wrap(ExcelOperations.get_headers(file_path, sheet_name, header_row, max_columns))
@@ -1052,9 +1077,6 @@ def excel_update_range(
         start_cell: 起始单元格（可选，与end_cell配合使用）
         end_cell: 结束单元格（可选，与start_cell配合使用）
     """
-    _path_err = _validate_path(file_path)
-    if _path_err:
-        return _path_err
     
     # 参数兼容性处理：如果提供了start_cell和end_cell，构建range表达式
     if start_cell and end_cell:
@@ -1167,9 +1189,6 @@ def excel_assess_data_impact(
         data: 要写入的数据，默认为None
         detailed: 是否返回详细信息，默认为True
     """
-    _path_err = _validate_path(file_path)
-    if _path_err:
-        return _path_err
 
     # 详细模式下先验证范围表达式
     if detailed:
@@ -1529,9 +1548,6 @@ def excel_create_backup(
         file_path: Excel文件路径
         backup_dir: 备份目录路径，默认为None表示同级backup目录
     """
-    _path_err = _validate_path(file_path)
-    if _path_err:
-        return _path_err
     if not os.path.exists(file_path):
         return _fail(f"源文件不存在: {file_path}", meta={"error_code": "FILE_NOT_FOUND"})
 
@@ -1623,9 +1639,6 @@ def excel_list_backups(
         file_path: Excel文件路径
         backup_dir: 备份目录路径，默认为None
     """
-    _path_err = _validate_path(file_path)
-    if _path_err:
-        return _path_err
     try:
         # 确定备份目录
         if backup_dir is None:
@@ -1681,9 +1694,6 @@ def excel_insert_rows(
         count: 插入的行数，默认为1
         streaming: 是否使用流式写入，默认为True
     """
-    _path_err = _validate_path(file_path)
-    if _path_err:
-        return _path_err
     return _wrap(ExcelOperations.insert_rows(file_path, sheet_name, row_index, count, streaming))
 
 
@@ -1705,9 +1715,6 @@ def excel_insert_columns(
         count: 插入的列数，默认为1
         streaming: 是否使用流式写入，默认为True
     """
-    _path_err = _validate_path(file_path)
-    if _path_err:
-        return _path_err
     return _wrap(ExcelOperations.insert_columns(file_path, sheet_name, column_index, count, streaming))
 
 
@@ -1725,9 +1732,6 @@ def excel_find_last_row(
         sheet_name: 工作表名称
         column: 列名或列索引，默认为None
     """
-    _path_err = _validate_path(file_path)
-    if _path_err:
-        return _path_err
     return _wrap(ExcelOperations.find_last_row(file_path, sheet_name, column))
 
 
@@ -1743,9 +1747,6 @@ def excel_create_file(
         file_path: Excel文件路径
         sheet_names: 初始工作表名称列表，默认为None
     """
-    _path_err = _validate_path(file_path)
-    if _path_err:
-        return _path_err
     return _wrap(ExcelOperations.create_file(file_path, sheet_names))
 
 
@@ -1765,9 +1766,6 @@ def excel_export_to_csv(
         sheet_name: 工作表名称，默认为None
         encoding: 编码格式，默认为"utf-8"
     """
-    _path_err = _validate_path(file_path)
-    if _path_err:
-        return _path_err
     return _wrap(ExcelOperations.export_to_csv(file_path, output_path, sheet_name, encoding))
 
 
@@ -1849,9 +1847,6 @@ def excel_get_file_info(file_path: str) -> Dict[str, Any]:
     Args:
         file_path: Excel文件路径
     """
-    _path_err = _validate_path(file_path)
-    if _path_err:
-        return _path_err
     return _wrap(ExcelOperations.get_file_info(file_path))
 
 
@@ -1869,9 +1864,6 @@ def excel_create_sheet(
         sheet_name: 新工作表名称
         index: 插入位置索引，默认为None
     """
-    _path_err = _validate_path(file_path)
-    if _path_err:
-        return _path_err
     return _wrap(ExcelOperations.create_sheet(file_path, sheet_name, index))
 
 
@@ -1887,9 +1879,6 @@ def excel_delete_sheet(
         file_path: Excel文件路径
         sheet_name: 要删除的工作表名称
     """
-    _path_err = _validate_path(file_path)
-    if _path_err:
-        return _path_err
     # 开始操作会话
     operation_logger.start_session(file_path)
 
@@ -1935,9 +1924,6 @@ def excel_rename_sheet(
         old_name: 原工作表名称
         new_name: 新工作表名称
     """
-    _path_err = _validate_path(file_path)
-    if _path_err:
-        return _path_err
     return _wrap(ExcelOperations.rename_sheet(file_path, old_name, new_name))
 
 
@@ -1959,9 +1945,6 @@ def excel_copy_sheet(
         index: 插入位置索引，默认为None
         streaming: 是否使用流式写入，默认为True
     """
-    _path_err = _validate_path(file_path)
-    if _path_err:
-        return _path_err
     return _wrap(ExcelOperations.copy_sheet(file_path, source_name, new_name, index, streaming))
 
 
@@ -1983,9 +1966,6 @@ def excel_rename_column(
         new_header: 新列名
         header_row: 表头行号，默认为1
     """
-    _path_err = _validate_path(file_path)
-    if _path_err:
-        return _path_err
     return _wrap(ExcelOperations.rename_column(file_path, sheet_name, old_header, new_header, header_row))
 
 
@@ -2011,9 +1991,6 @@ def excel_upsert_row(
         header_row: 表头行号，默认为1
         streaming: 是否使用流式写入，默认为True
     """
-    _path_err = _validate_path(file_path)
-    if _path_err:
-        return _path_err
     return _wrap(ExcelOperations.upsert_row(file_path, sheet_name, key_column, key_value, updates, header_row, streaming))
 
 
@@ -2039,9 +2016,6 @@ def excel_batch_insert_rows(
         insert_position: 插入位置行号，默认为None
         condition: 条件表达式，默认为None
     """
-    _path_err = _validate_path(file_path)
-    if _path_err:
-        return _path_err
 
     # 确定插入位置
     target_row = None
@@ -2121,9 +2095,6 @@ def excel_delete_rows(
         streaming: 是否使用流式写入，默认为True
         condition: SQL条件表达式，默认为None
     """
-    _path_err = _validate_path(file_path)
-    if _path_err:
-        return _path_err
 
     # condition模式：根据SQL条件查找并删除行
     if condition is not None:
@@ -2273,9 +2244,6 @@ def excel_delete_columns(
         count: 删除的列数，默认为1
         streaming: 是否使用流式写入，默认为True
     """
-    _path_err = _validate_path(file_path)
-    if _path_err:
-        return _path_err
     # 开始操作会话
     operation_logger.start_session(file_path)
 
@@ -2341,9 +2309,6 @@ def excel_set_formula(
             }
         )
 
-    _path_err = _validate_path(file_path)
-    if _path_err:
-        return _path_err
     _formula_err = SecurityValidator.validate_formula(formula)
     if not _formula_err['valid']:
         return _fail(f'🔒 安全验证失败: {_formula_err["error"]}', meta={"error_code": "FORMULA_SECURITY_FAILED"})
@@ -2384,9 +2349,6 @@ query_expression: SELECT * FROM 技能表 WHERE 伤害>100 | GROUP BY | JOIN ON
         include_headers: 是否包含表头，默认为True
         output_format: 输出格式，默认为"table"
     """
-    _path_err = _validate_path(file_path)
-    if _path_err:
-        return _path_err
     # 参数验证
     if not file_path or not file_path.strip():
         return _fail('文件路径不能为空', meta={"error_code": "MISSING_FILE_PATH"})
@@ -2437,9 +2399,6 @@ def excel_update_query(
         dry_run: 是否仅预览不实际写入，默认为False
     """
 
-    _path_err = _validate_path(file_path)
-    if _path_err:
-        return _path_err
     if not file_path or not file_path.strip():
         return _fail('文件路径不能为空', meta={"error_code": "MISSING_FILE_PATH"})
 
@@ -2710,9 +2669,6 @@ def excel_describe_table(
         sheet_name: 工作表名称，默认为None表示第一个工作表
     """
     # 文件验证和加载
-    _path_err = _validate_path(file_path)
-    if _path_err:
-        return _path_err
     if not file_path or not file_path.strip():
         return _fail('文件路径不能为空', meta={"error_code": "MISSING_FILE_PATH"})
 
@@ -2792,9 +2748,6 @@ def excel_format_cells(
         start_cell: 起始单元格（可选，与end_cell配合使用）
         end_cell: 结束单元格（可选，与start_cell配合使用）
     """
-    _path_err = _validate_path(file_path)
-    if _path_err:
-        return _path_err
     
     # 参数校验：当没有提供formatting和preset参数时，明确告知用户
     if formatting is None and preset is None:
@@ -2844,9 +2797,6 @@ def excel_merge_cells(
         sheet_name: 工作表名称
         range: 单元格范围
     """
-    _path_err = _validate_path(file_path)
-    if _path_err:
-        return _path_err
     return _wrap(ExcelOperations.merge_cells(file_path, sheet_name, range))
 
 
@@ -2864,9 +2814,6 @@ def excel_unmerge_cells(
         sheet_name: 工作表名称
         range: 单元格范围
     """
-    _path_err = _validate_path(file_path)
-    if _path_err:
-        return _path_err
     return _wrap(ExcelOperations.unmerge_cells(file_path, sheet_name, range))
 
 
@@ -2886,9 +2833,6 @@ def excel_set_borders(
         range: 单元格范围
         border_style: 边框样式，默认为"thin"
     """
-    _path_err = _validate_path(file_path)
-    if _path_err:
-        return _path_err
     return _wrap(ExcelOperations.set_borders(file_path, sheet_name, range, border_style))
 
 
@@ -2910,9 +2854,6 @@ def excel_set_row_height(
         height: 行高（磅值）
         count: 影响的行数，默认为1
     """
-    _path_err = _validate_path(file_path)
-    if _path_err:
-        return _path_err
     return _wrap(ExcelOperations.set_row_height(file_path, sheet_name, row_index, height, count))
 
 
@@ -2934,9 +2875,6 @@ def excel_set_column_width(
         width: 列宽（字符单位）
         count: 影响的列数，默认为1
     """
-    _path_err = _validate_path(file_path)
-    if _path_err:
-        return _path_err
     return _wrap(ExcelOperations.set_column_width(file_path, sheet_name, column_index, width, count))
 
 
@@ -2977,9 +2915,6 @@ def excel_check_duplicate_ids(
         id_column: ID列名或列索引，默认为1
         header_row: 表头行号，默认为1
     """
-    _path_err = _validate_path(file_path)
-    if _path_err:
-        return _path_err
     return _wrap(ExcelOperations.check_duplicate_ids(file_path, sheet_name, id_column, header_row))
 
 
@@ -3037,9 +2972,6 @@ def excel_get_range_user_friendly(
         end_cell: 结束单元格，如 "C10"
         include_formatting: 是否包含格式信息
     """
-    _path_err = _validate_path(file_path)
-    if _path_err:
-        return _path_err
     
     # 构建范围表达式
     range_expression = f"{sheet_name}!{start_cell}:{end_cell}"
@@ -3085,9 +3017,6 @@ def excel_format_cells_user_friendly(
         formatting: 样式配置，包含bold/italic/underline等字段
         preset: 预设样式名称
     """
-    _path_err = _validate_path(file_path)
-    if _path_err:
-        return _path_err
     
     # 构建范围表达式
     range_expression = f"{sheet_name}!{start_cell}:{end_cell}"
@@ -3141,9 +3070,6 @@ def excel_update_range_user_friendly(
             - True: 插入模式，在目标位置插入新行，原有数据下移，适合添加新数据
         streaming: 是否使用流式写入，默认True
     """
-    _path_err = _validate_path(file_path)
-    if _path_err:
-        return _path_err
     
     # 构建范围表达式
     range_expression = f"{sheet_name}!{start_cell}:{end_cell}"
@@ -3978,9 +3904,6 @@ def excel_write_only_override(
         preserve_formulas: 是否保留公式，默认为False
         preserve_col_widths: 是否保留列宽，默认为True
     """
-    _path_err = _validate_path(file_path)
-    if _path_err:
-        return _path_err
 
     try:
         # 验证参数

@@ -28,7 +28,7 @@
         "崩溃或错误自动创建REQ",
         "优先从Stack Overflow/GitHub Issues搜索真实用户遇到的奇怪问题"
       ],
-      "notes": "第243轮测试10个案例6通过4失败(REQ-038/039/040)；第245轮测试10个案例9通过1失败(REQ-041)；第247轮测试5个案例全通过(REQ-042修复)"
+      "notes": "第243轮测试10个案例6通过4失败(REQ-038/039/040)；第245轮测试10个案例9通过1失败(REQ-041)；第247轮测试5个案例全通过(REQ-042修复)；第248轮测试16个案例15通过1信息"
     },
     "REQ-037": {
       "title": "线程安全：formula_cache并发访问保护",
@@ -45,14 +45,6 @@
       "source": "边缘案例测试",
       "description": "当工作表在远端单元格（如Z100）仅有格式化而无数据时，excel_get_file_info返回total_rows=100、total_cols=26，与实际数据范围不符。",
       "notes": "应区分data_range和formatted_range，或标注实际数据维度"
-    },
-    "REQ-042": {
-      "title": "BUG：_preprocess_quoted_identifiers未处理SQL转义引号",
-      "priority": "P2",
-      "status": "DONE",
-      "source": "自审",
-      "description": "_preprocess_quoted_identifiers使用简单的字符串替换处理双引号列名，如果SQL中包含转义引号（如\"col\\\"name\"\"），可能导致错误替换。",
-      "notes": "第247轮修复：改用AST方法精确替换列引用位置（SELECT/ORDER BY/GROUP BY），WHERE值位置保持不变；新增_col_map_cache解决缓存命中时映射丢失问题"
     }
   }
 }
