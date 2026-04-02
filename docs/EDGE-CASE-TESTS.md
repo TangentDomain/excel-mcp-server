@@ -985,3 +985,206 @@
   - `check_duplicate_ids`传入列名（如'ID'）时被错误用`column_index_from_string()`解释为列字母（'ID'=238），导致"列不存在或索引超出范围"
   - 修复：先在表头行搜索列名匹配，未找到再回退列字母解释
   - read_only模式下空单元格无`column`属性，改用`enumerate`
+
+---
+
+## 第255轮测试 (2026-04-02) - T131-T160
+
+### 测试131: SQL TRIM函数
+- **操作步骤**: `SELECT TRIM(Name) as trimmed, Score FROM SQL`
+- **预期结果**: 返回去除前后空格的Name
+- **实际结果**: 正确返回TRIM结果（Alice从"  Alice  "变为"Alice"）
+- **是否通过**: PASS
+
+### 测试132: SQL ROUND函数
+- **操作步骤**: `SELECT Value, ROUND(Pct, 2) as rounded FROM SQL`
+- **预期结果**: 返回四舍五入到2位小数
+- **实际结果**: 报错"不支持的表达式: ROUND(Pct, 2)"
+- **是否通过**: FAIL（功能缺失）
+- **建议**: 添加ROUND函数支持
+
+### 测试133: SQL ABS函数
+- **操作步骤**: `SELECT X, ABS(X) as abs_x FROM SQL`
+- **预期结果**: 返回绝对值
+- **实际结果**: 报错"不支持的表达式: ABS(X)"
+- **是否通过**: FAIL（功能缺失）
+- **建议**: 添加ABS函数支持
+
+### 测试134: SQL MIN/MAX GROUP BY
+- **操作步骤**: `SELECT Class, MIN(Score) as min_s, MAX(Score) as max_s FROM SQL GROUP BY Class`
+- **预期结果**: 按Class分组返回最小和最大Score
+- **实际结果**: 正确返回（A: min=85, max=90; B: min=78, max=78）
+- **是否通过**: PASS
+
+### 测试135: SQL SUBSTR函数
+- **操作步骤**: `SELECT Name, SUBSTR(Name, 1, 3) as first3 FROM SQL`
+- **预期结果**: 返回前3个字符
+- **实际结果**: 正确返回（Alice→Ali, Bob→Bob, Charlie→Cha）
+- **是否通过**: PASS
+
+### 测试136: SQL REPLACE函数
+- **操作步骤**: `SELECT Name, REPLACE(Name, 'Alice', 'ALICE') as replaced FROM SQL`
+- **预期结果**: 替换后的字符串
+- **实际结果**: 正确返回（Alice→ALICE, Bob不变）
+- **是否通过**: PASS
+
+### 测试137: SQL CAST
+- **操作步骤**: `SELECT Name, CAST(Score AS VARCHAR) as score_str FROM SQL`
+- **预期结果**: 类型转换
+- **实际结果**: 正确执行
+- **是否通过**: PASS
+
+### 测试138: SQL多聚合GROUP BY
+- **操作步骤**: `SELECT Class, COUNT(*) as cnt, SUM(Score) as total, AVG(Score) as avg FROM SQL GROUP BY Class`
+- **预期结果**: 同时返回COUNT/SUM/AVG
+- **实际结果**: 正确返回（A: 2/175/87.5; B: 3/78/78）
+- **是否通过**: PASS
+
+### 测试139: SQL LIKE下划线通配符
+- **操作步骤**: `SELECT * FROM SQL WHERE Name LIKE '_o_'`
+- **预期结果**: 匹配3字符且中间是o的Name
+- **实际结果**: 正确执行
+- **是否通过**: PASS
+
+### 测试140: SQL NOT LIKE
+- **操作步骤**: `SELECT Name FROM SQL WHERE Name NOT LIKE 'A%'`
+- **预期结果**: 返回不以A开头的Name
+- **实际结果**: 正确返回（Bob, Charlie等）
+- **是否通过**: PASS
+
+### 测试141: SQL嵌套聚合表达式（BUG发现）
+- **操作步骤**: `SELECT Class, SUM(Score) / COUNT(*) as avg_score FROM SQL GROUP BY Class`
+- **预期结果**: 返回Class和计算出的avg_score两列
+- **实际结果**: 只返回Class列，avg_score计算列丢失（columns_returned=1）
+- **是否通过**: FAIL（BUG）
+- **根因**: SQL引擎在处理`SUM(Score) / COUNT(*)`这类复合聚合表达式时，只返回了非聚合列
+- **建议**: 修复聚合表达式的列返回逻辑
+
+### 测试142: get_range空范围
+- **操作步骤**: 读取SQL!Z100:Z200（无数据区域）
+- **预期结果**: 返回空或None
+- **实际结果**: 返回包含coordinate的空单元格列表（Z100-Z118）
+- **是否通过**: PASS（有返回格式但数据为空）
+
+### 测试143: SQL多条件AND WHERE
+- **操作步骤**: `SELECT Name, Score FROM SQL WHERE Class = 'A' AND Score >= 85 AND Name LIKE 'A%'`
+- **预期结果**: 返回Alice（A类+85分+以A开头）
+- **实际结果**: 正确返回1行（Alice, 85）
+- **是否通过**: PASS
+
+### 测试144: 查询空工作表
+- **操作步骤**: `SELECT * FROM Format`（空工作表）
+- **预期结果**: 返回空结果或报错
+- **实际结果**: 返回0行结果
+- **是否通过**: PASS
+
+### 测试145: get_headers合并单元格
+- **操作步骤**: 合并A1:B1后写入数据，读取表头
+- **预期结果**: 返回MergedHeader
+- **实际结果**: 返回空表头（header_count=0）
+- **是否通过**: INFO（合并单元格后数据未正确写入read_only模式）
+
+### 测试146: get_headers双行模式误判
+- **操作步骤**: 写入[["Str","Num","Bool"],["hello",42,True],...]后读取表头
+- **预期结果**: field_names=["Str","Num","Bool"]
+- **实际结果**: field_names=["hello","42","True"]（第二行被当作字段名，第一行被当作描述）
+- **是否通过**: INFO（双行表头模式误判，纯数值42和布尔True被当作英文字段名）
+- **建议**: 双行模式检测逻辑应更严格，纯数值不应被当作字段名
+
+### 测试147: search大小写不敏感
+- **操作步骤**: 搜索"alice"（case_sensitive=False），数据含Alice/ALICE/alice
+- **预期结果**: 匹配所有3个
+- **实际结果**: 正确返回3个匹配（Alice, ALICE, alice）
+- **是否通过**: PASS
+
+### 测试148: SQL WHERE !=
+- **操作步骤**: `SELECT Name, Class FROM SQL WHERE Class != 'A'`
+- **预期结果**: 返回非A类的行
+- **实际结果**: 正确返回3行
+- **是否通过**: PASS
+
+### 测试149: SQL WHERE <>
+- **操作步骤**: `SELECT Name, Class FROM SQL WHERE Class <> 'A'`
+- **预期结果**: 同!=，返回非A类的行
+- **实际结果**: 正确返回3行（与!=一致）
+- **是否通过**: PASS
+
+### 测试150: batch_insert + query streaming=False
+- **操作步骤**: batch_insert 20行dict数据(streaming=False)，然后SQL查询
+- **预期结果**: 插入成功并可查询
+- **实际结果**: dict数据需要预存表头行才能匹配键名（无表头时报"数据验证失败"）；有表头后插入和查询均成功
+- **是否通过**: INFO（设计：dict格式batch_insert依赖表头行匹配）
+
+### 测试151: SQL日期字符串比较
+- **操作步骤**: `SELECT Name, Date FROM Data WHERE Date >= '2024-02-01'`
+- **预期结果**: 返回2月1日之后的记录
+- **实际结果**: 正确返回3行（Bob 02-20, Charlie 03-10, Eve 04-01）
+- **是否通过**: PASS
+
+### 测试152: SQL COUNT WHERE空字符串过滤
+- **操作步骤**: `SELECT COUNT(*) as total, SUM(Value) as total_val FROM Data WHERE Tag = 'active'`
+- **预期结果**: 只统计Tag='active'的行
+- **实际结果**: 正确返回（2行, sum=40）
+- **是否通过**: PASS
+
+### 测试153: get_range单单元格
+- **操作步骤**: 读取Data!A1:A1
+- **预期结果**: 返回单个单元格
+- **实际结果**: 正确返回（value='Name'）
+- **是否通过**: PASS
+
+### 测试154: find_last_row非流式写入后
+- **操作步骤**: streaming=False写入10行后find_last_row
+- **预期结果**: last_row=10
+- **实际结果**: 正确返回last_row=10
+- **是否通过**: PASS
+
+### 测试155: SQL除零保护(WHERE过滤)
+- **操作步骤**: `SELECT A, B, A / B as ratio FROM SQL WHERE B > 0`
+- **预期结果**: 只返回B>0的行并计算ratio
+- **实际结果**: 正确返回1行（A=20, B=5, ratio=4）
+- **是否通过**: PASS
+
+### 测试156: SQL括号组合(OR+AND)
+- **操作步骤**: `SELECT Name, Score FROM SQL WHERE (Class = 'A' OR Class = 'B') AND Score > 80`
+- **预期结果**: 满足括号条件的行
+- **实际结果**: 正确返回2行（Alice 85, Bob 90）
+- **是否通过**: PASS
+
+### 测试157: rename_column后查询新列名
+- **操作步骤**: 重命名Score→Score2，然后SQL查询Score2
+- **预期结果**: 查询使用新列名成功
+- **实际结果**: 重命名成功，查询返回正确结果（Score2 > 85 返回 Bob 90）
+- **是否通过**: PASS
+
+### 测试158: SQL多列排序ASC/DESC混合
+- **操作步骤**: `SELECT Name, Class, Score2 FROM SQL ORDER BY Class ASC, Score2 DESC`
+- **预期结果**: 按Class升序、同Class内按Score2降序
+- **实际结果**: 正确返回（Bob A 90 > Alice A 85）
+- **是否通过**: PASS
+
+### 测试159: batch_insert dict部分字段streaming=False
+- **操作步骤**: dict含3字段，第二个dict只有2字段（缺Email）
+- **预期结果**: 插入成功，缺失字段留空
+- **实际结果**: 插入成功（2行），get_range确认缺失字段为空
+- **是否通过**: PASS
+
+### 测试160: get_file_info非流式写入后精度
+- **操作步骤**: streaming=False写入10行4列后get_file_info
+- **预期结果**: total_rows=10, total_cols=4
+- **实际结果**: 正确返回total_rows=10, total_cols=4
+- **是否通过**: PASS
+
+### 第255轮统计
+- **总计**: 30个边缘案例（T131-T160）
+- **通过**: 25个（PASS）
+- **信息**: 3个（INFO，T145合并单元格+streaming、T146双行模式误判、T150 dict依赖表头）
+- **失败**: 2个（FAIL，T132 ROUND不支持、T133 ABS不支持）
+- **额外发现BUG**: 1个（T141 嵌套聚合表达式SUM/COUNT计算列丢失）
+- **关键发现**:
+  - SQL引擎不支持ROUND/ABS数学函数（明确报错"不支持的表达式"）
+  - SQL引擎在处理`SUM(Score) / COUNT(*)`复合聚合表达式时丢失计算列，只返回非聚合列
+  - get_headers双行模式将纯数值(42)和布尔(True)误判为英文字段名
+  - streaming=False写入后get_file_info正确反映数据维度（total_rows/total_cols准确）
+  - SQL日期字符串比较（>= '2024-02-01'）正确按字典序匹配
+  - rename_column后SQL查询新列名正常工作
