@@ -45,6 +45,20 @@
       "source": "边缘案例测试",
       "description": "当工作表在远端单元格（如Z100）仅有格式化而无数据时，excel_get_file_info返回total_rows=100、total_cols=26，与实际数据范围不符。",
       "notes": "应区分data_range和formatted_range，或标注实际数据维度"
+    },
+    "REQ-043": {
+      "title": "安全回归：commit e9590b0移除39处_validate_path调用未替换为装饰器",
+      "priority": "P0",
+      "status": "OPEN",
+      "source": "自审",
+      "description": "commit e9590b0尝试实现REQ-034（路径验证装饰器），移除了39处_path_err=_validate_path(file_path)调用，但@_validate_file_path装饰器从未被正确应用到工具函数上。导致路径遍历安全检查（..检测）从大部分工具函数中丢失。ExcelValidator.validate_file_path仅检查文件存在和扩展名，不检查路径遍历。",
+      "acceptance_criteria": [
+        "所有接受file_path参数的工具函数都有路径遍历保护",
+        "方案A：正确应用@_validate_file_path装饰器到所有工具函数",
+        "方案B：回滚e9590b0的_validate_path移除，恢复原始调用",
+        "安全测试：验证../../etc/passwd等路径遍历被拒绝"
+      ],
+      "notes": "当前仅10处_validate_path调用保留（部分函数如excel_search_directory/excel_restore_backup/excel_import_from_csv等）；39处被移除未替换"
     }
   }
 }
