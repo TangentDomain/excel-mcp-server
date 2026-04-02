@@ -424,19 +424,22 @@ class ExcelComparer:
         """获取工作表结构变化"""
         structural_changes = {}
 
-        # 比较行数和列数
-        if sheet1.max_row != sheet2.max_row:
+        # 比较行数和列数（空工作表max_row/max_column可能为None）
+        mr1, mr2 = sheet1.max_row or 0, sheet2.max_row or 0
+        mc1, mc2 = sheet1.max_column or 0, sheet2.max_column or 0
+
+        if mr1 != mr2:
             structural_changes['max_row'] = {
-                'sheet1': sheet1.max_row,
-                'sheet2': sheet2.max_row,
-                'difference': sheet2.max_row - sheet1.max_row
+                'sheet1': mr1,
+                'sheet2': mr2,
+                'difference': mr2 - mr1
             }
 
-        if sheet1.max_column != sheet2.max_column:
+        if mc1 != mc2:
             structural_changes['max_column'] = {
-                'sheet1': sheet1.max_column,
-                'sheet2': sheet2.max_column,
-                'difference': sheet2.max_column - sheet1.max_column
+                'sheet1': mc1,
+                'sheet2': mc2,
+                'difference': mc2 - mc1
             }
 
         return structural_changes
