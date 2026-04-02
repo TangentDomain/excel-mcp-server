@@ -11,6 +11,17 @@
       "description": "多个硬编码值应提取为可配置常量：max_files=100, query_cache_ttl=300, target_mb=512.0, MAX_RESULT_ROWS=500等。",
       "notes": "分布在server.py和advanced_sql_query.py中"
     },
+    "REQ-047": {
+      "title": "重构：抽取Sheet验证公共方法消除重复代码",
+      "type": "refactor",
+      "priority": "P2",
+      "status": "OPEN",
+      "source": "自审",
+      "attempts": 0,
+      "last_failure": "",
+      "description": "server.py中多个user_friendly函数（get_range/update_range/format_cells等）重复执行相同的Sheet存在性验证逻辑（加载workbook→检查sheet名→返回错误）。应抽取为公共工具函数。",
+      "notes": "第259轮自审发现，涉及server.py约4处重复"
+    },
     "REQ-036": {
       "title": "边缘案例自动化测试：每轮自动搜索并验证奇怪场景",
       "type": "feature",
