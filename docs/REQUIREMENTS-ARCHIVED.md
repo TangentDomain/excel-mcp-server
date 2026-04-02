@@ -164,6 +164,33 @@
       "description": "commit e9590b0尝试实现REQ-034（路径验证装饰器），移除了39处_path_err=_validate_path(file_path)调用，但@_validate_file_path装饰器从未被正确应用到工具函数上。导致路径遍历安全检查从大部分工具函数中丢失。",
       "notes": "第251轮修复：为10个MCP工具函数添加@_validate_file_path装饰器，2个函数添加内联_validate_path调用，v1.7.4发布",
       "archived_at": "2026-04-02"
+    },
+    "REQ-034": {
+      "title": "代码质量：路径验证逻辑抽取为装饰器",
+      "status": "DONE",
+      "priority": "P2",
+      "source": "自审",
+      "description": "server.py中_validate_path检查模式重复出现10+次，抽取为装饰器减少重复代码。",
+      "notes": "REQ-043修复过程中已为20+个MCP工具函数应用@_validate_file_path装饰器，剩余少量内联调用为特殊场景(merge/batch)",
+      "archived_at": "2026-04-02"
+    },
+    "REQ-037": {
+      "title": "线程安全：formula_cache并发访问保护",
+      "status": "DONE",
+      "priority": "P2",
+      "source": "自审",
+      "description": "formula_cache.py中的缓存操作在并发MCP调用场景下缺乏线程安全保护，可能导致缓存数据竞争。",
+      "notes": "已实现：threading.RLock()保护所有公共方法(get/put/cache_workbook/get_cached_workbook/clear/invalidate_file/get_stats)",
+      "archived_at": "2026-04-02"
+    },
+    "REQ-040": {
+      "title": "信息不准确：稀疏工作表file_info维度被格式化膨胀",
+      "status": "DONE",
+      "priority": "P2",
+      "source": "边缘案例测试",
+      "description": "当工作表在远端单元格（如Z100）仅有格式化而无数据时，excel_get_file_info返回total_rows=100、total_cols=26，与实际数据范围不符。",
+      "notes": "第252轮修复：get_file_info区分实际数据维度和格式化维度，仅当两者不同时才额外报告formatted_rows/formatted_cols",
+      "archived_at": "2026-04-02"
     }
   }
 }
