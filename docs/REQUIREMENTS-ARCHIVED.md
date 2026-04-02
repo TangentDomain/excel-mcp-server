@@ -191,6 +191,33 @@
       "description": "当工作表在远端单元格（如Z100）仅有格式化而无数据时，excel_get_file_info返回total_rows=100、total_cols=26，与实际数据范围不符。",
       "notes": "第252轮修复：get_file_info区分实际数据维度和格式化维度，仅当两者不同时才额外报告formatted_rows/formatted_cols",
       "archived_at": "2026-04-02"
+    },
+    "REQ-044": {
+      "title": "find_last_row列名查找与check_duplicate_ids一致化",
+      "status": "DONE",
+      "priority": "P2",
+      "source": "自审",
+      "description": "find_last_row中使用column_index_from_string直接解释列参数，与check_duplicate_ids修复后的行为不一致。",
+      "notes": "第257轮修复：先查表头匹配列名，找不到再回退列字母解释",
+      "archived_at": "2026-04-02"
+    },
+    "REQ-045": {
+      "title": "batch_insert_rows insert_position模块导入错误",
+      "status": "DONE",
+      "priority": "P2",
+      "source": "边缘案例测试",
+      "description": "batch_insert_rows指定insert_position时报错模块路径有误。",
+      "notes": "第257轮修复：ExcelWriter导入路径从api.excel_writer改为core.excel_writer",
+      "archived_at": "2026-04-02"
+    },
+    "REQ-046": {
+      "title": "delete_rows condition数值类型比较问题",
+      "status": "DONE",
+      "priority": "P2",
+      "source": "自审",
+      "description": "delete_rows使用condition参数时，对数值列返回0行删除。疑似条件解析将数值列作为字符串处理。",
+      "notes": "第257轮修复：df.query前用pd.to_numeric(errors='ignore')转换数值列",
+      "archived_at": "2026-04-02"
     }
   }
 }
