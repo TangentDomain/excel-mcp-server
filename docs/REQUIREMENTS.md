@@ -8,6 +8,14 @@
       "description": "多个硬编码值应提取为可配置常量：max_files=100, query_cache_ttl=300, target_mb=512.0, MAX_RESULT_ROWS=500等。",
       "notes": "分布在server.py和advanced_sql_query.py中"
     },
+    "REQ-044": {
+      "title": "find_last_row列名查找与check_duplicate_ids一致化",
+      "priority": "P2",
+      "status": "OPEN",
+      "source": "自审",
+      "description": "find_last_row中使用column_index_from_string直接解释列参数，与check_duplicate_ids修复后的行为不一致。当用户传入列名(如'ID')时会被错误解释为列字母。应抽取公共列解析方法，统一先查表头再回退列字母的逻辑。",
+      "notes": "涉及excel_operations.py的find_last_row(~L1786)和check_duplicate_ids(~L1934)"
+    },
     "REQ-036": {
       "title": "边缘案例自动化测试：每轮自动搜索并验证奇怪场景",
       "priority": "P1",
