@@ -3056,8 +3056,8 @@ def excel_format_cells_user_friendly(
             )
         
         # 调用原有的API
-        result = ExcelOperations.update_range_format(
-            file_path, range_expression, formatting, preset
+        result = ExcelOperations.format_cells(
+            file_path, sheet_name, f"{start_cell}:{end_cell}", formatting, preset
         )
         return _wrap(result)
         
