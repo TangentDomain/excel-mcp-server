@@ -1301,6 +1301,10 @@ class ExcelWriter:
                 vertical=align_config.get('vertical', cell.alignment.vertical)
             )
 
+        # 数字格式
+        if 'number_format' in formatting:
+            cell.number_format = formatting['number_format']
+
     def _parse_and_resolve_sheet(self, workbook, range_expression: str,
                                   sheet_name: Optional[str] = None):
         """解析范围表达式并获取工作表，消除merge/unmerge/borders的重复逻辑
