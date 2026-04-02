@@ -1,23 +1,22 @@
-# NOW.md - 第246轮
+# NOW.md - 第247轮
 
 ## 当前状态
-- **轮次**: 第246轮
-- **时间**: 2026-04-01
+- **轮次**: 第247轮
+- **时间**: 2026-04-02
 
 ## 完成工作
-- 文档维护检查通过（删除comprehensive_api_test.py/watchdog_excel_test.py）
+- 文档维护检查通过（REQ-039/041归档，版本一致）
 - CI检查通过（green）
-- REQ-039: list_sheets增加sheet_state字段区分隐藏工作表
-  - SheetInfo新增sheet_state字段(visible/hidden/veryHidden)
-  - calamine通过sheets_metadata读取可见性（int映射避免不可哈希问题）
-  - openpyxl通过sheet.sheet_state读取可见性
-  - ExcelOperations响应中每张工作表返回state字段
-- v1.7.0发布到PyPI
+- REQ-036: 边缘案例测试21 - SQL双引号标识符与字符串字面量冲突
+- REQ-042: 修复_preprocess_quoted_identifiers两个BUG
+  - AST方法精确替换：只替换列引用位置（SELECT/ORDER BY/GROUP BY/HAVING），WHERE值位置保持不变
+  - 新增_col_map_cache解决缓存命中时列名映射丢失
+- v1.7.1发布到PyPI
 
 ## 关键指标
-- **版本**: v1.7.0 (已发布PyPI)
-- **测试**: 850 passed + MCP冒烟测试通过
-- **Commit**: c704433 (develop), 6059e3d (main)
+- **版本**: v1.7.1 (已发布PyPI)
+- **测试**: 851 passed + MCP冒烟测试通过
+- **Commit**: bd729a1 (develop), cd1783a (main)
 
 ## 待处理
 - [ ] REQ-036: 边缘案例自动化测试（每轮执行1个新案例）
