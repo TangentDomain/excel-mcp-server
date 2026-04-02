@@ -318,9 +318,9 @@ class ExcelComparer:
         """传统的逐单元格比较"""
         differences = []
 
-        # 获取两个工作表的实际范围
-        max_row = max(sheet1.max_row, sheet2.max_row)
-        max_col = max(sheet1.max_column, sheet2.max_column)
+        # 获取两个工作表的实际范围（空工作表max_row/max_column可能为None）
+        max_row = max(sheet1.max_row or 0, sheet2.max_row or 0)
+        max_col = max(sheet1.max_column or 0, sheet2.max_column or 0)
 
         # 遍历所有单元格
         for row in range(1, max_row + 1):
@@ -520,7 +520,7 @@ class ExcelComparer:
     def _extract_headers(self, sheet, header_row: int) -> List[str]:
         """从工作表中提取表头"""
         headers = []
-        for col in range(1, sheet.max_column + 1):
+        for col in range(1, (sheet.max_column or 0) + 1):
             cell_value = sheet.cell(row=header_row, column=col).value
             if cell_value is not None:
                 headers.append(str(cell_value))
@@ -536,7 +536,7 @@ class ExcelComparer:
         id_col_index = self._get_id_column_index(id_column, headers)
 
         # 从表头行的下一行开始提取数据
-        for row_num in range(header_row + 1, sheet.max_row + 1):
+        for row_num in range(header_row + 1, (sheet.max_row or 0) + 1):
             row_data = {}
             row_id = None
 
