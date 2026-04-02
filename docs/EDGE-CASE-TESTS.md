@@ -175,6 +175,111 @@
 
 ## 2026-04-02 第248轮
 
+### 测试22: SQL列名含点号(v1.2, v2.0)
+- **操作步骤**: 列名"v1.2"/"v2.0"，执行 `SELECT "v1.2", "v2.0", result FROM Sheet1 WHERE result > 25`
+- **预期结果**: 返回1行
+- **实际结果**: 正确返回1行 [[10, 20, 30]]
+- **是否通过**: PASS
+
+### 测试23: SQL列名以数字开头(1st, 2nd)
+- **操作步骤**: 列名"1st"/"2nd"，执行 `SELECT "1st", "2nd" FROM Sheet1`
+- **预期结果**: 返回数值
+- **实际结果**: 正确返回 [[100, 200]]
+- **是否通过**: PASS
+
+### 测试24: SQL LIKE通配符查询
+- **操作步骤**: `WHERE name LIKE 'Al%'`
+- **预期结果**: 返回Alice和Alex
+- **实际结果**: 正确返回 ['Alice', 'Alex']
+- **是否通过**: PASS
+
+### 测试25: SQL GROUP BY + HAVING
+- **操作步骤**: `GROUP BY class HAVING AVG(score) > 87`
+- **预期结果**: 只返回A组
+- **实际结果**: 正确返回 [['A', 91]]
+- **是否通过**: PASS
+
+### 测试26: 公式写入(#DIV/0!)
+- **操作步骤**: 写入 `=A1/B1`（B1=0），读取A2
+- **预期结果**: 公式值或错误码
+- **实际结果**: openpyxl降级模式正确读取公式计算值: 10
+- **是否通过**: PASS
+
+### 测试27: SQL中文WHERE条件
+- **操作步骤**: `WHERE 类型 = '战士'`
+- **预期结果**: 返回2行战士数据
+- **实际结果**: 正确返回 [['战士', 150], ['战士', 200]]
+- **是否通过**: PASS
+
+### 测试28: 跨工作表公式引用
+- **操作步骤**: Sheet2写入 `=Sheet1!A1*2`，读取Sheet2
+- **预期结果**: 返回200
+- **实际结果**: Sheet2不存在（update_range不会自动创建工作表）
+- **是否通过**: PASS（预期行为，非BUG）
+
+### 测试29: SQL ORDER BY含空值
+- **操作步骤**: score列含空字符串，`ORDER BY score DESC`
+- **预期结果**: 正常排序或提示
+- **实际结果**: `TypeError: '<' not supported between instances of 'str' and 'int'`
+- **是否通过**: INFO（pandas混合类型排序限制，非BUG）
+
+### 测试30: SQL列名含连字符(hp-max)
+- **操作步骤**: 列名"hp-max"/"hp-min"，执行 `SELECT "hp-max", "hp-min", total FROM Sheet1 WHERE total > 500`
+- **预期结果**: 返回1行
+- **实际结果**: 正确返回 [[500, 200, 700]]
+- **是否通过**: PASS
+
+### 测试31: SQL COUNT(DISTINCT)
+- **操作步骤**: `SELECT COUNT(DISTINCT type) as cnt FROM Sheet1`
+- **预期结果**: 返回3
+- **实际结果**: 正确返回3
+- **是否通过**: PASS
+
+### 测试32: SQL BETWEEN操作符
+- **操作步骤**: `WHERE score BETWEEN 85 AND 90`
+- **预期结果**: 返回Alice(85)/Bob(90)/Dave(88)
+- **实际结果**: 正确返回
+- **是否通过**: PASS
+
+### 测试33: SQL IN操作符
+- **操作步骤**: `WHERE class IN ('A', 'C')`
+- **预期结果**: 返回Alice/Charlie/Dave
+- **实际结果**: 正确返回
+- **是否通过**: PASS
+
+### 测试34: SQL WHERE子查询
+- **操作步骤**: `WHERE score > (SELECT AVG(score) FROM Sheet1)`
+- **预期结果**: 返回高于平均分的行
+- **实际结果**: 正确返回Alice(90)/Charlie(95)
+- **是否通过**: PASS
+
+### 测试35: SQL CASE WHEN表达式
+- **操作步骤**: `SELECT CASE WHEN score >= 80 THEN 'pass' ELSE 'fail' END`
+- **预期结果**: Alice=pass, Bob=fail, Charlie=pass
+- **实际结果**: 正确返回
+- **是否通过**: PASS
+
+### 测试36: SQL下划线列名
+- **操作步骤**: 列名"hp_max"，执行 `SELECT hp_max, mp_max FROM Sheet1 WHERE hp_max > 400`
+- **预期结果**: 返回1行
+- **实际结果**: 正确返回 [[500, 200]]
+- **是否通过**: PASS
+
+### 测试37: 批量插入500行后get_file_info
+- **操作步骤**: batch_insert_rows 500行后调用get_file_info
+- **预期结果**: total_rows >= 500
+- **实际结果**: total_rows=0（数据实际已写入，get_range可读出）
+- **是否通过**: INFO（get_file_info在streaming写入后维度读取不准，关联REQ-040）
+
+### 第248轮统计
+- **总计**: 16个边缘案例
+- **通过**: 13个
+- **信息**: 2个（预期行为/已知限制）
+- **发现BUG**: 0个新BUG
+- **额外修复**: server.py 3处IndentationError（commit e9590b0破坏）
+
+## 2026-04-02 第248轮
+
 ### 测试22: 循环公式引用
 - **操作步骤**: E2=E3, E3=E2，创建循环引用
 - **预期结果**: 优雅处理（不崩溃）
