@@ -49,7 +49,7 @@
     "REQ-043": {
       "title": "安全回归：commit e9590b0移除39处_validate_path调用未替换为装饰器",
       "priority": "P0",
-      "status": "OPEN",
+      "status": "DONE",
       "source": "自审",
       "description": "commit e9590b0尝试实现REQ-034（路径验证装饰器），移除了39处_path_err=_validate_path(file_path)调用，但@_validate_file_path装饰器从未被正确应用到工具函数上。导致路径遍历安全检查（..检测）从大部分工具函数中丢失。ExcelValidator.validate_file_path仅检查文件存在和扩展名，不检查路径遍历。",
       "acceptance_criteria": [
@@ -58,7 +58,7 @@
         "方案B：回滚e9590b0的_validate_path移除，恢复原始调用",
         "安全测试：验证../../etc/passwd等路径遍历被拒绝"
       ],
-      "notes": "当前仅10处_validate_path调用保留（部分函数如excel_search_directory/excel_restore_backup/excel_import_from_csv等）；39处被移除未替换"
+      "notes": "第251轮修复：为10个MCP工具函数添加@_validate_file_path装饰器，2个函数添加内联_validate_path调用，v1.7.4发布"
     }
   }
 }

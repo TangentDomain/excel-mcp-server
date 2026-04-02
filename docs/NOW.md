@@ -1,26 +1,21 @@
-# NOW.md - 第249轮
+# NOW.md - 第251轮
 
 ## 当前状态
-- **轮次**: 第249轮
+- **轮次**: 第251轮
 - **时间**: 2026-04-02
 
 ## 完成工作
-- 文档维护检查通过（REQ-042归档为DONE，JSON校验通过）
-- CI检查通过（green）
-- 发现并修复server.py 3处IndentationError（commit e9590b0将def行替换为@_validate_file_path()装饰器）
-  - start_session / validate_file_path / validate_file_size 方法定义被破坏
-- REQ-036: 边缘案例测试（16个案例）
-  - SQL: 点号列名/数字开头列名/LIKE/GROUP BY+HAVING/COUNT DISTINCT/BETWEEN/IN/WHERE子查询/CASE WHEN/连字符列名/下划线列名/中文WHERE
-  - 公式: #DIV/0!写入读取
-  - 批量: 500行batch_insert + get_file_info维度
-  - 13通过/2信息(预期行为)/1信息(已知限制)
-  - 0个新BUG发现
-- v1.7.2发布到PyPI
+- 文档维护检查通过
+- REQ-043: 安全回归修复 - 为所有接受file_path的MCP工具添加路径遍历保护
+  - 10个函数添加@_validate_file_path装饰器
+  - 2个函数(excel_merge_files/excel_merge_multiple_files)添加内联_validate_path调用
+  - excel_merge_files补充output_path验证
+- v1.7.4发布到PyPI
 
 ## 关键指标
-- **版本**: v1.7.2 (已发布PyPI)
+- **版本**: v1.7.4 (已发布PyPI)
 - **测试**: 851 passed + MCP冒烟测试通过
-- **Commit**: 815462e (develop), ce70508 (main)
+- **Commit**: 25cfd24 (develop), dd93f7e (main)
 
 ## 待处理
 - [ ] REQ-036: 边缘案例自动化测试（持续执行）
