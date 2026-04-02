@@ -807,40 +807,56 @@ class ExcelManager:
             # 获取文件格式
             file_format = Path(file_path).suffix.lower().lstrip('.')
 
-            # 加载工作簿获取详细信息
-            workbook = load_workbook(file_path, read_only=True)
+            # 加载工作簿获取详细信息（非read_only模式以获取准确数据维度）
+            workbook = load_workbook(file_path)
             sheet_count = len(workbook.sheetnames)
             sheet_names = workbook.sheetnames
             has_macros = file_format == 'xlsm'
 
-            # 简单统计数据行数（使用第一个工作表）
+            # 统计第一个工作表的行列范围
             total_rows = 0
             total_cols = 0
+            formatted_rows = 0
+            formatted_cols = 0
             if workbook.worksheets:
-                ws = workbook.worksheets[0]  # 使用第一个工作表
+                ws = workbook.worksheets[0]
+                # 格式化范围（包含仅有格式无数据的单元格）
                 if ws.max_row and ws.max_column:
-                    total_rows = ws.max_row
-                    total_cols = ws.max_column
+                    formatted_rows = ws.max_row
+                    formatted_cols = ws.max_column
+                # 实际数据范围（仅含非空值单元格）
+                for row in ws.iter_rows():
+                    for cell in row:
+                        if cell.value is not None:
+                            total_rows = max(total_rows, cell.row)
+                            total_cols = max(total_cols, cell.column)
 
             workbook.close()
+
+            # 构建返回数据
+            file_data = {
+                'file_path': file_path,
+                'file_name': Path(file_path).name,
+                'file_size': file_size,
+                'file_size_mb': round(file_size / 1024 / 1024, 2),
+                'created_time': created_time,
+                'modified_time': modified_time,
+                'format': file_format,
+                'sheet_count': sheet_count,
+                'sheet_names': sheet_names,
+                'has_macros': has_macros,
+                'total_rows': total_rows,
+                'total_cols': total_cols
+            }
+            # 仅当格式化范围与数据范围不同时才报告格式化维度
+            if formatted_rows != total_rows or formatted_cols != total_cols:
+                file_data['formatted_rows'] = formatted_rows
+                file_data['formatted_cols'] = formatted_cols
 
             return OperationResult(
                 success=True,
                 message=f"成功获取文件信息: {file_path}",
-                data={
-                    'file_path': file_path,
-                    'file_name': Path(file_path).name,
-                    'file_size': file_size,
-                    'file_size_mb': round(file_size / 1024 / 1024, 2),
-                    'created_time': created_time,
-                    'modified_time': modified_time,
-                    'format': file_format,
-                    'sheet_count': sheet_count,
-                    'sheet_names': sheet_names,
-                    'has_macros': has_macros,
-                    'total_rows': total_rows,
-                    'total_cols': total_cols
-                },
+                data=file_data,
                 metadata={
                     'file_format': file_format,
                     'is_macro_enabled': has_macros,

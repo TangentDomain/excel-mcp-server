@@ -155,6 +155,15 @@
       "description": "_preprocess_quoted_identifiers使用简单的字符串替换处理双引号列名，如果SQL中包含转义引号（如\"col\\\"name\"\"），可能导致错误替换。",
       "notes": "第247轮修复：改用AST方法精确替换列引用位置（SELECT/ORDER BY/GROUP BY），WHERE值位置保持不变；新增_col_map_cache解决缓存命中时映射丢失问题",
       "archived_at": "2026-04-02"
+    },
+    "REQ-043": {
+      "title": "安全回归：commit e9590b0移除39处_validate_path调用未替换为装饰器",
+      "status": "DONE",
+      "priority": "P0",
+      "source": "自审",
+      "description": "commit e9590b0尝试实现REQ-034（路径验证装饰器），移除了39处_path_err=_validate_path(file_path)调用，但@_validate_file_path装饰器从未被正确应用到工具函数上。导致路径遍历安全检查从大部分工具函数中丢失。",
+      "notes": "第251轮修复：为10个MCP工具函数添加@_validate_file_path装饰器，2个函数添加内联_validate_path调用，v1.7.4发布",
+      "archived_at": "2026-04-02"
     }
   }
 }
