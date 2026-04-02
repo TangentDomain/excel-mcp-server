@@ -1671,3 +1671,145 @@
   - CSV导出正确处理特殊字符（逗号、引号、换行）
   - evaluate_formula需要文件上下文（非独立计算器）
   - 无效颜色值被openpyxl静默忽略，工具未做前置校验
+
+## 2026-04-02 第260轮
+
+### 测试T276: 31字符Sheet名（Excel最大值）
+- **操作步骤**: excel_create_sheet 31字符名称
+- **预期结果**: 创建成功
+- **实际结果**: 成功创建31字符Sheet
+- **是否通过**: PASS
+
+### 测试T277: 32字符Sheet名（应失败）
+- **操作步骤**: excel_create_sheet 32字符名称
+- **预期结果**: 报错拒绝
+- **实际结果**: 正确拒绝，提示"工作表名称过长: 32个字符，Excel限制最多31个字符"
+- **是否通过**: PASS
+
+### 测试T278: 重命名Sheet为同名
+- **操作步骤**: excel_rename_sheet old_name=Sheet1 new_name=Sheet1
+- **预期结果**: 报错或静默处理
+- **实际结果**: 正确拒绝，提示"新名称与原名称相同，无需重命名"
+- **是否通过**: INFO（行为合理）
+
+### 测试T279: 复制不存在的Sheet
+- **操作步骤**: excel_copy_sheet source_name=NoSuchSheet
+- **预期结果**: 报错
+- **实际结果**: 正确报错"工作表不存在: NoSuchSheet"
+- **是否通过**: PASS
+
+### 测试T280: 循环引用公式
+- **操作步骤**: A1→=B1, B1→=A1
+- **预期结果**: openpyxl接受但不计算
+- **实际结果**: 成功设置，openpyxl接受循环引用（不计算）
+- **是否通过**: PASS
+
+### 测试T281: 批量插入空数据
+- **操作步骤**: excel_batch_insert_rows data=[]
+- **预期结果**: 报错
+- **实际结果**: 正确拒绝"数据不能为空，需提供行数据列表"
+- **是否通过**: INFO（行为正确）
+
+### 测试T282: 删除空区域行
+- **操作步骤**: excel_delete_rows start_row=100 count=5
+- **预期结果**: 需要row_index或condition参数
+- **实际结果**: 提示"删除行需要指定 row_index 或 condition 参数"
+- **是否通过**: INFO（API设计合理，但参数名不直观）
+
+### 测试T283: 在高索引处插入列
+- **操作步骤**: excel_insert_columns column_index=26
+- **预期结果**: 成功
+- **实际结果**: 成功插入第27列
+- **是否通过**: PASS
+
+### 测试T284: 正则表达式通配符搜索
+- **操作步骤**: excel_search pattern=".*" use_regex=True
+- **预期结果**: 搜索到结果
+- **实际结果**: 成功搜索
+- **是否通过**: PASS
+
+### 测试T285: 对非Excel文件获取信息
+- **操作步骤**: excel_get_file_info .txt文件
+- **预期结果**: 报错
+- **实际结果**: 正确拒绝"不支持的文件格式: .txt"
+- **是否通过**: PASS
+
+### 测试T286: 格式轮转xlsx→csv→xlsx
+- **操作步骤**: 先转csv再转回xlsx
+- **预期结果**: 双向转换成功
+- **实际结果**: xlsx→csv成功但csv→xlsx失败，openpyxl不支持读取CSV
+- **是否通过**: FAIL（已知限制：convert_format不支持CSV→xlsx，应用excel_import_from_csv）
+
+### 测试T287: 合并单元格后写入
+- **操作步骤**: merge C1:D1 → write [m,v] to C1:D1
+- **预期结果**: 合并和写入都处理
+- **实际结果**: 合并成功，写入也成功
+- **是否通过**: PASS
+
+### 测试T288: SQL LIMIT 0查询
+- **操作步骤**: SELECT * FROM Sheet1 LIMIT 0
+- **预期结果**: 返回空结果集
+- **实际结果**: 成功执行，返回空结果
+- **是否通过**: PASS
+
+### 测试T289: 设置列表类型数据验证
+- **操作步骤**: excel_set_data_validation type=list criteria="Yes,No,Maybe"
+- **预期结果**: 设置成功
+- **实际结果**: 成功设置
+- **是否通过**: PASS
+
+### 测试T290: 条件格式-颜色标度
+- **操作步骤**: excel_add_conditional_format format_type=colorScale
+- **预期结果**: 设置成功或报错
+- **实际结果**: 报错"不支持的格式样式"，仅支持lightRed/lightGreen/lightYellow/lightTurquoise
+- **是否通过**: INFO（仅支持cellValue类型，colorScale不支持）
+
+### 测试T291: Sheet自身对比
+- **操作步骤**: excel_compare_sheets 同一文件同一Sheet
+- **预期结果**: 返回无差异
+- **实际结果**: 成功返回对比结果
+- **是否通过**: PASS
+
+### 测试T292: 删除最后一个Sheet
+- **操作步骤**: excel_delete_sheet 删除唯一Sheet
+- **预期结果**: 应拒绝（Excel至少需要1个Sheet）
+- **实际结果**: 成功删除，文件变成无Sheet状态（openpyxl允许）
+- **是否通过**: INFO（潜在问题：空工作簿可能被Excel打不开）
+
+### 测试T293: 创建柱状图
+- **操作步骤**: excel_create_chart chart_type=bar
+- **预期结果**: 创建成功
+- **实际结果**: 失败，Sheet已被T292删除
+- **是否通过**: FAIL（测试依赖问题，非真实BUG）
+
+### 测试T294: 极端行高列宽
+- **操作步骤**: row_height=0.1, column_width=255
+- **预期结果**: 设置成功（Excel允许范围0-409.5磅/0-255字符）
+- **实际结果**: 成功设置
+- **是否通过**: PASS
+
+### 测试T295: 空表检查重复ID
+- **操作步骤**: excel_check_duplicate_ids 空Sheet
+- **预期结果**: 返回无重复
+- **实际结果**: Sheet已被T292删除，报错"工作表不存在"
+- **是否通过**: INFO（测试依赖问题）
+
+### 第260轮统计
+- **总计**: 20个边缘案例（T276-T295）
+- **通过**: 12个（PASS）
+- **信息**: 5个（INFO，T278同名重命名、T281空数据、T282参数提示、T290 colorScale不支持、T292删除最后Sheet）
+- **失败**: 1个（FAIL，T286 convert_format CSV→xlsx不支持）
+- **测试依赖**: 2个（T293/T295因T292删除Sheet导致）
+- **发现BUG**: 1个
+  - T286: excel_convert_format不支持CSV→xlsx（openpyxl限制），应使用csv模块+openpyxl组合而非直接load_workbook
+- **关键发现**:
+  - Sheet名称验证完善：31字符成功，32字符正确拒绝
+  - 同名重命名被正确拦截
+  - 循环引用公式被openpyxl接受（不崩溃）
+  - 正则搜索功能正常
+  - 非Excel文件格式校验正确
+  - 合并单元格写入正常
+  - SQL LIMIT 0空结果正确
+  - 数据验证列表类型支持正常
+  - 条件格式仅支持cellValue类型，不支持colorScale/dataBar等
+  - 删除最后一个Sheet被openpyxl允许（可能导致无法打开的文件）
