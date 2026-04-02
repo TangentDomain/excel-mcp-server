@@ -373,3 +373,104 @@
 - **信息**: 1个（evaluate_formula的context_sheet参数）
 - **发现BUG**: 0个
 - **结论**: 所有核心功能稳定，SQL引擎支持HAVING/LIKE/BETWEEN/IN/子查询/CASE WHEN
+
+## 2026-04-02 第250轮
+
+### 测试38: SQL UNION查询
+- **操作步骤**: `SELECT Name FROM Sheet UNION SELECT Name FROM Sheet`
+- **预期结果**: 返回去重后的Name列表
+- **实际结果**: 正确返回5行（含表头）
+- **是否通过**: PASS
+
+### 测试39: SQL LIMIT
+- **操作步骤**: `SELECT * FROM Sheet LIMIT 2`
+- **预期结果**: 返回前2行（含表头）
+- **实际结果**: 正确返回2行
+- **是否通过**: PASS
+
+### 测试40: SQL alias在WHERE中使用
+- **操作步骤**: `SELECT Name AS n, Score AS s FROM Sheet WHERE s > 80`
+- **预期结果**: 使用别名s过滤
+- **实际结果**: 失败，列's'不存在（别名在WHERE中不被识别）
+- **是否通过**: INFO（SQL标准行为，WHERE中不能使用SELECT别名）
+
+### 测试41: SQL算术表达式
+- **操作步骤**: `SELECT Name, Score * 2 AS doubled FROM Sheet`
+- **预期结果**: 返回Score的2倍
+- **实际结果**: 正确返回（Alice=180, Bob=150, Charlie=190, Dave=120, Eve=160）
+- **是否通过**: PASS
+
+### 测试42: SQL聚合无GROUP BY
+- **操作步骤**: `SELECT COUNT(*) as total, AVG(Score) as avg_score FROM Sheet`
+- **预期结果**: 返回总行数和平均分
+- **实际结果**: 正确返回 total=5, avg_score=80
+- **是否通过**: PASS
+
+### 测试43: SQL DISTINCT
+- **操作步骤**: `SELECT DISTINCT class FROM Sheet`
+- **预期结果**: 返回去重的class值
+- **实际结果**: 正确返回A/B/C 3个值
+- **是否通过**: PASS
+
+### 测试44: SQL多列ORDER BY
+- **操作步骤**: `SELECT * FROM Sheet ORDER BY class ASC, Score DESC`
+- **预期结果**: 按class升序，同class内按Score降序
+- **实际结果**: 正确排序（Charlie A 95 > Alice A 90 > Eve B 80 > Bob B 75 > Dave C 60）
+- **是否通过**: PASS
+
+### 测试45: SQL OR条件
+- **操作步骤**: `SELECT * FROM Sheet WHERE class = 'A' OR class = 'C'`
+- **预期结果**: 返回A和C类的行
+- **实际结果**: 正确返回3行（Alice, Charlie, Dave）
+- **是否通过**: PASS
+
+### 测试46: SQL NOT条件
+- **操作步骤**: `SELECT * FROM Sheet WHERE NOT class = 'A'`
+- **预期结果**: 返回非A类的行
+- **实际结果**: 正确返回3行（Bob, Dave, Eve）
+- **是否通过**: PASS
+
+### 测试47: SQL LENGTH函数
+- **操作步骤**: `SELECT Name, LENGTH(Name) as len FROM Sheet`
+- **预期结果**: 返回名字长度
+- **实际结果**: 正确返回（Alice=5, Bob=3, Charlie=7, Dave=4, Eve=3）
+- **是否通过**: PASS
+
+### 测试48: SQL UPPER/LOWER函数
+- **操作步骤**: `SELECT UPPER(Name) as up, LOWER(Name) as lo FROM Sheet`
+- **预期结果**: 返回大写和小写形式
+- **实际结果**: 正确返回（ALICE/alice, BOB/bob等）
+- **是否通过**: PASS
+
+### 测试49: SQL字符串拼接（||运算符）
+- **操作步骤**: `SELECT Name || ' - ' || class AS label FROM Sheet`
+- **预期结果**: 返回拼接字符串
+- **实际结果**: 失败，`||`被解析为OR运算符（"Name OR ' - ' OR class"）
+- **是否通过**: FAIL（功能缺失）
+- **建议**: 支持CONCAT()函数作为替代，或正确处理||运算符
+
+### 测试50: SQL COALESCE函数
+- **操作步骤**: `SELECT Name, COALESCE(Grade, 'N/A') AS grade FROM Sheet`
+- **预期结果**: 空值替换为N/A
+- **实际结果**: 正确返回（所有Grade都有值，正常显示）
+- **是否通过**: PASS
+
+### 测试51: SQL FROM子查询
+- **操作步骤**: `SELECT * FROM (SELECT Name, Score FROM Sheet WHERE Score > 70) AS sub`
+- **预期结果**: 返回子查询结果
+- **实际结果**: 明确报错"不支持FROM子查询"
+- **是否通过**: INFO（已知限制，文档明确说明仅支持WHERE子查询）
+
+### 测试52: SQL AND+OR组合条件
+- **操作步骤**: `SELECT * FROM Sheet WHERE class = 'A' AND (Score > 90 OR Grade = 'A+')`
+- **预期结果**: 返回A类且Score>90或Grade=A+的行
+- **实际结果**: 正确返回2行（Alice A 90 A+, Charlie A 95 A+）
+- **是否通过**: PASS
+
+### 第250轮统计
+- **总计**: 15个边缘案例
+- **通过**: 12个
+- **信息**: 2个（T40 alias WHERE限制、T51 FROM子查询不支持）
+- **失败**: 1个（T49 ||拼接运算符被误解析为OR）
+- **发现BUG**: 1个（||字符串拼接运算符不支持，需支持CONCAT()函数替代）
+- **结论**: SQL引擎功能完善，支持UNION/LIMIT/别名/算术/聚合/DISTINCT/多列排序/逻辑运算/字符串函数/COALESCE/组合条件
