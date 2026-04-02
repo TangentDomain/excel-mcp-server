@@ -24,6 +24,14 @@
       "description": "batch_insert_rows指定insert_position时报错：No module named 'excel_mcp_server_fastmcp.api.excel...'。模块路径可能有误。",
       "notes": "T166发现，第256轮"
     },
+    "REQ-046": {
+      "title": "delete_rows condition数值类型比较问题",
+      "priority": "P2",
+      "status": "OPEN",
+      "source": "自审",
+      "description": "delete_rows使用condition参数（如'Score < 60'）时，对数值列返回0行删除。疑似条件解析将数值列作为字符串处理，导致比较失败。",
+      "notes": "T165发现，第256轮"
+    },
     "REQ-036": {
       "title": "边缘案例自动化测试：每轮自动搜索并验证奇怪场景",
       "priority": "P1",
