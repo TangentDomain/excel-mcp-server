@@ -149,3 +149,26 @@
 - **失败**: 1个（1个BUG）
 - **发现的BUG**:
   1. SQL含空格列名返回列头字符串而非实际值 → REQ-041
+
+## 2026-04-02 第247轮
+
+### 测试21: SQL双引号标识符与字符串字面量冲突 (REQ-042)
+- **操作步骤**: 列名含空格"Player Name"，执行多种SQL查询测试双引号处理
+- **子测试**:
+  - 21a. `SELECT "Player Name"` → PASS（正确返回列值Alice/Bob/Charlie）
+  - 21b. `WHERE type = "Player Name"` → FAIL后修复（原始实现将WHERE字符串误替换为列引用，返回0行；AST修复后正确返回2行）
+  - 21c. `WHERE "Player Name" = 'Alice'` → PASS（WHERE左侧列引用正确替换）
+  - 21d. `ORDER BY "Score"` → PASS
+  - 21e. 组合查询 SELECT+WHERE+ORDER BY → PASS
+- **发现BUG**:
+  1. `_preprocess_quoted_identifiers`使用str.replace全量替换，WHERE中的字符串值也被替换为列引用 → 已修复（改用AST方法）
+  2. DataFrame缓存命中时`_original_to_clean_cols`为空（映射仅在_clean_dataframe中构建，缓存跳过此步骤）→ 已修复（新增_col_map_cache同步列名映射）
+- **修复方案**:
+  - AST方法：只替换SELECT/ORDER BY/GROUP BY/HAVING中的字面量列引用，WHERE右侧字符串值保持不变
+  - 列名映射缓存：_col_map_cache与_df_cache同步，缓存命中时恢复映射
+
+### 第247轮统计
+- **总计**: 5个边缘案例
+- **通过**: 5个（修复后）
+- **发现BUG**: 2个（均已修复）
+- **关联需求**: REQ-042
