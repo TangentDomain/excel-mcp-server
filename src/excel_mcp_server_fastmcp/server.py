@@ -416,6 +416,11 @@ def _validate_file_path(param='file_path'):
         @_validate_file_path(['csv_path', 'output_path'])  # 验证多个参数
     """
     def decorator(func):
+        """创建验证装饰器。
+
+        Args:
+            func: 被装饰的函数。
+        """
         @functools.wraps(func)
         def wrapper(*args, **kwargs):
             params = [param] if isinstance(param, str) else param
