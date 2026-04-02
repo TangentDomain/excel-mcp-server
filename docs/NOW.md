@@ -1,24 +1,26 @@
-# NOW.md - 第258轮
+# NOW.md - 第259轮
 
 ## 当前状态
-- **轮次**: 第258轮
+- **轮次**: 第259轮
 - **时间**: 2026-04-02
 
 ## 完成工作
-- REQ-036: 边缘案例测试T231-T255
-  - 发现并修复format_cells_user_friendly BUG：调用不存在的update_range_range方法→改为format_cells
-  - 验证数据验证(set_data_validation/clear_validation)正常工作
-  - 验证条件格式(add/clear_conditional_format)基本正常
-  - 验证图表(create_chart bar/line)正常工作
-  - 验证user_friendly API(get/update_range_user_friendly)正常工作
-  - 验证SQL高级查询(CASE WHEN/IN/LIKE/COUNT DISTINCT/FROM子查询/HAVING/BETWEEN)全部正常
-  - 验证备份操作(create_backup/list_backups)正常工作
-  - v1.7.9发布
+- REQ-036: 边缘案例测试T256-T275（20个案例）
+  - Sheet名称验证（非法字符、超长）正确拒绝
+  - 合并单元格保护良好（从属写入被拒）
+  - 跨Sheet数据验证支持正常
+  - Upsert重复键处理正确（insert→update）
+  - 批量更新重叠区域后写入覆盖正确
+  - SQL UPDATE dry_run不修改数据
+  - CSV导出正确处理特殊字符
+  - Write-only override保留周围数据
+  - 文件比较、取消合并、设置边框均正常
+  - 无BUG发现
 
 ## 关键指标
 - **版本**: v1.7.9
-- **测试**: 851 passed + MCP冒烟通过
-- **Commit**: 008cdba (develop)
+- **测试**: MCP冒烟通过
+- **Commit**: aea59ca (develop)
 
 ## 待处理
 - [ ] REQ-036: 边缘案例自动化测试（持续执行，P1）
