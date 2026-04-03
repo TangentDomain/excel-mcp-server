@@ -2,7 +2,7 @@
 
 # 🎮 ExcelMCP: 让游戏策划用嘴说话的Excel神器
 
-[![PyPI](https://img.shields.io/pypi/v/excel-mcp-server-fastmcp.svg)](https://pypi.org/project/excel-mcp-server-fastmcp/v1.7.16)
+[![PyPI](https://img.shields.io/pypi/v/excel-mcp-server-fastmcp.svg)](https://pypi.org/project/excel-mcp-server-fastmcp/v1.7.17)
 [![CI](https://github.com/TangentDomain/excel-mcp-server/actions/workflows/ci.yml/badge.svg)](https://github.com/TangentDomain/excel-mcp-server/actions/workflows/ci.yml)
 ![Tests](https://img.shields.io/badge/tests-851-brightgreen.svg)
 ![Tools](https://img.shields.io/badge/tools-53-green.svg)
@@ -16,7 +16,7 @@
 
 ---
 
-## 🚀 最新更新 (v1.7.16)
+## 🚀 最新更新 (v1.7.17)
 
 ### 🐛 BUG修复
 - **excel_create_pivot_table修复**: Sheet不存在时错误码从OPERATION_FAILED改为SHEET_NOT_FOUND，与其他函数保持一致

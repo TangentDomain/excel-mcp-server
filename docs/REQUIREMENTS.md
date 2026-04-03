@@ -4,7 +4,7 @@
       "title": "配置化：硬编码常量提取为配置项",
       "type": "refactor",
       "priority": "P2",
-      "status": "OPEN",
+      "status": "DONE",
       "source": "自审",
       "attempts": 1,
       "last_failure": "第275轮误标DONE：缓存映射修复不是根因。实际bug在数据加载阶段，original_rows=379但MapEvent sheet只有59行，所有sheet数据被混在一起。详见FEEDBACK.md OPEN-#1",
