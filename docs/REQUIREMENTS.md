@@ -6,7 +6,7 @@
       "priority": "P2",
       "status": "DONE",
       "source": "自审",
-      "attempts": 1,
+      "attempts": 2,
       "last_failure": "第275轮误标DONE：缓存映射修复不是根因。实际bug在数据加载阶段，original_rows=379但MapEvent sheet只有59行，所有sheet数据被混在一起。详见FEEDBACK.md OPEN-#1",
       "description": "多个硬编码值应提取为可配置常量：max_files=100, query_cache_ttl=300, target_mb=512.0, MAX_RESULT_ROWS=500等。",
       "notes": "分布在server.py和advanced_sql_query.py中"
@@ -18,7 +18,7 @@
       "priority": "P1",
       "status": "IN-PROGRESS",
       "source": "CEO",
-      "attempts": 16,
+      "attempts": 17,
       "last_failure": "",
       "description": "每轮执行时，自动搜索一些稀奇古怪的Excel使用场景（如超长公式、特殊字符sheet名、合并单元格+筛选、数据透视表嵌套、条件格式+VBA、超大文件性能等），用uvx安装的MCP工具实际调用测试，记录是否崩溃/返回错误/正常处理。",
       "acceptance_criteria": [
