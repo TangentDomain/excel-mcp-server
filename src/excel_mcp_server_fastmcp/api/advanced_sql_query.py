@@ -3935,6 +3935,8 @@ class AdvancedSQLQueryEngine:
         total_row[0] = 'TOTAL'
         has_numeric = False
         for i, col in enumerate(result_df.columns):
+            if i == 0:
+                continue
             series = pd.to_numeric(result_df[col], errors='coerce')
             if series.notna().sum() > len(result_df) * 0.5:
                 total_row[i] = self._serialize_value(series.sum())
