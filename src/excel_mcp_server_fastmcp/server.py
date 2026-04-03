@@ -2698,20 +2698,15 @@ def excel_describe_table(
         return _fail('文件路径不能为空', meta={"error_code": "MISSING_FILE_PATH"})
 
     try:
-        import openpyxl
-        wb = openpyxl.load_workbook(file_path, read_only=True, data_only=True)
+        wb, ws = ExcelValidator.get_workbook_and_sheet(file_path, sheet_name, read_only=True, data_only=True)
+        if not sheet_name:
+            sheet_name = ws.title
+    except DataValidationError as e:
+        return _fail(e.message, meta={"error_code": "SHEET_NOT_FOUND", "hint": e.hint, "suggested_fix": e.suggested_fix})
     except Exception as e:
         return _fail(f'无法打开文件: {e}', meta={"error_code": "FILE_OPEN_FAILED"})
 
     try:
-        # 选择工作表
-        if sheet_name:
-            if sheet_name not in wb.sheetnames:
-                return _fail(f'工作表 "{sheet_name}" 不存在。可用工作表: {wb.sheetnames}', meta={"error_code": "SHEET_NOT_FOUND"})
-            ws = wb[sheet_name]
-        else:
-            ws = wb.worksheets[0]
-            sheet_name = ws.title
 
         # 读取前几行来判断表头类型
         rows = list(ws.iter_rows(max_row=4, values_only=True))
@@ -3363,18 +3358,13 @@ def excel_create_chart(file_path: str, sheet_name: str, chart_type: str, data_ra
         from openpyxl import load_workbook
         from openpyxl.chart import BarChart, LineChart, PieChart, ScatterChart, Reference
         from openpyxl.utils import range_boundaries
-        
-        wb = load_workbook(file_path)
-        
-        if sheet_name not in wb.sheetnames:
-            return _fail("工作表不存在", meta={"error_code": "SHEET_NOT_FOUND"})
-        
-        ws = wb[sheet_name]
-        
+
+        wb, ws = ExcelValidator.get_workbook_and_sheet(file_path, sheet_name)
+
         # 创建图表对象
         chart_map = {
             "column": BarChart,
-            "bar": BarChart, 
+            "bar": BarChart,
             "line": LineChart,
             "pie": PieChart,
             "scatter": ScatterChart
@@ -3424,7 +3414,9 @@ def excel_create_chart(file_path: str, sheet_name: str, chart_type: str, data_ra
             'title': title,
             'chart_count': len(ws._charts)
         })
-        
+
+    except DataValidationError as e:
+        return _fail(e.message, meta={"error_code": "SHEET_NOT_FOUND", "hint": e.hint, "suggested_fix": e.suggested_fix})
     except Exception as e:
         return _fail("图表创建失败", meta={"error_code": "OPERATION_FAILED"})
 
@@ -3456,11 +3448,8 @@ def excel_create_pivot_table(file_path: str, sheet_name: str, data_range: str,
         from openpyxl.utils import range_boundaries, get_column_letter
         import pandas as pd
         import numpy as np
-        
-        wb = load_workbook(file_path)
-        
-        if sheet_name not in wb.sheetnames:
-            return _fail("数据工作表不存在", meta={"error_code": "SHEET_NOT_FOUND"})
+
+        wb, ws = ExcelValidator.get_workbook_and_sheet(file_path, sheet_name)
         
         # 处理聚合函数别名
         agg_func_map = {
@@ -3479,9 +3468,7 @@ def excel_create_pivot_table(file_path: str, sheet_name: str, data_range: str,
                                                    "hint": f"支持的函数: {list(agg_func_map.keys())}"})
         
         normalized_agg_func = agg_func_map[agg_func]
-        
-        ws = wb[sheet_name]
-        
+
         # 解析数据范围
         min_col, min_row, max_col, max_row = range_boundaries(data_range)
         
@@ -3628,7 +3615,9 @@ def excel_create_pivot_table(file_path: str, sheet_name: str, data_range: str,
             'pivot_rows': len(index_cols),
             'pivot_cols': len(pivot_df.columns)
         })
-        
+
+    except DataValidationError as e:
+        return _fail(e.message, meta={"error_code": "SHEET_NOT_FOUND", "hint": e.hint, "suggested_fix": e.suggested_fix})
     except Exception as e:
         return _fail("透视表创建失败", meta={"error_code": "OPERATION_FAILED", "error": str(e)})
 
@@ -3701,13 +3690,8 @@ def excel_set_data_validation(file_path: str, sheet_name: str, range_address: st
     try:
         from openpyxl import load_workbook
         from openpyxl.worksheet.datavalidation import DataValidation
-        
-        wb = load_workbook(file_path)
-        
-        if sheet_name not in wb.sheetnames:
-            return _fail("工作表不存在", meta={"error_code": "SHEET_NOT_FOUND"})
-        
-        ws = wb[sheet_name]
+
+        wb, ws = ExcelValidator.get_workbook_and_sheet(file_path, sheet_name)
         
         # 创建数据验证对象
         dv = DataValidation(type=validation_type, formula1=criteria, showDropDown=True)
@@ -3733,7 +3717,9 @@ def excel_set_data_validation(file_path: str, sheet_name: str, range_address: st
             'input_message': input_message,
             'validation_count': len(ws.data_validations)
         })
-        
+
+    except DataValidationError as e:
+        return _fail(e.message, meta={"error_code": "SHEET_NOT_FOUND", "hint": e.hint, "suggested_fix": e.suggested_fix})
     except Exception as e:
         return _fail("数据验证设置失败", meta={"error_code": "OPERATION_FAILED"})
 
@@ -3815,13 +3801,8 @@ def excel_add_conditional_format(file_path: str, sheet_name: str, range_address:
     try:
         from openpyxl import load_workbook, styles
         from openpyxl.formatting.rule import CellIsRule, FormulaRule
-        
-        wb = load_workbook(file_path)
-        
-        if sheet_name not in wb.sheetnames:
-            return _fail("工作表不存在", meta={"error_code": "SHEET_NOT_FOUND"})
-        
-        ws = wb[sheet_name]
+
+        wb, ws = ExcelValidator.get_workbook_and_sheet(file_path, sheet_name)
         
         # 创建格式样式
         style_map = {
@@ -3861,7 +3842,9 @@ def excel_add_conditional_format(file_path: str, sheet_name: str, range_address:
             'sheet_name': sheet_name,
             'rule_applied': True
         })
-        
+
+    except DataValidationError as e:
+        return _fail(e.message, meta={"error_code": "SHEET_NOT_FOUND", "hint": e.hint, "suggested_fix": e.suggested_fix})
     except Exception as e:
         return _fail("条件格式添加失败", meta={"error_code": "OPERATION_FAILED"})
 

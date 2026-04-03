@@ -454,3 +454,38 @@ class ExcelValidator:
             'warning': warning,
             'within_limits': True
         }
+
+    @staticmethod
+    def get_workbook_and_sheet(file_path: str, sheet_name: str = None, read_only: bool = False, data_only: bool = False):
+        """加载 workbook 并获取指定的工作表
+
+        Args:
+            file_path: Excel文件路径
+            sheet_name: 工作表名称（可选，如果不提供则返回第一个工作表）
+            read_only: 是否以只读模式打开
+            data_only: 是否读取单元格的值而不是公式
+
+        Returns:
+            tuple: (workbook, worksheet) 如果验证成功
+            None: 如果验证失败（调用者需要检查返回值）
+
+        Raises:
+            DataValidationError: 如果工作表不存在
+        """
+        from openpyxl import load_workbook
+
+        wb = load_workbook(file_path, read_only=read_only, data_only=data_only)
+
+        if sheet_name:
+            if sheet_name not in wb.sheetnames:
+                wb.close()
+                raise DataValidationError(
+                    f"工作表 '{sheet_name}' 不存在",
+                    f"可用工作表: {', '.join(wb.sheetnames)}",
+                    "请使用正确的工作表名称"
+                )
+            ws = wb[sheet_name]
+        else:
+            ws = wb.worksheets[0]
+
+        return wb, ws
