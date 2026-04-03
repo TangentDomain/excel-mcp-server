@@ -117,12 +117,12 @@
       "title": "修复：excel_create_pivot_table错误码不一致",
       "type": "fix",
       "priority": "P2",
-      "status": "IN-PROGRESS",
+      "status": "DONE",
       "source": "自审",
       "attempts": 1,
       "last_failure": "",
       "description": "excel_create_pivot_table函数在Sheet不存在时使用OPERATION_FAILED错误码（第3462行），而其他函数（如excel_create_chart、excel_set_data_validation等）使用SHEET_NOT_FOUND。应统一为SHEET_NOT_FOUND以提高错误提示的一致性。",
-      "notes": "第270轮代码自审发现"
+      "notes": "第271轮修复：OPERATION_FAILED→SHEET_NOT_FOUND（server.py:3462）"
     }
   }
 }

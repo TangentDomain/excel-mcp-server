@@ -2,7 +2,7 @@
 
 # 🎮 ExcelMCP: 让游戏策划用嘴说话的Excel神器
 
-[![PyPI](https://img.shields.io/pypi/v/excel-mcp-server-fastmcp.svg)](https://pypi.org/project/excel-mcp-server-fastmcp/v1.7.14)
+[![PyPI](https://img.shields.io/pypi/v/excel-mcp-server-fastmcp.svg)](https://pypi.org/project/excel-mcp-server-fastmcp/v1.7.15)
 [![CI](https://github.com/TangentDomain/excel-mcp-server/actions/workflows/ci.yml/badge.svg)](https://github.com/TangentDomain/excel-mcp-server/actions/workflows/ci.yml)
 ![Tests](https://img.shields.io/badge/tests-851-brightgreen.svg)
 ![Tools](https://img.shields.io/badge/tools-53-green.svg)
@@ -16,18 +16,13 @@
 
 ---
 
-## 🚀 最新更新 (v1.7.14)
+## 🚀 最新更新 (v1.7.15)
 
 ### 🐛 BUG修复
-- **excel_list_charts修复**: 修复图表列表获取时的AttributeError（chart_type/title/data_labels属性访问错误）
-- **clear_validation修复**: 修复清除指定范围数据验证无效的问题（范围匹配使用dv.sqref而非dv.formula1）
-- **错误提示优化**: 3处"工作表不存在"错误码从OPERATION_FAILED改为SHEET_NOT_FOUND，消除误导性提示
+- **excel_create_pivot_table修复**: Sheet不存在时错误码从OPERATION_FAILED改为SHEET_NOT_FOUND，与其他函数保持一致
 
-### 🔧 改进优化
-- **MCP工具验证**：53个游戏专用工具全面测试通过
-- **文档体系完善**： ROADMAP.md 路线图发布，6个发展阶段规划
-- **用户体验提升**：一键安装、快速配置、即时验证
-- **错误处理增强**：智能异常分类和修复建议
+### 📋 验证
+- **REQ-051验证**: 边缘测试脚本函数名正确，无需修改
 
 ### 🎮 游戏场景支持
 - **技能系统**：CTE查询、平衡分析、批量调整
