@@ -16,6 +16,7 @@ from openpyxl.utils import get_column_letter
 from ..models.types import SearchMatch, MatchType, OperationResult
 from ..utils.validators import ExcelValidator
 from ..utils.parsers import RangeParser
+from ..utils.config import MAX_SEARCH_FILES
 
 logger = logging.getLogger(__name__)
 
@@ -409,7 +410,7 @@ class ExcelSearcher:
         recursive: bool = True,
         file_extensions: Optional[List[str]] = None,
         file_pattern: Optional[str] = None,
-        max_files: int = 100
+        max_files: int = MAX_SEARCH_FILES
     ) -> OperationResult:
         """
         在目录下的所有Excel文件中使用正则表达式搜索单元格内容
@@ -593,7 +594,7 @@ class ExcelSearcher:
         recursive: bool = True,
         file_extensions: Optional[List[str]] = None,
         file_pattern: Optional[str] = None,
-        max_files: int = 100
+        max_files: int = MAX_SEARCH_FILES
     ) -> OperationResult:
         """
         静态方法：在目录下的所有Excel文件中使用正则表达式搜索单元格内容

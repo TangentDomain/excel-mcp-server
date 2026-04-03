@@ -21,6 +21,7 @@ from ..core.excel_compare import ExcelComparer
 from ..core.excel_converter import ExcelConverter
 from ..models.types import ComparisonOptions
 from ..utils.formatter import format_operation_result
+from ..utils.config import MAX_SEARCH_FILES
 from ..utils.exceptions import (
     ExcelException,
     SheetNotFoundError,
@@ -666,7 +667,7 @@ class ExcelOperations:
         recursive: bool = True,
         file_extensions: Optional[List[str]] = None,
         file_pattern: Optional[str] = None,
-        max_files: int = 100
+        max_files: int = MAX_SEARCH_FILES
     ) -> Dict[str, Any]:
         """
         @intention 在目录下的所有Excel文件中搜索内容（VSCode风格搜索选项）

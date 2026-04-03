@@ -87,6 +87,15 @@ try:
 except ImportError:
     StreamingWriter = None
 
+# 配置常量
+from ..utils.config import (
+    MAX_CACHE_SIZE,
+    MAX_QUERY_CACHE_SIZE,
+    QUERY_CACHE_TTL,
+    CACHE_TARGET_MEMORY_MB,
+    MAX_RESULT_ROWS
+)
+
 
 class StructuredSQLError(Exception):
     """结构化SQL错误，为AI提供可自动修复的错误信息。
@@ -434,15 +443,15 @@ class AdvancedSQLQueryEngine:
         self.disable_streaming_aggregate = disable_streaming_aggregate
         # DataFrame缓存：{file_path: (mtime, worksheets_data, header_descriptions)}
         self._df_cache = {}
-        self._max_cache_size = 20  # 最大缓存文件数，防止内存泄漏
+        self._max_cache_size = MAX_CACHE_SIZE  # 最大缓存文件数，防止内存泄漏
         # 列名映射缓存：{file_path: {原始列名: 清洗列名}}
         # 与_df_cache同步，避免缓存命中时_original_to_clean_cols为空
         self._col_map_cache = {}
 
         # 性能优化：查询结果缓存 {hash(sql): (result_df, file_mtime)}
         self._query_result_cache = {}
-        self._max_query_cache_size = 15  # 最大查询缓存数，防止内存泄漏
-        self._query_cache_ttl = 300  # 查询缓存TTL（5分钟）
+        self._max_query_cache_size = MAX_QUERY_CACHE_SIZE  # 最大查询缓存数，防止内存泄漏
+        self._query_cache_ttl = QUERY_CACHE_TTL  # 查询缓存TTL
 
         if not SQLGLOT_AVAILABLE:
             raise ImportError("SQLGlot未安装，请运行: pip install sqlglot")
@@ -818,7 +827,7 @@ class AdvancedSQLQueryEngine:
             worksheets_data字典，加载失败返回None
         """
         mtime = os.path.getmtime(file_path)
-        cache_key = file_path
+        cache_key = f"{file_path}|{sheet_name or ''}"
         if cache_key in self._df_cache:
             cached_mtime, cached_data, cached_desc = self._df_cache[cache_key]
             if cached_mtime == mtime:
@@ -855,12 +864,14 @@ class AdvancedSQLQueryEngine:
                 total += df.memory_usage(deep=True).sum() / 1024 / 1024
         return total
 
-    def evict_cache_by_memory(self, target_mb: float = 512.0):
+    def evict_cache_by_memory(self, target_mb: float = None):
         """内存感知缓存淘汰：当缓存总内存超过阈值时，淘汰最早的缓存项
 
         Args:
-            target_mb: 目标最大缓存内存（MB），默认512MB
+            target_mb: 目标最大缓存内存（MB），默认使用 CACHE_TARGET_MEMORY_MB
         """
+        if target_mb is None:
+            target_mb = CACHE_TARGET_MEMORY_MB
         while self._estimate_cache_memory_mb() > target_mb and self._df_cache:
             self._df_cache.pop(next(iter(self._df_cache)))
             logger.info(f"缓存内存淘汰后剩余: {self._estimate_cache_memory_mb():.1f}MB")
@@ -3981,7 +3992,6 @@ class AdvancedSQLQueryEngine:
                 data.append([self._serialize_value(val) for val in row])
 
         # 大结果自动截断：保护AI上下文窗口（MAX_RESULT_ROWS=500）
-        MAX_RESULT_ROWS = 500
         truncated = False
         data_row_count = len(result_df)
         if data_row_count > MAX_RESULT_ROWS:

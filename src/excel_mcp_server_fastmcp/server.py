@@ -43,6 +43,7 @@ except ImportError as e:
 from .api.excel_operations import ExcelOperations
 from .utils.validators import ExcelValidator, DataValidationError
 from .utils import extract_rich_text
+from .utils.config import MAX_SEARCH_FILES
 
 # 导入智能配置推荐模块
 try:
@@ -850,7 +851,7 @@ def excel_search_directory(
     recursive: bool = True,
     file_extensions: Optional[List[str]] = None,
     file_pattern: Optional[str] = None,
-    max_files: int = 100
+    max_files: int = MAX_SEARCH_FILES
 ) -> Dict[str, Any]:
     """在目录下所有Excel文件中搜索内容。支持文件类型过滤和递归搜索。
 
@@ -865,7 +866,7 @@ def excel_search_directory(
         recursive: 是否递归搜索子目录，默认为True
         file_extensions: 文件扩展名过滤列表，默认为None
         file_pattern: 文件名模式匹配，默认为None
-        max_files: 最大搜索文件数，默认为100
+        max_files: 最大搜索文件数，默认为 MAX_SEARCH_FILES
     """
     _path_err = _validate_path(directory_path)
     if _path_err:
