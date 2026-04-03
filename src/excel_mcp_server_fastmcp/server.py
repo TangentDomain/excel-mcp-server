@@ -3459,7 +3459,7 @@ def excel_create_pivot_table(file_path: str, sheet_name: str, data_range: str,
         wb = load_workbook(file_path)
         
         if sheet_name not in wb.sheetnames:
-            return _fail("数据工作表不存在", meta={"error_code": "OPERATION_FAILED"})
+            return _fail("数据工作表不存在", meta={"error_code": "SHEET_NOT_FOUND"})
         
         # 处理聚合函数别名
         agg_func_map = {
