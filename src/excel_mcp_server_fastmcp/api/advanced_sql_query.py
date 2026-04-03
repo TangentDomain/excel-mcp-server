@@ -4045,7 +4045,7 @@ class AdvancedSQLQueryEngine:
         # GROUP BY 聚合结果自动追加 TOTAL 行
         has_total_row = False
         if has_group_by and include_headers:
-            total_row = self._build_total_row(result_df)
+            total_row = self._build_total_row(result_df, self._group_by_columns)
             if total_row:
                 data.append(total_row)
                 has_total_row = True
