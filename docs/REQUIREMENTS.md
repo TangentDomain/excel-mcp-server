@@ -40,7 +40,7 @@
       "attempts": 10,
       "last_failure": "第277轮：子代理修了上游问题（双行表头/缓存/desc_map）后标DONE，未验证GROUP BY结果。手动测试确认GROUP BY聚合逻辑仍有bug。",
       "description": "SQL: SELECT 显示路径ID, 显示位置ID, COUNT(*) as cnt FROM MapEvent WHERE 显示路径ID IN (1, 2) AND 显示位置ID < 100 GROUP BY 显示路径ID, 显示位置ID。结果出现 [38, 589, 58] 等不存在于原始数据中的值。",
-      "notes": "!!! 禁止标DONE除非通过以下验证 !!! 验证代码：python3导入execute_advanced_sql_query，用上述SQL查/tmp/MapEvent.xlsx，检查result['data'][1:]中每行的前两列是否都在[1,2]和[0,99]范围内。有任何一行不符合=BUG未修复。上游问题（双行表头/缓存key/desc_map）已在fe0b0f8修复。BUG在_apply_group_by_aggregation方法内部——传入的DataFrame完全正确（58行，PathID只有1和2），但聚合结果错误。手动pandas groupby结果正确（30行全部符合条件），说明bug在_apply_group_by_aggregation的实现逻辑中，不是数据问题。"
+      "notes": "!!! 强制验证规则（REQ 标 DONE 的前置条件）!!!\n修复前：必须先运行验证代码确认 bug 存在（有异常行=bug存在）\n修复后：必须再次运行验证代码确认 bug 消失（无异常行=bug修复）\n验证代码：python3 -c \"import sys; sys.path.insert(0,'src'); from excel_mcp_server_fastmcp.api.advanced_sql_query import execute_advanced_sql_query; r=execute_advanced_sql_query('/tmp/MapEvent.xlsx','SELECT 显示路径ID,显示位置ID,COUNT(*) as cnt FROM MapEvent WHERE 显示路径ID IN (1,2) AND 显示位置ID<100 GROUP BY 显示路径ID,显示位置ID'); bad=[x for x in r['data'][1:] if x[0] not in [1,2] or x[1]>=100]; print('BUG' if bad else 'FIXED', bad)\"\n只有输出 FIXED 时才能标 DONE。输出 BUG=未修复=绝对不能标 DONE。\n\n根因定位：上游问题（双行表头/缓存key/desc_map）已在fe0b0f8修复。传入_execute_query的DataFrame完全正确（58行，PathID只有1和2），但_apply_group_by_aggregation返回了[38,589,58]等不存在于数据中的值。手动pandas groupby结果正确（30行全部符合条件）。bug在_apply_group_by_aggregation方法内部。"
     }
   }
 }

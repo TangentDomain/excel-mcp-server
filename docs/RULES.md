@@ -206,4 +206,3 @@ src/excel_mcp_server_fastmcp/
 **验证方式**: 基准测试对比 + 用户反馈收集 + 内存使用监控
 **当前状态**: ⚠️ 进行中 - REQ-032已添加，性能优化策略规划中
 
-- **REQ-052 禁止标 DONE 除非验证通过**：GROUP BY 聚合 bug（P0），已修了 10 轮未解决。子代理反复误标 DONE。必须用 REQUIREMENTS.md notes 中的验证代码确认结果无异常后才能标 DONE。验证失败 = bug 未修复 = 不能标 DONE。这是铁律，违反零容忍。
