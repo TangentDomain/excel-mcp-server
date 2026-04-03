@@ -1,0 +1,10 @@
+{
+  "thresholds": {
+    "H4_cron_alive": 15,
+    "R3_git_ahead_max": 5,
+    "H1_rules_max_lines": 300,
+    "H1_now_max_lines": 30,
+    "H1_decisions_max_items": 40,
+    "H2_req_max_attempts": 10
+  }
+}
