@@ -70,15 +70,11 @@ class ExcelValidator:
         """
         if row_index < 1:
             raise DataValidationError(
-                "行索引无效", 
-                "行索引必须为正整数",
-                "请使用1开始的行号（如第1行、第2行等），不要使用0或负数"
+                "行索引无效（行索引必须为正整数，请使用1开始的行号）"
             )
         if count < 1:
             raise DataValidationError(
-                "操作行数无效", 
-                "操作行数必须为正整数",
-                "请指定要操作的正数行数（如插入1行、删除5行等）"
+                "操作行数无效（操作行数必须为正整数）"
             )
         if count > cls.MAX_ROWS_OPERATION:
             raise OperationLimitError(
@@ -101,15 +97,11 @@ class ExcelValidator:
         """
         if column_index < 1:
             raise DataValidationError(
-                "列索引无效", 
-                "列索引必须为正整数",
-                "请使用1开始的列号（如第1列A、第2列B等），或使用列字母（如'A', 'B'）"
+                "列索引无效（列索引必须为正整数，请使用1开始的列号）"
             )
         if count < 1:
             raise DataValidationError(
-                "操作列数无效", 
-                "操作列数必须为正整数",
-                "请指定要操作的正数列数（如插入1列、删除3列等）"
+                "操作列数无效（操作列数必须为正整数）"
             )
         if count > cls.MAX_COLUMNS_OPERATION:
             raise OperationLimitError(

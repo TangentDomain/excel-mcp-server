@@ -4016,6 +4016,7 @@ def excel_write_only_override(
 
         # 降级到传统openpyxl模式（作为备用方案）
         try:
+            from excel_mcp_server_fastmcp.core.excel_writer import ExcelWriter
             writer = ExcelWriter(file_path)
             result = writer.update_range(
                 f"{sheet_name}!{range_spec}", 
