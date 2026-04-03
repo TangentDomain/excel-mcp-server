@@ -823,7 +823,8 @@ class AdvancedSQLQueryEngine:
             cached_mtime, cached_data, cached_desc = self._df_cache[cache_key]
             if cached_mtime == mtime:
                 self._header_descriptions = cached_desc
-                # 缓存命中时恢复列名映射，避免_preprocess_quoted_identifiers因映射为空而跳过
+                # 缓存命中时，重置列名映射为当前文件的正确映射，避免其他文件的映射干扰
+                self._original_to_clean_cols = {}
                 if cache_key in self._col_map_cache:
                     self._original_to_clean_cols.update(self._col_map_cache[cache_key])
                 return cached_data
