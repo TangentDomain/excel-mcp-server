@@ -2,7 +2,7 @@
 
 # 🎮 ExcelMCP: 让游戏策划用嘴说话的Excel神器
 
-[![PyPI](https://img.shields.io/pypi/v/excel-mcp-server-fastmcp.svg)](https://pypi.org/project/excel-mcp-server-fastmcp/v1.7.11)
+[![PyPI](https://img.shields.io/pypi/v/excel-mcp-server-fastmcp.svg)](https://pypi.org/project/excel-mcp-server-fastmcp/v1.7.12)
 [![CI](https://github.com/TangentDomain/excel-mcp-server/actions/workflows/ci.yml/badge.svg)](https://github.com/TangentDomain/excel-mcp-server/actions/workflows/ci.yml)
 ![Tests](https://img.shields.io/badge/tests-851-brightgreen.svg)
 ![Tools](https://img.shields.io/badge/tools-53-green.svg)
