@@ -219,5 +219,15 @@
       "notes": "第257轮修复：df.query前用pd.to_numeric(errors='ignore')转换数值列",
       "archived_at": "2026-04-02"
     }
+    "REQ-048": {
+      "title": "保护：删除最后一个Sheet时应阻止或自动创建默认Sheet",
+      "type": "fix",
+      "priority": "P2",
+      "status": "DONE",
+      "source": "自审",
+      "description": "第260轮边缘测试T292发现：excel_delete_sheet允许删除最后一个Sheet，导致工作簿无Sheet。应在删除前检查剩余Sheet数量。",
+      "notes": "已验证：excel_manager.py:319-321已有len(wb.sheetnames)<=1检查，test_delete_last_sheet已覆盖。第263轮确认无需修改。",
+      "archived_at": "2026-04-03"
+    }
   }
 }
