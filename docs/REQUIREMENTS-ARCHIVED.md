@@ -250,6 +250,83 @@
       "description": "excel_create_pivot_table函数在Sheet不存在时使用OPERATION_FAILED错误码，而其他函数使用SHEET_NOT_FOUND。应统一为SHEET_NOT_FOUND。",
       "notes": "第271轮修复：OPERATION_FAILED→SHEET_NOT_FOUND（server.py:3462）",
       "archived_at": "2026-04-03"
+    },
+    "REQ-047": {
+      "title": "重构：抽取Sheet验证公共方法消除重复代码",
+      "type": "refactor",
+      "priority": "P2",
+      "status": "DONE",
+      "source": "自审",
+      "attempts": 0,
+      "description": "server.py中多个user_friendly函数（get_range/update_range/format_cells等）重复执行相同的Sheet存在性验证逻辑（加载workbook→检查sheet名→返回错误）。应抽取为公共工具函数。",
+      "notes": "第259轮自审发现，涉及server.py约4处重复。第274轮完成。",
+      "archived_at": "2026-04-03"
+    },
+    "REQ-049": {
+      "title": "Docstring合规率提升：补充缺失的Args/Returns文档段",
+      "type": "refactor",
+      "priority": "P2",
+      "status": "DONE",
+      "source": "质量抽检",
+      "attempts": 1,
+      "description": "497个函数中仅233个有Args段（合规率46.9%），远低于85%目标。需批量补充公共函数的Args/Parameters和Returns文档段。",
+      "notes": "来源FEEDBACK.md #1/#3（第7轮），目标合规率85%以上。已达成85.4%合规率，完成目标。第274轮完成。",
+      "archived_at": "2026-04-03"
+    },
+    "REQ-050": {
+      "title": "工具函数抽取：将RichText纯文本提取逻辑抽取为公共函数",
+      "type": "refactor",
+      "priority": "P2",
+      "status": "DONE",
+      "source": "自审",
+      "attempts": 0,
+      "description": "excel_list_charts函数中的_extract_title_text逻辑用于从openpyxl RichText对象提取纯文本，这个逻辑可能在其他地方复用（如读取图表标题、单元格注释等），应抽取为公共工具函数放到utils/目录下。",
+      "notes": "第268轮代码自审发现。第274轮完成。",
+      "archived_at": "2026-04-03"
+    },
+    "REQ-052": {
+      "title": "修复GROUP BY聚合错误：部分行被归入不符合WHERE条件的分组",
+      "type": "fix",
+      "priority": "P0",
+      "status": "DONE",
+      "source": "质量抽检",
+      "attempts": 4,
+      "description": "GROUP BY聚合查询中，部分行被错误归入不符合WHERE条件的分组。例：WHERE 显示路径ID IN (1,2) AND 显示位置ID < 100 GROUP BY后出现路径ID=36、位置ID=569的行。文件：src/api/advanced_sql_query.py GROUP BY逻辑。",
+      "notes": "来源FEEDBACK.md OPEN-#1，CEO实测MapEvent.xlsx复现。第269轮代码审查：执行顺序正确（WHERE先于GROUP BY），未发现逻辑bug。第271轮深入审查：发现_apply_where_clause存在静默失败场景（condition_str为空时返回未过滤df），但IN+AND条件不受影响。最可能原因是数据类型不匹配。数据类型已确认全部int（CEO已用MapEvent.xlsx验证）。Bug在数据加载阶段：original_rows=379但MapEvent sheet只有59行，所有sheet数据被混在一起。详见FEEDBACK.md OPEN-#1精确线索。第274轮完成。",
+      "archived_at": "2026-04-03"
+    },
+    "REQ-053": {
+      "title": "优化：抽取excel_list_charts中的_extract_title_text为公共函数",
+      "type": "refactor",
+      "priority": "P2",
+      "status": "DONE",
+      "source": "自审",
+      "attempts": 0,
+      "description": "excel_list_charts函数中的_extract_title_text逻辑用于从openpyxl RichText对象提取纯文本，定义在函数内部，每次调用都会重新定义，效率略低。应抽取为模块级别的公共函数，供其他函数（如读取图表标题、单元格注释等）复用。",
+      "notes": "第269轮代码自审发现（与REQ-050类似，但针对chart场景）。第274轮完成。",
+      "archived_at": "2026-04-03"
+    },
+    "REQ-054": {
+      "title": "优化：恢复DataValidationError的结构化错误信息",
+      "type": "refactor",
+      "priority": "P2",
+      "status": "DONE",
+      "source": "自审",
+      "attempts": 0,
+      "description": "第266轮将DataValidationError从3参数（错误标题、错误描述、错误建议）简化为1参数（完整错误信息），降低了错误信息的结构化程度，可能影响AI的错误理解和自动修复能力。建议恢复为3参数格式，提升错误处理质量。",
+      "notes": "第269轮代码自审发现（commit 41a8e6e简化错误信息，降低了AI可读性）。第274轮完成。",
+      "archived_at": "2026-04-03"
+    },
+    "REQ-056": {
+      "title": "修复：_apply_where_clause静默失败时不返回未过滤DataFrame",
+      "type": "fix",
+      "priority": "P2",
+      "status": "DONE",
+      "source": "自审",
+      "attempts": 3,
+      "description": "advanced_sql_query.py的_apply_where_clause中，当_sql_condition_to_pandas返回None或空字符串时（如EXISTS子查询），直接返回未过滤的DataFrame（第2907行），导致WHERE条件被静默跳过。应改为抛出错误或记录警告。",
+      "notes": "第271轮代码自审发现（REQ-052审查过程中的附带发现）。第274轮完成。",
+      "archived_at": "2026-04-03"
     }
   }
 }
