@@ -56,7 +56,11 @@ class ExcelManager:
                 created_sheets = []
                 for i, sheet_name in enumerate(sheet_names):
                     if not sheet_name or not sheet_name.strip():
-                        raise DataValidationError(f"工作表名称不能为空: 索引 {i}")
+                        raise DataValidationError(
+                            f"工作表名称不能为空: 索引 {i}",
+                            "工作表名称不能为空白字符串",
+                            "请为所有工作表提供有效的名称"
+                        )
 
                     sheet = workbook.create_sheet(title=sheet_name.strip())
                     created_sheets.append(SheetInfo(

@@ -53,7 +53,8 @@ class TestExceptions:
         assert "Invalid data" in str(error)
         assert error.suggested_fix is not None
         formatted = error.get_formatted_message()
-        assert "数据验证失败" in formatted
+        assert "Invalid data" in formatted
+        assert "some detail" in formatted
 
     def test_operation_limit_error(self):
         """Test OperationLimitError creation"""

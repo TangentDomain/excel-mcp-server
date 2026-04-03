@@ -56,7 +56,11 @@ class ExcelConverter:
             # 选择工作表
             if sheet_name:
                 if sheet_name not in workbook.sheetnames:
-                    raise DataValidationError(f"工作表 '{sheet_name}' 不存在")
+                    raise DataValidationError(
+                        f"工作表 '{sheet_name}' 不存在",
+                        f"可用工作表: {', '.join(workbook.sheetnames)}",
+                        "请使用正确的工作表名称"
+                    )
                 sheet = workbook[sheet_name]
             else:
                 sheet = workbook.active

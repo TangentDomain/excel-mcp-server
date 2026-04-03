@@ -54,7 +54,11 @@ class ExcelValidator:
             DataValidationError: 工作表名称无效
         """
         if sheet_name is not None and not sheet_name.strip():
-            raise DataValidationError("工作表名称不能为空")
+            raise DataValidationError(
+                "工作表名称不能为空",
+                "工作表名称不能为空白字符串",
+                "请提供有效的工作表名称"
+            )
 
     @classmethod
     def validate_row_operations(cls, row_index: int, count: int) -> None:
@@ -70,11 +74,15 @@ class ExcelValidator:
         """
         if row_index < 1:
             raise DataValidationError(
-                "行索引无效（行索引必须为正整数，请使用1开始的行号）"
+                "行索引无效",
+                "行索引必须为正整数",
+                "请使用1开始的行号（如第1行、第2行等），不要使用0或负数"
             )
         if count < 1:
             raise DataValidationError(
-                "操作行数无效（操作行数必须为正整数）"
+                "操作行数无效",
+                "操作行数必须为正整数",
+                "请指定要操作的正数行数（如插入1行、删除5行等）"
             )
         if count > cls.MAX_ROWS_OPERATION:
             raise OperationLimitError(
@@ -97,11 +105,15 @@ class ExcelValidator:
         """
         if column_index < 1:
             raise DataValidationError(
-                "列索引无效（列索引必须为正整数，请使用1开始的列号）"
+                "列索引无效",
+                "列索引必须为正整数",
+                "请使用1开始的列号（如第1列A、第2列B等），或使用列字母（如'A', 'B'）"
             )
         if count < 1:
             raise DataValidationError(
-                "操作列数无效（操作列数必须为正整数）"
+                "操作列数无效",
+                "操作列数必须为正整数",
+                "请指定要操作的正数列数（如插入1列、删除3列等）"
             )
         if count > cls.MAX_COLUMNS_OPERATION:
             raise OperationLimitError(

@@ -291,7 +291,9 @@ class ExcelWriter:
             # 验证删除范围
             if start_row > original_max_row:
                 raise DataValidationError(
-                    f"起始行号({start_row})超过工作表最大行数({original_max_row})"
+                    f"起始行号({start_row})超过工作表最大行数({original_max_row})",
+                    f"工作表最大行数为{original_max_row}",
+                    f"请使用不超过{original_max_row}的行号"
                 )
 
             # 计算实际删除的行数
