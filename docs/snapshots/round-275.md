@@ -28,7 +28,7 @@
       "priority": "P1",
       "status": "IN-PROGRESS",
       "source": "CEO",
-      "attempts": 14,
+      "attempts": 13,
       "last_failure": "",
       "description": "每轮执行时，自动搜索一些稀奇古怪的Excel使用场景（如超长公式、特殊字符sheet名、合并单元格+筛选、数据透视表嵌套、条件格式+VBA、超大文件性能等），用uvx安装的MCP工具实际调用测试，记录是否崩溃/返回错误/正常处理。",
       "acceptance_criteria": [
@@ -69,9 +69,9 @@
       "title": "修复GROUP BY聚合错误：部分行被归入不符合WHERE条件的分组",
       "type": "fix",
       "priority": "P0",
-      "status": "IN-PROGRESS",
+      "status": "OPEN",
       "source": "质量抽检",
-      "attempts": 4,
+      "attempts": 3,
       "last_failure": "第271轮深入审查：WHERE在第2128行执行（_apply_where_clause），GROUP BY在第2136行执行（_apply_group_by_aggregation），顺序正确。_apply_where_clause中存在一个静默失败场景：当_sql_condition_to_pandas返回None/空字符串时（如EXISTS子查询），会直接返回未过滤的DataFrame。但IN+AND+比较的WHERE条件会走pandas query路径，不会触发此问题。可能原因是Excel数据类型不匹配（如显示路径ID列存储为字符串而非整数），导致WHERE条件未正确匹配。需CEO提供MapEvent.xlsx或确认数据类型。",
       "description": "GROUP BY聚合查询中，部分行被错误归入不符合WHERE条件的分组。例：WHERE 显示路径ID IN (1,2) AND 显示位置ID < 100 GROUP BY后出现路径ID=36、位置ID=569的行。文件：src/api/advanced_sql_query.py GROUP BY逻辑。",
       "notes": "来源FEEDBACK.md OPEN-#1，CEO实测MapEvent.xlsx复现。第269轮代码审查：执行顺序正确（WHERE先于GROUP BY），未发现逻辑bug。第271轮深入审查：发现_apply_where_clause存在静默失败场景（condition_str为空时返回未过滤df），但IN+AND条件不受影响。最可能原因是数据类型不匹配。数据类型已确认全部int（CEO已用MapEvent.xlsx验证）。Bug在数据加载阶段：original_rows=379但MapEvent sheet只有59行，所有sheet数据被混在一起。详见FEEDBACK.md OPEN-#1精确线索。"
@@ -107,7 +107,7 @@
       "priority": "P2",
       "status": "IN-PROGRESS",
       "source": "自审",
-      "attempts": 3,
+      "attempts": 2,
       "last_failure": "",
       "description": "advanced_sql_query.py的_apply_where_clause中，当_sql_condition_to_pandas返回None或空字符串时（如EXISTS子查询），直接返回未过滤的DataFrame（第2907行），导致WHERE条件被静默跳过。应改为抛出错误或记录警告。",
       "notes": "第271轮代码自审发现（REQ-052审查过程中的附带发现）"
