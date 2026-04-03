@@ -3398,6 +3398,9 @@ class AdvancedSQLQueryEngine:
                 if isinstance(expr, (exp.Column, exp.Identifier)):
                     group_by_columns.append(expr.name)
 
+        # 保存GROUP BY列到实例变量，供_build_total_row使用
+        self._group_by_columns = group_by_columns
+
         if not aggregations:
             # 没有聚合函数，只应用GROUP BY去重
             if group_by_columns:
@@ -3927,14 +3930,26 @@ class AdvancedSQLQueryEngine:
 
         return df
 
-    def _build_total_row(self, result_df: pd.DataFrame) -> Optional[List]:
-        """构建GROUP BY聚合结果的TOTAL汇总行"""
+    def _build_total_row(self, result_df: pd.DataFrame, group_by_columns: List[str] = None) -> Optional[List]:
+        """构建GROUP BY聚合结果的TOTAL汇总行
+
+        Args:
+            result_df (pd.DataFrame): 结果DataFrame
+            group_by_columns (List[str]): GROUP BY列名列表，跳过这些列的求和
+
+        Returns:
+            Optional[List]: TOTAL汇总行，如果没有数值列则返回None
+        """
+        if group_by_columns is None:
+            group_by_columns = []
         if result_df.empty or len(result_df) <= 1:
             return None
         total_row = [''] * len(result_df.columns)
         total_row[0] = 'TOTAL'
         has_numeric = False
         for i, col in enumerate(result_df.columns):
+            if col in group_by_columns:
+                continue
             series = pd.to_numeric(result_df[col], errors='coerce')
             if series.notna().sum() > len(result_df) * 0.5:
                 total_row[i] = self._serialize_value(series.sum())
@@ -4030,7 +4045,7 @@ class AdvancedSQLQueryEngine:
         # GROUP BY 聚合结果自动追加 TOTAL 行
         has_total_row = False
         if has_group_by and include_headers:
-            total_row = self._build_total_row(result_df)
+            total_row = self._build_total_row(result_df, self._group_by_columns)
             if total_row:
                 data.append(total_row)
                 has_total_row = True
