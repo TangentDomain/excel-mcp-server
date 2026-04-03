@@ -937,11 +937,11 @@ class AdvancedSQLQueryEngine:
 
                         if len(non_empty_second) >= 2:
                             second_all_field = all(
-                                re.match(r'^[a-zA-Z_][a-zA-Z0-9_.]*$', v)
+                                re.match(r'^[a-zA-Z_][a-zA-Z0-9_.#]*$', v)
                                 for v in non_empty_second
                             )
                             first_all_field = all(
-                                re.match(r'^[a-zA-Z_][a-zA-Z0-9_]*$', v)
+                                re.match(r'^[a-zA-Z_][a-zA-Z0-9_#]*$', v)
                                 for v in non_empty_first
                             ) if non_empty_first else False
                             if second_all_field and not first_all_field:
@@ -961,15 +961,16 @@ class AdvancedSQLQueryEngine:
                         header=1,
                         keep_default_na=False
                     )
-                    # 从calamine读取的行值构建中英文映射
-                    desc_map = {}
+                    # 注意：desc_map 在 _clean_dataframe 之后构建（列名可能被清洗）
+                    # 先记录原始映射关系，后面清洗后再构建最终映射
+                    raw_desc_pairs = []
                     if second_row_values and first_row_values:
-                        for fname, desc in zip(second_row_values, first_row_values):
+                        for col_idx, fname in enumerate(second_row_values):
                             fname = fname.strip() if fname else ''
-                            desc = desc.strip() if desc else ''
-                            if fname:
-                                desc_map[fname] = desc
-                    self._header_descriptions[sheet] = desc_map
+                            desc = first_row_values[col_idx].strip() if col_idx < len(first_row_values) else ''
+                            if fname and desc and desc != fname:
+                                raw_desc_pairs.append((col_idx, fname, desc))
+
                 else:
                     df = pd.read_excel(
                         file_path,
@@ -977,8 +978,21 @@ class AdvancedSQLQueryEngine:
                         engine='calamine',
                         keep_default_na=False
                     )
+                    raw_desc_pairs = []
 
+                # 清洗 DataFrame（列名中的特殊字符会被替换）
+                original_columns = list(df.columns)
                 df = self._clean_dataframe(df)
+                cleaned_columns = list(df.columns)
+
+                # 构建中文描述映射（用清洗后的列名）
+                if raw_desc_pairs:
+                    desc_map = {}
+                    for col_idx, fname, desc in raw_desc_pairs:
+                        if col_idx < len(cleaned_columns):
+                            desc_map[cleaned_columns[col_idx]] = desc
+                    self._header_descriptions[sheet] = desc_map
+
                 df = self._optimize_dtypes(df)
                 worksheets_data[sheet] = df
 
