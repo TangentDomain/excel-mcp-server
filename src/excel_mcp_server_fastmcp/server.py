@@ -2969,7 +2969,14 @@ def excel_compare_sheets(
 @mcp.tool()
 @_track_call
 def excel_server_stats() -> Dict[str, Any]:
-    """服务器状态：缓存、调用次数、运行时间。无参数。"""
+    """服务器状态：缓存、调用次数、运行时间。
+
+    Args:
+        无参数
+
+    Returns:
+        Dict: 包含缓存、调用次数、运行时间等统计信息
+    """
     stats = _tracker.get_stats()
     return _ok("服务器统计信息", data=stats)
 
@@ -2996,19 +3003,12 @@ def excel_get_range_user_friendly(
     
     # 构建范围表达式
     range_expression = f"{sheet_name}!{start_cell}:{end_cell}"
-    
+
     try:
-        # 调用原有的excel_get_range函数
-        from openpyxl import load_workbook
-        wb = load_workbook(file_path, read_only=True)
-        sheet_names = wb.sheetnames
-        wb.close()
-        
-        if sheet_name not in sheet_names:
-            return _fail(
-                f"工作表 '{sheet_name}' 不存在。可用工作表: {', '.join(sheet_names)}",
-                meta={"error_code": "SHEET_NOT_FOUND", "available_sheets": sheet_names}
-            )
+        # 验证工作表存在
+        error_result = _validate_sheet_exists(file_path, sheet_name)
+        if error_result:
+            return error_result
         
         # 调用原有的API
         result = ExcelOperations.get_range(file_path, range_expression, include_formatting)
@@ -3041,19 +3041,12 @@ def excel_format_cells_user_friendly(
     
     # 构建范围表达式
     range_expression = f"{sheet_name}!{start_cell}:{end_cell}"
-    
+
     try:
         # 验证工作表存在
-        from openpyxl import load_workbook
-        wb = load_workbook(file_path, read_only=True)
-        sheet_names = wb.sheetnames
-        wb.close()
-        
-        if sheet_name not in sheet_names:
-            return _fail(
-                f"工作表 '{sheet_name}' 不存在。可用工作表: {', '.join(sheet_names)}",
-                meta={"error_code": "SHEET_NOT_FOUND", "available_sheets": sheet_names}
-            )
+        error_result = _validate_sheet_exists(file_path, sheet_name)
+        if error_result:
+            return error_result
         
         # 调用原有的API
         result = ExcelOperations.format_cells(
@@ -3094,19 +3087,12 @@ def excel_update_range_user_friendly(
     
     # 构建范围表达式
     range_expression = f"{sheet_name}!{start_cell}:{end_cell}"
-    
+
     try:
         # 验证工作表存在
-        from openpyxl import load_workbook
-        wb = load_workbook(file_path, read_only=True)
-        sheet_names = wb.sheetnames
-        wb.close()
-        
-        if sheet_name not in sheet_names:
-            return _fail(
-                f"工作表 '{sheet_name}' 不存在。可用工作表: {', '.join(sheet_names)}",
-                meta={"error_code": "SHEET_NOT_FOUND", "available_sheets": sheet_names}
-            )
+        error_result = _validate_sheet_exists(file_path, sheet_name)
+        if error_result:
+            return error_result
         
         # 调用原有的API
         result = ExcelOperations.update_range(
@@ -3117,6 +3103,35 @@ def excel_update_range_user_friendly(
     except Exception as e:
         return _fail(f"数据写入失败: {str(e)}")
 
+
+# ==================== Sheet 验证公共函数 ====================
+def _validate_sheet_exists(file_path: str, sheet_name: str) -> Optional[Dict[str, Any]]:
+    """验证工作表是否存在
+
+    Args:
+        file_path: Excel文件路径
+        sheet_name: 工作表名称
+
+    Returns:
+        如果验证失败，返回错误字典；如果验证通过，返回 None
+    """
+    try:
+        from openpyxl import load_workbook
+        wb = load_workbook(file_path, read_only=True)
+        sheet_names = wb.sheetnames
+        wb.close()
+
+        if sheet_name not in sheet_names:
+            return _fail(
+                f"工作表 '{sheet_name}' 不存在。可用工作表: {', '.join(sheet_names)}",
+                meta={"error_code": "SHEET_NOT_FOUND", "available_sheets": sheet_names}
+            )
+        return None
+    except Exception as e:
+        return _fail(
+            f"验证工作表 '{sheet_name}' 时出错: {str(e)}",
+            meta={"error_code": "SHEET_VALIDATION_ERROR", "sheet_name": sheet_name}
+        )
 
 # ==================== 批量操作工具 ====================
 @mcp.tool()
@@ -4337,6 +4352,13 @@ if SMART_CONFIG_AVAILABLE:
 
 def main():
     """Entry point for excel-mcp-server-fastmcp.
+
+    Args:
+        --stdio: 标准输入输出模式（默认），本地使用，uvx/claude/cursor
+        --sse: Server-Sent Events远程模式
+        --streamable-http: Streamable HTTP远程模式，推荐用于团队共享
+        --mount-path=<path>: HTTP模式挂载路径
+        --version, -v: 显示版本号
 
     支持三种传输模式：
     - stdio（默认）：本地使用，uvx/claude/cursor

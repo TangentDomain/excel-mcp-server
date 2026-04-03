@@ -4,7 +4,7 @@
       "title": "配置化：硬编码常量提取为配置项",
       "type": "refactor",
       "priority": "P2",
-      "status": "DONE",
+      "status": "OPEN",
       "source": "自审",
       "attempts": 0,
       "last_failure": "",
@@ -15,7 +15,7 @@
       "title": "重构：抽取Sheet验证公共方法消除重复代码",
       "type": "refactor",
       "priority": "P2",
-      "status": "DONE",
+      "status": "OPEN",
       "source": "自审",
       "attempts": 0,
       "last_failure": "",
@@ -28,7 +28,7 @@
       "priority": "P1",
       "status": "IN-PROGRESS",
       "source": "CEO",
-      "attempts": 14,
+      "attempts": 13,
       "last_failure": "",
       "description": "每轮执行时，自动搜索一些稀奇古怪的Excel使用场景（如超长公式、特殊字符sheet名、合并单元格+筛选、数据透视表嵌套、条件格式+VBA、超大文件性能等），用uvx安装的MCP工具实际调用测试，记录是否崩溃/返回错误/正常处理。",
       "acceptance_criteria": [
@@ -45,19 +45,19 @@
       "title": "Docstring合规率提升：补充缺失的Args/Returns文档段",
       "type": "refactor",
       "priority": "P2",
-      "status": "DONE",
+      "status": "OPEN",
       "source": "质量抽检",
-      "attempts": 1,
+      "attempts": 0,
       "last_failure": "",
       "description": "497个函数中仅233个有Args段（合规率46.9%），远低于85%目标。需批量补充公共函数的Args/Parameters和Returns文档段。",
-      "notes": "来源FEEDBACK.md #1/#3（第7轮），目标合规率85%以上。已达成85.4%合规率，完成目标。"
+      "notes": "来源FEEDBACK.md #1/#3（第7轮），目标合规率85%以上"
     },
 
     "REQ-050": {
       "title": "工具函数抽取：将RichText纯文本提取逻辑抽取为公共函数",
       "type": "refactor",
       "priority": "P2",
-      "status": "DONE",
+      "status": "OPEN",
       "source": "自审",
       "attempts": 0,
       "last_failure": "",
@@ -69,19 +69,19 @@
       "title": "修复GROUP BY聚合错误：部分行被归入不符合WHERE条件的分组",
       "type": "fix",
       "priority": "P0",
-      "status": "DONE",
+      "status": "OPEN",
       "source": "质量抽检",
-      "attempts": 4,
-      "last_failure": "",
+      "attempts": 3,
+      "last_failure": "第271轮深入审查：WHERE在第2128行执行（_apply_where_clause），GROUP BY在第2136行执行（_apply_group_by_aggregation），顺序正确。_apply_where_clause中存在一个静默失败场景：当_sql_condition_to_pandas返回None/空字符串时（如EXISTS子查询），会直接返回未过滤的DataFrame。但IN+AND+比较的WHERE条件会走pandas query路径，不会触发此问题。可能原因是Excel数据类型不匹配（如显示路径ID列存储为字符串而非整数），导致WHERE条件未正确匹配。需CEO提供MapEvent.xlsx或确认数据类型。",
       "description": "GROUP BY聚合查询中，部分行被错误归入不符合WHERE条件的分组。例：WHERE 显示路径ID IN (1,2) AND 显示位置ID < 100 GROUP BY后出现路径ID=36、位置ID=569的行。文件：src/api/advanced_sql_query.py GROUP BY逻辑。",
-      "notes": "来源FEEDBACK.md OPEN-#1，CEO实测MapEvent.xlsx复现。第269轮代码审查：执行顺序正确（WHERE先于GROUP BY），未发现逻辑bug。第271轮深入审查：发现_apply_where_clause存在静默失败场景（condition_str为空时返回未过滤df），但IN+AND条件不受影响。最可能原因是数据类型不匹配。数据类型已确认全部int（CEO已用MapEvent.xlsx验证）。Bug在数据加载阶段：original_rows=379但MapEvent sheet只有59行，所有sheet数据被混在一起。详见FEEDBACK.md OPEN-#1精确线索。"
+      "notes": "来源FEEDBACK.md OPEN-#1，CEO实测MapEvent.xlsx复现。第269轮代码审查：执行顺序正确（WHERE先于GROUP BY），未发现逻辑bug。第271轮深入审查：发现_apply_where_clause存在静默失败场景（condition_str为空时返回未过滤df），但IN+AND条件不受影响。最可能原因是数据类型不匹配。需确认MapEvent.xlsx数据类型。"
     },
 
     "REQ-053": {
       "title": "优化：抽取excel_list_charts中的_extract_title_text为公共函数",
       "type": "refactor",
       "priority": "P2",
-      "status": "DONE",
+      "status": "OPEN",
       "source": "自审",
       "attempts": 0,
       "last_failure": "",
@@ -93,7 +93,7 @@
       "title": "优化：恢复DataValidationError的结构化错误信息",
       "type": "refactor",
       "priority": "P2",
-      "status": "DONE",
+      "status": "OPEN",
       "source": "自审",
       "attempts": 0,
       "last_failure": "",
@@ -101,16 +101,18 @@
       "notes": "第269轮代码自审发现（commit 41a8e6e简化错误信息，降低了AI可读性）"
     },
 
-    "REQ-056": {
-      "title": "修复：_apply_where_clause静默失败时不返回未过滤DataFrame",
-      "type": "fix",
-      "priority": "P2",
-      "status": "DONE",
+
+
+    "REQ-057": {
+      "title": "优化：And/Or条件None值处理统一回退机制",
+      "type": "refactor",
+      "priority": "P3",
+      "status": "OPEN",
       "source": "自审",
-      "attempts": 3,
+      "attempts": 0,
       "last_failure": "",
-      "description": "advanced_sql_query.py的_apply_where_clause中，当_sql_condition_to_pandas返回None或空字符串时（如EXISTS子查询），直接返回未过滤的DataFrame（第2907行），导致WHERE条件被静默跳过。应改为抛出错误或记录警告。",
-      "notes": "第271轮代码自审发现（REQ-052审查过程中的附带发现）"
+      "description": "当前And/Or条件处理中遇到None值时会抛出ValueError导致查询失败（advanced_sql_query.py:2967-2968,2974-2975），但系统已有逐行过滤的回退机制。建议改为返回None，让_apply_where_clause统一处理并回退，保持一致的行为：所有不支持的SQL特性都回退到逐行过滤而非失败。",
+      "notes": "第272轮代码自审发现（REQ-056修复过程中的附带发现）"
     }
   }
 }

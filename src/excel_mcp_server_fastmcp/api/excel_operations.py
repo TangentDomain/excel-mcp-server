@@ -1517,6 +1517,14 @@ class ExcelOperations:
     def merge_cells(cls, file_path: str, sheet_name: str, range: str) -> Dict[str, Any]:
         """
         @intention 合并指定范围的单元格
+
+        Args:
+            file_path: Excel文件路径
+            sheet_name: 工作表名称
+            range: 要合并的单元格范围（如 A1:C3）
+
+        Returns:
+            Dict: 操作结果，成功或失败信息
         """
         if cls.DEBUG_LOG_ENABLED:
             logger.info(f"{cls._LOG_PREFIX} 开始合并单元格: {range}")
@@ -1535,6 +1543,14 @@ class ExcelOperations:
     def unmerge_cells(cls, file_path: str, sheet_name: str, range: str) -> Dict[str, Any]:
         """
         @intention 取消合并指定范围的单元格
+
+        Args:
+            file_path: Excel文件路径
+            sheet_name: 工作表名称
+            range: 要取消合并的单元格范围（如 A1:C3）
+
+        Returns:
+            Dict: 操作结果，成功或失败信息
         """
         if cls.DEBUG_LOG_ENABLED:
             logger.info(f"{cls._LOG_PREFIX} 开始取消合并单元格: {range}")
@@ -1554,6 +1570,15 @@ class ExcelOperations:
                    border_style: str = "thin") -> Dict[str, Any]:
         """
         @intention 为指定范围设置边框样式
+
+        Args:
+            file_path: Excel文件路径
+            sheet_name: 工作表名称
+            range: 要设置边框的单元格范围（如 A1:C3）
+            border_style: 边框样式，如 thin、medium、thick（默认：thin）
+
+        Returns:
+            Dict: 操作结果，成功或失败信息
         """
         if cls.DEBUG_LOG_ENABLED:
             logger.info(f"{cls._LOG_PREFIX} 开始设置边框: {range}, 样式: {border_style}")
@@ -1573,6 +1598,16 @@ class ExcelOperations:
                       height: float, count: int = 1) -> Dict[str, Any]:
         """
         @intention 调整指定行的高度
+
+        Args:
+            file_path: Excel文件路径
+            sheet_name: 工作表名称
+            row_index: 起始行号（从1开始）
+            height: 行高（磅）
+            count: 要设置的连续行数（默认：1）
+
+        Returns:
+            Dict: 操作结果，成功或失败信息
         """
         if cls.DEBUG_LOG_ENABLED:
             logger.info(f"{cls._LOG_PREFIX} 开始调整行高: 行{row_index}, 高度{height}, 数量{count}")
@@ -1599,6 +1634,16 @@ class ExcelOperations:
                         width: float, count: int = 1) -> Dict[str, Any]:
         """
         @intention 调整指定列的宽度
+
+        Args:
+            file_path: Excel文件路径
+            sheet_name: 工作表名称
+            column_index: 起始列号（从1开始）
+            width: 列宽（字符）
+            count: 要设置的连续列数（默认：1）
+
+        Returns:
+            Dict: 操作结果，成功或失败信息
         """
         if cls.DEBUG_LOG_ENABLED:
             logger.info(f"{cls._LOG_PREFIX} 开始调整列宽: 列{column_index}, 宽度{width}, 数量{count}")
@@ -1628,6 +1673,17 @@ class ExcelOperations:
                       header_row: int = 1) -> Dict[str, Any]:
         """
         @intention 比较两个Excel工作表，识别ID对象的新增、删除、修改
+
+        Args:
+            file1_path: 第一个Excel文件路径
+            sheet1_name: 第一个工作表名称
+            file2_path: 第二个Excel文件路径
+            sheet2_name: 第二个工作表名称
+            id_column: ID列的索引或列名（默认：1，即第一列）
+            header_row: 表头行号（默认：1）
+
+        Returns:
+            Dict: 比较结果，包含新增、删除、修改的记录
         """
         if cls.DEBUG_LOG_ENABLED:
             logger.info(f"{cls._LOG_PREFIX} 开始比较工作表: {file1_path}:{sheet1_name} vs {file2_path}:{sheet2_name}")
@@ -1655,6 +1711,15 @@ class ExcelOperations:
                    formula: str) -> Dict[str, Any]:
         """
         @intention 设置指定单元格或区域的公式
+
+        Args:
+            file_path: Excel文件路径
+            sheet_name: 工作表名称
+            cell_range: 单元格或区域（如 A1 或 A1:C3）
+            formula: 公式表达式（以 = 开头）
+
+        Returns:
+            Dict: 操作结果，成功或失败信息
         """
         if cls.DEBUG_LOG_ENABLED:
             logger.info(f"{cls._LOG_PREFIX} 开始设置公式: {cell_range} = {formula}")
@@ -1673,6 +1738,13 @@ class ExcelOperations:
     def evaluate_formula(cls, formula: str, context_sheet: Optional[str] = None) -> Dict[str, Any]:
         """
         @intention 计算公式的值，不修改文件
+
+        Args:
+            formula: 要计算的公式表达式（可以不包含 =）
+            context_sheet: 上下文工作表（可选），用于引用单元格值
+
+        Returns:
+            Dict: 计算结果，成功或失败信息
         """
         if cls.DEBUG_LOG_ENABLED:
             logger.info(f"{cls._LOG_PREFIX} 开始计算公式: {formula}")
@@ -1691,6 +1763,13 @@ class ExcelOperations:
     def compare_files(cls, file1_path: str, file2_path: str) -> Dict[str, Any]:
         """
         @intention 比较两个Excel文件的所有工作表
+
+        Args:
+            file1_path: 第一个Excel文件路径
+            file2_path: 第二个Excel文件路径
+
+        Returns:
+            Dict: 比较结果，包含各工作表的差异统计
         """
         if cls.DEBUG_LOG_ENABLED:
             logger.info(f"{cls._LOG_PREFIX} 开始比较文件: {file1_path} vs {file2_path}")
