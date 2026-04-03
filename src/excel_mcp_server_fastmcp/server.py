@@ -3366,7 +3366,7 @@ def excel_create_chart(file_path: str, sheet_name: str, chart_type: str, data_ra
         wb = load_workbook(file_path)
         
         if sheet_name not in wb.sheetnames:
-            return _fail("工作表不存在", meta={"error_code": "OPERATION_FAILED"})
+            return _fail("工作表不存在", meta={"error_code": "SHEET_NOT_FOUND"})
         
         ws = wb[sheet_name]
         
@@ -3657,15 +3657,32 @@ def excel_list_charts(file_path: str, sheet_name: str = None) -> Dict[str, Any]:
             ws = wb[sheet]
             
             for i, chart in enumerate(ws._charts):
+                def _extract_title_text(title_obj):
+                    if not title_obj:
+                        return ""
+                    try:
+                        t = title_obj.text
+                        if isinstance(t, str):
+                            return t
+                        if hasattr(t, 'p'):
+                            parts = []
+                            for p in t.p:
+                                for r in (p.r or []):
+                                    if hasattr(r, 't'):
+                                        parts.append(r.t)
+                            return ''.join(parts)
+                    except Exception:
+                        pass
+                    return str(title_obj)[:100]
+
                 chart_info = {
                     'sheet_name': sheet,
                     'chart_index': i,
-                    'chart_type': chart.chart_type,
-                    'position': chart.anchor,
-                    'data_range': str(chart.data.srcDataSource),
-                    'title': chart.title.text if chart.title else "",
-                    'legend': chart.legend.position if chart.legend else None,
-                    'has_data_labels': len(chart.dLbls) > 0 if hasattr(chart, 'dLbls') else False
+                    'chart_type': getattr(chart, 'type', type(chart).__name__),
+                    'position': str(chart.anchor),
+                    'title': _extract_title_text(chart.title),
+                    'legend': getattr(chart.legend, 'position', None) if chart.legend else None,
+                    'has_data_labels': bool(chart.dLbls) if hasattr(chart, 'dLbls') and chart.dLbls else False
                 }
                 charts_info.append(chart_info)
         
@@ -3705,7 +3722,7 @@ def excel_set_data_validation(file_path: str, sheet_name: str, range_address: st
         wb = load_workbook(file_path)
         
         if sheet_name not in wb.sheetnames:
-            return _fail("工作表不存在", meta={"error_code": "OPERATION_FAILED"})
+            return _fail("工作表不存在", meta={"error_code": "SHEET_NOT_FOUND"})
         
         ws = wb[sheet_name]
         
@@ -3770,7 +3787,7 @@ def excel_clear_validation(file_path: str, sheet_name: str = None, range_address
                 # 清除指定范围的验证
                 dv_to_remove = []
                 for dv in list(ws.data_validations.dataValidation):
-                    dv_range = str(dv.formula1) if dv.formula1 else ""
+                    dv_range = str(dv.sqref) if dv.sqref else ""
                     if range_address in dv_range or dv_range in range_address:
                         dv_to_remove.append(dv)
                 
@@ -3819,7 +3836,7 @@ def excel_add_conditional_format(file_path: str, sheet_name: str, range_address:
         wb = load_workbook(file_path)
         
         if sheet_name not in wb.sheetnames:
-            return _fail("工作表不存在", meta={"error_code": "OPERATION_FAILED"})
+            return _fail("工作表不存在", meta={"error_code": "SHEET_NOT_FOUND"})
         
         ws = wb[sheet_name]
         
