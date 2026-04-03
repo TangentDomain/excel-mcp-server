@@ -69,12 +69,12 @@
       "title": "边缘测试脚本同步：修正函数名不匹配问题",
       "type": "fix",
       "priority": "P1",
-      "status": "DONE",
+      "status": "IN-PROGRESS",
       "source": "自审",
       "attempts": 1,
       "last_failure": "",
       "description": "边缘测试脚本edge_case_tests_round268.py使用了过时的函数名（excel_create_workbook应改为excel_create_file），导致测试脚本无法正常运行。需要更新所有边缘测试脚本，确保使用正确的MCP工具函数名。",
-      "notes": "第271轮验证：脚本中所有8个MCP函数名均正确（excel_format_cells/get_range/query等），不使用excel_create_workbook。原始描述不准确，实际无函数名不匹配问题。"
+      "notes": "第268轮发现测试脚本卡住的原因，影响REQ-036执行"
     },
 
     "REQ-052": {
