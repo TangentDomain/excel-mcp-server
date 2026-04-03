@@ -42,6 +42,7 @@ except ImportError as e:
 # 导入API模块
 from .api.excel_operations import ExcelOperations
 from .utils.validators import ExcelValidator, DataValidationError
+from .utils import extract_rich_text
 
 # 导入智能配置推荐模块
 try:
@@ -3657,30 +3658,12 @@ def excel_list_charts(file_path: str, sheet_name: str = None) -> Dict[str, Any]:
             ws = wb[sheet]
             
             for i, chart in enumerate(ws._charts):
-                def _extract_title_text(title_obj):
-                    if not title_obj:
-                        return ""
-                    try:
-                        t = title_obj.text
-                        if isinstance(t, str):
-                            return t
-                        if hasattr(t, 'p'):
-                            parts = []
-                            for p in t.p:
-                                for r in (p.r or []):
-                                    if hasattr(r, 't'):
-                                        parts.append(r.t)
-                            return ''.join(parts)
-                    except Exception:
-                        pass
-                    return str(title_obj)[:100]
-
                 chart_info = {
                     'sheet_name': sheet,
                     'chart_index': i,
                     'chart_type': getattr(chart, 'type', type(chart).__name__),
                     'position': str(chart.anchor),
-                    'title': _extract_title_text(chart.title),
+                    'title': extract_rich_text(chart.title),
                     'legend': getattr(chart.legend, 'position', None) if chart.legend else None,
                     'has_data_labels': bool(chart.dLbls) if hasattr(chart, 'dLbls') and chart.dLbls else False
                 }
