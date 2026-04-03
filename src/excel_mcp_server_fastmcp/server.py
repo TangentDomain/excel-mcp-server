@@ -2614,6 +2614,10 @@ def _prepare_describe_result(sheet_name, is_dual_header, columns, row_count, fil
         'columns': columns
     }, meta={"file_path": file_path, "sheet": sheet_name})
 
+
+@mcp.tool()
+@_validate_file_path()
+@_track_call
 def excel_describe_table(
     file_path: str,
     sheet_name: str = None
