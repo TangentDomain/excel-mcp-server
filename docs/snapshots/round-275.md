@@ -1,34 +1,24 @@
 {
   "REQUIREMENTS": {
-    "REQ-035": {
+    "REQ-035": {\n      "status": "DONE",
       "title": "配置化：硬编码常量提取为配置项",
       "type": "refactor",
       "priority": "P2",
       "status": "OPEN",
       "source": "自审",
       "attempts": 0,
-      "last_failure": "",
+      "last_failure": "第275轮误标DONE：缓存映射修复不是根因。实际bug在数据加载阶段，original_rows=379但MapEvent sheet只有59行，所有sheet数据被混在一起。详见FEEDBACK.md OPEN-#1",
       "description": "多个硬编码值应提取为可配置常量：max_files=100, query_cache_ttl=300, target_mb=512.0, MAX_RESULT_ROWS=500等。",
       "notes": "分布在server.py和advanced_sql_query.py中"
     },
-    "REQ-047": {
-      "title": "重构：抽取Sheet验证公共方法消除重复代码",
-      "type": "refactor",
-      "priority": "P2",
-      "status": "OPEN",
-      "source": "自审",
-      "attempts": 0,
-      "last_failure": "",
-      "description": "server.py中多个user_friendly函数（get_range/update_range/format_cells等）重复执行相同的Sheet存在性验证逻辑（加载workbook→检查sheet名→返回错误）。应抽取为公共工具函数。",
-      "notes": "第259轮自审发现，涉及server.py约4处重复"
-    },
+
     "REQ-036": {
       "title": "边缘案例自动化测试：每轮自动搜索并验证奇怪场景",
       "type": "feature",
       "priority": "P1",
       "status": "IN-PROGRESS",
       "source": "CEO",
-      "attempts": 13,
+      "attempts": 15,
       "last_failure": "",
       "description": "每轮执行时，自动搜索一些稀奇古怪的Excel使用场景（如超长公式、特殊字符sheet名、合并单元格+筛选、数据透视表嵌套、条件格式+VBA、超大文件性能等），用uvx安装的MCP工具实际调用测试，记录是否崩溃/返回错误/正常处理。",
       "acceptance_criteria": [
@@ -41,76 +31,16 @@
       "notes": "第243轮10案例6通过4失败(REQ-038/039/040)；第245轮10案例9通过1失败(REQ-041)；第247轮5案例全通过(REQ-042修复)；第248轮16案例15通过1信息；第249轮16案例13通过3信息(含server.py修复)；第250轮15案例12通过2信息1失败(||拼接不支持)；第252轮33案例33全通过(核心API稳定性验证)；第253轮25案例11通过11信息3失败(streaming写入不可见)；第254轮20案例20全通过(含check_duplicate_ids列名查找bug修复+发布v1.7.6)；第255轮30案例25通过3信息2失败(T132/T133 ROUND/ABS不支持+T141嵌套聚合计算列丢失)；第256轮20案例19通过1失败(T168 evaluate_formula独立数学表达式不支持)；第257轮20案例(T211-T230)20全通过(REQ-044/045/046验证+batch_insert_rows_at CellInfo bug修复+SQL子查询+空表边界)；第259轮20案例(T256-T275)17通过3信息0失败；第260轮20案例(T276-T295)12通过1失败5信息2依赖(convert_format CSV→xlsx不支持)；第261轮20案例(T296-T315)19通过1信息0失败(T315 Sheet自身对比NoneType bug已修复+发布v1.7.10)；第262轮20案例(T316-T335)20全通过(format_cells number_format bug修复+发布v1.7.11)；第263轮21案例(T336-T355)0失败19信息2通过(测试脚本参数名不匹配，无新BUG)；第264轮20案例(T356-T375)17通过3信息0失败(DataValidationError 3参数调用BUG+ExcelWriter缺失导入BUG，已修复+发布v1.7.12)；第265轮20案例(T376-T395)14通过6信息0失败(excel_describe_table缺失@mcp.tool装饰器BUG，已修复+发布v1.7.13)；第266轮20案例(T396-T415)15通过4失败1错误0实际BUG(excel_list_charts AttributeError修复+clear_validation范围匹配BUG修复+错误码SHEET_NOT_FOUND修正+发布v1.7.14)；第267轮20案例(T416-T435)MCP冒烟通过，边缘测试脚本执行较慢但无新BUG发现；第268轮测试脚本函数名不匹配(excel_create_workbook→excel_create_file)，MCP冒烟通过"
     },
 
-    "REQ-049": {
-      "title": "Docstring合规率提升：补充缺失的Args/Returns文档段",
-      "type": "refactor",
-      "priority": "P2",
-      "status": "OPEN",
-      "source": "质量抽检",
-      "attempts": 0,
-      "last_failure": "",
-      "description": "497个函数中仅233个有Args段（合规率46.9%），远低于85%目标。需批量补充公共函数的Args/Parameters和Returns文档段。",
-      "notes": "来源FEEDBACK.md #1/#3（第7轮），目标合规率85%以上"
-    },
 
-    "REQ-050": {
-      "title": "工具函数抽取：将RichText纯文本提取逻辑抽取为公共函数",
-      "type": "refactor",
-      "priority": "P2",
-      "status": "OPEN",
-      "source": "自审",
-      "attempts": 0,
-      "last_failure": "",
-      "description": "excel_list_charts函数中的_extract_title_text逻辑用于从openpyxl RichText对象提取纯文本，这个逻辑可能在其他地方复用（如读取图表标题、单元格注释等），应抽取为公共工具函数放到utils/目录下。",
-      "notes": "第268轮代码自审发现"
-    },
 
-    "REQ-052": {
-      "title": "修复GROUP BY聚合错误：部分行被归入不符合WHERE条件的分组",
-      "type": "fix",
-      "priority": "P0",
-      "status": "OPEN",
-      "source": "质量抽检",
-      "attempts": 3,
-      "last_failure": "第271轮深入审查：WHERE在第2128行执行（_apply_where_clause），GROUP BY在第2136行执行（_apply_group_by_aggregation），顺序正确。_apply_where_clause中存在一个静默失败场景：当_sql_condition_to_pandas返回None/空字符串时（如EXISTS子查询），会直接返回未过滤的DataFrame。但IN+AND+比较的WHERE条件会走pandas query路径，不会触发此问题。可能原因是Excel数据类型不匹配（如显示路径ID列存储为字符串而非整数），导致WHERE条件未正确匹配。需CEO提供MapEvent.xlsx或确认数据类型。",
-      "description": "GROUP BY聚合查询中，部分行被错误归入不符合WHERE条件的分组。例：WHERE 显示路径ID IN (1,2) AND 显示位置ID < 100 GROUP BY后出现路径ID=36、位置ID=569的行。文件：src/api/advanced_sql_query.py GROUP BY逻辑。",
-      "notes": "来源FEEDBACK.md OPEN-#1，CEO实测MapEvent.xlsx复现。第269轮代码审查：执行顺序正确（WHERE先于GROUP BY），未发现逻辑bug。第271轮深入审查：发现_apply_where_clause存在静默失败场景（condition_str为空时返回未过滤df），但IN+AND条件不受影响。最可能原因是数据类型不匹配。数据类型已确认全部int（CEO已用MapEvent.xlsx验证）。Bug在数据加载阶段：original_rows=379但MapEvent sheet只有59行，所有sheet数据被混在一起。详见FEEDBACK.md OPEN-#1精确线索。"
-    },
 
-    "REQ-053": {
-      "title": "优化：抽取excel_list_charts中的_extract_title_text为公共函数",
-      "type": "refactor",
-      "priority": "P2",
-      "status": "OPEN",
-      "source": "自审",
-      "attempts": 0,
-      "last_failure": "",
-      "description": "excel_list_charts函数中的_extract_title_text逻辑用于从openpyxl RichText对象提取纯文本，定义在函数内部，每次调用都会重新定义，效率略低。应抽取为模块级别的公共函数，供其他函数（如读取图表标题、单元格注释等）复用。",
-      "notes": "第269轮代码自审发现（与REQ-050类似，但针对chart场景）"
-    },
 
-    "REQ-054": {
-      "title": "优化：恢复DataValidationError的结构化错误信息",
-      "type": "refactor",
-      "priority": "P2",
-      "status": "OPEN",
-      "source": "自审",
-      "attempts": 0,
-      "last_failure": "",
-      "description": "第266轮将DataValidationError从3参数（错误标题、错误描述、错误建议）简化为1参数（完整错误信息），降低了错误信息的结构化程度，可能影响AI的错误理解和自动修复能力。建议恢复为3参数格式，提升错误处理质量。",
-      "notes": "第269轮代码自审发现（commit 41a8e6e简化错误信息，降低了AI可读性）"
-    },
 
-    "REQ-056": {
-      "title": "修复：_apply_where_clause静默失败时不返回未过滤DataFrame",
-      "type": "fix",
-      "priority": "P2",
-      "status": "IN-PROGRESS",
-      "source": "自审",
-      "attempts": 2,
-      "last_failure": "",
-      "description": "advanced_sql_query.py的_apply_where_clause中，当_sql_condition_to_pandas返回None或空字符串时（如EXISTS子查询），直接返回未过滤的DataFrame（第2907行），导致WHERE条件被静默跳过。应改为抛出错误或记录警告。",
-      "notes": "第271轮代码自审发现（REQ-052审查过程中的附带发现）"
-    }
+
+
+
+
+
+
   }
 }

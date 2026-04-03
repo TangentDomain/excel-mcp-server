@@ -43,7 +43,14 @@ except ImportError as e:
 from .api.excel_operations import ExcelOperations
 from .utils.validators import ExcelValidator, DataValidationError
 from .utils import extract_rich_text
-from .utils.config import MAX_SEARCH_FILES
+from .utils.config import (
+    MAX_SEARCH_FILES,
+    MAX_FILE_SIZE_MB,
+    DATA_DENSITY_THRESHOLD,
+    LARGE_OPERATION_CELL_THRESHOLD,
+    DATA_QUALITY_MAX_SCORE,
+    DATA_QUALITY_PENALTY_PER_SUGGESTION
+)
 
 # 导入智能配置推荐模块
 try:
@@ -305,7 +312,7 @@ class SecurityValidator:
     # 允许的文件扩展名
     ALLOWED_EXTENSIONS = {'.xlsx', '.xlsm', '.xls', '.csv', '.json', '.bak'}
     # 文件大小上限（50MB）
-    MAX_FILE_SIZE = 50 * 1024 * 1024
+    MAX_FILE_SIZE = MAX_FILE_SIZE_MB * 1024 * 1024
     # 危险公式模式（DDE攻击、命令执行等）
     DANGEROUS_FORMULA_PATTERNS = [
         re.compile(r'\bDDE\b', re.IGNORECASE),
@@ -1450,7 +1457,7 @@ def _generate_assessment_recommendations(
     if data_analysis['has_formulas']:
         recommendations.append("📊 检测到公式数据，建议验证公式的正确性")
 
-    if data_analysis['completeness_rate'] > 50:
+    if data_analysis['completeness_rate'] > DATA_DENSITY_THRESHOLD:
         recommendations.append("💾 数据密度较高，建议先导出重要数据")
 
     # 基于操作类型的建议
@@ -1461,7 +1468,7 @@ def _generate_assessment_recommendations(
             recommendations.append("✏️ 将覆盖现有数据，建议使用insert_mode=True")
 
     # 性能建议
-    if scale_info['total_cells'] > 5000:
+    if scale_info['total_cells'] > LARGE_OPERATION_CELL_THRESHOLD:
         recommendations.append("⏱️ 大范围操作可能需要较长时间，请耐心等待")
 
     return recommendations
@@ -4315,15 +4322,22 @@ if SMART_CONFIG_AVAILABLE:
         return summary
     
     def _calculate_data_quality_score(analysis: Dict[str, Any]) -> float:
-        """计算数据质量评分"""
-        score = 100.0
+        """计算数据质量评分
+        
+        Args:
+            analysis (Dict[str, Any]): 数据分析结果
+            
+        Returns:
+            float: 数据质量评分（0-100）
+        """
+        score = DATA_QUALITY_MAX_SCORE
         
         # 根据优化建议扣分
         suggestions = analysis.get("optimization_suggestions", [])
-        score -= len(suggestions) * 5  # 每个建议扣5分
+        score -= len(suggestions) * DATA_QUALITY_PENALTY_PER_SUGGESTION
         
         # 确保评分在0-100之间
-        return max(0, min(100, score))
+        return max(0, min(DATA_QUALITY_MAX_SCORE, score))
     
     def _categorize_by_priority(rules: List[Dict[str, Any]]) -> Dict[str, int]:
         """按优先级分类规则"""

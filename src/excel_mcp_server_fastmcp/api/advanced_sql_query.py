@@ -93,7 +93,11 @@ from ..utils.config import (
     MAX_QUERY_CACHE_SIZE,
     QUERY_CACHE_TTL,
     CACHE_TARGET_MEMORY_MB,
-    MAX_RESULT_ROWS
+    MAX_RESULT_ROWS,
+    STREAMING_WRITE_MIN_ROWS,
+    STREAMING_WRITE_MIN_CHANGES,
+    STREAMING_WRITE_MIN_FILE_SIZE_MB,
+    MARKDOWN_TABLE_MAX_ROWS
 )
 
 
@@ -828,7 +832,6 @@ class AdvancedSQLQueryEngine:
         """
         mtime = os.path.getmtime(file_path)
         cache_key = f"{file_path}|{sheet_name or ''}"
-        with open('/tmp/debug_cache.log', 'a') as f: f.write(f"cache_key={cache_key}, hit={cache_key in self._df_cache}\n")
         if cache_key in self._df_cache:
             cached_mtime, cached_data, cached_desc = self._df_cache[cache_key]
             if cached_mtime == mtime:
@@ -932,9 +935,9 @@ class AdvancedSQLQueryEngine:
                         non_empty_second = [v for v in second_row_values if v]
                         non_empty_first = [v for v in first_row_values if v]
 
-                        if len(non_empty_second) >= 3:
+                        if len(non_empty_second) >= 2:
                             second_all_field = all(
-                                re.match(r'^[a-zA-Z_][a-zA-Z0-9_]*$', v)
+                                re.match(r'^[a-zA-Z_][a-zA-Z0-9_.]*$', v)
                                 for v in non_empty_second
                             )
                             first_all_field = all(
@@ -3924,7 +3927,16 @@ class AdvancedSQLQueryEngine:
                 has_numeric = True
         return total_row if has_numeric else None
 
-    def _generate_markdown_table(self, data: List, max_rows: int = 50) -> str:
+    def _generate_markdown_table(self, data: List, max_rows: int = MARKDOWN_TABLE_MAX_ROWS) -> str:
+        """生成Markdown格式表格
+        
+        Args:
+            data (List): 表格数据
+            max_rows (int): 最大行数，默认使用配置值
+            
+        Returns:
+            str: Markdown格式表格字符串
+        """
         """将查询结果数据转为Markdown表格"""
         if not data:
             return ''
@@ -4326,9 +4338,9 @@ class AdvancedSQLQueryEngine:
                 # 决策：使用流式写入的条件
                 file_size = os.path.getsize(file_path)
                 use_streaming = (
-                    affected_rows >= 50 or  # 影响行数≥50
-                    len(changes) >= 100 or  # 修改单元格数≥100
-                    file_size > 1024 * 1024  # 文件大小>1MB
+                    affected_rows >= STREAMING_WRITE_MIN_ROWS or  # 影响行数≥阈值
+                    len(changes) >= STREAMING_WRITE_MIN_CHANGES or  # 修改单元格数≥阈值
+                    file_size > STREAMING_WRITE_MIN_FILE_SIZE_MB * 1024 * 1024  # 文件大小>阈值
                 )
 
                 if use_streaming and StreamingWriter.is_available():
