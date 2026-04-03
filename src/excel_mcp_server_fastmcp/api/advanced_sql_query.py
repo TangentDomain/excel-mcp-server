@@ -3927,15 +3927,25 @@ class AdvancedSQLQueryEngine:
 
         return df
 
-    def _build_total_row(self, result_df: pd.DataFrame) -> Optional[List]:
-        """构建GROUP BY聚合结果的TOTAL汇总行"""
+    def _build_total_row(self, result_df: pd.DataFrame, group_by_columns: List[str] = None) -> Optional[List]:
+        """构建GROUP BY聚合结果的TOTAL汇总行
+
+        Args:
+            result_df (pd.DataFrame): 结果DataFrame
+            group_by_columns (List[str]): GROUP BY列名列表，跳过这些列的求和
+
+        Returns:
+            Optional[List]: TOTAL汇总行，如果没有数值列则返回None
+        """
+        if group_by_columns is None:
+            group_by_columns = []
         if result_df.empty or len(result_df) <= 1:
             return None
         total_row = [''] * len(result_df.columns)
         total_row[0] = 'TOTAL'
         has_numeric = False
         for i, col in enumerate(result_df.columns):
-            if i == 0:
+            if col in group_by_columns:
                 continue
             series = pd.to_numeric(result_df[col], errors='coerce')
             if series.notna().sum() > len(result_df) * 0.5:
