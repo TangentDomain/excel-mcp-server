@@ -2,7 +2,7 @@
 
 # 🎮 ExcelMCP: The Excel Wizard That Understands Game Devs
 
-[![PyPI](https://img.shields.io/pypi/v/excel-mcp-server-fastmcp.svg)](https://pypi.org/project/excel-mcp-server-fastmcp/v1.7.12)
+[![PyPI](https://img.shields.io/pypi/v/excel-mcp-server-fastmcp.svg)](https://pypi.org/project/excel-mcp-server-fastmcp/v1.7.13)
 [![CI](https://github.com/TangentDomain/excel-mcp-server/actions/workflows/ci.yml/badge.svg)](https://github.com/TangentDomain/excel-mcp-server/actions/workflows/ci.yml)
 ![Tests](https://img.shields.io/badge/tests-851-brightgreen.svg)
 ![Tools](https://img.shields.io/badge/tools-53-green.svg)
@@ -16,7 +16,7 @@
 
 ---
 
-## 🚀 Latest Updates (v1.6.51)
+## 🚀 Latest Updates (v1.7.13)
 
 ### ✨ New Features
 - **Smart Error Handling**: Automatically detect and fix common Excel data issues
