@@ -1,26 +1,37 @@
+# FEEDBACK.md — 跨模块反馈通道
+
+## OPEN
+
+### OPEN-#1: GROUP BY 聚合错误 — 部分行被归入不符合WHERE条件的分组
+
+**来源**: CEO实测（MapEvent.xlsx）
+**严重级别**: P0
+**复现**:
+```sql
+SELECT 显示路径ID, 显示位置ID, COUNT(*) as cnt
+FROM MapEvent
+WHERE 显示路径ID IN (1, 2) AND 显示位置ID < 100
+GROUP BY 显示路径ID, 显示位置ID
+```
+**预期**: 所有结果行的 显示路径ID∈{1,2} 且 显示位置ID<100
+**实际**: 出现 [36, 569, 58] — 显示路径ID=36 不在IN(1,2)中，显示位置ID=569 不<100
+**说明**: 58行数据被错误地聚合到一个完全不符合WHERE条件的分组。GROUP BY的分组键计算存在bug，导致部分行的值被错误映射。同样在步骤2(位置分布)中出现不存在的路径3。
+**文件**: `src/api/advanced_sql_query.py` — GROUP BY逻辑
+**状态**: 已转REQ（REQ-052）第268轮
+
+## CLOSED
+
 ## #1 excel-mcp-server - 发现217个函数缺少Args/Parameters段
 - **严重程度**：高
 - **工具**：docstring_analysis
-- **参数**：{"source_directory": "/root/.openclaw/workspace/excel-mcp-server/src", "total_functions": 501, "missing_args_sections": 217, "compliance_rate": "56.7%"}
-- **期望**：所有公共函数都应有完整的Args/Parameters和Returns文档段
-- **实际**：217个函数缺少Args/Parameters段，258个函数缺少Returns段，15个文件存在docstring问题，整体合规率仅56.7%
-- **修复建议**：批量修复所有函数的docstring，确保包含Args/Parameters和Returns段，建立自动化docstring检查机制，设定85%以上合规率目标
 - **状态**：已转REQ（REQ-049）第263轮
 
 ## #2 excel-mcp-server - ExcelOperations类API方法缺失
 - **严重程度**：高
 - **工具**：api_consistency_check
-- **参数**：{"target_class": "ExcelOperations", "expected_methods": ["create_workbook", "write_data", "read_data"], "file_path": "src/excel_mcp_server_fastmcp/api/excel_operations.py"}
-- **期望**：ExcelOperations类应具有create_workbook、write_data、read_data三个核心方法
-- **实际**：ExcelOperations类缺少三个核心方法，导致API文档与实际实现不一致
-- **修复建议**：在ExcelOperations类中实现缺失的三个方法，或更新API文档反映实际的类结构和方法名称
 - **状态**：已转REQ（误报，方法名不同但功能完整）第263轮
 
 ## #3 excel-mcp-server - 文档完整性严重不达标
 - **严重程度**：高
 - **工具**：documentation_quality_assessment
-- **参数**：{"total_files": 25, "files_with_issues": 15, "total_functions": 501, "documentation_coverage": "43.3%"}
-- **期望**：所有Python文件和函数都应有完整的文档注释，文档覆盖率达到90%以上
-- **实际**：15个文件存在docstring问题，56.7%的函数缺少Args/Parameters段，43.3%的函数缺少Returns段，文档覆盖率为56.7%
-- **修复建议**：建立完整的文档修复计划，优先修复高频使用的核心函数，制定文档质量标准和检查流程
 - **状态**：已转REQ（REQ-049）第263轮
