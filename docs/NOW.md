@@ -1,19 +1,21 @@
-# NOW.md - 第265轮
+# NOW.md - 第266轮
 
 ## 当前状态
-- **轮次**: 第265轮
+- **轮次**: 第266轮
 - **时间**: 2026-04-03
 
 ## 完成工作
-- REQ-036: 边缘案例测试T376-T395（20个案例，14通过6信息0失败）
-  - 发现BUG：excel_describe_table缺失@mcp.tool()装饰器，函数存在但未注册为MCP工具
-  - 修复：添加@mcp.tool()、@_validate_file_path()、@_track_call装饰器
-  - 发布v1.7.13
+- REQ-036: 边缘案例测试T396-T415（20个案例，15通过4失败1错误0实际BUG）
+  - 发现并修复BUG：excel_list_charts的chart.chart_type→chart.type，chart.data.srcDataSource不存在，
+    chart.title.text需要从RichText提取纯文本，chart.dLbls空值保护
+  - 发现并修复BUG：excel_clear_validation用dv.formula1匹配范围(应使用dv.sqref)
+  - 修正3处"工作表不存在"错误码OPERATION_FAILED→SHEET_NOT_FOUND
+  - 发布v1.7.14
 
 ## 关键指标
-- **版本**: v1.7.13
+- **版本**: v1.7.14
 - **测试**: 851 passed + MCP冒烟通过
-- **Commit**: 52d82ef (main)
+- **Commit**: 61a405b (main)
 
 ## 待处理
 - [ ] REQ-036: 边缘案例自动化测试（持续执行，P1）

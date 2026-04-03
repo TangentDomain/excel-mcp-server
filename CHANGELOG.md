@@ -5,6 +5,13 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## v1.7.14 - 2026-04-03
+
+### Fixed
+- **excel_list_charts**: 修复AttributeError（chart.chart_type→chart.type, chart.data.srcDataSource移除, chart.title.text RichText提取, chart.dLbls空值保护）
+- **excel_clear_validation**: 修复清除指定范围数据验证无效（dv.formula1→dv.sqref匹配范围）
+- **错误码修正**: 3处"工作表不存在"OPERATION_FAILED→SHEET_NOT_FOUND
+
 ## v1.6.49 - 2026-03-29
 
 ### Added

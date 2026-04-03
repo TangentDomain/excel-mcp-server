@@ -2,7 +2,7 @@
 
 # 🎮 ExcelMCP: The Excel Wizard That Understands Game Devs
 
-[![PyPI](https://img.shields.io/pypi/v/excel-mcp-server-fastmcp.svg)](https://pypi.org/project/excel-mcp-server-fastmcp/v1.7.13)
+[![PyPI](https://img.shields.io/pypi/v/excel-mcp-server-fastmcp.svg)](https://pypi.org/project/excel-mcp-server-fastmcp/v1.7.14)
 [![CI](https://github.com/TangentDomain/excel-mcp-server/actions/workflows/ci.yml/badge.svg)](https://github.com/TangentDomain/excel-mcp-server/actions/workflows/ci.yml)
 ![Tests](https://img.shields.io/badge/tests-851-brightgreen.svg)
 ![Tools](https://img.shields.io/badge/tools-53-green.svg)
@@ -16,13 +16,12 @@
 
 ---
 
-## 🚀 Latest Updates (v1.7.13)
+## 🚀 Latest Updates (v1.7.14)
 
-### ✨ New Features
-- **Smart Error Handling**: Automatically detect and fix common Excel data issues
-- **Performance Optimization**: Large file processing speed increased by 50%, memory usage reduced by 30%
-- **Batch Operations Enhanced**: Support streaming write, handle 100K+ data batch processing
-- **Version Management**: Automatic version checking and synchronization, avoid version inconsistency issues
+### 🐛 Bug Fixes
+- **excel_list_charts fix**: Fixed AttributeError when listing charts (chart_type/title/data_labels property access errors)
+- **clear_validation fix**: Fixed clearing data validation for specific ranges not working (using dv.sqref instead of dv.formula1)
+- **Error message improvement**: Changed 3 "sheet not found" error codes from OPERATION_FAILED to SHEET_NOT_FOUND
 
 ### 🔧 Improvements
 - **MCP Tool Validation**: All 53 game-specific tools fully tested

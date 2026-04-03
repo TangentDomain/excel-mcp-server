@@ -2,7 +2,7 @@
 
 # 🎮 ExcelMCP: 让游戏策划用嘴说话的Excel神器
 
-[![PyPI](https://img.shields.io/pypi/v/excel-mcp-server-fastmcp.svg)](https://pypi.org/project/excel-mcp-server-fastmcp/v1.7.13)
+[![PyPI](https://img.shields.io/pypi/v/excel-mcp-server-fastmcp.svg)](https://pypi.org/project/excel-mcp-server-fastmcp/v1.7.14)
 [![CI](https://github.com/TangentDomain/excel-mcp-server/actions/workflows/ci.yml/badge.svg)](https://github.com/TangentDomain/excel-mcp-server/actions/workflows/ci.yml)
 ![Tests](https://img.shields.io/badge/tests-851-brightgreen.svg)
 ![Tools](https://img.shields.io/badge/tools-53-green.svg)
@@ -16,14 +16,12 @@
 
 ---
 
-## 🚀 最新更新 (v1.7.13)
+## 🚀 最新更新 (v1.7.14)
 
-### ✨ 新增功能
-- **智能配置推荐系统**：基于游戏类型自动分析Excel结构，提供配置优化建议
-- **智能错误处理**：自动检测和修复常见Excel数据问题
-- **性能优化**：大文件处理速度提升50%，内存占用减少30%
-- **批量操作增强**：支持流式写入，支持10万+数据批量处理
-- **版本管理**：自动版本检查和同步，避免版本不一致问题
+### 🐛 BUG修复
+- **excel_list_charts修复**: 修复图表列表获取时的AttributeError（chart_type/title/data_labels属性访问错误）
+- **clear_validation修复**: 修复清除指定范围数据验证无效的问题（范围匹配使用dv.sqref而非dv.formula1）
+- **错误提示优化**: 3处"工作表不存在"错误码从OPERATION_FAILED改为SHEET_NOT_FOUND，消除误导性提示
 
 ### 🔧 改进优化
 - **MCP工具验证**：53个游戏专用工具全面测试通过
