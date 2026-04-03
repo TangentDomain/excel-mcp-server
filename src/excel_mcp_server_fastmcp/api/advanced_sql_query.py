@@ -3398,6 +3398,9 @@ class AdvancedSQLQueryEngine:
                 if isinstance(expr, (exp.Column, exp.Identifier)):
                     group_by_columns.append(expr.name)
 
+        # 保存GROUP BY列到实例变量，供_build_total_row使用
+        self._group_by_columns = group_by_columns
+
         if not aggregations:
             # 没有聚合函数，只应用GROUP BY去重
             if group_by_columns:
