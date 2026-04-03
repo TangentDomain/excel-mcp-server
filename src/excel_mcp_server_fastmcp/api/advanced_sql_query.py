@@ -828,6 +828,7 @@ class AdvancedSQLQueryEngine:
         """
         mtime = os.path.getmtime(file_path)
         cache_key = f"{file_path}|{sheet_name or ''}"
+        with open('/tmp/debug_cache.log', 'a') as f: f.write(f"cache_key={cache_key}, hit={cache_key in self._df_cache}\n")
         if cache_key in self._df_cache:
             cached_mtime, cached_data, cached_desc = self._df_cache[cache_key]
             if cached_mtime == mtime:
