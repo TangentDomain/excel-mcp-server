@@ -228,6 +228,28 @@
       "description": "第260轮边缘测试T292发现：excel_delete_sheet允许删除最后一个Sheet，导致工作簿无Sheet。应在删除前检查剩余Sheet数量。",
       "notes": "已验证：excel_manager.py:319-321已有len(wb.sheetnames)<=1检查，test_delete_last_sheet已覆盖。第263轮确认无需修改。",
       "archived_at": "2026-04-03"
+    },
+    "REQ-051": {
+      "title": "边缘测试脚本同步：修正函数名不匹配问题",
+      "type": "fix",
+      "priority": "P1",
+      "status": "DONE",
+      "source": "自审",
+      "attempts": 1,
+      "description": "边缘测试脚本edge_case_tests_round268.py使用了过时的函数名（excel_create_workbook应改为excel_create_file），导致测试脚本无法正常运行。",
+      "notes": "第271轮验证：脚本中所有8个MCP函数名均正确，不使用excel_create_workbook。原始描述不准确，实际无函数名不匹配问题。",
+      "archived_at": "2026-04-03"
+    },
+    "REQ-055": {
+      "title": "修复：excel_create_pivot_table错误码不一致",
+      "type": "fix",
+      "priority": "P2",
+      "status": "DONE",
+      "source": "自审",
+      "attempts": 1,
+      "description": "excel_create_pivot_table函数在Sheet不存在时使用OPERATION_FAILED错误码，而其他函数使用SHEET_NOT_FOUND。应统一为SHEET_NOT_FOUND。",
+      "notes": "第271轮修复：OPERATION_FAILED→SHEET_NOT_FOUND（server.py:3462）",
+      "archived_at": "2026-04-03"
     }
   }
 }

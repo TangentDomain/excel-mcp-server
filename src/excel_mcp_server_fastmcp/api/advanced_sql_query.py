@@ -2904,7 +2904,8 @@ class AdvancedSQLQueryEngine:
                 # 如果查询失败，尝试逐行过滤
                 return self._apply_row_filter(where_clause.this, df)
 
-        return df
+        logger.warning("WHERE条件转换为pandas表达式失败，回退到逐行过滤: %s", where_expr)
+        return self._apply_row_filter(where_expr, df)
 
     @staticmethod
     def _like_to_regex(value_str: str) -> str:
@@ -2963,11 +2964,15 @@ class AdvancedSQLQueryEngine:
         elif isinstance(condition, exp.And):
             left = self._sql_condition_to_pandas(condition.left, df)
             right = self._sql_condition_to_pandas(condition.right, df)
+            if left is None or right is None:
+                raise ValueError("AND条件包含不支持的子查询类型，需使用逐行过滤")
             return f"({left}) & ({right})"
 
         elif isinstance(condition, exp.Or):
             left = self._sql_condition_to_pandas(condition.left, df)
             right = self._sql_condition_to_pandas(condition.right, df)
+            if left is None or right is None:
+                raise ValueError("OR条件包含不支持的子查询类型，需使用逐行过滤")
             return f"({left}) | ({right})"
 
         elif isinstance(condition, exp.Paren):
@@ -3755,7 +3760,8 @@ class AdvancedSQLQueryEngine:
                 # 备用方案：逐行过滤
                 return self._apply_row_filter(having_clause.this, df)
 
-        return df
+        logger.warning("HAVING条件转换为pandas表达式失败，回退到逐行过滤: %s", having_clause.this)
+        return self._apply_row_filter(having_clause.this, df)
 
     def _extract_select_aliases(self, parsed_sql: exp.Expression) -> Dict[str, Any]:
         """提取SELECT子句中的别名映射（委托_extract_select_alias统一逻辑）
@@ -4229,7 +4235,8 @@ class AdvancedSQLQueryEngine:
                 except Exception:
                     filtered_df = self._apply_row_filter(where_clause.this, df)
             else:
-                filtered_df = df
+                logger.warning("UPDATE WHERE条件转换为pandas表达式失败，回退到逐行过滤: %s", where_clause.this)
+                filtered_df = self._apply_row_filter(where_clause.this, df)
         else:
             filtered_df = df
 
