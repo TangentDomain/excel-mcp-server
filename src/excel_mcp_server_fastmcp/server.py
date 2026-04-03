@@ -2969,7 +2969,14 @@ def excel_compare_sheets(
 @mcp.tool()
 @_track_call
 def excel_server_stats() -> Dict[str, Any]:
-    """服务器状态：缓存、调用次数、运行时间。无参数。"""
+    """服务器状态：缓存、调用次数、运行时间。
+
+    Args:
+        无参数
+
+    Returns:
+        Dict: 包含缓存、调用次数、运行时间等统计信息
+    """
     stats = _tracker.get_stats()
     return _ok("服务器统计信息", data=stats)
 
@@ -4345,6 +4352,13 @@ if SMART_CONFIG_AVAILABLE:
 
 def main():
     """Entry point for excel-mcp-server-fastmcp.
+
+    Args:
+        --stdio: 标准输入输出模式（默认），本地使用，uvx/claude/cursor
+        --sse: Server-Sent Events远程模式
+        --streamable-http: Streamable HTTP远程模式，推荐用于团队共享
+        --mount-path=<path>: HTTP模式挂载路径
+        --version, -v: 显示版本号
 
     支持三种传输模式：
     - stdio（默认）：本地使用，uvx/claude/cursor
