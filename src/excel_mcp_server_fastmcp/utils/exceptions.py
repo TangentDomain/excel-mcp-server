@@ -69,11 +69,12 @@ class SheetNotFoundError(ExcelException):
 
 class DataValidationError(ExcelException):
     """数据验证异常"""
-    
-    def __init__(self, validation_type: str, details: str = None):
-        message = f"数据验证失败 ({validation_type})"
-        hint = details or "输入的数据不符合要求"
-        suggested_fix = "请检查数据的格式、类型和范围是否符合要求"
+
+    def __init__(self, message: str, hint: str = None, suggested_fix: str = None):
+        if not hint:
+            hint = "输入的数据不符合要求"
+        if not suggested_fix:
+            suggested_fix = "请检查数据的格式、类型和范围是否符合要求"
         super().__init__(message, hint, suggested_fix)
 
 

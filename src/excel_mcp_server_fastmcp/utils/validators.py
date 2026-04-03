@@ -54,7 +54,11 @@ class ExcelValidator:
             DataValidationError: 工作表名称无效
         """
         if sheet_name is not None and not sheet_name.strip():
-            raise DataValidationError("工作表名称不能为空")
+            raise DataValidationError(
+                "工作表名称不能为空",
+                "工作表名称不能为空白字符串",
+                "请提供有效的工作表名称"
+            )
 
     @classmethod
     def validate_row_operations(cls, row_index: int, count: int) -> None:
@@ -70,11 +74,15 @@ class ExcelValidator:
         """
         if row_index < 1:
             raise DataValidationError(
-                "行索引无效（行索引必须为正整数，请使用1开始的行号）"
+                "行索引无效",
+                "行索引必须为正整数",
+                "请使用1开始的行号（如第1行、第2行等），不要使用0或负数"
             )
         if count < 1:
             raise DataValidationError(
-                "操作行数无效（操作行数必须为正整数）"
+                "操作行数无效",
+                "操作行数必须为正整数",
+                "请指定要操作的正数行数（如插入1行、删除5行等）"
             )
         if count > cls.MAX_ROWS_OPERATION:
             raise OperationLimitError(
@@ -97,11 +105,15 @@ class ExcelValidator:
         """
         if column_index < 1:
             raise DataValidationError(
-                "列索引无效（列索引必须为正整数，请使用1开始的列号）"
+                "列索引无效",
+                "列索引必须为正整数",
+                "请使用1开始的列号（如第1列A、第2列B等），或使用列字母（如'A', 'B'）"
             )
         if count < 1:
             raise DataValidationError(
-                "操作列数无效（操作列数必须为正整数）"
+                "操作列数无效",
+                "操作列数必须为正整数",
+                "请指定要操作的正数列数（如插入1列、删除3列等）"
             )
         if count > cls.MAX_COLUMNS_OPERATION:
             raise OperationLimitError(
@@ -442,3 +454,38 @@ class ExcelValidator:
             'warning': warning,
             'within_limits': True
         }
+
+    @staticmethod
+    def get_workbook_and_sheet(file_path: str, sheet_name: str = None, read_only: bool = False, data_only: bool = False):
+        """加载 workbook 并获取指定的工作表
+
+        Args:
+            file_path: Excel文件路径
+            sheet_name: 工作表名称（可选，如果不提供则返回第一个工作表）
+            read_only: 是否以只读模式打开
+            data_only: 是否读取单元格的值而不是公式
+
+        Returns:
+            tuple: (workbook, worksheet) 如果验证成功
+            None: 如果验证失败（调用者需要检查返回值）
+
+        Raises:
+            DataValidationError: 如果工作表不存在
+        """
+        from openpyxl import load_workbook
+
+        wb = load_workbook(file_path, read_only=read_only, data_only=data_only)
+
+        if sheet_name:
+            if sheet_name not in wb.sheetnames:
+                wb.close()
+                raise DataValidationError(
+                    f"工作表 '{sheet_name}' 不存在",
+                    f"可用工作表: {', '.join(wb.sheetnames)}",
+                    "请使用正确的工作表名称"
+                )
+            ws = wb[sheet_name]
+        else:
+            ws = wb.worksheets[0]
+
+        return wb, ws
