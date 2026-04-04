@@ -3929,18 +3929,31 @@ class AdvancedSQLQueryEngine:
             # Handle mixed data types in ORDER BY columns
             for col in sort_columns:
                 if col in df.columns:
-                    # Convert to string type for mixed data to avoid sorting errors
-                    # This ensures consistent ordering of NULLs, numbers, and strings
-                    df[f'_temp_sort_{col}'] = df[col].astype(str)
-                    # Replace the sort column with the temp string version
-                    sort_columns = [f'_temp_sort_{c}' if c == col else c for c in sort_columns]
+                    # Check if column has mixed data types (numbers and strings)
+                    col_data = df[col]
+                    has_numbers = False
+                    has_strings = False
+                    
+                    for val in col_data.dropna():
+                        if isinstance(val, (int, float)):
+                            has_numbers = True
+                        elif isinstance(val, str):
+                            has_strings = True
+                        
+                        if has_numbers and has_strings:
+                            # Mixed types - convert to string for consistent sorting
+                            df[f'_temp_sort_{col}'] = col_data.astype(str)
+                            sort_columns = [f'_temp_sort_{c}' if c == col else c for c in sort_columns]
+                            break
             
-            return df.sort_values(by=sort_columns, ascending=ascending)
+            sorted_df = df.sort_values(by=sort_columns, ascending=ascending)
             
             # Clean up temporary columns
-            for col in sort_columns:
+            for col in list(sort_columns):
                 if col.startswith('_temp_sort_'):
-                    df.drop(columns=[col], inplace=True)
+                    sorted_df.drop(columns=[col], inplace=True)
+            
+            return sorted_df
 
         return df
 
