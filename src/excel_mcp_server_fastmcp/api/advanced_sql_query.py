@@ -3969,36 +3969,16 @@ class AdvancedSQLQueryEngine:
         """
         if result_df.empty or len(result_df) <= 1:
             return None
-        
-        # Create a copy to avoid modifying original
         total_row = [''] * len(result_df.columns)
-        
-        # First pass: ensure GROUP BY columns are preserved correctly
-        for i, col in enumerate(result_df.columns):
-            if col in group_by_columns:
-                # Copy the first value from each group for GROUP BY columns
-                total_row[i] = result_df.iloc[0, i]
-        
-        # Second pass: calculate sums for non-GROUP BY numeric columns
+        total_row[0] = 'TOTAL'
         has_numeric = False
         for i, col in enumerate(result_df.columns):
             if col in group_by_columns:
                 continue
-                
-            # Try to convert to numeric
             series = pd.to_numeric(result_df[col], errors='coerce')
-            
-            # Check if this column is numeric enough
-            if series.notna().sum() > 0:
-                # Calculate sum and serialize
-                col_sum = series.sum()
-                total_row[i] = self._serialize_value(col_sum)
+            if series.notna().sum() > len(result_df) * 0.5:
+                total_row[i] = self._serialize_value(series.sum())
                 has_numeric = True
-        
-        # Mark as TOTAL row only if we have numeric aggregations
-        if has_numeric:
-            total_row[0] = 'TOTAL'
-        
         return total_row if has_numeric else None
 
     def _generate_markdown_table(self, data: List, max_rows: int = MARKDOWN_TABLE_MAX_ROWS) -> str:
