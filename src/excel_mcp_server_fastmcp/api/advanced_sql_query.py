@@ -3943,7 +3943,6 @@ class AdvancedSQLQueryEngine:
         if result_df.empty or len(result_df) <= 1:
             return None
         total_row = [''] * len(result_df.columns)
-        total_row[0] = 'TOTAL'
         has_numeric = False
         for i, col in enumerate(result_df.columns):
             if col in group_by_columns:
@@ -3952,6 +3951,8 @@ class AdvancedSQLQueryEngine:
             if series.notna().sum() > len(result_df) * 0.5:
                 total_row[i] = self._serialize_value(series.sum())
                 has_numeric = True
+        if has_numeric:
+            total_row[0] = 'TOTAL'
         return total_row if has_numeric else None
 
     def _generate_markdown_table(self, data: List, max_rows: int = MARKDOWN_TABLE_MAX_ROWS) -> str:
