@@ -3930,7 +3930,7 @@ class AdvancedSQLQueryEngine:
 
         return df
 
-    def _build_total_row(self, result_df: pd.DataFrame, group_by_columns: List[str] = None) -> Optional[List]:
+    def _build_total_row(self, result_df: pd.DataFrame, group_by_columns: List[str] = []) -> Optional[List]:
         """构建GROUP BY聚合结果的TOTAL汇总行
 
         Args:
@@ -3940,8 +3940,6 @@ class AdvancedSQLQueryEngine:
         Returns:
             Optional[List]: TOTAL汇总行，如果没有数值列则返回None
         """
-        if group_by_columns is None:
-            group_by_columns = []
         if result_df.empty or len(result_df) <= 1:
             return None
         total_row = [''] * len(result_df.columns)
