@@ -17,17 +17,6 @@
         "优先从Stack Overflow/GitHub Issues搜索真实用户遇到的奇怪问题"
       ],
       "notes": "第243轮10案例6通过4失败(REQ-038/039/040)；第245轮10案例9通过1失败(REQ-041)；第247轮5案例全通过(REQ-042修复)；第248轮16案例15通过1信息；第249轮16案例13通过3信息(含server.py修复)；第250轮15案例12通过2信息1失败(||拼接不支持)；第252轮33案例33全通过(核心API稳定性验证)；第253轮25案例11通过11信息3失败(streaming写入不可见)；第254轮20案例20全通过(含check_duplicate_ids列名查找bug修复+发布v1.7.6)；第255轮30案例25通过3信息2失败(T132/T133 ROUND/ABS不支持+T141嵌套聚合计算列丢失)；第256轮20案例19通过1失败(T168 evaluate_formula独立数学表达式不支持)；第257轮20案例(T211-T230)20全通过(REQ-044/045/046验证+batch_insert_rows_at CellInfo bug修复+SQL子查询+空表边界)；第259轮20案例(T256-T275)17通过3信息0失败；第260轮20案例(T276-T295)12通过1失败5信息2依赖(convert_format CSV→xlsx不支持)；第261轮20案例(T296-T315)19通过1信息0失败(T315 Sheet自身对比NoneType bug已修复+发布v1.7.10)；第262轮20案例(T316-T335)20全通过(format_cells number_format bug修复+发布v1.7.11)；第263轮21案例(T336-T355)0失败19信息2通过(测试脚本参数名不匹配，无新BUG)；第264轮20案例(T356-T375)17通过3信息0失败(DataValidationError 3参数调用BUG+ExcelWriter缺失导入BUG，已修复+发布v1.7.12)；第265轮20案例(T376-T395)14通过6信息0失败(excel_describe_table缺失@mcp.tool装饰器BUG，已修复+发布v1.7.13)；第266轮20案例(T396-T415)15通过4失败1错误0实际BUG(excel_list_charts AttributeError修复+clear_validation范围匹配BUG修复+错误码SHEET_NOT_FOUND修正+发布v1.7.14)；第267轮20案例(T416-T435)MCP冒烟通过，边缘测试脚本执行较慢但无新BUG发现；第268轮测试脚本函数名不匹配(excel_create_workbook→excel_create_file)，MCP冒烟通过"
-    },
-    "REQ-052": {
-      "title": "修复GROUP BY聚合错误：WHERE过滤后的结果包含不符合条件的数据",
-      "type": "fix",
-      "priority": "P0",
-      "status": "IN-PROGRESS",
-      "source": "CEO实测复现",
-      "attempts": 11,
-      "last_failure": "第277轮：子代理修了上游问题（双行表头/缓存/desc_map）后标DONE，未验证GROUP BY结果。手动测试确认GROUP BY聚合逻辑仍有bug。",
-      "description": "SQL: SELECT 显示路径ID, 显示位置ID, COUNT(*) as cnt FROM MapEvent WHERE 显示路径ID IN (1, 2) AND 显示位置ID < 100 GROUP BY 显示路径ID, 显示位置ID。结果出现 [38, 589, 58] 等不存在于原始数据中的值。",
-      "notes": "!!! 强制验证规则（REQ 标 DONE 的前置条件）!!!\n修复前：必须先运行验证代码确认 bug 存在（有异常行=bug存在）\n修复后：必须再次运行验证代码确认 bug 消失（无异常行=bug修复）\n验证代码：python3 -c \"import sys; sys.path.insert(0,'src'); from excel_mcp_server_fastmcp.api.advanced_sql_query import execute_advanced_sql_query; r=execute_advanced_sql_query('/tmp/MapEvent.xlsx','SELECT 显示路径ID,显示位置ID,COUNT(*) as cnt FROM MapEvent WHERE 显示路径ID IN (1,2) AND 显示位置ID<100 GROUP BY 显示路径ID,显示位置ID'); bad=[x for x in r['data'][1:] if x[0] not in [1,2] or x[1]>=100]; print('BUG' if bad else 'FIXED', bad)\"\n只有输出 FIXED 时才能标 DONE。输出 BUG=未修复=绝对不能标 DONE。\n\n根因定位：上游问题（双行表头/缓存key/desc_map）已在fe0b0f8修复。传入_execute_query的DataFrame完全正确（58行，PathID只有1和2），但_apply_group_by_aggregation返回了[38,589,58]等不存在于数据中的值。手动pandas groupby结果正确（30行全部符合条件）。bug在_apply_group_by_aggregation方法内部。"
     }
   }
 }

@@ -327,6 +327,20 @@
       "description": "advanced_sql_query.py的_apply_where_clause中，当_sql_condition_to_pandas返回None或空字符串时（如EXISTS子查询），直接返回未过滤的DataFrame（第2907行），导致WHERE条件被静默跳过。应改为抛出错误或记录警告。",
       "notes": "第271轮代码自审发现（REQ-052审查过程中的附带发现）。第274轮完成。",
       "archived_at": "2026-04-03"
+    },
+    "REQ-035": {
+      "title": "配置化：硬编码常量提取为配置项",
+      "type": "refactor",
+      "priority": "P2",
+      "status": "DONE",
+      "source": "自审",
+      "attempts": 2,
+      "last_failure": "第275轮误标DONE：缓存映射修复不是根因。实际bug在数据加载阶段，original_rows=379但MapEvent sheet只有59行，所有sheet数据被混在一起。详见FEEDBACK.md OPEN-#1",
+      "description": "多个硬编码值应提取为可配置常量：max_files=100, query_cache_ttl=300, target_mb=512.0, MAX_RESULT_ROWS=500等。",
+      "notes": "分布在server.py和advanced_sql_query.py中",
+      "completed_at": "2026-04-03",
+      "completion_commit": "fe0b0f8",
+      "archived_at": "2026-04-04"
     }
   }
 }
