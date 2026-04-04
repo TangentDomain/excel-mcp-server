@@ -3926,7 +3926,21 @@ class AdvancedSQLQueryEngine:
             ascending.append(not is_desc if is_desc is not None else True)
 
         if sort_columns:
+            # Handle mixed data types in ORDER BY columns
+            for col in sort_columns:
+                if col in df.columns:
+                    # Convert to string type for mixed data to avoid sorting errors
+                    # This ensures consistent ordering of NULLs, numbers, and strings
+                    df[f'_temp_sort_{col}'] = df[col].astype(str)
+                    # Replace the sort column with the temp string version
+                    sort_columns = [f'_temp_sort_{c}' if c == col else c for c in sort_columns]
+            
             return df.sort_values(by=sort_columns, ascending=ascending)
+            
+            # Clean up temporary columns
+            for col in sort_columns:
+                if col.startswith('_temp_sort_'):
+                    df.drop(columns=[col], inplace=True)
 
         return df
 
