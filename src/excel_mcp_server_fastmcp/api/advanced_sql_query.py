@@ -3700,12 +3700,12 @@ class AdvancedSQLQueryEngine:
         values = [coalesce_expr.this] + list(coalesce_expr.expressions)
         for val_expr in values:
             val = self._get_expression_value(val_expr, row)
-            # 处理：None/NaN/空字符串都视为无效值，需要继续查找下一个参数
+            # 跳过None/NaN，继续查找下一个参数
             if val is not None and not (isinstance(val, float) and np.isnan(val)):
                 if val == '':
-                    continue  # 空字符串跳过，查找下一个
+                    return 0  # 空字符串转为0
                 return val
-        return 0
+        return 0  # 所有参数都无效（None/NaN）时返回0
 
     def _evaluate_coalesce_vectorized(self, coalesce_expr: exp.Coalesce, df: pd.DataFrame) -> pd.Series:
         """向量化评估COALESCE/IFNULL表达式（用于DataFrame），空字符串转为0
@@ -3721,8 +3721,9 @@ class AdvancedSQLQueryEngine:
         for val_expr in values:
             if isinstance(val_expr, exp.Column) and val_expr.name in df.columns:
                 series = df[val_expr.name].astype(object)
-                # 空字符串转为NaN，使combine_first能正确处理
-                series = series.replace('', np.nan)
+                # 空字符串转为0（在NaN处理之前）
+                series = series.replace('', 0)
+                # None/NaN保持不变，用于combine_first处理
             elif isinstance(val_expr, exp.Literal):
                 v = self._parse_literal_value(val_expr)
                 series = pd.Series([v] * len(df), index=df.index, dtype=object)
