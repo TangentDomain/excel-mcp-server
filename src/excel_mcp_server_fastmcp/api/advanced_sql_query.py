@@ -620,6 +620,7 @@ class AdvancedSQLQueryEngine:
 
                 # 格式化结果（传入parsed_sql和WHERE前数据用于空结果智能建议）
                 has_group_by = not isinstance(parsed_sql, exp.Union) and parsed_sql.args.get('group') is not None
+                has_having = parsed_sql.args.get('having') is not None
                 result = self._format_query_result(
                     result_data,
                     file_path,
@@ -627,6 +628,7 @@ class AdvancedSQLQueryEngine:
                     worksheets_data,
                     include_headers,
                     has_group_by=has_group_by,
+                    has_having=has_having,
                     parsed_sql=parsed_sql,
                     df_before_where=self._df_before_where,
                     output_format=output_format
@@ -2166,10 +2168,13 @@ class AdvancedSQLQueryEngine:
             base_df = self._apply_group_by_aggregation(parsed_sql, base_df)
 
             # 应用HAVING条件
-            if parsed_sql.args.get('having'):
+            has_having = parsed_sql.args.get('having') is not None
+            if has_having:
                 # 保存HAVING前的DataFrame，用于HAVING空结果建议
                 self._df_before_having = base_df.copy()
                 base_df = self._apply_having_clause(parsed_sql, base_df)
+        else:
+            has_having = False
 
         # 应用窗口函数（ROW_NUMBER, RANK, DENSE_RANK）
         # 窗口函数在GROUP BY/HAVING之后、ORDER BY/SELECT之前计算
@@ -4058,6 +4063,7 @@ class AdvancedSQLQueryEngine:
         worksheets_data: Dict[str, pd.DataFrame],
         include_headers: bool,
         has_group_by: bool = False,
+        has_having: bool = False,
         parsed_sql: exp.Expression = None,
         df_before_where: pd.DataFrame = None,
         output_format: str = "table"
@@ -4066,6 +4072,7 @@ class AdvancedSQLQueryEngine:
 
         Args:
             has_group_by: 如果为True且有数值聚合列，自动追加TOTAL行
+            has_having: 如果为True，表示使用了HAVING过滤，不添加TOTAL行
             parsed_sql: 解析后的SQL表达式，用于空结果智能建议
             df_before_where: WHERE过滤前的DataFrame，用于空结果智能建议
             output_format: 输出格式 table/json/csv
@@ -4091,9 +4098,9 @@ class AdvancedSQLQueryEngine:
             data = data[:keep_rows]
             truncated = True
 
-        # GROUP BY 聚合结果自动追加 TOTAL 行
+        # GROUP BY 聚合结果自动追加 TOTAL 行（HAVING过滤时不添加）
         has_total_row = False
-        if has_group_by and include_headers:
+        if has_group_by and include_headers and not has_having:
             total_row = self._build_total_row(result_df, self._group_by_columns)
             if total_row:
                 data.append(total_row)
