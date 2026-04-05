@@ -3537,7 +3537,7 @@ class AdvancedSQLQueryEngine:
             # 确保group_by_columns中的列都存在
             valid_group_cols = [c for c in group_by_columns if c in df.columns]
             if valid_group_cols:
-            is_agg = self._is_aggregate_function(select_expr.this if isinstance(select_expr, exp.Alias) else select_expr)
+                grouped = df.groupby(valid_group_cols, observed=True)
             else:
                 grouped = df.groupby(lambda x: 0)
         else:
