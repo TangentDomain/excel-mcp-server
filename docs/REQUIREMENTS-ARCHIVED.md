@@ -341,6 +341,19 @@
       "completed_at": "2026-04-03",
       "completion_commit": "fe0b0f8",
       "archived_at": "2026-04-04"
+    },
+    "REQ-061": {
+      "title": "GROUP BY 聚合逻辑 bug",
+      "type": "fix",
+      "priority": "P0",
+      "status": "DONE",
+      "source": "FEEDBACK.md OPEN-#1",
+      "attempts": 5,
+      "created": "2026-04-04",
+      "completed": "2026-04-05",
+      "description": "GROUP BY 聚合逻辑导致TOTAL行数据错误，影响所有聚合查询。必须在_apply_group_by_aggregation方法中修复聚合计算逻辑。",
+      "notes": "验证规则：\n```\npython3 -c \"\nimport sys; sys.path.insert(0,\"src\")\nfrom excel_mcp_server_fastmcp.api.advanced_sql_query import execute_advanced_sql_query\nr = execute_advanced_sql_query(\"/tmp/test.xlsx\",\"SELECT 分类, SUM(值) as total_val FROM Sheet GROUP BY 分类 ORDER BY 分类\")\nfor row in r[\"data\"]: print(row)  # 第二行应该是 [\"TOTAL\", \"实际聚合值\"]\n\"\n```\n修复后TOTAL行的聚合值必须正确。",
+      "archived_at": "2026-04-05"
     }
   }
 }
