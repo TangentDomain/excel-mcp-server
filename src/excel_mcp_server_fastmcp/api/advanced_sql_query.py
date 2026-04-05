@@ -3189,8 +3189,8 @@ class AdvancedSQLQueryEngine:
             # 标量子查询: WHERE col > (SELECT AVG(...) FROM ...)
             try:
                 sub_result = self._execute_subquery(expr, self._current_worksheets)
-                if len(sub_result) > 0 and len(sub_result.columns) > 0:
-                    scalar_val = sub_result.iloc[0, 0]
+                if len(sub_result) > 1 and len(sub_result.columns) > 0:
+                    scalar_val = sub_result.iloc[1, 0]  # 跳过标题行，取实际数据
                     if isinstance(scalar_val, (int, float, np.integer, np.floating)):
                         return float(scalar_val)
                     return f"'{scalar_val}'"
@@ -3590,17 +3590,20 @@ class AdvancedSQLQueryEngine:
             return None
 
     def _evaluate_coalesce_for_row(self, coalesce_expr: exp.Coalesce, row: pd.Series) -> Any:
-        """逐行评估COALESCE/IFNULL表达式"""
+        """逐行评估COALESCE/IFNULL表达式，空字符串转为0"""
         # COALESCE结构: this=第一个参数, expressions=[后续参数]
         values = [coalesce_expr.this] + list(coalesce_expr.expressions)
         for val_expr in values:
             val = self._get_expression_value(val_expr, row)
+            # 处理：None/NaN/空字符串都视为无效值，需要继续查找下一个参数
             if val is not None and not (isinstance(val, float) and np.isnan(val)):
+                if val == '':
+                    continue  # 空字符串跳过，查找下一个
                 return val
-        return None
+        return 0
 
     def _evaluate_coalesce_vectorized(self, coalesce_expr: exp.Coalesce, df: pd.DataFrame) -> pd.Series:
-        """向量化评估COALESCE/IFNULL表达式（用于DataFrame）
+        """向量化评估COALESCE/IFNULL表达式（用于DataFrame），空字符串转为0
 
         使用 pandas combine_first 实现真正的向量化操作，
         替代逐行 _evaluate_coalesce_for_row 循环。
@@ -3613,6 +3616,8 @@ class AdvancedSQLQueryEngine:
         for val_expr in values:
             if isinstance(val_expr, exp.Column) and val_expr.name in df.columns:
                 series = df[val_expr.name].astype(object)
+                # 空字符串转为NaN，使combine_first能正确处理
+                series = series.replace('', np.nan)
             elif isinstance(val_expr, exp.Literal):
                 v = self._parse_literal_value(val_expr)
                 series = pd.Series([v] * len(df), index=df.index, dtype=object)
@@ -3629,7 +3634,8 @@ class AdvancedSQLQueryEngine:
             results = [self._evaluate_coalesce_for_row(coalesce_expr, df.iloc[i]) for i in range(len(df))]
             return pd.Series(results, index=df.index)
 
-        return result
+        # 所有参数都无效时返回0
+        return result.fillna(0)
 
 
     def _generate_aggregate_alias(self, expr: exp.Expression) -> str:
