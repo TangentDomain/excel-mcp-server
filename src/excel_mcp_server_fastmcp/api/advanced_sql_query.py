@@ -3057,7 +3057,8 @@ class AdvancedSQLQueryEngine:
             try:
                 sub_result = self._execute_subquery(subquery, self._current_worksheets)
                 if len(sub_result.columns) > 0:
-                    sub_values = sub_result.iloc[:, 0].dropna().tolist()
+                    # 确保子查询结果排除表头行（iloc[1:, 0]而不是iloc[:, 0]）
+                    sub_values = sub_result.iloc[1:, 0].dropna().tolist()
                     values_str = ', '.join(repr(v) for v in sub_values)
                     return f"{prefix}{left}.isin([{values_str}])"
                 return f"{prefix}{left}.isin([])"
