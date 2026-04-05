@@ -491,13 +491,16 @@ class AdvancedSQLQueryEngine:
         
         self._query_result_cache[cache_key] = (time.time(), result_df, file_mtime)
 
-    def execute_sql_query(
-        self,
-        file_path: str,
-        sql: str,
-        sheet_name: Optional[str] = None,
-        limit: Optional[int] = None,
-        include_headers: bool = True,
+    def execute_sql_query(self, excel_path: str, sql_query: str) -> dict:
+        """执行SQL查询
+        
+        Args:
+            excel_path: Excel文件路径
+            sql_query: 要执行的SQL查询语句
+        
+        Returns:
+            查询结果字典，包含data, columns, sheet_info等字段
+        """
         output_format: str = "table"
     ) -> Dict[str, Any]:
         """
@@ -3461,6 +3464,15 @@ class AdvancedSQLQueryEngine:
 
     def _apply_group_by_aggregation(self, parsed_sql: exp.Expression, df: pd.DataFrame) -> pd.DataFrame:
         """应用GROUP BY和聚合函数
+        """应用GROUP BY和聚合函数
+        
+        Args:
+            parsed_sql: SQL解析后的表达式对象
+            df: 要处理的DataFrame数据
+        
+        Returns:
+            应用GROUP BY和聚合函数后的DataFrame
+        
         性能优化：
         - 大数据集使用向量化操作代替逐行计算
         - 减少不必要的DataFrame复制
@@ -4735,13 +4747,16 @@ def _get_engine() -> AdvancedSQLQueryEngine:
         _shared_engine = AdvancedSQLQueryEngine()
     return _shared_engine
 
-
-def execute_advanced_sql_query(
-    file_path: str,
-    sql: str,
-    sheet_name: Optional[str] = None,
-    limit: Optional[int] = None,
-    include_headers: bool = True,
+    def execute_advanced_sql_query(self, excel_path: str, sql_query: str) -> dict:
+        """执行高级SQL查询
+        
+        Args:
+            excel_path: Excel文件路径
+            sql_query: 要执行的SQL查询语句（支持复杂语法）
+        
+        Returns:
+            查询结果字典，包含data, columns, sheet_info等字段
+        """
     output_format: str = "table"
 ) -> Dict[str, Any]:
     """
