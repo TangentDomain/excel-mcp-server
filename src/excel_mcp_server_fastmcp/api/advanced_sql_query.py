@@ -13,7 +13,7 @@
 - CTE: WITH ... AS (SELECT ...)
 - 字符串函数: UPPER, LOWER, TRIM, LENGTH, CONCAT, REPLACE, SUBSTRING, LEFT, RIGHT
 - 窗口函数: ROW_NUMBER, RANK, DENSE_RANK（OVER PARTITION BY ... ORDER BY ...）
-- 合并查询: UNION, UNION ALL
+- 集合操作: UNION, UNION ALL, EXCEPT, INTERSECT
 
 不支持功能：
 - FROM子查询（FROM (SELECT ...) AS alias）
@@ -126,8 +126,6 @@ def _unsupported_error_hint(err_detail: str) -> str:
         return '此工具仅支持SELECT查询。数据修改请使用excel_update_query（UPDATE语句）。'
     if 'NATURAL JOIN' in err_upper:
         return '不支持NATURAL JOIN，请改用显式ON条件：JOIN 表2 ON 表1.列 = 表2.列'
-    if 'INTERSECT' in err_upper or 'EXCEPT' in err_upper:
-        return '不支持INTERSECT/EXCEPT，请用JOIN或WHERE IN替代'
     if 'FETCH' in err_upper or 'NEXT' in err_upper:
         return '不支持FETCH/NEXT语法，请用LIMIT：SELECT ... LIMIT 10'
     if 'RECURSIVE' in err_upper:
@@ -611,15 +609,18 @@ class AdvancedSQLQueryEngine:
                         'query_info': qi
                     }
 
-                # 执行查询（UNION/UNION ALL 或普通 SELECT）
+                # 执行查询（UNION/UNION ALL/EXCEPT/INTERSECT 或普通 SELECT）
                 if isinstance(parsed_sql, exp.Union):
                     result_data = self._execute_union(parsed_sql, worksheets_data, limit)
+                elif isinstance(parsed_sql, (exp.Except, exp.Intersect)):
+                    result_data = self._execute_except_intersect(parsed_sql, worksheets_data, limit)
                 else:
                     result_data = self._execute_query(parsed_sql, worksheets_data, limit)
                 _query_elapsed = (time.time() - _query_start) * 1000
 
                 # 格式化结果（传入parsed_sql和WHERE前数据用于空结果智能建议）
-                has_group_by = not isinstance(parsed_sql, exp.Union) and parsed_sql.args.get('group') is not None
+                has_group_by = not isinstance(parsed_sql, (exp.Union, exp.Except, exp.Intersect)) and parsed_sql.args.get('group') is not None
+                has_having = parsed_sql.args.get('having') is not None
                 result = self._format_query_result(
                     result_data,
                     file_path,
@@ -627,6 +628,7 @@ class AdvancedSQLQueryEngine:
                     worksheets_data,
                     include_headers,
                     has_group_by=has_group_by,
+                    has_having=has_having,
                     parsed_sql=parsed_sql,
                     df_before_where=self._df_before_where,
                     output_format=output_format
@@ -1294,8 +1296,8 @@ class AdvancedSQLQueryEngine:
             Dict[str, Any]: 验证结果
         """
         try:
-            # 检查是否为SELECT语句或UNION（UNION内部由多个SELECT组成）
-            if not isinstance(parsed_sql, (exp.Select, exp.Union)):
+            # 检查是否为SELECT语句、UNION、EXCEPT或INTERSECT
+            if not isinstance(parsed_sql, (exp.Select, exp.Union, exp.Except, exp.Intersect)):
                 return {
                     'valid': False,
                     'error': '只支持SELECT查询语句，不支持INSERT、UPDATE、DELETE等操作'
@@ -1309,6 +1311,7 @@ class AdvancedSQLQueryEngine:
             if with_clause:
                 return {'valid': True}  # CTE在_execute_query中处理
             # UNION/UNION ALL 支持已实现
+            # EXCEPT/INTERSECT 支持已实现
             # 窗口函数支持已实现 (ROW_NUMBER, RANK, DENSE_RANK)
 
             return {'valid': True}
@@ -1824,6 +1827,87 @@ class AdvancedSQLQueryEngine:
 
         return combined
 
+    def _execute_except_intersect(
+        self,
+        parsed_sql: exp.Expression,
+        worksheets_data: Dict[str, pd.DataFrame],
+        limit: Optional[int] = None
+    ) -> pd.DataFrame:
+        """
+        执行 EXCEPT / INTERSECT 查询
+
+        从 Except/Intersect 表达式中提取所有 SELECT 语句，分别执行后进行集合操作。
+        EXCEPT: 返回第一个查询结果中不存在于第二个查询结果的行（差集）
+        INTERSECT: 返回两个查询结果中都存在的行（交集）
+
+        Args:
+            parsed_sql: 解析后的 Except/Intersect 表达式
+            worksheets_data: 工作表数据
+            limit: 结果限制
+
+        Returns:
+            pd.DataFrame: 集合操作后的查询结果
+        """
+        # 确定操作类型
+        is_except = isinstance(parsed_sql, exp.Except)
+        is_intersect = isinstance(parsed_sql, exp.Intersect)
+
+        # 递归提取所有 SELECT 语句（支持链式 EXCEPT/INTERSECT）
+        def _extract_selects(node):
+            if isinstance(node, exp.Select):
+                return [node]
+            elif isinstance(node, (exp.Union, exp.Except, exp.Intersect)):
+                selects = []
+                # this 可能是 Union/Except/Intersect（链式）或 Select
+                selects.extend(_extract_selects(node.this))
+                # expression 是右侧的 Select 或 Union/Except/Intersect
+                selects.extend(_extract_selects(node.expression))
+                return selects
+            return []
+
+        selects = _extract_selects(parsed_sql)
+        if not selects:
+            raise ValueError("EXCEPT/INTERSECT 查询中未找到有效的 SELECT 语句")
+        if len(selects) != 2:
+            raise ValueError("EXCEPT/INTERSECT 查询必须包含恰好两个 SELECT 语句")
+
+        # 执行两个 SELECT
+        df1 = self._execute_query(selects[0], worksheets_data, limit=None)
+        df2 = self._execute_query(selects[1], worksheets_data, limit=None)
+
+        # 对齐列名
+        base_columns = list(df1.columns)
+        df2_aligned = df2.reindex(columns=base_columns)
+
+        if is_except:
+            # EXCEPT: 差集 - df1 中不在 df2 中的行
+            # 使用 merge(how='left', indicator=True) 实现
+            merged = df1.merge(df2_aligned, how='left', indicator=True, on=list(base_columns))
+            # 保留只在左侧（df1）的行
+            result = merged[merged['_merge'] == 'left_only'].drop(columns=['_merge']).reset_index(drop=True)
+        elif is_intersect:
+            # INTERSECT: 交集 - df1 和 df2 都有的行
+            # 使用 merge(how='inner') 实现
+            result = df1.merge(df2_aligned, how='inner', on=list(base_columns)).drop_duplicates().reset_index(drop=True)
+        else:
+            return pd.DataFrame()
+
+        # 应用 ORDER BY（如果有）
+        order_clause = parsed_sql.args.get('order')
+        if order_clause:
+            result = self._apply_union_order_by(result, order_clause)
+
+        # 应用 LIMIT（如果有）
+        op_limit = self._extract_int_value(parsed_sql.args.get('limit'))
+        if op_limit is not None:
+            result = result.head(op_limit)
+
+        # 应用外部传入的 limit
+        if limit is not None:
+            result = result.head(limit)
+
+        return result
+
     def _has_window_function(self, parsed_sql: exp.Expression) -> bool:
         """检查SQL是否包含窗口函数"""
         return bool(parsed_sql.find(exp.Window))
@@ -2166,10 +2250,13 @@ class AdvancedSQLQueryEngine:
             base_df = self._apply_group_by_aggregation(parsed_sql, base_df)
 
             # 应用HAVING条件
-            if parsed_sql.args.get('having'):
+            has_having = parsed_sql.args.get('having') is not None
+            if has_having:
                 # 保存HAVING前的DataFrame，用于HAVING空结果建议
                 self._df_before_having = base_df.copy()
                 base_df = self._apply_having_clause(parsed_sql, base_df)
+        else:
+            has_having = False
 
         # 应用窗口函数（ROW_NUMBER, RANK, DENSE_RANK）
         # 窗口函数在GROUP BY/HAVING之后、ORDER BY/SELECT之前计算
@@ -3186,14 +3273,19 @@ class AdvancedSQLQueryEngine:
             return self._expression_to_column_reference(expr, df)
 
         elif isinstance(expr, exp.Subquery):
-            # 标量子查询: WHERE col > (SELECT AVG(...) FROM ...)
+            """标量子查询: WHERE col > (SELECT AVG(...) FROM ...)
+            
+            子查询结果应返回单行单列的标量值。
+            修复: 直接从 DataFrame 提取标量值，不再假设有标题行。
+            """
             try:
                 sub_result = self._execute_subquery(expr, self._current_worksheets)
-                if len(sub_result) > 1 and len(sub_result.columns) > 0:
-                    scalar_val = sub_result.iloc[1, 0]  # 跳过标题行，取实际数据
+                if len(sub_result) > 0 and len(sub_result.columns) > 0:
+                    scalar_val = sub_result.iloc[0, 0]
                     if isinstance(scalar_val, (int, float, np.integer, np.floating)):
                         return float(scalar_val)
-                    return f"'{scalar_val}'"
+                    if scalar_val is not None:
+                        return f"'{scalar_val}'"
                 return "0"
             except Exception as e:
                 raise ValueError(f"标量子查询执行失败: {e}")
@@ -4053,6 +4145,7 @@ class AdvancedSQLQueryEngine:
         worksheets_data: Dict[str, pd.DataFrame],
         include_headers: bool,
         has_group_by: bool = False,
+        has_having: bool = False,
         parsed_sql: exp.Expression = None,
         df_before_where: pd.DataFrame = None,
         output_format: str = "table"
@@ -4061,6 +4154,7 @@ class AdvancedSQLQueryEngine:
 
         Args:
             has_group_by: 如果为True且有数值聚合列，自动追加TOTAL行
+            has_having: 如果为True，表示使用了HAVING过滤，不添加TOTAL行
             parsed_sql: 解析后的SQL表达式，用于空结果智能建议
             df_before_where: WHERE过滤前的DataFrame，用于空结果智能建议
             output_format: 输出格式 table/json/csv
@@ -4086,9 +4180,9 @@ class AdvancedSQLQueryEngine:
             data = data[:keep_rows]
             truncated = True
 
-        # GROUP BY 聚合结果自动追加 TOTAL 行
+        # GROUP BY 聚合结果自动追加 TOTAL 行（HAVING过滤时不添加）
         has_total_row = False
-        if has_group_by and include_headers:
+        if has_group_by and include_headers and not has_having:
             total_row = self._build_total_row(result_df, self._group_by_columns)
             if total_row:
                 data.append(total_row)
