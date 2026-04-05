@@ -3456,32 +3456,45 @@ class AdvancedSQLQueryEngine:
             if is_agg:
                 agg_expr = original_expr if isinstance(select_expr, exp.Alias) else select_expr
                 agg_result = self._apply_aggregation_function(agg_expr, grouped, df)
+                # 修复：确保聚合结果是正确格式
                 if isinstance(agg_result, (int, float, np.integer, np.floating)):
                     result_data[alias_name] = pd.Series([agg_result])
+                elif isinstance(agg_result, pd.Series):
+                    result_data[alias_name] = agg_result.reset_index(drop=True)
                 else:
-                    result_data[alias_name] = agg_result
+                    # 尝试转换为Series
+                    try:
+                        result_data[alias_name] = pd.Series([agg_result])
+                    except:
+                        result_data[alias_name] = pd.Series([None])
             # 处理CASE WHEN表达式（已预计算到df，直接从grouped取first）
             elif isinstance(original_expr, exp.Case):
-                result_data[alias_name] = grouped[alias_name].first()
+                result_data[alias_name] = grouped[alias_name].first().reset_index(drop=True)
             # 处理COALESCE表达式（已预计算到df，直接从grouped取first）
             elif isinstance(original_expr, exp.Coalesce):
-                result_data[alias_name] = grouped[alias_name].first()
+                result_data[alias_name] = grouped[alias_name].first().reset_index(drop=True)
             # 处理标量子查询（已预计算到df，直接从grouped取first）
             elif isinstance(original_expr, exp.Subquery):
-                result_data[alias_name] = grouped[alias_name].first()
+                result_data[alias_name] = grouped[alias_name].first().reset_index(drop=True)
             # 处理普通列（GROUP BY列）
             elif hasattr(original_expr, 'name'):
                 col_name = original_expr.name
                 if col_name in group_by_columns:
-                    result_data[alias_name] = grouped[col_name].first()
+                    result_data[alias_name] = grouped[col_name].first().reset_index(drop=True)
             # 处理SELECT * 的情况
             elif alias_name == '*':
                 for col in group_by_columns:
                     if col not in result_data:
-                        result_data[col] = grouped[col].first()
+                        result_data[col] = grouped[col].first().reset_index(drop=True)
 
         # 组合结果，保持列顺序
-        result_df = pd.DataFrame(result_data, columns=ordered_columns).reset_index(drop=True)
+        try:
+            result_df = pd.DataFrame(result_data, columns=ordered_columns).reset_index(drop=True)
+        except Exception as e:
+            # 如果创建DataFrame失败，尝试逐列构建
+            print(f"警告：构建结果DataFrame时出错: {e}")
+            result_data = {k: v.reset_index(drop=True) for k, v in result_data.items()}
+            result_df = pd.DataFrame(result_data, columns=ordered_columns).reset_index(drop=True)
 
         return result_df
 
