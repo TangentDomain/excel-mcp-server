@@ -16,6 +16,18 @@ from openpyxl.styles import Font, PatternFill, Alignment
 logging.getLogger('openpyxl').setLevel(logging.ERROR)
 
 
+@pytest.fixture(autouse=True)
+def clear_sql_engine_cache():
+    """在每个测试之前清除SQL引擎缓存，避免并行测试时的缓存污染"""
+    try:
+        from excel_mcp_server_fastmcp.api.advanced_sql_query import _get_engine
+        engine = _get_engine()
+        engine.clear_cache()
+    except ImportError:
+        # 如果sqlglot未安装，跳过
+        pass
+
+
 def safe_rmtree(path, max_retries=5, delay=0.1):
     """Safely remove directory tree with retry mechanism for Windows file locking"""
     import gc

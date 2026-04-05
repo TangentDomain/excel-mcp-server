@@ -1,29 +1,20 @@
-# 第277轮 (2026-04-04)
+# 第287轮 (2026-04-05)
 ## 执行内容
-- 完成REQ-032: 性能优化大型Excel文件处理（2GB+）(perf, P1)
-- 版本升级: v1.7.19
-- 提交: meta-evolve: 断点恢复，完成合并推送
+- 完成REQ-058: COALESCE 对 NULL 值不生效 (fix, P1)
+- 完成REQ-061: GROUP BY 聚合逻辑 bug (fix, P0)
 - 测试: MCP冒烟通过，全量测试通过
-- PyPI发布: 版本已存在，仅更新tag
-- 反思: 断点恢复机制有效，但需减少跨轮次依赖
+- 反思: 断点恢复机制有效，需要持续关注边缘案例修复
+
 ## Git Commit
-eaff33c meta-evolve: resolve merge conflict in step markers
-9cec9b4 meta-evolve: R4质量修复，重新格式化merge commit
-59c8d79 meta-evolve: merge main into develop
-f4a77f5 [REQ-036] type: derive 创建边缘案例自动搜索脚本
-💡 反思：断点恢复机制有效，但需减少跨轮次依赖。
+ebbfeec [REQ-061] type: fix 修复GROUP BY聚合逻辑
+3d03870 [REQ-058] type: fix 修复COALESCE NULL值处理
+9603293 [REQ-061] type: fix 修复GROUP BY聚合逻辑bug
+cc49024 [REQ-052] type: fix 修改 _build_total_row 方法跳过GROUP BY列求和
+890692b [meta-evolve] Round 286 local changes
+💡 反思：断点恢复机制有效，需要持续关注边缘案例修复。
 
 ## 下轮计划
 - 最高优先级：REQ-053 (ORDER BY浮点/混合类型列返回0行, P1 fix)
-- 次高优先级：REQ-054 (嵌套子查询只返回1行, P2 fix)
-
-# 第285轮 (2026-04-04)
-## 执行情况
-- 完成REQ: REQ-052, REQ-053, REQ-061 (GROUP BY相关修复)
-- 修复内容: _build_total_row方法、ORDER BY混合类型排序
-- 测试结果: 部分通过，仍有边缘案例需要关注
-- Commits: 67183c7, aafb5c4, 7686a0e
-## 下轮计划
-- 继续修复REQ-054 (嵌套子查询)
-- 处理REQ-057/058 (P1优先级需求)
+- 次高优先级：REQ-054 (嵌套子查询只返回1行, P1 fix)
+- 第三优先级：REQ-057 (支持窗口函数, P3 feature)
 
