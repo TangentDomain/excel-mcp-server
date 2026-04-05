@@ -3186,14 +3186,19 @@ class AdvancedSQLQueryEngine:
             return self._expression_to_column_reference(expr, df)
 
         elif isinstance(expr, exp.Subquery):
-            # 标量子查询: WHERE col > (SELECT AVG(...) FROM ...)
+            """标量子查询: WHERE col > (SELECT AVG(...) FROM ...)
+            
+            子查询结果应返回单行单列的标量值。
+            修复: 直接从 DataFrame 提取标量值，不再假设有标题行。
+            """
             try:
                 sub_result = self._execute_subquery(expr, self._current_worksheets)
-                if len(sub_result) > 1 and len(sub_result.columns) > 0:
-                    scalar_val = sub_result.iloc[1, 0]  # 跳过标题行，取实际数据
+                if len(sub_result) > 0 and len(sub_result.columns) > 0:
+                    scalar_val = sub_result.iloc[0, 0]
                     if isinstance(scalar_val, (int, float, np.integer, np.floating)):
                         return float(scalar_val)
-                    return f"'{scalar_val}'"
+                    if scalar_val is not None:
+                        return f"'{scalar_val}'"
                 return "0"
             except Exception as e:
                 raise ValueError(f"标量子查询执行失败: {e}")
