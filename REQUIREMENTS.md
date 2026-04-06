@@ -1,18 +1,5 @@
 {
   "REQUIREMENTS": {
-    "REQ-065": {
-      "title": "修复主会话sed替换引入的函数签名回归",
-      "type": "fix",
-      "priority": "P0",
-      "status": "DONE",
-      "attempts": 2,
-      "last_failure": "REQ-061 子任务1超时失败，REQ-065 未执行",
-      "source": "FEEDBACK-013",
-      "created": "2026-04-06",
-      "description": "主会话用 sed -i 批量修复12处 `df -> pd.DataFrame:` 语法错误时，引入了函数签名回归：1) _apply_order_by(self, parsed_sql, df) 参数名被错误替换；2) _apply_join_clause(self, joins, left_df) 同理；3) _evaluate_case_expression 中 row 变量未定义。需要逐个检查被sed替换过的函数签名，对照git diff恢复正确签名。",
-      "notes": "测试用例：\n- SELECT name FROM employees ORDER BY salary DESC\n- SELECT name, CASE WHEN salary > 30000 THEN '高' ELSE '低' END FROM employees\n- SELECT e.name FROM employees e JOIN orders o ON e.name = o.customer\n修复后必须跑测试用例验证。",
-      "completed_at": "2026-04-06T11:46:58.460540"
-    },
     "REQ-053": {
       "title": "ORDER BY 浮点/混合类型列返回0行",
       "type": "fix",
@@ -79,6 +66,17 @@
       "created": "2026-04-06",
       "description": "describe_table和get_headers对双行表头的识别结果不一致。需要统一表头解析逻辑，确保同一文件两种API返回一致的表头信息。",
       "notes": "需要定义明确的表头识别规则，特别是合并单元格和双行表头的场景。"
+    },
+    "REQ-071": {
+      "title": "修复Conventional Commits提交格式违规",
+      "type": "fix",
+      "priority": "P2",
+      "status": "OPEN",
+      "attempts": 0,
+      "source": "FEEDBACK.md #1",
+      "created": "2026-04-06",
+      "description": "提交 `4d230c9` 违反规范，缺少type前缀，格式为 `[REQ-065] DONE + 新增REQ-066~070` 而非 `[REQ-065] type: DONE + 新增REQ-066~070`。需要修正提交信息，添加正确的type前缀（如feat:或fix:），确保符合CONVENTIONAL_COMMITS.md规范。",
+      "notes": "使用 `git commit --amend --no-edit` 修正提交信息，添加正确的type前缀。type必须是feat/fix/refactor/docs/test/chore/perf之一。"
     }
   }
 }

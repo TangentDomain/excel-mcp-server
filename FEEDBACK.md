@@ -9,6 +9,24 @@
 - **修复建议**：批量修复所有函数的docstring，确保包含Args/Parameters和Returns段，建立自动化docstring检查机制，设定90%以上合规率目标
 - **状态**：✅ 已转REQ-062（2026-04-05创建）
 
+## #1 [HIGH] CONVENTIONAL_COMMITS - 提交格式违规
+- **严重程度**：高
+- **工具**：Conventional commits validation
+- **参数**：{"threshold": 0, "total_commits": 6, "violations": 1}
+- **期望**：所有提交必须遵循格式 `[REQ-XXX] type: 描述`，type必须是feat/fix/refactor/docs/test/chore/perf之一
+- **实际**：提交 `4d230c9` 违反规范，缺少type前缀，格式为 `[REQ-065] DONE + 新增REQ-066~070` 而非 `[REQ-065] type: DONE + 新增REQ-066~070`
+- **修复建议**：使用 `git commit --amend --no-edit` 修正提交信息，添加正确的type前缀（如feat:或fix:），确保符合CONVENTIONAL_COMMITS.md规范
+- **状态**：✅ 已转REQ-071（2026-04-06创建）
+
+## #2 [MEDIUM] QUALITY_BACKLOG - 5个P1需求未处理
+- **严重程度**：中
+- **工具**：Requirements backlog analysis
+- **参数**：{"open_p1_requirements": 5, "total_attempts": 0, "created_date": "2026-04-06"}
+- **期望**：所有P1优先级需求应有至少1次处理尝试
+- **实际**：发现5个P1优先级需求（REQ-066~070）全部状态为OPEN，attempt次数为0，未进行任何处理
+- **修复建议**：按优先级顺序依次处理REQ-066~070，每个需求至少执行一次完整修复流程，记录修复过程和结果
+- **状态**：✅ 已转REQ-066~070（2026-04-06创建）
+
 ## OPEN-#1 [P0] GROUP BY 聚合逻辑 bug
 
 **状态**：✅ 已转REQ-061（2026-04-05完成）
