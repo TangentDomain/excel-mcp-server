@@ -3794,9 +3794,16 @@ def excel_set_data_validation(file_path: str, sheet_name: str, range_address: st
 
     Returns:
         Dict[str, Any]: 包含验证设置结果的字典：
-            - success: 操作是否成功
-            - message: 操作结果消息
-            - data: 验证详情（validation_type, criteria, range_address, sheet_name, input_title, input_message, validation_count）
+            - success: 操作是否成功（bool）
+            - message: 操作结果消息（str）
+            - data: 验证详情（dict），包含以下字段：
+                - validation_type: 验证类型（str）
+                - criteria: 验证条件（str）
+                - range_address: 单元格范围（str）
+                - sheet_name: 工作表名称（str）
+                - input_title: 输入提示标题（str）
+                - input_message: 输入提示内容（str）
+                - validation_count: 当前工作表中的验证规则总数（int）
     """
     try:
         from openpyxl import load_workbook
