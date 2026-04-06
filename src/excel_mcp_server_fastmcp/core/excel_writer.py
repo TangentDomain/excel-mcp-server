@@ -42,6 +42,51 @@ class ExcelWriter:
         """
         self.file_path = ExcelValidator.validate_file_path(file_path)
 
+    def _check_file_lock(self) -> None:
+        """检查文件是否被锁定
+
+        Raises:
+            PermissionError: 文件被锁定或无法访问
+        """
+        try:
+            # 尝试以写入模式打开文件来检测锁定
+            test_file = open(self.file_path, 'rb+')
+            test_file.close()
+        except PermissionError as e:
+            raise PermissionError(f"文件被锁定或权限不足: {self.file_path}") from e
+        except IOError as e:
+            if e.errno == 13:  # Permission denied
+                raise PermissionError(f"文件被锁定: {self.file_path}") from e
+            raise
+
+    def _safe_save_workbook(self, workbook, operation_name: str = "保存文件") -> None:
+        """安全保存工作簿，包含文件锁定检测和错误处理
+
+        Args:
+            workbook: openpyxl工作簿对象
+            operation_name: 操作名称，用于错误消息
+
+        Raises:
+            PermissionError: 文件被锁定或权限不足
+            IOError: 保存文件时发生IO错误
+            Exception: 其他保存错误
+        """
+        # 检查文件锁定
+        self._check_file_lock()
+
+        try:
+            workbook.save(self.file_path)
+            logger.info(f"{operation_name}成功: {self.file_path}")
+        except PermissionError as e:
+            logger.error(f"{operation_name}失败 - 权限错误: {e}")
+            raise PermissionError(f"文件保存失败，权限不足或文件被锁定: {self.file_path}") from e
+        except IOError as e:
+            logger.error(f"{operation_name}失败 - IO错误: {e}")
+            raise IOError(f"文件保存失败，IO错误: {e}") from e
+        except Exception as e:
+            logger.error(f"{operation_name}失败 - 未知错误: {e}")
+            raise Exception(f"文件保存失败: {str(e)}") from e
+
     def update_range(
         self,
         range_expression: str,
@@ -112,7 +157,7 @@ class ExcelWriter:
             )
 
             # 保存文件
-            workbook.save(self.file_path)
+            self._safe_save_workbook(workbook, "更新范围数据")
             workbook.close()
 
             mode_description = "插入模式" if insert_mode else "覆盖模式"
@@ -176,7 +221,7 @@ class ExcelWriter:
             sheet.insert_rows(row_index, count)
 
             # 保存文件
-            workbook.save(self.file_path)
+            self._safe_save_workbook(workbook, "插入行")
             workbook.close()
 
             return OperationResult(
@@ -234,7 +279,7 @@ class ExcelWriter:
             sheet.insert_cols(column_index, count)
 
             # 保存文件
-            workbook.save(self.file_path)
+            self._safe_save_workbook(workbook, "插入列")
 
             # 验证：重新加载文件确认列已插入
             verification_workbook = load_workbook(self.file_path)
@@ -317,7 +362,7 @@ class ExcelWriter:
             sheet.delete_rows(start_row, actual_count)
 
             # 保存文件
-            workbook.save(self.file_path)
+            self._safe_save_workbook(workbook, "删除行")
 
             workbook.close()
             return OperationResult(
@@ -384,7 +429,7 @@ class ExcelWriter:
             sheet.delete_cols(start_column, actual_count)
 
             # 保存文件
-            workbook.save(self.file_path)
+            self._safe_save_workbook(workbook, "删除列")
 
             workbook.close()
             return OperationResult(
@@ -591,7 +636,7 @@ class ExcelWriter:
             cell.value = f"={formula}"
 
             # 保存文件
-            workbook.save(self.file_path)
+            self._safe_save_workbook(workbook, "设置公式")
             workbook.close()
 
             # 重新读取以获取计算值 - 使用只读模式
@@ -672,7 +717,7 @@ class ExcelWriter:
                     formatted_count += 1
 
             # 保存文件
-            workbook.save(self.file_path)
+            self._safe_save_workbook(workbook, "格式化单元格")
             workbook.close()
 
             logger.info(f"成功格式化{formatted_count}个单元格")
@@ -1472,7 +1517,7 @@ class ExcelWriter:
 
             worksheet.merge_cells(range_info.cell_range)
 
-            workbook.save(self.file_path)
+            self._safe_save_workbook(workbook, "合并单元格")
             workbook.close()
 
             return OperationResult(
@@ -1517,7 +1562,7 @@ class ExcelWriter:
 
             worksheet.unmerge_cells(range_info.cell_range)
 
-            workbook.save(self.file_path)
+            self._safe_save_workbook(workbook, "取消合并单元格")
             workbook.close()
 
             return OperationResult(
@@ -1588,7 +1633,7 @@ class ExcelWriter:
                         cell_count += 1
 
             # 保存文件
-            workbook.save(self.file_path)
+            self._safe_save_workbook(workbook, "设置边框")
             workbook.close()
 
             return OperationResult(
@@ -1638,7 +1683,7 @@ class ExcelWriter:
             worksheet.row_dimensions[row_number].height = height
 
             # 保存文件
-            workbook.save(self.file_path)
+            self._safe_save_workbook(workbook, "设置行高")
             workbook.close()
 
             return OperationResult(
@@ -1687,7 +1732,7 @@ class ExcelWriter:
             worksheet.column_dimensions[column.upper()].width = width
 
             # 保存文件
-            workbook.save(self.file_path)
+            self._safe_save_workbook(workbook, "设置列宽")
             workbook.close()
 
             return OperationResult(
