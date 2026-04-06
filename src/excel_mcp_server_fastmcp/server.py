@@ -3746,8 +3746,8 @@ def excel_list_charts(file_path: str, sheet_name: str = None) -> Dict[str, Any]:
 @mcp.tool()
 @_validate_file_path()
 @_track_call
-def excel_set_data_validation(file_path: str, sheet_name: str, range_address: str, 
-                            validation_type: str, criteria: str, input_title: str = "", 
+def excel_set_data_validation(file_path: str, sheet_name: str, range_address: str,
+                            validation_type: str, criteria: str, input_title: str = "",
                             input_message: str = "") -> Dict[str, Any]:
     """设置数据验证规则。validation_type: list/whole_number/decimal/date/text_length/custom。
 
@@ -3757,30 +3757,77 @@ def excel_set_data_validation(file_path: str, sheet_name: str, range_address: st
         range_address: 单元格范围
         validation_type: 验证类型
         criteria: 验证条件
+            - list: 列表源（如 "A1:A10" 或 "选项1,选项2,选项3"）
+            - whole_number/decimal/date/text_length: 格式为 "操作符,值1,值2"
+              操作符: between/notBetween/equal/notEqual/greaterThan/lessThan/greaterThanOrEqual/lessThanOrEqual
+              示例: "between,1,100" 或 "greaterThan,0"
+            - custom: 自定义公式（如 "=AND(A1>0,A1<100)"）
         input_title: 输入提示标题，默认为空字符串
         input_message: 输入提示内容，默认为空字符串
+
+    Returns:
+        Dict[str, Any]: 包含验证设置结果的字典：
+            - success: 操作是否成功
+            - message: 操作结果消息
+            - data: 验证详情（validation_type, criteria, range_address, sheet_name, input_title, input_message, validation_count）
     """
     try:
         from openpyxl import load_workbook
         from openpyxl.worksheet.datavalidation import DataValidation
 
         wb, ws = ExcelValidator.get_workbook_and_sheet(file_path, sheet_name)
-        
+
+        # 映射验证类型到 openpyxl 要求的格式
+        type_mapping = {
+            'whole_number': 'whole',
+            'text_length': 'textLength',
+        }
+        openpyxl_type = type_mapping.get(validation_type, validation_type)
+
         # 创建数据验证对象
-        dv = DataValidation(type=validation_type, formula1=criteria, showDropDown=True)
-        
+        dv_kwargs = {'type': openpyxl_type}
+
+        # 根据验证类型设置参数
+        if validation_type == 'list':
+            # 列表类型：formula1 为列表源
+            dv_kwargs['formula1'] = criteria
+            dv_kwargs['showDropDown'] = True
+        elif validation_type == 'custom':
+            # 自定义公式：formula1 为公式表达式
+            dv_kwargs['formula1'] = criteria
+        elif validation_type in ['whole_number', 'decimal', 'date', 'text_length']:
+            # 数值/日期/长度类型：需要解析操作符和值
+            parts = [p.strip() for p in criteria.split(',')]
+            if len(parts) < 2:
+                return _fail(f"验证条件格式错误，应为 '操作符,值1,值2'，当前为: {criteria}",
+                            meta={"error_code": "VALIDATION_FAILED"})
+
+            operator = parts[0]
+            value1 = parts[1]
+            value2 = parts[2] if len(parts) > 2 else None
+
+            dv_kwargs['operator'] = operator
+            dv_kwargs['formula1'] = value1
+            if value2:
+                dv_kwargs['formula2'] = value2
+        else:
+            return _fail(f"不支持的验证类型: {validation_type}，支持的类型: list/whole_number/decimal/date/text_length/custom",
+                        meta={"error_code": "VALIDATION_FAILED"})
+
+        dv = DataValidation(**dv_kwargs)
+
         # 设置输入提示
         if input_title or input_message:
             dv.promptTitle = input_title
             dv.prompt = input_message
-        
+
         # 添加应用到指定范围
         dv.add(range_address)
         ws.add_data_validation(dv)
-        
+
         # 保存文件
         wb.save(file_path)
-        
+
         return _ok("数据验证设置成功", data={
             'validation_type': validation_type,
             'criteria': criteria,
@@ -3794,7 +3841,7 @@ def excel_set_data_validation(file_path: str, sheet_name: str, range_address: st
     except DataValidationError as e:
         return _fail(e.message, meta={"error_code": "SHEET_NOT_FOUND", "hint": e.hint, "suggested_fix": e.suggested_fix})
     except Exception as e:
-        return _fail("数据验证设置失败", meta={"error_code": "OPERATION_FAILED"})
+        return _fail(f"数据验证设置失败: {str(e)}", meta={"error_code": "OPERATION_FAILED"})
 
 
 @mcp.tool()
@@ -4085,14 +4132,14 @@ def excel_write_only_override(
                 insert_mode=False  # 强制覆盖模式
             )
             
-            if result.get('success'):
+            if result.success:
                 # 记录结果
                 operation_logger.log_operation("operation_result", {
                     "success": True,
                     "updated_cells": len(data) * len(data[0]) if data else 0,
                     "message": f"传统模式覆盖完成"
                 })
-                
+
                 return {
                     'success': True,
                     'message': f"传统模式覆盖完成: {result.get('message', '')}",

@@ -642,3 +642,215 @@ class TestFormulaDispatch:
 
         assert result.success
         assert result.metadata.get('smart_append') is False
+
+
+class TestFormulaCalculation:
+    """公式计算功能测试 - 验证不同文件格式处理"""
+
+    @pytest.fixture
+    def excel_file_with_formulas(self, temp_dir):
+        """创建包含公式的测试文件"""
+        from openpyxl import Workbook
+        file_path = temp_dir / "formulas_test.xlsx"
+        wb = Workbook()
+        ws = wb.active
+        ws.title = "Data"
+
+        # 写入测试数据
+        ws['A1'] = 10
+        ws['A2'] = 20
+        ws['A3'] = 30
+        ws['A4'] = 40
+        ws['A5'] = 50
+
+        # 写入公式
+        ws['B1'] = '=SUM(A1:A5)'
+        ws['B2'] = '=AVERAGE(A1:A5)'
+        ws['B3'] = '=MAX(A1:A5)'
+        ws['B4'] = '=MIN(A1:A5)'
+        ws['B5'] = '=COUNT(A1:A5)'
+
+        wb.save(file_path)
+        wb.close()
+        return file_path
+
+    @pytest.fixture
+    def xlsm_file_with_formulas(self, temp_dir):
+        """创建包含公式的xlsm文件（带宏的Excel文件）"""
+        from openpyxl import Workbook
+        file_path = temp_dir / "formulas_test.xlsm"
+        wb = Workbook()
+        ws = wb.active
+        ws.title = "Data"
+
+        # 写入测试数据
+        ws['A1'] = 100
+        ws['A2'] = 200
+        ws['A3'] = 300
+
+        # 写入公式
+        ws['B1'] = '=SUM(A1:A3)'
+        ws['B2'] = '=AVERAGE(A1:A3)'
+
+        wb.save(file_path)
+        wb.close()
+        return file_path
+
+    def test_detect_file_format_xlsx(self, excel_file_with_formulas):
+        """检测xlsx文件格式"""
+        writer = ExcelWriter(str(excel_file_with_formulas))
+        detected_format = writer._detect_file_format()
+        assert detected_format == 'xlsx'
+
+    def test_detect_file_format_xlsm(self, xlsm_file_with_formulas):
+        """检测xlsm文件格式"""
+        writer = ExcelWriter(str(xlsm_file_with_formulas))
+        detected_format = writer._detect_file_format()
+        assert detected_format == 'xlsm'
+
+    def test_detect_file_format_nonexistent(self):
+        """检测不存在的文件格式，应返回默认xlsx"""
+        writer = ExcelWriter("nonexistent.xlsx")
+        detected_format = writer._detect_file_format()
+        assert detected_format == 'xlsx'
+
+    def test_create_temp_workbook_xlsx(self, excel_file_with_formulas):
+        """为xlsx文件创建临时工作簿进行公式计算"""
+        from openpyxl import load_workbook
+        writer = ExcelWriter(str(excel_file_with_formulas))
+        cache = get_formula_cache()
+
+        temp_wb, temp_path = writer._create_temp_workbook("Data", cache)
+
+        assert temp_wb is not None
+        assert temp_path.endswith('.xlsx')
+
+        # 验证临时工作簿包含原始数据
+        temp_sheet = temp_wb.active
+        assert temp_sheet['A1'].value == 10
+        assert temp_sheet['A5'].value == 50
+
+        temp_wb.close()
+
+    def test_create_temp_workbook_xlsm(self, xlsm_file_with_formulas):
+        """为xlsm文件创建临时工作簿进行公式计算"""
+        from openpyxl import load_workbook
+        writer = ExcelWriter(str(xlsm_file_with_formulas))
+        cache = get_formula_cache()
+
+        temp_wb, temp_path = writer._create_temp_workbook("Data", cache)
+
+        assert temp_wb is not None
+        assert temp_path.endswith('.xlsx')
+
+        # 验证临时工作簿包含原始数据
+        temp_sheet = temp_wb.active
+        assert temp_sheet['A1'].value == 100
+        assert temp_sheet['A3'].value == 300
+
+        temp_wb.close()
+
+    def test_formula_calculation_xlsx(self, excel_file_with_formulas):
+        """在xlsx文件中计算公式结果"""
+        from openpyxl import load_workbook
+        writer = ExcelWriter(str(excel_file_with_formulas))
+        wb = load_workbook(excel_file_with_formulas)
+        sheet = wb.active
+
+        # 计算SUM公式
+        sum_result = writer._basic_formula_parse("SUM(A1:A5)", sheet)
+        assert sum_result == 150.0
+
+        # 计算AVERAGE公式
+        avg_result = writer._basic_formula_parse("AVERAGE(A1:A5)", sheet)
+        assert avg_result == 30.0
+
+        # 计算MAX公式
+        max_result = writer._basic_formula_parse("MAX(A1:A5)", sheet)
+        assert max_result == 50.0
+
+        # 计算MIN公式
+        min_result = writer._basic_formula_parse("MIN(A1:A5)", sheet)
+        assert min_result == 10.0
+
+        # 计算COUNT公式
+        count_result = writer._basic_formula_parse("COUNT(A1:A5)", sheet)
+        assert count_result == 5
+
+        wb.close()
+
+    def test_formula_calculation_xlsm(self, xlsm_file_with_formulas):
+        """在xlsm文件中计算公式结果"""
+        from openpyxl import load_workbook
+        writer = ExcelWriter(str(xlsm_file_with_formulas))
+        wb = load_workbook(xlsm_file_with_formulas)
+        sheet = wb.active
+
+        # 计算SUM公式
+        sum_result = writer._basic_formula_parse("SUM(A1:A3)", sheet)
+        assert sum_result == 600.0
+
+        # 计算AVERAGE公式
+        avg_result = writer._basic_formula_parse("AVERAGE(A1:A3)", sheet)
+        assert avg_result == 200.0
+
+        wb.close()
+
+    def test_temp_workbook_preserves_format(self, excel_file_with_formulas):
+        """临时工作簿创建时保留原始文件格式信息"""
+        writer = ExcelWriter(str(excel_file_with_formulas))
+        cache = get_formula_cache()
+
+        # 获取检测到的格式
+        file_format = writer._detect_file_format()
+
+        # 创建临时工作簿
+        temp_wb, temp_path = writer._create_temp_workbook("Data", cache)
+
+        # 验证临时文件扩展名与检测格式一致
+        assert file_format == 'xlsx'
+        assert temp_path.endswith('.xlsx')
+
+        temp_wb.close()
+
+    def test_formula_with_multiple_formats(self, temp_dir):
+        """验证公式计算在不同格式文件中的一致性"""
+        from openpyxl import Workbook, load_workbook
+
+        # 创建xlsx文件
+        xlsx_path = temp_dir / "test_xlsx.xlsx"
+        wb_xlsx = Workbook()
+        ws_xlsx = wb_xlsx.active
+        ws_xlsx['A1'] = 5
+        ws_xlsx['A2'] = 15
+        ws_xlsx['A3'] = 25
+        wb_xlsx.save(xlsx_path)
+        wb_xlsx.close()
+
+        # 创建xlsm文件
+        xlsm_path = temp_dir / "test_xlsm.xlsm"
+        wb_xlsm = Workbook()
+        ws_xlsm = wb_xlsm.active
+        ws_xlsm['A1'] = 5
+        ws_xlsm['A2'] = 15
+        ws_xlsm['A3'] = 25
+        wb_xlsm.save(xlsm_path)
+        wb_xlsm.close()
+
+        # 在两种格式文件中计算相同公式，结果应一致
+        writer_xlsx = ExcelWriter(str(xlsx_path))
+        wb_xlsx = load_workbook(xlsx_path)
+        sheet_xlsx = wb_xlsx.active
+        sum_xlsx = writer_xlsx._basic_formula_parse("SUM(A1:A3)", sheet_xlsx)
+        avg_xlsx = writer_xlsx._basic_formula_parse("AVERAGE(A1:A3)", sheet_xlsx)
+        wb_xlsx.close()
+
+        writer_xlsm = ExcelWriter(str(xlsm_path))
+        wb_xlsm = load_workbook(xlsm_path)
+        sheet_xlsm = wb_xlsm.active
+        sum_xlsm = writer_xlsm._basic_formula_parse("SUM(A1:A3)", sheet_xlsm)
+        avg_xlsm = writer_xlsm._basic_formula_parse("AVERAGE(A1:A3)", sheet_xlsm)
+        wb_xlsm.close()
+
+        assert sum_xlsx == sum_xlsm == 45.0
+        assert avg_xlsx == avg_xlsm == 15.0

@@ -4,6 +4,7 @@
 从 Stack Overflow 和 GitHub Issues 搜索真实用户遇到的 Excel 奇怪问题
 """
 
+import argparse
 import json
 import os
 import re
@@ -318,6 +319,93 @@ class EdgeCaseCollector:
         
         return all_cases
 
+    def get_recent_high_priority_cases(self, limit: int = 10) -> List[Dict]:
+        """获取最近发现的高优先级边缘案例
+        
+        Args:
+            limit: 返回的最大案例数
+            
+        Returns:
+            高优先级边缘案例列表，按发现时间倒序排列
+        """
+        cases = list(self.existing_cases.values())
+        high_priority = [c for c in cases if c['priority'] == 'high']
+        
+        # 按发现时间倒序排序
+        high_priority.sort(
+            key=lambda x: x.get('discovered_at', ''),
+            reverse=True
+        )
+        
+        return high_priority[:limit]
+
+    def get_recent_cases(self, max_count: int = 5) -> List[Dict]:
+        """返回最近发现的高优先级边缘案例
+        
+        Args:
+            max_count: 返回的最大案例数
+            
+        Returns:
+            高优先级边缘案例列表，按发现时间倒序排列
+        """
+        return self.get_recent_high_priority_cases(limit=max_count)
+
+    def convert_to_test_case(self, case: Dict) -> str:
+        """将边缘案例转换为测试用例格式
+        
+        Args:
+            case: 边缘案例字典
+            
+        Returns:
+            格式化的测试用例字符串
+        """
+        test_case = f"""# 测试用例: {case['title']}
+
+## 优先级: {case['priority']}
+
+## 描述
+{case['description']}
+
+## 来源
+{case['source']}: {case['source_url']}
+
+## 操作步骤
+"""
+        if case.get('steps'):
+            for i, step in enumerate(case['steps'], 1):
+                test_case += f"{i}. {step}\n"
+        else:
+            test_case += "暂无详细步骤\n"
+        
+        test_case += f"""
+## 预期结果
+{case.get('expected', '待补充')}
+
+## 实际结果
+{case.get('actual', '待补充')}
+
+## 元数据
+- 浏览量: {case['views']}
+- 回答数: {case['answers']}
+- 评分: {case['score']}
+- 发现时间: {case['discovered_at']}
+"""
+        return test_case
+
+    def to_test_case(self) -> str:
+        """将案例转换为测试用例格式
+        
+        Returns:
+            格式化的测试用例字符串
+        """
+        cases = self.get_recent_cases()
+        test_cases = []
+        
+        for case in cases:
+            test_cases.append(self.convert_to_test_case(case))
+        
+        return "\n\n" + "=" * 50 + "\n\n".join(test_cases)
+
     def run(self) -> None:
         """运行边缘案例发现流程"""
         print("=" * 50)
@@ -359,8 +447,55 @@ class EdgeCaseCollector:
 
 def main():
     """主函数"""
-    collector = EdgeCaseCollector()
-    collector.run()
+    parser = argparse.ArgumentParser(
+        description='边缘案例自动发现工具',
+        formatter_class=argparse.RawDescriptionHelpFormatter
+    )
+    parser.add_argument(
+        '--recent', '-r',
+        action='store_true',
+        help='只返回最近发现的高优先级案例，不执行完整搜索'
+    )
+    parser.add_argument(
+        '--limit', '-l',
+        type=int,
+        default=10,
+        help='返回的案例数量限制（默认: 10）'
+    )
+    parser.add_argument(
+        '--format-test-cases', '-f',
+        action='store_true',
+        help='将案例转换为测试用例格式输出'
+    )
+    parser.add_argument(
+        '--output', '-o',
+        type=str,
+        default='docs/edge_cases.json',
+        help='输出文件路径（默认: docs/edge_cases.json）'
+    )
+    
+    args = parser.parse_args()
+    
+    collector = EdgeCaseCollector(output_path=args.output)
+    
+    if args.recent:
+        cases = collector.get_recent_high_priority_cases(limit=args.limit)
+        print(f"\n最近发现的高优先级边缘案例 ({len(cases)} 个):\n")
+        print("=" * 50)
+        
+        for i, case in enumerate(cases, 1):
+            if args.format_test_cases:
+                print(collector.convert_to_test_case(case))
+                print("\n" + "-" * 50 + "\n")
+            else:
+                print(f"{i}. [{case['priority'].upper()}] {case['title']}")
+                print(f"   来源: {case['source']}")
+                print(f"   URL: {case['source_url']}")
+                print(f"   发现时间: {case['discovered_at']}")
+                print(f"   评分: {case['score']} | 浏览: {case['views']} | 回答: {case['answers']}")
+                print()
+    else:
+        collector.run()
 
 
 if __name__ == "__main__":

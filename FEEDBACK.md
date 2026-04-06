@@ -9,6 +9,24 @@
 - **修复建议**：批量修复所有函数的docstring，确保包含Args/Parameters和Returns段，建立自动化docstring检查机制，设定90%以上合规率目标
 - **状态**：✅ 已转REQ-062（2026-04-05创建）
 
+## #1 [HIGH] CONVENTIONAL_COMMITS - 提交格式违规
+- **严重程度**：高
+- **工具**：Conventional commits validation
+- **参数**：{"threshold": 0, "total_commits": 6, "violations": 1}
+- **期望**：所有提交必须遵循格式 `[REQ-XXX] type: 描述`，type必须是feat/fix/refactor/docs/test/chore/perf之一
+- **实际**：提交 `4d230c9` 违反规范，缺少type前缀，格式为 `[REQ-065] DONE + 新增REQ-066~070` 而非 `[REQ-065] type: DONE + 新增REQ-066~070`
+- **修复建议**：使用 `git commit --amend --no-edit` 修正提交信息，添加正确的type前缀（如feat:或fix:），确保符合CONVENTIONAL_COMMITS.md规范
+- **状态**：✅ 已转REQ-071（2026-04-06创建）
+
+## #2 [MEDIUM] QUALITY_BACKLOG - 5个P1需求未处理
+- **严重程度**：中
+- **工具**：Requirements backlog analysis
+- **参数**：{"open_p1_requirements": 5, "total_attempts": 0, "created_date": "2026-04-06"}
+- **期望**：所有P1优先级需求应有至少1次处理尝试
+- **实际**：发现5个P1优先级需求（REQ-066~070）全部状态为OPEN，attempt次数为0，未进行任何处理
+- **修复建议**：按优先级顺序依次处理REQ-066~070，每个需求至少执行一次完整修复流程，记录修复过程和结果
+- **状态**：✅ 已转REQ-066~070（2026-04-06创建）
+
 ## OPEN-#1 [P0] GROUP BY 聚合逻辑 bug
 
 **状态**：✅ 已转REQ-061（2026-04-05完成）
@@ -33,4 +51,13 @@
   - `SELECT name FROM employees ORDER BY salary DESC`
   - `SELECT name, CASE WHEN salary > 30000 THEN '高' ELSE '低' END FROM employees`
   - `SELECT e.name FROM employees e JOIN orders o ON e.name = o.customer`
-- **状态**：P0
+- **状态**：✅ 已验证无问题（2026-04-06，子代理验证三个函数签名均正确，回归已被后续迭代自动修复）
+
+### FEEDBACK-014: pytest 输出误读 warnings 为 failures（P1）
+- **问题**：cron-prompt 或质量检查脚本把 pytest 的 warnings 当成 failures 报告。实际输出是 `851 passed, 9 warnings`（0 failed），但报告写"9 failed"
+- **根因**：解析 pytest 输出时没有区分 `failed` 和 `warnings`
+- **要求**：
+  1. 找到 cron-prompt 或脚本中解析 pytest 输出的逻辑
+  2. 正确区分 `X passed, Y failed, Z warnings` — 只有 `failed` 数才算失败
+  3. 同时检查 check.py 的 R4 质量检查是否有同样问题
+- **状态**：✅ 已修复（2026-04-06，cron-prompt增加明确警告+程序化正则验证）
