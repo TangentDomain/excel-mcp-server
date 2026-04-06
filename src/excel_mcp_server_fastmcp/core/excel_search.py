@@ -141,7 +141,14 @@ class ExcelSearcher:
             )
 
     def _build_regex_flags(self, flags: str) -> int:
-        """构建正则表达式标志"""
+        """构建正则表达式标志
+
+        Args:
+            flags: 正则表达式标志字符串 (i=忽略大小写, m=多行, s=点匹配换行)
+
+        Returns:
+            int: 组合后的正则表达式标志位
+        """
         regex_flags = 0
         if 'i' in flags.lower():
             regex_flags |= re.IGNORECASE
@@ -157,7 +164,16 @@ class ExcelSearcher:
         sheet_name: Optional[str] = None,
         range_expression: Optional[str] = None
     ) -> List[SearchMatch]:
-        """使用calamine快速搜索纯值（不搜公式）"""
+        """使用calamine快速搜索纯值（不搜公式）
+
+        Args:
+            regex: 编译后的正则表达式对象
+            sheet_name: 工作表名称（可选）
+            range_expression: 搜索范围表达式（可选）
+
+        Returns:
+            List[SearchMatch]: 匹配结果列表
+        """
         wb = CalamineWorkbook.from_path(self.file_path)
         matches = []
 
@@ -211,7 +227,16 @@ class ExcelSearcher:
         return matches
 
     def _in_range(self, range_info, row: int, col: int) -> bool:
-        """检查单元格(row,col)是否在范围内（1-based）"""
+        """检查单元格(row,col)是否在范围内（1-based）
+
+        Args:
+            range_info: 范围信息对象
+            row: 行号（1-based）
+            col: 列号（1-based）
+
+        Returns:
+            bool: 单元格是否在指定范围内
+        """
         rt = range_info.range_type
         if rt in [RangeType.ROW_RANGE, RangeType.SINGLE_ROW]:
             parts = range_info.cell_range.split(':')
@@ -238,7 +263,19 @@ class ExcelSearcher:
         sheet_name: Optional[str] = None,
         range_expression: Optional[str] = None
     ) -> List[SearchMatch]:
-        """在工作簿中搜索"""
+        """在工作簿中搜索
+
+        Args:
+            workbook: openpyxl工作簿对象
+            regex: 编译后的正则表达式对象
+            search_values: 是否搜索单元格值
+            search_formulas: 是否搜索单元格公式
+            sheet_name: 工作表名称（可选）
+            range_expression: 搜索范围表达式（可选）
+
+        Returns:
+            List[SearchMatch]: 匹配结果列表
+        """
         matches = []
 
         # 解析范围表达式（如果提供）
@@ -281,7 +318,18 @@ class ExcelSearcher:
         search_values: bool,
         search_formulas: bool
     ) -> List[SearchMatch]:
-        """在整个工作表中搜索"""
+        """在整个工作表中搜索
+
+        Args:
+            sheet: openpyxl工作表对象
+            sheet_name: 工作表名称
+            regex: 编译后的正则表达式对象
+            search_values: 是否搜索单元格值
+            search_formulas: 是否搜索单元格公式
+
+        Returns:
+            List[SearchMatch]: 匹配结果列表
+        """
         matches = []
 
         # 遍历所有单元格
@@ -329,7 +377,19 @@ class ExcelSearcher:
         search_formulas: bool,
         range_info
     ) -> List[SearchMatch]:
-        """在指定范围内搜索"""
+        """在指定范围内搜索
+
+        Args:
+            sheet: openpyxl工作表对象
+            sheet_name: 工作表名称
+            regex: 编译后的正则表达式对象
+            search_values: 是否搜索单元格值
+            search_formulas: 是否搜索单元格公式
+            range_info: 范围信息对象
+
+        Returns:
+            List[SearchMatch]: 匹配结果列表
+        """
         from openpyxl.utils import range_boundaries, column_index_from_string
 
         matches = []
@@ -535,7 +595,18 @@ class ExcelSearcher:
         recursive: bool,
         max_files: int
     ) -> List[Path]:
-        """查找目录中的Excel文件"""
+        """查找目录中的Excel文件
+
+        Args:
+            directory: 目录路径对象
+            extensions: 文件扩展名列表
+            file_regex: 文件名正则表达式（可选）
+            recursive: 是否递归搜索子目录
+            max_files: 最大文件数量限制
+
+        Returns:
+            List[Path]: 找到的Excel文件路径列表
+        """
         excel_files = []
 
         # 构建搜索模式
@@ -569,7 +640,15 @@ class ExcelSearcher:
         return excel_files[:max_files]  # 确保不超过最大限制
 
     def _should_include_file(self, file_path: Path, file_regex: Optional[re.Pattern]) -> bool:
-        """判断是否应该包含该文件"""
+        """判断是否应该包含该文件
+
+        Args:
+            file_path: 文件路径对象
+            file_regex: 文件名正则表达式（可选）
+
+        Returns:
+            bool: 是否应该包含该文件
+        """
         # 检查文件是否存在且是文件
         if not file_path.is_file():
             return False
@@ -596,10 +675,23 @@ class ExcelSearcher:
         file_pattern: Optional[str] = None,
         max_files: int = MAX_SEARCH_FILES
     ) -> OperationResult:
-        """
-        静态方法：在目录下的所有Excel文件中使用正则表达式搜索单元格内容
+        """静态方法：在目录下的所有Excel文件中使用正则表达式搜索单元格内容
 
         这是一个静态方法，不需要创建ExcelSearcher实例
+
+        Args:
+            directory_path: 目录路径
+            pattern: 正则表达式模式
+            flags: 正则表达式标志 (i=忽略大小写, m=多行, s=点匹配换行)
+            search_values: 是否搜索单元格的显示值
+            search_formulas: 是否搜索单元格的公式
+            recursive: 是否递归搜索子目录
+            file_extensions: 文件扩展名过滤，如['.xlsx', '.xlsm']
+            file_pattern: 文件名正则模式过滤
+            max_files: 最大搜索文件数限制
+
+        Returns:
+            OperationResult: 包含聚合搜索结果的结果对象
         """
         try:
             # 验证目录路径
@@ -701,7 +793,14 @@ class ExcelSearcher:
 
     @staticmethod
     def _build_regex_flags_static(flags: str) -> int:
-        """静态方法：构建正则表达式标志"""
+        """静态方法：构建正则表达式标志
+
+        Args:
+            flags: 正则表达式标志字符串 (i=忽略大小写, m=多行, s=点匹配换行)
+
+        Returns:
+            int: 组合后的正则表达式标志位
+        """
         regex_flags = 0
         if 'i' in flags.lower():
             regex_flags |= re.IGNORECASE
@@ -719,7 +818,18 @@ class ExcelSearcher:
         recursive: bool,
         max_files: int
     ) -> List[Path]:
-        """静态方法：查找目录中的Excel文件"""
+        """静态方法：查找目录中的Excel文件
+
+        Args:
+            directory: 目录路径对象
+            extensions: 文件扩展名列表
+            file_regex: 文件名正则表达式（可选）
+            recursive: 是否递归搜索子目录
+            max_files: 最大文件数量限制
+
+        Returns:
+            List[Path]: 找到的Excel文件路径列表
+        """
         excel_files = []
 
         # 构建搜索模式
@@ -754,7 +864,15 @@ class ExcelSearcher:
 
     @staticmethod
     def _should_include_file_static(file_path: Path, file_regex: Optional[re.Pattern]) -> bool:
-        """静态方法：判断是否应该包含该文件"""
+        """静态方法：判断是否应该包含该文件
+
+        Args:
+            file_path: 文件路径对象
+            file_regex: 文件名正则表达式（可选）
+
+        Returns:
+            bool: 是否应该包含该文件
+        """
         # 检查文件是否存在且是文件
         if not file_path.is_file():
             return False
