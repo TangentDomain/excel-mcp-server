@@ -511,7 +511,6 @@ class AdvancedSQLQueryEngine:
         output_format: str = "table"
     ) -> Dict[str, Any]:
         """
-        执行SQL查询，支持完整的SQL语法
 
         Args:
             file_path: Excel文件路径
