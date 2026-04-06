@@ -271,6 +271,20 @@ def _track_call(func):
     """工具调用追踪装饰器，记录每次调用的耗时和结果，自动检测返回值中的错误"""
     @functools.wraps(func)
     def wrapper(*args, **kwargs):
+        """包装函数，记录工具调用的耗时和结果信息
+        
+        Args:
+            *args: 传递给被装饰函数的位置参数
+            **kwargs: 传递给被装饰函数的关键字参数
+            
+        Returns:
+            被装饰函数的执行结果
+            
+        Note:
+            自动检测函数返回值中的错误状态，记录到追踪器中
+            如果返回值是dict且success=False，记录为失败
+            异常情况也会被捕获并记录
+        """
         start = time.perf_counter()
         try:
             result = func(*args, **kwargs)
@@ -432,6 +446,21 @@ def _validate_file_path(param='file_path'):
         """
         @functools.wraps(func)
         def wrapper(*args, **kwargs):
+            """包装函数，在调用前验证文件路径参数
+            
+            Args:
+                *args: 传递给被装饰函数的位置参数
+                **kwargs: 传递给被装饰函数的关键字参数，包含需要验证的路径参数
+                
+            Returns:
+                如果验证通过，返回被装饰函数的执行结果
+                如果验证失败，返回错误信息
+                
+            Note:
+                根据@param_list指定的参数名，从kwargs中获取对应的路径值
+                对每个路径值调用_validate_path进行验证
+                参数值为None时跳过验证
+            """
             params = [param] if isinstance(param, str) else param
             for p_name in params:
                 p_value = kwargs.get(p_name)
@@ -457,6 +486,18 @@ class JsonFormatter(logging.Formatter):
     激活方式: EXCEL_MCP_JSON_LOG=1
     """
     def format(self, record):
+        """格式化日志记录为JSON格式
+        
+        Args:
+            record: 日志记录对象，包含levelname, module, message等属性
+            
+        Returns:
+            str: 格式化后的JSON字符串，包含时间戳、级别、模块、消息等字段
+            
+        Note:
+            根据记录中的可选字段(tool, duration_ms, error等)动态添加到JSON中
+            使用ensure_ascii=False确保中文字符正常输出
+        """
         log_entry = {
             'ts': datetime.now().isoformat(),
             'level': record.levelname,
