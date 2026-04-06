@@ -3804,6 +3804,12 @@ def excel_set_data_validation(file_path: str, sheet_name: str, range_address: st
 
         wb, ws = ExcelValidator.get_workbook_and_sheet(file_path, sheet_name)
 
+        # 验证类型映射和检查
+        supported_types = ['list', 'whole_number', 'decimal', 'date', 'text_length', 'custom']
+        if validation_type not in supported_types:
+            return _fail(f"不支持的验证类型: {validation_type}，支持的类型: {','.join(supported_types)}",
+                        meta={"error_code": "VALIDATION_FAILED"})
+
         # 映射验证类型到 openpyxl 要求的格式
         type_mapping = {
             'whole_number': 'whole',
@@ -3815,31 +3821,48 @@ def excel_set_data_validation(file_path: str, sheet_name: str, range_address: st
         dv_kwargs = {'type': openpyxl_type}
 
         # 根据验证类型设置参数
-        if validation_type == 'list':
-            # 列表类型：formula1 为列表源
-            dv_kwargs['formula1'] = criteria
-            dv_kwargs['showDropDown'] = True
-        elif validation_type == 'custom':
-            # 自定义公式：formula1 为公式表达式
-            dv_kwargs['formula1'] = criteria
-        elif validation_type in ['whole_number', 'decimal', 'date', 'text_length']:
-            # 数值/日期/长度类型：需要解析操作符和值
-            parts = [p.strip() for p in criteria.split(',')]
-            if len(parts) < 2:
-                return _fail(f"验证条件格式错误，应为 '操作符,值1,值2'，当前为: {criteria}",
-                            meta={"error_code": "VALIDATION_FAILED"})
+        try:
+            if validation_type == 'list':
+                # 列表类型：formula1 为列表源
+                if not criteria or not criteria.strip():
+                    return _fail("列表验证类型必须提供 criteria 参数（列表源）",
+                                meta={"error_code": "VALIDATION_FAILED"})
+                dv_kwargs['formula1'] = criteria
+                dv_kwargs['showDropDown'] = True
+            elif validation_type == 'custom':
+                # 自定义公式：formula1 为公式表达式
+                if not criteria or not criteria.strip():
+                    return _fail("自定义验证类型必须提供 criteria 参数（公式表达式）",
+                                meta={"error_code": "VALIDATION_FAILED"})
+                dv_kwargs['formula1'] = criteria
+            elif validation_type in ['whole_number', 'decimal', 'date', 'text_length']:
+                # 数值/日期/长度类型：需要解析操作符和值
+                if not criteria or not criteria.strip():
+                    return _fail(f"{validation_type} 验证类型必须提供 criteria 参数（格式: '操作符,值1,值2'）",
+                                meta={"error_code": "VALIDATION_FAILED"})
+                
+                parts = [p.strip() for p in criteria.split(',')]
+                if len(parts) < 2:
+                    return _fail(f"验证条件格式错误，应为 '操作符,值1,值2'，当前为: {criteria}",
+                                meta={"error_code": "VALIDATION_FAILED"})
 
-            operator = parts[0]
-            value1 = parts[1]
-            value2 = parts[2] if len(parts) > 2 else None
+                operator = parts[0]
+                value1 = parts[1]
+                value2 = parts[2] if len(parts) > 2 else None
 
-            dv_kwargs['operator'] = operator
-            dv_kwargs['formula1'] = value1
-            if value2:
-                dv_kwargs['formula2'] = value2
-        else:
-            return _fail(f"不支持的验证类型: {validation_type}，支持的类型: list/whole_number/decimal/date/text_length/custom",
-                        meta={"error_code": "VALIDATION_FAILED"})
+                # 验证操作符
+                valid_operators = ['between', 'notBetween', 'equal', 'notEqual', 'greaterThan', 
+                                 'lessThan', 'greaterThanOrEqual', 'lessThanOrEqual']
+                if operator not in valid_operators:
+                    return _fail(f"不支持的操作符: {operator}，支持的操作符: {','.join(valid_operators)}",
+                                meta={"error_code": "VALIDATION_FAILED"})
+
+                dv_kwargs['operator'] = operator
+                dv_kwargs['formula1'] = value1
+                if value2:
+                    dv_kwargs['formula2'] = value2
+        except Exception as e:
+            return _fail(f"验证条件解析失败: {str(e)}", meta={"error_code": "VALIDATION_FAILED"})
 
         dv = DataValidation(**dv_kwargs)
 
