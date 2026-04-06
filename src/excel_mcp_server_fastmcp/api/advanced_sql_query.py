@@ -1032,7 +1032,7 @@ class AdvancedSQLQueryEngine:
 
         return worksheets_data
 
-    def _clean_dataframe(self, df -> pd.DataFrame:
+    def _clean_dataframe(self, df) -> pd.DataFrame:
         """
         清理DataFrame数据
 
@@ -1261,7 +1261,7 @@ class AdvancedSQLQueryEngine:
         # 无法提取SELECT子句,不替换(安全优先)
         return sql
 
-    def _optimize_dtypes(self, df -> pd.DataFrame:
+    def _optimize_dtypes(self, df) -> pd.DataFrame:
         """
         优化DataFrame数据类型以减少内存占用
 
@@ -1556,7 +1556,7 @@ class AdvancedSQLQueryEngine:
                 return expr.name, None
         return None, None
 
-    def _resolve_column_name(self, col_name: str, df -> str:
+    def _resolve_column_name(self, col_name: str, df) -> str:
         """解析列名,支持表别名格式(如 r.名称)"""
         if '.' in col_name:
             # 处理表别名格式,如 r.名称
@@ -1725,7 +1725,7 @@ class AdvancedSQLQueryEngine:
 
         return ""
 
-    def _apply_union_order_by(self, df -> pd.DataFrame:
+    def _apply_union_order_by(self, df) -> pd.DataFrame:
         """
         对 UNION 合并后的 DataFrame 应用 ORDER BY 排序
 
@@ -1940,7 +1940,7 @@ class AdvancedSQLQueryEngine:
         """检查SQL是否包含窗口函数"""
         return bool(parsed_sql.find(exp.Window))
 
-    def _apply_window_functions(self, parsed_sql: exp.Expression, df -> pd.DataFrame:
+    def _apply_window_functions(self, parsed_sql: exp.Expression, df) -> pd.DataFrame:
         """
         计算窗口函数并将结果添加到DataFrame
         支持: ROW_NUMBER, RANK, DENSE_RANK
@@ -2337,7 +2337,7 @@ class AdvancedSQLQueryEngine:
                 return True
         return False
 
-    def _apply_select_expressions(self, parsed_sql: exp.Expression, df -> pd.DataFrame:
+    def _apply_select_expressions(self, parsed_sql: exp.Expression, df) -> pd.DataFrame:
         """
         应用SELECT表达式(非聚合查询)
         处理计算字段,别名等
@@ -2623,7 +2623,7 @@ class AdvancedSQLQueryEngine:
         exp.Length: 'len',
     }
 
-    def _evaluate_string_function(self, expr, df -> pd.Series:
+    def _evaluate_string_function(self, expr, df) -> pd.Series:
         """计算字符串函数,返回pd.Series"""
         func_type = type(expr)
 
@@ -2706,7 +2706,7 @@ class AdvancedSQLQueryEngine:
             return val[-n:] if n > 0 else ''
         return val
 
-    def _expr_to_series(self, expr, df -> pd.Series:
+    def _expr_to_series(self, expr, df) -> pd.Series:
         """将表达式转换为pd.Series(支持列引用,字面量,数学表达式,字符串函数)"""
         if isinstance(expr, exp.Column):
             col_name = expr.name
@@ -2788,7 +2788,7 @@ class AdvancedSQLQueryEngine:
         # 如果没有明确的FROM子句,返回第一个表名
         raise ValueError("无法确定FROM子句中的表名")
 
-    def _apply_join_clause(self, joins, left_df -> pd.DataFrame:
+    def _apply_join_clause(self, joins, left_df) -> pd.DataFrame:
         """
         应用JOIN子句,支持INNER/LEFT/RIGHT/FULL/CROSS JOIN
         性能优化:使用索引优化和智能JOIN策略
@@ -3026,7 +3026,7 @@ class AdvancedSQLQueryEngine:
         # 默认左=左表, 右=右表
         return left_col, right_col
 
-    def _apply_where_clause(self, parsed_sql: exp.Expression, df -> pd.DataFrame:
+    def _apply_where_clause(self, parsed_sql: exp.Expression, df) -> pd.DataFrame:
         """应用WHERE条件"""
         where_clause = parsed_sql.args.get('where')
         if not where_clause:
@@ -3068,7 +3068,7 @@ class AdvancedSQLQueryEngine:
         except (ValueError, TypeError):
             return expr.this
 
-    def _in_to_pandas(self, in_expr: exp.In, df -> str:
+    def _in_to_pandas(self, in_expr: exp.In, df) -> str:
         """将IN/NOT IN条件转换为pandas表达式(支持子查询和值列表)
 
         Args:
@@ -3098,7 +3098,7 @@ class AdvancedSQLQueryEngine:
         values_str = ', '.join(str(v) for v in values)
         return f"{prefix}{left}.isin([{values_str}])"
 
-    def _sql_condition_to_pandas(self, condition: exp.Expression, df -> str:
+    def _sql_condition_to_pandas(self, condition: exp.Expression, df) -> str:
         """将SQL条件转换为pandas查询字符串"""
         op_type = type(condition)
         if op_type in self._PANDAS_OPS:
@@ -3164,7 +3164,7 @@ class AdvancedSQLQueryEngine:
         else:
             raise ValueError(f"不支持的条件类型: {type(condition)}")
 
-    def _expression_to_column_reference(self, expr: exp.Expression, df -> str:
+    def _expression_to_column_reference(self, expr: exp.Expression, df) -> str:
         """将表达式转换为列引用(支持表限定符 a.column)"""
         if isinstance(expr, exp.Column):
             col_name = expr.name
@@ -3279,7 +3279,7 @@ class AdvancedSQLQueryEngine:
         else:
             raise ValueError(f"不支持的表达式类型: {type(expr)}")
 
-    def _expression_to_value(self, expr: exp.Expression, df -> Union[str, int, float]:
+    def _expression_to_value(self, expr: exp.Expression, df) -> Union[str, int, float]:
         """将表达式转换为值"""
         if isinstance(expr, exp.Literal):
             # 委托_parse_literal_value统一处理Literal->Python值转换
@@ -3321,7 +3321,7 @@ class AdvancedSQLQueryEngine:
         else:
             raise ValueError(f"不支持的表达式类型: {type(expr)}")
 
-    def _apply_row_filter(self, condition: exp.Expression, df -> pd.DataFrame:
+    def _apply_row_filter(self, condition: exp.Expression, df) -> pd.DataFrame:
         """逐行应用过滤条件(备用方案),使用apply替代iterrows提升性能"""
         mask = df.apply(lambda row: self._evaluate_condition_for_row(condition, row), axis=1)
         return df[mask]
@@ -3487,8 +3487,7 @@ class AdvancedSQLQueryEngine:
         else:
             return None
 
-    def _apply_group_by_aggregation(self, parsed_sql: exp.Expression, df -> pd.DataFrame:
-        """应用GROUP BY和聚合函数
+    def _apply_group_by_aggregation(self, parsed_sql: exp.Expression, df) -> pd.DataFrame:
         """应用GROUP BY和聚合函数
         
         Args:
@@ -3672,7 +3671,7 @@ class AdvancedSQLQueryEngine:
         except Exception as e:
             raise ValueError(f"子查询执行失败: {e}")
 
-    def _evaluate_case_expression(self, case_expr: exp.Case, df -> Any:
+    def _evaluate_case_expression(self, case_expr: exp.Case, df) -> Any:
         """
         评估CASE WHEN表达式
 
@@ -3744,7 +3743,7 @@ class AdvancedSQLQueryEngine:
                 return val
         return 0  # 所有参数都无效(None/NaN)时返回0
 
-    def _evaluate_coalesce_vectorized(self, coalesce_expr: exp.Coalesce, df -> pd.Series:
+    def _evaluate_coalesce_vectorized(self, coalesce_expr: exp.Coalesce, df) -> pd.Series:
         """向量化评估COALESCE/IFNULL表达式(用于DataFrame),空字符串转为0
 
         使用 pandas combine_first 实现真正的向量化操作,
@@ -3824,7 +3823,7 @@ class AdvancedSQLQueryEngine:
         'min': lambda g, col: g[col].agg(lambda x: pd.to_numeric(x, errors='coerce').min()),
     }
 
-    def _apply_aggregation_function(self, expr: exp.Expression, grouped, df -> pd.Series:
+    def _apply_aggregation_function(self, expr: exp.Expression, grouped, df) -> pd.Series:
         """应用聚合函数"""
         if isinstance(expr, exp.Alias):
             return self._apply_aggregation_function(expr.this, grouped, df)
@@ -3866,7 +3865,7 @@ class AdvancedSQLQueryEngine:
         """检查是否为表达式(非单列)"""
         return not isinstance(node, exp.Column)
 
-    def _evaluate_expression(self, expr_node, df -> str:
+    def _evaluate_expression(self, expr_node, df) -> str:
         """计算表达式,返回临时列名"""
         if isinstance(expr_node, exp.Column):
             return expr_node.name
@@ -3909,7 +3908,7 @@ class AdvancedSQLQueryEngine:
         
         return temp_col
 
-    def _apply_having_clause(self, parsed_sql: exp.Expression, df -> pd.DataFrame:
+    def _apply_having_clause(self, parsed_sql: exp.Expression, df) -> pd.DataFrame:
         """应用HAVING条件"""
         having_clause = parsed_sql.args.get('having')
         if not having_clause:
@@ -3959,7 +3958,7 @@ class AdvancedSQLQueryEngine:
             aliases[alias_name] = original_expr
         return aliases
 
-    def _resolve_order_column(self, col_name: str, df -> Optional[str]:
+    def _resolve_order_column(self, col_name: str, df) -> Optional[str]:
         """解析ORDER BY列名:先查SELECT别名对应的基础列,再查原始列名
 
         Args:
@@ -3989,7 +3988,7 @@ class AdvancedSQLQueryEngine:
         # 3. 列名不存在
         return None
 
-    def _compute_temp_column(self, expr, df -> Optional[str]:
+    def _compute_temp_column(self, expr, df) -> Optional[str]:
         """将表达式计算结果写入临时列,支持数学/字符串/CASE/COALESCE
 
         Args:
@@ -4016,7 +4015,7 @@ class AdvancedSQLQueryEngine:
         except Exception:
             return None
 
-    def _resolve_order_expression(self, expr, df -> Optional[str]:
+    def _resolve_order_expression(self, expr, df) -> Optional[str]:
         """解析ORDER BY中的函数表达式,临时计算并添加为排序列
 
         支持: UPPER, LOWER, TRIM, LENGTH, CONCAT, REPLACE, SUBSTRING, LEFT, RIGHT,
@@ -4024,7 +4023,7 @@ class AdvancedSQLQueryEngine:
         """
         return self._compute_temp_column(expr, df, "__order_expr")
 
-    def _apply_order_by(self, parsed_sql: exp.Expression, df -> pd.DataFrame:
+    def _apply_order_by(self, parsed_sql: exp.Expression, df) -> pd.DataFrame:
         """应用ORDER BY排序
 
         Args:
@@ -4106,7 +4105,7 @@ class AdvancedSQLQueryEngine:
 
         return df
 
-    def _build_total_row(self, result_df -> Optional[List]:
+    def _build_total_row(self, result_df) -> Optional[List]:
         """构建GROUP BY聚合结果的TOTAL汇总行
 
         Args:
@@ -4316,7 +4315,7 @@ class AdvancedSQLQueryEngine:
 
         return result
 
-    def _infer_data_types(self, df -> Dict[str, str]:
+    def _infer_data_types(self, df) -> Dict[str, str]:
         """推断列的数据类型"""
         data_types = {}
 
