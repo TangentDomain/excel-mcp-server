@@ -852,6 +852,9 @@ def excel_list_sheets(file_path: str) -> Dict[str, Any]:
 
     Args:
         file_path: Excel文件路径
+        
+    Returns:
+        Dict[str, Any]: 包含工作表列表的字典，结构为 {"sheets": ["sheet1", "sheet2"], "success": bool}
     """
     return _wrap(ExcelOperations.list_sheets(file_path))
 
@@ -882,6 +885,9 @@ def excel_search(
         include_values: 是否包含单元格值，默认为True
         include_formulas: 是否包含公式，默认为False
         range: 搜索范围，默认为None
+        
+    Returns:
+        Dict[str, Any]: 搜索结果字典，包含匹配的单元格信息，结构为 {"matches": [{"sheet": str, "cell": str, "value": Any, "formula": str}], "success": bool, "total_matches": int}
     """
     return _wrap(ExcelOperations.search(file_path, pattern, sheet_name, case_sensitive, whole_word, use_regex, include_values, include_formulas, range))
 
@@ -915,6 +921,9 @@ def excel_search_directory(
         file_extensions: 文件扩展名过滤列表，默认为None
         file_pattern: 文件名模式匹配，默认为None
         max_files: 最大搜索文件数，默认为 MAX_SEARCH_FILES
+        
+    Returns:
+        Dict[str, Any]: 目录搜索结果字典，包含所有匹配项，结构为 {"matches": [{"file": str, "sheet": str, "cell": str, "value": Any}], "success": bool, "files_searched": int}
     """
     _path_err = _validate_path(directory_path)
     if _path_err:
