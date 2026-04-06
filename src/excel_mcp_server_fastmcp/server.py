@@ -3760,23 +3760,29 @@ def excel_set_data_validation(file_path: str, sheet_name: str, range_address: st
         - custom: 自定义公式验证
 
     验证规则创建逻辑:
-        1. 类型映射: 将用户输入的验证类型映射到 openpyxl 要求的格式
+        1. 类型映射（代码 3820-3825行）: 将用户输入的验证类型映射到 openpyxl 要求的格式
            - 'whole_number' → 'whole'
            - 'text_length' → 'textLength'
-           - 其他类型保持不变
+           - 其他类型（list/decimal/date/custom）保持不变
 
-        2. 根据验证类型构建验证参数:
-           - list: 使用 formula1 指定列表源，showDropDown=True
-           - custom: 使用 formula1 指定自定义公式
-           - whole_number/decimal/date/text_length: 解析操作符和值
+        2. 根据验证类型构建验证参数（代码 3827-3914行）:
+           - list（代码 3832-3839行）: 使用 formula1 指定列表源，showDropDown=True, allow_blank=True
+           - custom（代码 3840-3846行）: 使用 formula1 指定自定义公式，allow_blank=True
+           - whole_number/decimal/date/text_length（代码 3847-3912行）: 解析操作符和值
              * 格式: "操作符,值1,值2"
              * 操作符: between/notBetween/equal/notEqual/greaterThan/lessThan/greaterThanOrEqual/lessThanOrEqual
-             * 部分操作符需要两个值（如 between），部分只需一个值（如 greaterThan）
+             * 部分操作符需要两个值（between/notBetween），部分只需一个值（equal/greaterThan等）
+             * 值转换逻辑:
+               - whole_number: 值转换为整数（int(float(value))），自动截断小数部分
+               - decimal: 值转换为浮点数（float(value)）
+               - date: 值必须为 YYYY-MM-DD 格式，使用 datetime.strptime 验证并标准化
+               - text_length: 值转换为整数（int(float(value))）
 
-        3. 创建 DataValidation 对象并应用:
-           - 设置 input_title 和 input_message 作为输入提示
-           - 添加到指定单元格范围
-           - 保存工作簿
+        3. 创建 DataValidation 对象并应用（代码 3916-3956行）:
+           - 设置错误提示（代码 3918-3933行）: 根据验证类型设置不同的 errorTitle 和 error 消息
+           - 设置输入提示（代码 3936-3938行）: 使用 input_title 和 input_message
+           - 添加到指定单元格范围（代码 3941-3942行）: dv.add(range_address), ws.add_data_validation(dv)
+           - 保存工作簿（代码 3945-3956行）: wb.save(file_path)
 
     Args:
         file_path: Excel文件路径
