@@ -3829,18 +3829,20 @@ def excel_set_data_validation(file_path: str, sheet_name: str, range_address: st
                                 meta={"error_code": "VALIDATION_FAILED"})
                 dv_kwargs['formula1'] = criteria
                 dv_kwargs['showDropDown'] = True
+                dv_kwargs['allow_blank'] = True
             elif validation_type == 'custom':
                 # 自定义公式：formula1 为公式表达式
                 if not criteria or not criteria.strip():
                     return _fail("自定义验证类型必须提供 criteria 参数（公式表达式）",
                                 meta={"error_code": "VALIDATION_FAILED"})
                 dv_kwargs['formula1'] = criteria
+                dv_kwargs['allow_blank'] = True
             elif validation_type in ['whole_number', 'decimal', 'date', 'text_length']:
                 # 数值/日期/长度类型：需要解析操作符和值
                 if not criteria or not criteria.strip():
                     return _fail(f"{validation_type} 验证类型必须提供 criteria 参数（格式: '操作符,值1,值2'）",
                                 meta={"error_code": "VALIDATION_FAILED"})
-                
+
                 parts = [p.strip() for p in criteria.split(',')]
                 if len(parts) < 2:
                     return _fail(f"验证条件格式错误，应为 '操作符,值1,值2'，当前为: {criteria}",
@@ -3851,20 +3853,74 @@ def excel_set_data_validation(file_path: str, sheet_name: str, range_address: st
                 value2 = parts[2] if len(parts) > 2 else None
 
                 # 验证操作符
-                valid_operators = ['between', 'notBetween', 'equal', 'notEqual', 'greaterThan', 
+                valid_operators = ['between', 'notBetween', 'equal', 'notEqual', 'greaterThan',
                                  'lessThan', 'greaterThanOrEqual', 'lessThanOrEqual']
                 if operator not in valid_operators:
                     return _fail(f"不支持的操作符: {operator}，支持的操作符: {','.join(valid_operators)}",
+                                meta={"error_code": "VALIDATION_FAILED"})
+
+                # 根据验证类型进行值转换
+                try:
+                    if validation_type == 'whole_number':
+                        # 整数验证：值必须是整数
+                        value1 = str(int(float(value1)))
+                        if value2:
+                            value2 = str(int(float(value2)))
+                    elif validation_type == 'decimal':
+                        # 小数验证：值可以是小数或整数
+                        value1 = str(float(value1))
+                        if value2:
+                            value2 = str(float(value2))
+                    elif validation_type == 'date':
+                        # 日期验证：验证日期格式
+                        from datetime import datetime
+                        try:
+                            datetime.strptime(value1, '%Y-%m-%d')
+                            if value2:
+                                datetime.strptime(value2, '%Y-%m-%d')
+                        except ValueError:
+                            return _fail(f"日期格式错误，应为 YYYY-MM-DD 格式，当前: {value1}{',' + value2 if value2 else ''}",
+                                        meta={"error_code": "VALIDATION_FAILED"})
+                    elif validation_type == 'text_length':
+                        # 文本长度验证：值必须是整数
+                        value1 = str(int(float(value1)))
+                        if value2:
+                            value2 = str(int(float(value2)))
+                except ValueError as e:
+                    return _fail(f"值类型转换失败: {str(e)}，验证类型: {validation_type}",
                                 meta={"error_code": "VALIDATION_FAILED"})
 
                 dv_kwargs['operator'] = operator
                 dv_kwargs['formula1'] = value1
                 if value2:
                     dv_kwargs['formula2'] = value2
+                dv_kwargs['allow_blank'] = True
+
+                # 检查是否需要两个值
+                if operator in ['between', 'notBetween'] and not value2:
+                    return _fail(f"操作符 '{operator}' 需要两个值，请提供 '操作符,值1,值2' 格式",
+                                meta={"error_code": "VALIDATION_FAILED"})
         except Exception as e:
             return _fail(f"验证条件解析失败: {str(e)}", meta={"error_code": "VALIDATION_FAILED"})
 
         dv = DataValidation(**dv_kwargs)
+
+        # 设置错误提示
+        if validation_type in ['list', 'custom']:
+            dv.errorTitle = '输入错误'
+            dv.error = '请从下拉列表中选择有效值' if validation_type == 'list' else '请输入符合要求的值'
+        elif validation_type == 'whole_number':
+            dv.errorTitle = '输入错误'
+            dv.error = '请输入有效的整数'
+        elif validation_type == 'decimal':
+            dv.errorTitle = '输入错误'
+            dv.error = '请输入有效的数字'
+        elif validation_type == 'date':
+            dv.errorTitle = '输入错误'
+            dv.error = '请输入有效的日期（YYYY-MM-DD格式）'
+        elif validation_type == 'text_length':
+            dv.errorTitle = '输入错误'
+            dv.error = '请输入符合长度要求的文本'
 
         # 设置输入提示
         if input_title or input_message:
