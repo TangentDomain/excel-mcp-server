@@ -501,24 +501,22 @@ class AdvancedSQLQueryEngine:
         
         self._query_result_cache[cache_key] = (time.time(), result_df, file_mtime)
 
-    def execute_sql_query(self, excel_path: str, sql_query: str) -> dict:
-        """执行SQL查询
-        
-        Args:
-            excel_path: Excel文件路径
-            sql_query: 要执行的SQL查询语句
-        
-        Returns:
-            查询结果字典,包含data, columns, sheet_info等字段
-        """
+    def execute_sql_query(
+        self,
+        file_path: str,
+        sql: str,
+        sheet_name: Optional[str] = None,
+        limit: Optional[int] = None,
+        include_headers: bool = True,
         output_format: str = "table"
+    ) -> Dict[str, Any]:
         """
-        执行SQL查询,支持完整的SQL语法
+        执行SQL查询，支持完整的SQL语法
 
         Args:
             file_path: Excel文件路径
             sql: SQL查询语句
-            sheet_name: 工作表名称(可选,默认使用第一个)
+            sheet_name: 工作表名称（可选，默认使用第一个）
             limit: 限制返回行数
             include_headers: 是否包含表头
             output_format: 输出格式 table/json/csv
