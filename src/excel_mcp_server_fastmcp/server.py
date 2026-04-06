@@ -4207,7 +4207,7 @@ def excel_write_only_override(
 
                 return {
                     'success': True,
-                    'message': f"传统模式覆盖完成: {result.get('message', '')}",
+                    'message': f"传统模式覆盖完成: {result.message}",
                     'data': result,
                     'metadata': {
                         'file_path': file_path,
@@ -4216,8 +4216,9 @@ def excel_write_only_override(
                         'streaming_mode': False,
                         'override_mode': True,
                         'memory_efficiency': 'medium',
-                        **result
+                        'updated_cells': len(data) * len(data[0]) if data else 0
                     }
+                }
                 }
             else:
                 return result
