@@ -1725,7 +1725,7 @@ class AdvancedSQLQueryEngine:
 
         return ""
 
-    def _apply_union_order_by(self, df) -> pd.DataFrame:
+    def _apply_union_order_by(self, df, order_clause=None) -> pd.DataFrame:
         """
         对 UNION 合并后的 DataFrame 应用 ORDER BY 排序
 
@@ -2788,7 +2788,7 @@ class AdvancedSQLQueryEngine:
         # 如果没有明确的FROM子句,返回第一个表名
         raise ValueError("无法确定FROM子句中的表名")
 
-    def _apply_join_clause(self, joins, left_df) -> pd.DataFrame:
+    def _apply_join_clause(self, joins, left_df, worksheets_data=None, left_table=None) -> pd.DataFrame:
         """
         应用JOIN子句,支持INNER/LEFT/RIGHT/FULL/CROSS JOIN
         性能优化:使用索引优化和智能JOIN策略
@@ -3687,7 +3687,7 @@ class AdvancedSQLQueryEngine:
         except Exception as e:
             raise ValueError(f"子查询执行失败: {e}")
 
-    def _evaluate_case_expression(self, case_expr: exp.Case, df) -> Any:
+    def _evaluate_case_expression(self, case_expr: exp.Case, df, row=None) -> Any:
         """
         评估CASE WHEN表达式
 
@@ -3974,7 +3974,7 @@ class AdvancedSQLQueryEngine:
             aliases[alias_name] = original_expr
         return aliases
 
-    def _resolve_order_column(self, col_name: str, df) -> Optional[str]:
+    def _resolve_order_column(self, col_name: str, df, select_aliases=None) -> Optional[str]:
         """解析ORDER BY列名:先查SELECT别名对应的基础列,再查原始列名
 
         Args:
@@ -4004,18 +4004,18 @@ class AdvancedSQLQueryEngine:
         # 3. 列名不存在
         return None
 
-    def _compute_temp_column(self, expr, df) -> Optional[str]:
+    def _compute_temp_column(self, expr, df, temp_prefix="__temp__") -> Optional[str]:
         """将表达式计算结果写入临时列,支持数学/字符串/CASE/COALESCE
 
         Args:
             expr: SQL表达式
             df: DataFrame
-            prefix: 临时列名前缀
+            temp_prefix: 临时列名前缀
 
         Returns:
             临时列名,不支持的表达式返回None
         """
-        temp_col = f"{prefix}_{id(expr)}"
+        temp_col = f"{temp_prefix}_{id(expr)}"
         try:
             if self._is_string_function(expr):
                 df[temp_col] = self._evaluate_string_function(expr, df)
@@ -4039,7 +4039,7 @@ class AdvancedSQLQueryEngine:
         """
         return self._compute_temp_column(expr, df, "__order_expr")
 
-    def _apply_order_by(self, parsed_sql: exp.Expression, df) -> pd.DataFrame:
+    def _apply_order_by(self, parsed_sql: exp.Expression, df, select_aliases=None) -> pd.DataFrame:
         """应用ORDER BY排序
 
         Args:
@@ -4121,7 +4121,7 @@ class AdvancedSQLQueryEngine:
 
         return df
 
-    def _build_total_row(self, result_df) -> Optional[List]:
+    def _build_total_row(self, result_df: pd.DataFrame, group_by_columns: List[str] = []) -> Optional[List]:
         """构建GROUP BY聚合结果的TOTAL汇总行
 
         Args:

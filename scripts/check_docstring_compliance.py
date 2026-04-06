@@ -1,221 +1,145 @@
 #!/usr/bin/env python3
 """
-Docstring 合规性检查脚本
-
-检查所有公共函数的 docstring 是否包含 Args/Parameters 和 Returns 段
+检查docstring完整性的脚本
+扫描src/excel_mcp_server_fastmcp/目录下所有.py文件，统计缺失Args/Parameters和Returns段的公共函数
 """
 
-import ast
 import os
-import sys
+import re
+import ast
 from pathlib import Path
-from typing import List, Dict, Tuple
 
+def has_complete_docstring(docstring):
+    """检查docstring是否包含Args/Parameters和Returns段"""
+    if not docstring:
+        return False
+    
+    docstring = docstring.strip()
+    
+    # 检查Args/Parameters
+    has_args = bool(re.search(r'^\s*Args:\s*$', docstring, re.MULTILINE))
+    has_params = bool(re.search(r'^\s*Parameters:\s*$', docstring, re.MULTILINE))
+    
+    # 检查Returns
+    has_returns = bool(re.search(r'^\s*Returns:\s*$', docstring, re.MULTILINE))
+    
+    # 必须有Args/Parameters其中之一，并且有Returns
+    return (has_args or has_params) and has_returns
 
-class DocstringChecker(ast.NodeVisitor):
-    """Docstring 检查器"""
+def get_public_functions(tree):
+    """从AST中提取公共函数（非下划线开头）"""
+    public_functions = []
+    
+    for node in ast.walk(tree):
+        if isinstance(node, ast.FunctionDef):
+            # 只处理公共函数（非下划线开头）
+            if not node.name.startswith('_'):
+                # 检查是否有docstring
+                docstring = ast.get_docstring(node)
+                has_doc = docstring is not None
+                has_complete = has_complete_docstring(docstring) if has_doc else False
+                
+                public_functions.append({
+                    'name': node.name,
+                    'lineno': node.lineno,
+                    'has_docstring': has_doc,
+                    'has_complete_docstring': has_complete
+                })
+    
+    return public_functions
 
-    def __init__(self):
-        self.total_functions = 0
-        self.compliant_functions = 0
-        self.non_compliant_functions = []
-
-    def visit_FunctionDef(self, node: ast.FunctionDef):
-        """访问函数定义节点"""
-        # 跳过私有函数（以下划线开头）
-        if node.name.startswith('_'):
-            return
-
-        self.total_functions += 1
-
-        # 获取 docstring
-        docstring = ast.get_docstring(node)
-        if not docstring:
-            self.non_compliant_functions.append({
-                'name': node.name,
-                'line': node.lineno,
-                'issue': '缺少 docstring'
-            })
-            return
-
-        # 检查是否包含 Args 或 Parameters
-        has_args = 'Args:' in docstring or 'Parameters:' in docstring
-
-        # 检查是否包含 Returns
-        has_returns = 'Returns:' in docstring
-
-        if not (has_args and has_returns):
-            issues = []
-            if not has_args:
-                issues.append('缺少 Args 或 Parameters 段')
-            if not has_returns:
-                issues.append('缺少 Returns 段')
-
-            self.non_compliant_functions.append({
-                'name': node.name,
-                'line': node.lineno,
-                'issue': ', '.join(issues)
-            })
-        else:
-            self.compliant_functions += 1
-
-        # 继续访问子节点
-        self.generic_visit(node)
-
-
-def check_file(file_path: Path) -> Dict:
-    """检查单个 Python 文件
-
-    Args:
-        file_path: Python 文件路径
-
-    Returns:
-        检查结果字典
-    """
-    try:
-        with open(file_path, 'r', encoding='utf-8') as f:
-            content = f.read()
-
-        # 解析 AST
-        tree = ast.parse(content, filename=str(file_path))
-
-        # 创建检查器并访问
-        checker = DocstringChecker()
-        checker.visit(tree)
-
-        return {
-            'file_path': str(file_path),
-            'total_functions': checker.total_functions,
-            'compliant_functions': checker.compliant_functions,
-            'non_compliant_functions': checker.non_compliant_functions
-        }
-    except Exception as e:
-        return {
-            'file_path': str(file_path),
-            'error': str(e),
-            'total_functions': 0,
-            'compliant_functions': 0,
-            'non_compliant_functions': []
-        }
-
-
-def scan_directory(directory: Path) -> List[Dict]:
-    """扫描目录下的所有 Python 文件
-
-    Args:
-        directory: 要扫描的目录路径
-
-    Returns:
-        所有文件的检查结果列表
-    """
-    results = []
-
-    # 遍历目录
+def scan_directory(directory):
+    """扫描目录中的所有Python文件"""
+    results = {}
+    
     for root, dirs, files in os.walk(directory):
+        # 排除__pycache__目录
+        dirs[:] = [d for d in dirs if d != '__pycache__']
+        
         for file in files:
             if file.endswith('.py'):
-                file_path = Path(root) / file
-                result = check_file(file_path)
-                results.append(result)
-
+                filepath = os.path.join(root, file)
+                relative_path = os.path.relpath(filepath, directory)
+                
+                try:
+                    with open(filepath, 'r', encoding='utf-8') as f:
+                        content = f.read()
+                    
+                    # 解析AST
+                    tree = ast.parse(content)
+                    public_functions = get_public_functions(tree)
+                    
+                    # 统计结果
+                    total_functions = len(public_functions)
+                    with_docstring = sum(1 for f in public_functions if f['has_docstring'])
+                    complete_docstring = sum(1 for f in public_functions if f['has_complete_docstring'])
+                    missing_docstring = total_functions - with_docstring
+                    incomplete_docstring = with_docstring - complete_docstring
+                    
+                    results[relative_path] = {
+                        'total_functions': total_functions,
+                        'with_docstring': with_docstring,
+                        'complete_docstring': complete_docstring,
+                        'missing_docstring': missing_docstring,
+                        'incomplete_docstring': incomplete_docstring,
+                        'functions': public_functions
+                    }
+                    
+                except SyntaxError as e:
+                    print(f"语法错误 {filepath}: {e}")
+                except Exception as e:
+                    print(f"处理文件 {filepath} 时出错: {e}")
+    
     return results
 
-
-def print_results(results: List[Dict]):
-    """打印检查结果
-
-    Args:
-        results: 检查结果列表
-    """
-    total_functions = 0
-    total_compliant = 0
-    total_non_compliant = 0
-    all_issues = []
-
-    print("=" * 80)
-    print("Docstring 合规性检查报告")
-    print("=" * 80)
-    print()
-
-    # 统计总体数据
-    for result in results:
-        if 'error' in result:
-            print(f"⚠️  文件: {result['file_path']}")
-            print(f"   错误: {result['error']}")
-            print()
-            continue
-
-        total_functions += result['total_functions']
-        total_compliant += result['compliant_functions']
-        total_non_compliant += len(result['non_compliant_functions'])
-
-        # 收集所有问题
-        for issue in result['non_compliant_functions']:
-            all_issues.append({
-                'file': result['file_path'],
-                'name': issue['name'],
-                'line': issue['line'],
-                'issue': issue['issue']
-            })
-
-    # 打印汇总统计
-    print("📊 总体统计:")
-    print(f"   扫描文件数: {len(results)}")
-    print(f"   总函数数: {total_functions}")
-    print(f"   合规函数数: {total_compliant}")
-    print(f"   不合规函数数: {total_non_compliant}")
-
-    if total_functions > 0:
-        compliance_rate = (total_compliant / total_functions) * 100
-        print(f"   合规率: {compliance_rate:.2f}%")
-    print()
-
-    # 打印不合规函数清单
-    if all_issues:
-        print("❌ 不合规函数清单:")
-        print("-" * 80)
-
-        # 按文件分组
-        issues_by_file = {}
-        for issue in all_issues:
-            file_path = issue['file']
-            if file_path not in issues_by_file:
-                issues_by_file[file_path] = []
-            issues_by_file[file_path].append(issue)
-
-        for file_path, issues in sorted(issues_by_file.items()):
-            # 显示相对路径
-            rel_path = str(Path(file_path).relative_to(Path.cwd()))
-            print(f"\n📄 {rel_path}")
-            for issue in sorted(issues, key=lambda x: x['line']):
-                print(f"   行 {issue['line']:<4} | {issue['name']:<30} | {issue['issue']}")
-    else:
-        print("✅ 所有函数都符合 docstring 规范！")
-
-    print()
-    print("=" * 80)
-
-
 def main():
-    """主函数"""
-    # 获取要扫描的目录
-    script_dir = Path(__file__).parent
-    project_dir = script_dir.parent
-    target_dir = project_dir / "src" / "excel_mcp_server_fastmcp"
-
-    if not target_dir.exists():
-        print(f"❌ 错误: 目标目录不存在: {target_dir}")
-        sys.exit(1)
-
-    # 扫描目录
-    print(f"🔍 正在扫描目录: {target_dir}")
-    print()
-
-    results = scan_directory(target_dir)
-
-    # 打印结果
-    print_results(results)
-
+    directory = Path('src/excel_mcp_server_fastmcp')
+    
+    if not directory.exists():
+        print(f"错误: 目录 {directory} 不存在")
+        return
+    
+    print("开始扫描docstring完整性...")
+    print("=" * 60)
+    
+    results = scan_directory(directory)
+    
+    total_all = 0
+    total_with_doc = 0
+    total_complete = 0
+    total_missing = 0
+    total_incomplete = 0
+    
+    print(f"{'文件路径':<40} {'总数':<5} {'有文档':<8} {'完整':<8} {'缺失':<8} {'不完整':<8}")
+    print("-" * 60)
+    
+    for filepath, data in sorted(results.items()):
+        print(f"{filepath:<40} {data['total_functions']:<5} {data['with_docstring']:<8} "
+              f"{data['complete_docstring']:<8} {data['missing_docstring']:<8} {data['incomplete_docstring']:<8}")
+        
+        total_all += data['total_functions']
+        total_with_doc += data['with_docstring']
+        total_complete += data['complete_docstring']
+        total_missing += data['missing_docstring']
+        total_incomplete += data['incomplete_docstring']
+    
+    print("=" * 60)
+    print(f"总计: {total_all} 个函数, {total_with_doc} 有文档, {total_complete} 完整, "
+          f"{total_missing} 缺失, {total_incomplete} 不完整")
+    
+    # 计算覆盖率
+    coverage_rate = (total_complete / total_all * 100) if total_all > 0 else 0
+    print(f"docstring完整率: {coverage_rate:.1f}%")
+    
+    # 输出缺失docstring的函数详情
+    if total_missing > 0:
+        print("\n缺失docstring的函数:")
+        print("-" * 40)
+        for filepath, data in results.items():
+            if data['missing_docstring'] > 0:
+                for func in data['functions']:
+                    if not func['has_docstring']:
+                        print(f"{filepath}:{func['name']} (第{func['lineno']}行)")
 
 if __name__ == "__main__":
     main()

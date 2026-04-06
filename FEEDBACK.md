@@ -22,3 +22,15 @@
 - 方法：`_apply_group_by_aggregation`
 - 不要再修数据加载、中文替换、WHERE 逻辑——这些都没问题
 - 必须直接修 `_apply_group_by_aggregation` 方法
+
+### FEEDBACK-013: 主会话 sed 修复引入的函数签名回归（P0）
+- **问题**：主会话用 `sed -i 's/, df -> str:$/df: pd.DataFrame) -> str:/g'` 批量修复12处 `df -> pd.DataFrame:` 语法错误时，对部分函数签名引入了回归：
+  1. `_apply_order_by(self, parsed_sql, df)` — 参数名被改成 `df: pd.DataFrame)` 但方法签名定义不同
+  2. `_apply_join_clause(self, joins, left_df)` — 同理，参数被错误替换
+  3. `_evaluate_case_expression` 中 `row` 变量未定义
+- **根因**：sed 替换太暴力，没有区分不同函数签名的差异
+- **要求**：逐个检查被我 sed 替换过的函数签名，对照 git diff 恢复正确签名。测试用例：
+  - `SELECT name FROM employees ORDER BY salary DESC`
+  - `SELECT name, CASE WHEN salary > 30000 THEN '高' ELSE '低' END FROM employees`
+  - `SELECT e.name FROM employees e JOIN orders o ON e.name = o.customer`
+- **状态**：P0

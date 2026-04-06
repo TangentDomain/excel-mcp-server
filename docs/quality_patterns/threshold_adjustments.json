@@ -1,0 +1,58 @@
+[
+  {
+    "timestamp": "2026-04-06T04:36:21.987933+00:00",
+    "check_id": "R1",
+    "decision": "WARN",
+    "data": {
+      "reason": "adaptive_threshold",
+      "instance_type": "code",
+      "recent_fails": 8,
+      "success_after_fail": 0,
+      "excel_mcp_pattern": false,
+      "learning_score": 0.48
+    },
+    "rollback_needed": false
+  },
+  {
+    "timestamp": "2026-04-06T04:36:33.655787+00:00",
+    "check_id": "R1",
+    "decision": "WARN",
+    "data": {
+      "reason": "adaptive_threshold",
+      "instance_type": "code",
+      "recent_fails": 8,
+      "success_after_fail": 0,
+      "excel_mcp_pattern": false,
+      "learning_score": 0.48
+    },
+    "rollback_needed": false
+  },
+  {
+    "timestamp": "2026-04-06T06:38:06.258628+00:00",
+    "check_id": "R1",
+    "decision": "WARN",
+    "data": {
+      "reason": "adaptive_threshold",
+      "instance_type": "code",
+      "recent_fails": 8,
+      "success_after_fail": 0,
+      "excel_mcp_pattern": false,
+      "learning_score": 0.48
+    },
+    "rollback_needed": false
+  },
+  {
+    "timestamp": "2026-04-06T07:05:29.251730+00:00",
+    "check_id": "R1",
+    "decision": "WARN",
+    "data": {
+      "reason": "adaptive_threshold",
+      "instance_type": "code",
+      "recent_fails": 8,
+      "success_after_fail": 0,
+      "excel_mcp_pattern": false,
+      "learning_score": 0.48
+    },
+    "rollback_needed": false
+  }
+]

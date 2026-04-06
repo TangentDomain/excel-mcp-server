@@ -69,5 +69,81 @@
       "9603293 [REQ-061] type: fix 修复GROUP BY聚合逻辑bug"
     ],
     "timestamp": "2026-04-06T03:28:16Z"
+  },
+  {
+    "round": 0,
+    "instance_type": "code",
+    "issues": [
+      "⚠️ commit格式: 6/28 个异常（阈值0）"
+    ],
+    "commits": [
+      "952c6ee [REQ-062] type: fix 为3个API函数添加Returns文档段",
+      "985b602 [REQ-062] type: fix 为3个缺失docstring的函数添加文档",
+      "c936cfd [REQ-061] type: fix 修复GROUP BY多列聚合逻辑错误",
+      "af7916d 元迭代同步: 更新check.py支持自适应阈值功能",
+      "ac03e2c [REQ-064] type: fix Bump version to 1.8.1 (avoid duplicate on PyPI)",
+      "85dce5a [REQ-064] type: fix Fix version consistency: bump to 1.8.0",
+      "b45331e [REQ-064] type: fix Bump version to 1.7.20",
+      "7709d6d Merge develop into main: REQ-064 fixes",
+      "3f5af14 [REQ-064] type: fix 修复execute_sql_query方法签名和参数",
+      "04bfb3a [REQ-064] type: fix 删除错误output_format赋值",
+      "b90e92d [REQ-064] type: fix 修复execute_sql_query方法docstring",
+      "da4edc1 [REQ-064] type: fix 恢复execute_sql_query方法签名",
+      "bda3311 版本升级：1.7.19 → 1.8.0",
+      "fa94eb6 Merge develop into main: DOCSTRING修复和合规性检查",
+      "b8bb403 [REQ-062] type: fix 添加docstring到Core模块",
+      "142f94b [REQ-062] type: feat 添加docstring合规性检查脚本",
+      "e505c58 [REQ-062] type: fix 添加docstring到Core模块",
+      "158a260 [REQ-062] type: fix 添加docstring到Core模块",
+      "99be103 [REQ-062] type: fix 添加docstring到SQL查询模块",
+      "c4e4792 [REQ-062] type: refactor - 检查API模块docstring状态",
+      "3c7446b [REQ-062] type: refactor - 统计docstring缺失情况",
+      "433b7e8 [REQ-062] type: refactor - 统计docstring缺失情况",
+      "fc6e696 docs: update check history",
+      "ab0eba9 chore: backup updated",
+      "c651939 [REQ-061] fix: 修复GROUP BY聚合逻辑bug",
+      "fde91a9 [REQ-062] feat: 为主要函数添加完整的docstring文档",
+      "10fb735 [REQ-061] fix: 修复GROUP BY聚合逻辑中聚合函数检测的错误条件",
+      "be90b94 Meta-evolve round 291: Progress tracking setup"
+    ],
+    "timestamp": "2026-04-06T06:38:06Z"
+  },
+  {
+    "round": 0,
+    "instance_type": "code",
+    "issues": [
+      "⚠️ commit格式: 6/28 个异常（阈值0）"
+    ],
+    "commits": [
+      "952c6ee [REQ-062] type: fix 为3个API函数添加Returns文档段",
+      "985b602 [REQ-062] type: fix 为3个缺失docstring的函数添加文档",
+      "c936cfd [REQ-061] type: fix 修复GROUP BY多列聚合逻辑错误",
+      "af7916d 元迭代同步: 更新check.py支持自适应阈值功能",
+      "ac03e2c [REQ-064] type: fix Bump version to 1.8.1 (avoid duplicate on PyPI)",
+      "85dce5a [REQ-064] type: fix Fix version consistency: bump to 1.8.0",
+      "b45331e [REQ-064] type: fix Bump version to 1.7.20",
+      "7709d6d Merge develop into main: REQ-064 fixes",
+      "3f5af14 [REQ-064] type: fix 修复execute_sql_query方法签名和参数",
+      "04bfb3a [REQ-064] type: fix 删除错误output_format赋值",
+      "b90e92d [REQ-064] type: fix 修复execute_sql_query方法docstring",
+      "da4edc1 [REQ-064] type: fix 恢复execute_sql_query方法签名",
+      "bda3311 版本升级：1.7.19 → 1.8.0",
+      "fa94eb6 Merge develop into main: DOCSTRING修复和合规性检查",
+      "b8bb403 [REQ-062] type: fix 添加docstring到Core模块",
+      "142f94b [REQ-062] type: feat 添加docstring合规性检查脚本",
+      "e505c58 [REQ-062] type: fix 添加docstring到Core模块",
+      "158a260 [REQ-062] type: fix 添加docstring到Core模块",
+      "99be103 [REQ-062] type: fix 添加docstring到SQL查询模块",
+      "c4e4792 [REQ-062] type: refactor - 检查API模块docstring状态",
+      "3c7446b [REQ-062] type: refactor - 统计docstring缺失情况",
+      "433b7e8 [REQ-062] type: refactor - 统计docstring缺失情况",
+      "fc6e696 docs: update check history",
+      "ab0eba9 chore: backup updated",
+      "c651939 [REQ-061] fix: 修复GROUP BY聚合逻辑bug",
+      "fde91a9 [REQ-062] feat: 为主要函数添加完整的docstring文档",
+      "10fb735 [REQ-061] fix: 修复GROUP BY聚合逻辑中聚合函数检测的错误条件",
+      "be90b94 Meta-evolve round 291: Progress tracking setup"
+    ],
+    "timestamp": "2026-04-06T07:05:29Z"
   }
 ]
