@@ -854,12 +854,35 @@ class ExcelWriter:
                 error=f"公式执行失败: {str(e)}"
             )
 
+    def _detect_file_format(self) -> str:
+        """检测Excel文件格式
+
+        Returns:
+            str: 文件格式 ('xlsx', 'xls', 'xlsm', 'xltx', 'xltm', 'xlsb')，默认返回 'xlsx'
+        """
+        if not self.file_path or not os.path.exists(self.file_path):
+            logger.debug("无文件路径或文件不存在，使用默认格式 xlsx")
+            return 'xlsx'
+
+        # 从文件扩展名提取格式
+        _, ext = os.path.splitext(self.file_path)
+        ext = ext.lower().lstrip('.')
+
+        # 验证格式是否受支持
+        supported_formats = {'xlsx', 'xls', 'xlsm', 'xltx', 'xltm', 'xlsb'}
+        if ext in supported_formats:
+            logger.debug(f"检测到文件格式: {ext}")
+            return ext
+
+        logger.warning(f"不支持的文件格式 '{ext}'，使用默认格式 xlsx")
+        return 'xlsx'
+
     def _create_temp_workbook(
         self,
         context_sheet: Optional[str],
         cache
     ) -> tuple:
-        """创建临时工作簿用于计算
+        """创建临时工作簿用于计算，检测并保留原始文件格式
 
         Args:
             context_sheet: 上下文工作表名称
@@ -868,6 +891,9 @@ class ExcelWriter:
         Returns:
             tuple: (temp_workbook, temp_file_path) 元组，包含临时工作簿和文件路径
         """
+        # 检测原始文件格式
+        file_format = self._detect_file_format()
+
         # 创建临时工作簿进行计算
         temp_workbook = Workbook()
         temp_sheet = temp_workbook.active
@@ -901,8 +927,8 @@ class ExcelWriter:
         else:
             logger.debug("没有文件路径或文件不存在，使用空工作簿进行计算")
 
-        # 保存到临时文件
-        temp_file_path = TempFileManager.create_temp_excel_file()
+        # 保存到临时文件（根据检测到的格式）
+        temp_file_path = TempFileManager.create_temp_excel_file(suffix=f".{file_format}")
         temp_workbook.save(temp_file_path)
 
         # 缓存工作簿
