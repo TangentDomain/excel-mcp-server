@@ -339,6 +339,17 @@ class EdgeCaseCollector:
         
         return high_priority[:limit]
 
+    def get_recent_cases(self, max_count: int = 5) -> List[Dict]:
+        """返回最近发现的高优先级边缘案例
+        
+        Args:
+            max_count: 返回的最大案例数
+            
+        Returns:
+            高优先级边缘案例列表，按发现时间倒序排列
+        """
+        return self.get_recent_high_priority_cases(limit=max_count)
+
     def convert_to_test_case(self, case: Dict) -> str:
         """将边缘案例转换为测试用例格式
         
@@ -380,6 +391,20 @@ class EdgeCaseCollector:
 - 发现时间: {case['discovered_at']}
 """
         return test_case
+
+    def to_test_case(self) -> str:
+        """将案例转换为测试用例格式
+        
+        Returns:
+            格式化的测试用例字符串
+        """
+        cases = self.get_recent_cases()
+        test_cases = []
+        
+        for case in cases:
+            test_cases.append(self.convert_to_test_case(case))
+        
+        return "\n\n" + "=" * 50 + "\n\n".join(test_cases)
 
     def run(self) -> None:
         """运行边缘案例发现流程"""
