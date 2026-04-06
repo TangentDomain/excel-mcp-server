@@ -3502,6 +3502,11 @@ class AdvancedSQLQueryEngine:
         - 大数据集使用向量化操作代替逐行计算
         - 减少不必要的DataFrame复制
         - 优化groupby操作使用observed=True避免稀疏分组
+        
+        修复说明(REQ-061):
+        - 修复多列GROUP BY逻辑，确保当GROUP BY包含多列且SELECT包含计算表达式时，
+          正确按所有GROUP BY列分组，而非仅按计算列分组
+        - 确保所有GROUP BY列都包含在最终结果中
         """
         group_by_columns = []
         group_clause = parsed_sql.args.get('group')
@@ -3610,6 +3615,16 @@ class AdvancedSQLQueryEngine:
                 col_name = original_expr.name
                 if col_name in group_by_columns:
                     result_data[alias_name] = grouped[col_name].first().reset_index(drop=True)
+            
+        # 确保所有GROUP BY列都在结果中(修复多列GROUP BY逻辑)
+        # 如果SELECT中不包含某些GROUP BY列,需要确保它们被包含
+        for col in group_by_columns:
+            if col not in result_data:
+                # 为缺失的GROUP BY列添加到结果
+                result_data[col] = grouped[col].first().reset_index(drop=True)
+                # 如果不在有序列列表中,添加到末尾
+                if col not in ordered_columns:
+                    ordered_columns.append(col)
             # 处理SELECT * 的情况
             elif alias_name == '*':
                 for col in group_by_columns:
