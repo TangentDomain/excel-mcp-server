@@ -3824,10 +3824,10 @@ def excel_set_data_validation(file_path: str, sheet_name: str, range_address: st
         }
         openpyxl_type = type_mapping.get(validation_type, validation_type)
 
-        # 创建数据验证对象
+        # 步骤1: 创建数据验证对象基础参数
         dv_kwargs = {'type': openpyxl_type}
 
-        # 根据验证类型设置参数
+        # 步骤2: 根据验证类型构建特定参数
         try:
             if validation_type == 'list':
                 # 列表类型：formula1 为列表源
