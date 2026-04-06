@@ -3922,6 +3922,7 @@ def excel_set_data_validation(file_path: str, sheet_name: str, range_address: st
         dv = DataValidation(**dv_kwargs)
 
         # 设置错误提示
+        dv.showErrorMessage = True
         if validation_type in ['list', 'custom']:
             dv.errorTitle = '输入错误'
             dv.error = '请从下拉列表中选择有效值' if validation_type == 'list' else '请输入符合要求的值'
@@ -3940,6 +3941,7 @@ def excel_set_data_validation(file_path: str, sheet_name: str, range_address: st
 
         # 设置输入提示
         if input_title or input_message:
+            dv.showInputMessage = True
             dv.promptTitle = input_title
             dv.prompt = input_message
 
