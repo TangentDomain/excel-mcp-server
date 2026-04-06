@@ -295,7 +295,15 @@ class ExcelReader:
         )
 
     def _get_range_calamine(self, range_info: RangeInfo, range_expression: str) -> OperationResult:
-        """使用calamine快速读取范围数据（纯值，无格式）"""
+        """使用calamine快速读取范围数据（纯值，无格式）
+
+        Args:
+            range_info: 解析后的范围信息
+            range_expression: 原始范围表达式
+
+        Returns:
+            OperationResult: 范围数据结果
+        """
         wb = self._get_calamine_workbook()
         sheet_name = range_info.sheet_name
 
@@ -331,7 +339,15 @@ class ExcelReader:
         all_rows: List[List],
         range_info: RangeInfo
     ) -> tuple[ExcelData, ExcelDimensions]:
-        """从已加载的行数据中提取指定范围（0-based索引）"""
+        """从已加载的行数据中提取指定范围（0-based索引）
+
+        Args:
+            all_rows: 已加载的行数据列表
+            range_info: 解析后的范围信息
+
+        Returns:
+            tuple: (ExcelData, ExcelDimensions) 元组，包含提取的数据和维度信息
+        """
         data = []
 
         if range_info.range_type in [RangeType.ROW_RANGE, RangeType.SINGLE_ROW]:
@@ -411,13 +427,29 @@ class ExcelReader:
 
     @staticmethod
     def _normalize_calamine_value(val):
-        """归一化calamine值：整型浮点数转整数（25.0→25），与openpyxl行为一致"""
+        """归一化calamine值：整型浮点数转整数（25.0→25），与openpyxl行为一致
+
+        Args:
+            val: 待归一化的值
+
+        Returns:
+            Any: 归一化后的值
+        """
         if isinstance(val, float) and val == int(val) and not (val != val):  # 排除NaN
             return int(val)
         return val
 
     def _get_range_openpyxl(self, range_info: RangeInfo, range_expression: str, include_formatting: bool) -> OperationResult:
-        """使用openpyxl读取范围数据（支持格式化）"""
+        """使用openpyxl读取范围数据（支持格式化）
+
+        Args:
+            range_info: 解析后的范围信息
+            range_expression: 原始范围表达式
+            include_formatting: 是否包含格式信息
+
+        Returns:
+            OperationResult: 范围数据结果
+        """
         try:
             workbook = self._get_workbook(read_only=True, data_only=True)
             sheet = self._get_worksheet_openpyxl(workbook, range_info.sheet_name)
@@ -446,7 +478,18 @@ class ExcelReader:
             )
 
     def _get_worksheet_openpyxl(self, workbook, sheet_name: Optional[str]):
-        """获取openpyxl工作表"""
+        """获取openpyxl工作表
+
+        Args:
+            workbook: openpyxl工作簿对象
+            sheet_name: 工作表名称
+
+        Returns:
+            Worksheet: openpyxl工作表对象
+
+        Raises:
+            SheetNotFoundError: 工作表不存在时抛出
+        """
         if not sheet_name or not sheet_name.strip():
             raise SheetNotFoundError(f"工作表名称不能为空，必须明确指定工作表")
 
@@ -467,7 +510,16 @@ class ExcelReader:
         range_info: RangeInfo,
         include_formatting: bool
     ) -> tuple[ExcelData, ExcelDimensions]:
-        """根据范围类型获取数据（openpyxl）"""
+        """根据范围类型获取数据（openpyxl）
+
+        Args:
+            sheet: openpyxl工作表对象
+            range_info: 解析后的范围信息
+            include_formatting: 是否包含格式信息
+
+        Returns:
+            tuple: (ExcelData, ExcelDimensions) 元组，包含数据和维度信息
+        """
 
         if range_info.range_type in [RangeType.ROW_RANGE, RangeType.SINGLE_ROW]:
             return self._get_row_data(sheet, range_info, include_formatting)
@@ -482,7 +534,16 @@ class ExcelReader:
         range_info: RangeInfo,
         include_formatting: bool
     ) -> tuple[ExcelData, ExcelDimensions]:
-        """获取行范围数据"""
+        """获取行范围数据
+
+        Args:
+            sheet: openpyxl工作表对象
+            range_info: 解析后的范围信息
+            include_formatting: 是否包含格式信息
+
+        Returns:
+            tuple: (ExcelData, ExcelDimensions) 元组，包含行数据和维度信息
+        """
         row_parts = range_info.cell_range.split(':')
         start_row = int(row_parts[0])
         end_row = int(row_parts[1])
@@ -528,7 +589,16 @@ class ExcelReader:
         range_info: RangeInfo,
         include_formatting: bool
     ) -> tuple[ExcelData, ExcelDimensions]:
-        """获取列范围数据"""
+        """获取列范围数据
+
+        Args:
+            sheet: openpyxl工作表对象
+            range_info: 解析后的范围信息
+            include_formatting: 是否包含格式信息
+
+        Returns:
+            tuple: (ExcelData, ExcelDimensions) 元组，包含列数据和维度信息
+        """
         col_parts = range_info.cell_range.split(':')
         start_col = column_index_from_string(col_parts[0])
         end_col = column_index_from_string(col_parts[1])
@@ -558,7 +628,16 @@ class ExcelReader:
         range_info: RangeInfo,
         include_formatting: bool
     ) -> tuple[ExcelData, ExcelDimensions]:
-        """获取单元格范围数据"""
+        """获取单元格范围数据
+
+        Args:
+            sheet: openpyxl工作表对象
+            range_info: 解析后的范围信息
+            include_formatting: 是否包含格式信息
+
+        Returns:
+            tuple: (ExcelData, ExcelDimensions) 元组，包含单元格数据和维度信息
+        """
         min_col, min_row, max_col, max_row = range_boundaries(range_info.cell_range)
 
         data = []
@@ -580,7 +659,15 @@ class ExcelReader:
         return data, dimensions
 
     def _create_cell_info(self, cell, include_formatting: bool) -> CellInfo:
-        """创建单元格信息对象"""
+        """创建单元格信息对象
+
+        Args:
+            cell: openpyxl单元格对象
+            include_formatting: 是否包含格式信息
+
+        Returns:
+            CellInfo: 单元格信息对象
+        """
         if hasattr(cell, 'coordinate'):
             coordinate = cell.coordinate
         else:

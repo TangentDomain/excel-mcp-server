@@ -404,7 +404,7 @@ class ExcelWriter:
             data: 数据数组
 
         Returns:
-            标准的单元格范围表达式
+            str: 标准的单元格范围表达式
 
         Raises:
             ValueError: 当使用不支持的范围格式时
@@ -440,7 +440,18 @@ class ExcelWriter:
             return cell_range
 
     def _get_worksheet(self, workbook, sheet_name: Optional[str]):
-        """获取工作表 - 强制要求指定工作表名称"""
+        """获取工作表 - 强制要求指定工作表名称
+
+        Args:
+            workbook: openpyxl工作簿对象
+            sheet_name: 工作表名称
+
+        Returns:
+            Worksheet: openpyxl工作表对象
+
+        Raises:
+            SheetNotFoundError: 工作表不存在或为空时抛出
+        """
         if not sheet_name or not sheet_name.strip():
             raise SheetNotFoundError(f"工作表名称不能为空，必须明确指定工作表")
 
@@ -460,7 +471,18 @@ class ExcelWriter:
         start_col: int,
         preserve_formulas: bool
     ) -> List[ModifiedCell]:
-        """写入数据到工作表"""
+        """写入数据到工作表
+
+        Args:
+            sheet: openpyxl工作表对象
+            data: 要写入的二维数据数组
+            start_row: 起始行号（1-based）
+            start_col: 起始列号（1-based）
+            preserve_formulas: 是否保留公式
+
+        Returns:
+            List[ModifiedCell]: 修改的单元格列表
+        """
         modified_cells = []
 
         for row_offset, row_data in enumerate(data):
@@ -778,7 +800,15 @@ class ExcelWriter:
         context_sheet: Optional[str],
         cache
     ) -> tuple:
-        """创建临时工作簿用于计算"""
+        """创建临时工作簿用于计算
+
+        Args:
+            context_sheet: 上下文工作表名称
+            cache: 公式缓存对象
+
+        Returns:
+            tuple: (temp_workbook, temp_file_path) 元组，包含临时工作簿和文件路径
+        """
         # 创建临时工作簿进行计算
         temp_workbook = Workbook()
         temp_sheet = temp_workbook.active
@@ -827,7 +857,16 @@ class ExcelWriter:
         formula: str,
         temp_workbook
     ) -> any:
-        """使用xlcalculator进行计算"""
+        """使用xlcalculator进行计算
+
+        Args:
+            temp_file_path: 临时文件路径
+            formula: Excel公式
+            temp_workbook: 临时工作簿对象
+
+        Returns:
+            any: 计算结果
+        """
         from xlcalculator import ModelCompiler, Evaluator
 
         # 在临时单元格中设置要计算的公式
@@ -848,7 +887,15 @@ class ExcelWriter:
         return calculated_value
 
     def _fallback_calculation(self, temp_file_path: str, formula: str) -> any:
-        """备用计算方法"""
+        """备用计算方法
+
+        Args:
+            temp_file_path: 临时文件路径
+            formula: Excel公式
+
+        Returns:
+            any: 计算结果
+        """
         # 重新加载工作簿获取数据 - 使用只读模式
         data_workbook = load_workbook(temp_file_path, data_only=True, read_only=True)
         data_sheet = data_workbook["Calculation"]
@@ -860,7 +907,14 @@ class ExcelWriter:
         return calculated_value
 
     def _get_result_type(self, value) -> str:
-        """确定结果类型"""
+        """确定结果类型
+
+        Args:
+            value: 待判断的值
+
+        Returns:
+            str: 结果类型 ("null", "boolean", "number", "text", "date", "unknown")
+        """
         if value is None:
             return "null"
         elif isinstance(value, bool):
@@ -898,7 +952,14 @@ class ExcelWriter:
             return "unknown"
 
     def _safe_eval_expr(self, expr: str):
-        """安全求值简单数学表达式（仅支持数字和+-*/运算符）"""
+        """安全求值简单数学表达式（仅支持数字和+-*/运算符）
+
+        Args:
+            expr: 数学表达式字符串
+
+        Returns:
+            Any: 计算结果，如果表达式不合法则返回 None
+        """
         try:
             tree = ast.parse(expr, mode='eval')
             # 只允许数字常量和算术运算符
@@ -1060,6 +1121,9 @@ class ExcelWriter:
             values: 数值列表
             condition: 条件表达式（如 ">50", "<=100", "=25", "50"）
             mode: 'count' | 'sum' | 'average'
+
+        Returns:
+            float or int: 筛选后的聚合结果
         """
         # 解析条件
         if condition.startswith('>='):
@@ -1096,7 +1160,16 @@ class ExcelWriter:
             return sum(filtered) / len(filtered) if filtered else 0
 
     def _get_range_values(self, sheet, start_cell: str, end_cell: str) -> list:
-        """获取范围内的数值列表"""
+        """获取范围内的数值列表
+
+        Args:
+            sheet: openpyxl工作表对象
+            start_cell: 起始单元格地址（如 "A1"）
+            end_cell: 结束单元格地址（如 "C10"）
+
+        Returns:
+            list: 数值列表
+        """
 
         min_col, min_row, max_col, max_row = range_boundaries(f"{start_cell}:{end_cell}")
         values = []
@@ -1274,7 +1347,15 @@ class ExcelWriter:
             return len(values) / sum(1.0 / v for v in values)
 
     def _apply_cell_format(self, cell, formatting: dict):
-        """应用单元格格式"""
+        """应用单元格格式
+
+        Args:
+            cell: openpyxl单元格对象
+            formatting: 格式配置字典，包含 font, fill, alignment, number_format 等键
+
+        Returns:
+            None
+        """
         # 字体格式
         if 'font' in formatting:
             font_config = formatting['font']
