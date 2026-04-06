@@ -3866,10 +3866,10 @@ def excel_set_data_validation(file_path: str, sheet_name: str, range_address: st
                     return _fail(f"不支持的操作符: {operator}，支持的操作符: {','.join(valid_operators)}",
                                 meta={"error_code": "VALIDATION_FAILED"})
 
-                # 根据验证类型进行值转换
+                # 根据验证类型进行值转换和验证
                 try:
                     if validation_type == 'whole_number':
-                        # 整数验证：值必须是整数
+                        # 整数验证：值必须是整数，自动截断小数部分
                         value1 = str(int(float(value1)))
                         if value2:
                             value2 = str(int(float(value2)))
@@ -3879,12 +3879,15 @@ def excel_set_data_validation(file_path: str, sheet_name: str, range_address: st
                         if value2:
                             value2 = str(float(value2))
                     elif validation_type == 'date':
-                        # 日期验证：验证日期格式
+                        # 日期验证：验证并标准化日期格式
                         from datetime import datetime
                         try:
-                            datetime.strptime(value1, '%Y-%m-%d')
+                            # 验证并标准化为 YYYY-MM-DD 格式
+                            parsed_date1 = datetime.strptime(value1, '%Y-%m-%d')
+                            value1 = parsed_date1.strftime('%Y-%m-%d')
                             if value2:
-                                datetime.strptime(value2, '%Y-%m-%d')
+                                parsed_date2 = datetime.strptime(value2, '%Y-%m-%d')
+                                value2 = parsed_date2.strftime('%Y-%m-%d')
                         except ValueError:
                             return _fail(f"日期格式错误，应为 YYYY-MM-DD 格式，当前: {value1}{',' + value2 if value2 else ''}",
                                         meta={"error_code": "VALIDATION_FAILED"})
@@ -4281,7 +4284,6 @@ def excel_write_only_override(
                         'memory_efficiency': 'medium',
                         'updated_cells': len(data) * len(data[0]) if data else 0
                     }
-                }
                 }
             else:
                 return result
