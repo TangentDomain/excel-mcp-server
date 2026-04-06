@@ -3777,8 +3777,15 @@ def excel_set_data_validation(file_path: str, sheet_name: str, range_address: st
 
         wb, ws = ExcelValidator.get_workbook_and_sheet(file_path, sheet_name)
 
+        # 映射验证类型到 openpyxl 要求的格式
+        type_mapping = {
+            'whole_number': 'whole',
+            'text_length': 'textLength',
+        }
+        openpyxl_type = type_mapping.get(validation_type, validation_type)
+
         # 创建数据验证对象
-        dv_kwargs = {'type': validation_type}
+        dv_kwargs = {'type': openpyxl_type}
 
         # 根据验证类型设置参数
         if validation_type == 'list':
@@ -4125,14 +4132,14 @@ def excel_write_only_override(
                 insert_mode=False  # 强制覆盖模式
             )
             
-            if result.get('success'):
+            if result.success:
                 # 记录结果
                 operation_logger.log_operation("operation_result", {
                     "success": True,
                     "updated_cells": len(data) * len(data[0]) if data else 0,
                     "message": f"传统模式覆盖完成"
                 })
-                
+
                 return {
                     'success': True,
                     'message': f"传统模式覆盖完成: {result.get('message', '')}",
