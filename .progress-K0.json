@@ -1,0 +1,33 @@
+{
+  "round": 292,
+  "step": "K0",
+  "started_at": "2026-04-06T08:02:51.075457",
+  "sub_steps": [
+    {
+      "name": "clear_markers",
+      "description": "清空关键步骤标记"
+    },
+    {
+      "name": "read_now",
+      "description": "读docs/NOW.md获取轮次信息"
+    },
+    {
+      "name": "collect_instances",
+      "description": "采集其他实例状态"
+    },
+    {
+      "name": "run_auto_detect",
+      "description": "运行自动检测脚本"
+    },
+    {
+      "name": "identify_improvements",
+      "description": "识别可改进点"
+    },
+    {
+      "name": "check_stuck_instances",
+      "description": "检查卡住实例并行动"
+    }
+  ],
+  "context": {},
+  "outputs": {}
+}

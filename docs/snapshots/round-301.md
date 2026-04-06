@@ -6,7 +6,7 @@
       "priority": "P1",
       "status": "IN-PROGRESS",
       "source": "CEO",
-      "attempts": 20,
+      "attempts": 21,
       "last_failure": "",
       "description": "每轮执行时，自动搜索一些稀奇古怪的Excel使用场景（如超长公式、特殊字符sheet名、合并单元格+筛选、数据透视表嵌套、条件格式+VBA、超大文件性能等），用uvx安装的MCP工具实际调用测试，记录是否崩溃/返回错误/正常处理。",
       "acceptance_criteria": [

@@ -16,7 +16,7 @@
     "REQ-029": {
       "title": "Excel操作异常处理优化",
       "description": "将excel_operations.py中的通用异常处理替换为具体的自定义异常类，提升错误处理的精确性和用户体验",
-      "status": "DONE", 
+      "status": "DONE",
       "priority": "HIGH",
       "acceptance_criteria": [
         "替换excel_operations.py中的通用Exception捕获为具体异常类",
@@ -33,7 +33,7 @@
     "REQ-028": {
       "title": "错误处理机制优化",
       "description": "改进Excel操作中的错误处理，提供更友好的错误信息和AI修复建议",
-      "status": "DONE", 
+      "status": "DONE",
       "priority": "HIGH",
       "acceptance_criteria": [
         "为关键Excel操作函数添加详细的错误处理",
@@ -218,7 +218,7 @@
       "description": "delete_rows使用condition参数时，对数值列返回0行删除。疑似条件解析将数值列作为字符串处理。",
       "notes": "第257轮修复：df.query前用pd.to_numeric(errors='ignore')转换数值列",
       "archived_at": "2026-04-02"
-    }
+    },
     "REQ-048": {
       "title": "保护：删除最后一个Sheet时应阻止或自动创建默认Sheet",
       "type": "fix",
@@ -285,15 +285,17 @@
       "archived_at": "2026-04-03"
     },
     "REQ-052": {
-      "title": "修复GROUP BY聚合错误：部分行被归入不符合WHERE条件的分组",
+      "title": "修复GROUP BY聚合错误：WHERE过滤后的结果包含不符合条件的数据",
       "type": "fix",
       "priority": "P0",
       "status": "DONE",
-      "source": "质量抽检",
-      "attempts": 4,
-      "description": "GROUP BY聚合查询中，部分行被错误归入不符合WHERE条件的分组。例：WHERE 显示路径ID IN (1,2) AND 显示位置ID < 100 GROUP BY后出现路径ID=36、位置ID=569的行。文件：src/api/advanced_sql_query.py GROUP BY逻辑。",
-      "notes": "来源FEEDBACK.md OPEN-#1，CEO实测MapEvent.xlsx复现。第269轮代码审查：执行顺序正确（WHERE先于GROUP BY），未发现逻辑bug。第271轮深入审查：发现_apply_where_clause存在静默失败场景（condition_str为空时返回未过滤df），但IN+AND条件不受影响。最可能原因是数据类型不匹配。数据类型已确认全部int（CEO已用MapEvent.xlsx验证）。Bug在数据加载阶段：original_rows=379但MapEvent sheet只有59行，所有sheet数据被混在一起。详见FEEDBACK.md OPEN-#1精确线索。第274轮完成。",
-      "archived_at": "2026-04-03"
+      "source": "CEO实测复现",
+      "attempts": 11,
+      "last_failure": "",
+      "description": "SQL: SELECT 显示路径ID, 显示位置ID, COUNT(*) as cnt FROM MapEvent WHERE 显示路径ID IN (1, 2) AND 显示位置ID < 100 GROUP BY 显示路径ID, 显示位置ID。结果出现 [38, 589, 58] 等不存在于原始数据中的值。",
+      "notes": "!!! 强制验证规则（REQ 标 DONE 的前置条件）!!!\n修复前：必须先运行验证代码确认 bug 存在（有异常行=bug存在）\n修复后：必须再次运行验证代码确认 bug 消失（无异常行=bug修复）\n验证代码：python3 -c \"import sys; sys.path.insert(0,'src'); from excel_mcp_server_fastmcp.api.advanced_sql_query import execute_advanced_sql_query; r=execute_advanced_sql_query('/tmp/MapEvent.xlsx','SELECT 显示路径ID,显示位置ID,COUNT(*) as cnt FROM MapEvent WHERE 显示路径ID IN (1,2) AND 显示位置ID<100 GROUP BY 显示路径ID,显示位置ID'); bad=[x for x in r['data'][1:] if x[0] not in [1,2] or x[1]>=100]; print('BUG' if bad else 'FIXED', bad)\"\n只有输出 FIXED 时才能标 DONE。输出 BUG=未修复=绝对不能标 DONE。\n\n根因定位：上游问题（双行表头/缓存key/desc_map）已在fe0b0f8修复。传入_execute_query的DataFrame完全正确（58行，PathID只有1和2），但_apply_group_by_aggregation返回了[38,589,58]等不存在于数据中的值。手动pandas groupby结果正确（30行全部符合条件）。bug在_apply_group_by_aggregation方法内部。最终通过修改_build_total_row和_apply_group_by_aggregation方法修复。",
+      "completed_at": "2026-04-04",
+      "completion_commit": "81584a0"
     },
     "REQ-053": {
       "title": "优化：抽取excel_list_charts中的_extract_title_text为公共函数",
