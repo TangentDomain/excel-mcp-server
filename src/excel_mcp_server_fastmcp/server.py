@@ -3876,7 +3876,18 @@ def excel_set_data_validation(file_path: str, sheet_name: str, range_address: st
         ws.add_data_validation(dv)
 
         # 保存文件
-        wb.save(file_path)
+        try:
+            wb.save(file_path)
+        except Exception as save_error:
+            return _fail(f"数据验证设置成功但保存文件失败: {str(save_error)}", 
+                        meta={"error_code": "SAVE_FAILED", "validation_data": {
+                            'validation_type': validation_type,
+                            'criteria': criteria,
+                            'range_address': range_address,
+                            'sheet_name': sheet_name,
+                            'input_title': input_title,
+                            'input_message': input_message
+                        }})
 
         return _ok("数据验证设置成功", data={
             'validation_type': validation_type,
@@ -3888,10 +3899,14 @@ def excel_set_data_validation(file_path: str, sheet_name: str, range_address: st
             'validation_count': len(ws.data_validations)
         })
 
-    except DataValidationError as e:
-        return _fail(e.message, meta={"error_code": "SHEET_NOT_FOUND", "hint": e.hint, "suggested_fix": e.suggested_fix})
     except Exception as e:
-        return _fail(f"数据验证设置失败: {str(e)}", meta={"error_code": "OPERATION_FAILED"})
+        # 捕获所有异常，包括DataValidationError
+        error_msg = str(e)
+        if "DataValidationError" in error_msg or "data validation" in error_msg.lower():
+            return _fail(f"数据验证规则错误: {error_msg}", 
+                        meta={"error_code": "VALIDATION_RULE_ERROR", "suggested_fix": "检查验证条件和参数格式"})
+        else:
+            return _fail(f"数据验证设置失败: {error_msg}", meta={"error_code": "OPERATION_FAILED"})
 
 
 @mcp.tool()
