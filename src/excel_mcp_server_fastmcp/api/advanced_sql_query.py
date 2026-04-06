@@ -3582,6 +3582,10 @@ class AdvancedSQLQueryEngine:
         for i, select_expr in enumerate(parsed_sql.expressions):
             alias_name, original_expr = self._extract_select_alias(select_expr, i)
 
+            # 跳过SELECT *，它会在循环后单独处理
+            if isinstance(original_expr, exp.Star):
+                continue
+
             ordered_columns.append(alias_name)
 
             # 处理聚合函数
@@ -3616,6 +3620,16 @@ class AdvancedSQLQueryEngine:
                 if col_name in group_by_columns:
                     result_data[alias_name] = grouped[col_name].first().reset_index(drop=True)
             
+        # 处理SELECT *的情况：添加所有GROUP BY列
+        has_star = any(isinstance(self._extract_select_alias(expr, 0)[1], exp.Star) 
+                       for expr in parsed_sql.expressions)
+        if has_star:
+            for col in group_by_columns:
+                if col not in result_data:
+                    result_data[col] = grouped[col].first().reset_index(drop=True)
+                    if col not in ordered_columns:
+                        ordered_columns.append(col)
+
         # 确保所有GROUP BY列都在结果中(修复多列GROUP BY逻辑)
         # 如果SELECT中不包含某些GROUP BY列,需要确保它们被包含
         for col in group_by_columns:
@@ -3625,11 +3639,6 @@ class AdvancedSQLQueryEngine:
                 # 如果不在有序列列表中,添加到末尾
                 if col not in ordered_columns:
                     ordered_columns.append(col)
-            # 处理SELECT * 的情况
-            elif alias_name == '*':
-                for col in group_by_columns:
-                    if col not in result_data:
-                        result_data[col] = grouped[col].first().reset_index(drop=True)
 
         # 组合结果,保持列顺序
         try:
