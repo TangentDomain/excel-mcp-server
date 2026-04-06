@@ -177,6 +177,122 @@ class TestDataValidation:
         assert result["success"] is True
         assert result["data"]["cleared_count"] >= 1
 
+    def test_set_whole_number_validation(self, workbook):
+        """Set a whole number data validation."""
+        from src.excel_mcp_server_fastmcp.server import excel_set_data_validation
+
+        result = excel_set_data_validation(
+            workbook, "技能配置", "E2:E10", "whole_number",
+            "between,1,10", "冷却时间", "冷却时间应在1-10秒之间"
+        )
+        assert result["success"] is True
+        assert result["data"]["validation_type"] == "whole_number"
+        assert result["data"]["input_title"] == "冷却时间"
+
+    def test_set_decimal_validation(self, workbook):
+        """Set a decimal data validation."""
+        from src.excel_mcp_server_fastmcp.server import excel_set_data_validation
+
+        result = excel_set_data_validation(
+            workbook, "技能配置", "E2:E10", "decimal",
+            "greaterThan,0", "伤害倍率", "伤害倍率必须大于0"
+        )
+        assert result["success"] is True
+        assert result["data"]["validation_type"] == "decimal"
+
+    def test_set_date_validation(self, workbook):
+        """Set a date data validation."""
+        from src.excel_mcp_server_fastmcp.server import excel_set_data_validation
+
+        result = excel_set_data_validation(
+            workbook, "技能配置", "F2:F10", "date",
+            "greaterThanOrEqual,2024-01-01", "发布日期", "发布日期不能早于2024-01-01"
+        )
+        assert result["success"] is True
+        assert result["data"]["validation_type"] == "date"
+
+    def test_set_text_length_validation(self, workbook):
+        """Set a text length data validation."""
+        from src.excel_mcp_server_fastmcp.server import excel_set_data_validation
+
+        result = excel_set_data_validation(
+            workbook, "技能配置", "B2:B10", "text_length",
+            "between,2,10", "技能名称", "技能名称长度应在2-10字符之间"
+        )
+        assert result["success"] is True
+        assert result["data"]["validation_type"] == "text_length"
+
+    def test_set_custom_validation(self, workbook):
+        """Set a custom formula data validation."""
+        from src.excel_mcp_server_fastmcp.server import excel_set_data_validation
+
+        result = excel_set_data_validation(
+            workbook, "技能配置", "D2:D10", "custom",
+            "=AND(D2>=50,D2<=300)", "伤害值", "伤害值应在50-300之间"
+        )
+        assert result["success"] is True
+        assert result["data"]["validation_type"] == "custom"
+
+    def test_validation_operators(self, workbook):
+        """Test various validation operators."""
+        from src.excel_mcp_server_fastmcp.server import excel_set_data_validation
+
+        operators_tests = [
+            ("equal,5", "equal"),
+            ("notEqual,0", "notEqual"),
+            ("greaterThan,100", "greaterThan"),
+            ("lessThan,1000", "lessThan"),
+            ("greaterThanOrEqual,10", "greaterThanOrEqual"),
+            ("lessThanOrEqual,100", "lessThanOrEqual"),
+            ("between,1,100", "between"),
+            ("notBetween,100,1000", "notBetween"),
+        ]
+
+        for criteria, expected_op in operators_tests:
+            result = excel_set_data_validation(
+                workbook, "技能配置", "E2:E10", "whole_number",
+                criteria, "测试", "测试验证"
+            )
+            assert result["success"] is True
+
+    def test_invalid_validation_type(self, workbook):
+        """Reject invalid validation types."""
+        from src.excel_mcp_server_fastmcp.server import excel_set_data_validation
+
+        result = excel_set_data_validation(
+            workbook, "技能配置", "A1:A10", "invalid_type", "test"
+        )
+        assert result["success"] is False
+        assert "不支持的验证类型" in result["message"]
+
+    def test_invalid_criteria_format(self, workbook):
+        """Reject invalid criteria format."""
+        from src.excel_mcp_server_fastmcp.server import excel_set_data_validation
+
+        result = excel_set_data_validation(
+            workbook, "技能配置", "A1:A10", "whole_number", "invalid_format"
+        )
+        assert result["success"] is False
+        assert "验证条件格式错误" in result["message"]
+
+    def test_clear_validation_by_range(self, workbook):
+        """Clear validations for a specific range."""
+        from src.excel_mcp_server_fastmcp.server import (
+            excel_set_data_validation,
+            excel_clear_validation,
+        )
+
+        excel_set_data_validation(
+            workbook, "技能配置", "C2:C5", "list", "法师,战士"
+        )
+        excel_set_data_validation(
+            workbook, "技能配置", "E2:E5", "whole_number", "between,1,10"
+        )
+
+        result = excel_clear_validation(workbook, "技能配置", "C2:C5")
+        assert result["success"] is True
+        assert result["data"]["cleared_count"] >= 1
+
 class TestConditionalFormatting:
     """Tests for conditional formatting add / clear."""
 
