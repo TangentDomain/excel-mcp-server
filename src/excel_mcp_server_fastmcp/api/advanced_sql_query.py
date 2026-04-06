@@ -515,14 +515,33 @@ class AdvancedSQLQueryEngine:
 
         Args:
             file_path: Excel文件路径
-            sql: SQL查询语句
+            sql: SQL查询语句，支持完整的SELECT语法包括WHERE、JOIN、GROUP BY、HAVING、ORDER BY等
             sheet_name: 工作表名称（可选，默认使用第一个）
-            limit: 限制返回行数
-            include_headers: 是否包含表头
-            output_format: 输出格式 table/json/csv
+            limit: 限制返回行数，用于控制结果集大小
+            include_headers: 是否包含表头，True时返回数据第一行为列名
+            output_format: 输出格式，支持 table/json/csv 三种格式
 
         Returns:
-            Dict: 查询结果
+            Dict: 查询结果，包含以下字段:
+                - success (bool): 查询是否成功
+                - message (str): 结果消息或错误描述
+                - data (list): 查询结果数据（二维数组）
+                - query_info (dict): 查询详细信息
+                    - original_rows: 原始数据总行数
+                    - filtered_rows: 过滤后行数
+                    - returned_rows: 实际返回行数（可能因截断减少）
+                    - truncated: 是否被截断（超过最大行数限制）
+                    - query_applied: 是否应用了查询条件
+                    - sql_query: 执行的SQL语句
+                    - columns_returned: 返回的列数
+                    - available_tables: 可用的工作表列表
+                    - returned_columns: 返回的列名列表
+                    - data_types: 各列的数据类型推断
+                    - execution_time_ms: 查询执行耗时（毫秒）
+                    - markdown_table: Markdown格式表格（如数据存在）
+                    - suggestion: 空结果时的智能建议（如结果为空）
+                    - json_output: JSON格式输出（output_format=json时）
+                    - csv_output: CSV格式输出（output_format=csv时）
         """
         try:
             # 验证文件存在性
