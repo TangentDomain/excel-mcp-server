@@ -1,0 +1,73 @@
+[
+  {
+    "round": 0,
+    "instance_type": "code",
+    "issues": [
+      "⚠️ commit格式: 3/24 个异常（阈值0）"
+    ],
+    "commits": [
+      "b8bb403 [REQ-062] type: fix 添加docstring到Core模块",
+      "142f94b [REQ-062] type: feat 添加docstring合规性检查脚本",
+      "e505c58 [REQ-062] type: fix 添加docstring到Core模块",
+      "158a260 [REQ-062] type: fix 添加docstring到Core模块",
+      "99be103 [REQ-062] type: fix 添加docstring到SQL查询模块",
+      "c4e4792 [REQ-062] type: refactor - 检查API模块docstring状态",
+      "3c7446b [REQ-062] type: refactor - 统计docstring缺失情况",
+      "433b7e8 [REQ-062] type: refactor - 统计docstring缺失情况",
+      "fc6e696 docs: update check history",
+      "ab0eba9 chore: backup updated",
+      "c651939 [REQ-061] fix: 修复GROUP BY聚合逻辑bug",
+      "fde91a9 [REQ-062] feat: 为主要函数添加完整的docstring文档",
+      "10fb735 [REQ-061] fix: 修复GROUP BY聚合逻辑中聚合函数检测的错误条件",
+      "58fb253 [REQ-061] type: fix: 修复GROUP BY聚合逻辑bug",
+      "a580958 [REQ-058] type: fix 修复COALESCE对NULL值处理，空字符串转为0",
+      "38bf1e8 [meta-evolve] Round 291: update step markers and check history",
+      "75b87be [REQ-055] type: feature 支持EXCEPT和INTERSECT集合操作",
+      "297043f [REQ-059] type: fix 修复HAVING不过滤TOTAL行的bug",
+      "4dbf6c1 [REQ-054] type: fix 修复嵌套子查询只返回1行的bug",
+      "fc83486 docs: update check history",
+      "82e98ab [meta-evolve] Round 286: completion updated docs and check history",
+      "ebbfeec [REQ-061] type: fix 修复GROUP BY聚合逻辑",
+      "3d03870 [REQ-058] type: fix 修复COALESCE NULL值处理",
+      "9603293 [REQ-061] type: fix 修复GROUP BY聚合逻辑bug"
+    ],
+    "timestamp": "2026-04-06T00:15:39Z"
+  },
+  {
+    "round": 0,
+    "instance_type": "code",
+    "issues": [
+      "⚠️ commit格式: 3/27 个异常（阈值0）"
+    ],
+    "commits": [
+      "04bfb3a [REQ-064] type: fix 删除错误output_format赋值",
+      "b90e92d [REQ-064] type: fix 修复execute_sql_query方法docstring",
+      "da4edc1 [REQ-064] type: fix 恢复execute_sql_query方法签名",
+      "b8bb403 [REQ-062] type: fix 添加docstring到Core模块",
+      "142f94b [REQ-062] type: feat 添加docstring合规性检查脚本",
+      "e505c58 [REQ-062] type: fix 添加docstring到Core模块",
+      "158a260 [REQ-062] type: fix 添加docstring到Core模块",
+      "99be103 [REQ-062] type: fix 添加docstring到SQL查询模块",
+      "c4e4792 [REQ-062] type: refactor - 检查API模块docstring状态",
+      "3c7446b [REQ-062] type: refactor - 统计docstring缺失情况",
+      "433b7e8 [REQ-062] type: refactor - 统计docstring缺失情况",
+      "fc6e696 docs: update check history",
+      "ab0eba9 chore: backup updated",
+      "c651939 [REQ-061] fix: 修复GROUP BY聚合逻辑bug",
+      "fde91a9 [REQ-062] feat: 为主要函数添加完整的docstring文档",
+      "10fb735 [REQ-061] fix: 修复GROUP BY聚合逻辑中聚合函数检测的错误条件",
+      "58fb253 [REQ-061] type: fix: 修复GROUP BY聚合逻辑bug",
+      "a580958 [REQ-058] type: fix 修复COALESCE对NULL值处理，空字符串转为0",
+      "38bf1e8 [meta-evolve] Round 291: update step markers and check history",
+      "75b87be [REQ-055] type: feature 支持EXCEPT和INTERSECT集合操作",
+      "297043f [REQ-059] type: fix 修复HAVING不过滤TOTAL行的bug",
+      "4dbf6c1 [REQ-054] type: fix 修复嵌套子查询只返回1行的bug",
+      "fc83486 docs: update check history",
+      "82e98ab [meta-evolve] Round 286: completion updated docs and check history",
+      "ebbfeec [REQ-061] type: fix 修复GROUP BY聚合逻辑",
+      "3d03870 [REQ-058] type: fix 修复COALESCE NULL值处理",
+      "9603293 [REQ-061] type: fix 修复GROUP BY聚合逻辑bug"
+    ],
+    "timestamp": "2026-04-06T03:28:16Z"
+  }
+]
