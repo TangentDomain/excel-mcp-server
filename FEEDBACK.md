@@ -33,4 +33,13 @@
   - `SELECT name FROM employees ORDER BY salary DESC`
   - `SELECT name, CASE WHEN salary > 30000 THEN '高' ELSE '低' END FROM employees`
   - `SELECT e.name FROM employees e JOIN orders o ON e.name = o.customer`
-- **状态**：P0
+- **状态**：✅ 已验证无问题（2026-04-06，子代理验证三个函数签名均正确，回归已被后续迭代自动修复）
+
+### FEEDBACK-014: pytest 输出误读 warnings 为 failures（P1）
+- **问题**：cron-prompt 或质量检查脚本把 pytest 的 warnings 当成 failures 报告。实际输出是 `851 passed, 9 warnings`（0 failed），但报告写"9 failed"
+- **根因**：解析 pytest 输出时没有区分 `failed` 和 `warnings`
+- **要求**：
+  1. 找到 cron-prompt 或脚本中解析 pytest 输出的逻辑
+  2. 正确区分 `X passed, Y failed, Z warnings` — 只有 `failed` 数才算失败
+  3. 同时检查 check.py 的 R4 质量检查是否有同样问题
+- **状态**：✅ 已修复（2026-04-06，cron-prompt增加明确警告+程序化正则验证）
