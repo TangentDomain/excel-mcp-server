@@ -3882,7 +3882,6 @@ def excel_set_data_validation(file_path: str, sheet_name: str, range_address: st
         # 步骤3: 根据验证类型构建参数（详细见函数文档说明）
         logger.info(f"[DATA_VALIDATION] 步骤3: 根据验证类型构建参数")
         try:
-        try:
             if validation_type == 'list':
                 # 列表类型：formula1 为列表源
                 logger.info(f"[DATA_VALIDATION][LIST] 进入 list 类型处理路径 - criteria={criteria}")
