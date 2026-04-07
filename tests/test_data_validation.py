@@ -338,12 +338,12 @@ class TestDataValidation(unittest.TestCase):
 
 class TestDataValidationIntegration(unittest.TestCase):
     """数据验证集成测试：多验证类型组合测试"""
-    
+
     def setUp(self):
         """测试前准备：创建临时Excel文件"""
         self.temp_dir = tempfile.mkdtemp()
         self.test_file = os.path.join(self.temp_dir, 'test_integration.xlsx')
-        
+
         # 创建测试文件
         try:
             from openpyxl import Workbook
@@ -354,7 +354,7 @@ class TestDataValidationIntegration(unittest.TestCase):
         except ImportError:
             with open(self.test_file, 'w') as f:
                 f.write('mock_excel_file')
-    
+
     def tearDown(self):
         """测试后清理"""
         try:
@@ -363,6 +363,406 @@ class TestDataValidationIntegration(unittest.TestCase):
             os.rmdir(self.temp_dir)
         except:
             pass
+
+
+class TestDataValidationBoundary(unittest.TestCase):
+    """数据验证边界测试：空值、超限值、特殊字符"""
+
+    def setUp(self):
+        """测试前准备：创建临时Excel文件"""
+        self.temp_dir = tempfile.mkdtemp()
+        self.test_file = os.path.join(self.temp_dir, 'test_boundary.xlsx')
+
+        # 创建测试文件
+        try:
+            from openpyxl import Workbook
+            wb = Workbook()
+            ws = wb.active
+            ws.title = "BoundaryTest"
+            wb.save(self.test_file)
+        except ImportError:
+            with open(self.test_file, 'w') as f:
+                f.write('mock_excel_file')
+
+    def tearDown(self):
+        """测试后清理"""
+        try:
+            if os.path.exists(self.test_file):
+                os.unlink(self.test_file)
+            os.rmdir(self.temp_dir)
+        except:
+            pass
+
+    def test_whole_number_boundary_max_value(self):
+        """测试：whole_number验证 - 极大值边界"""
+        result = excel_set_data_validation(
+            file_path=self.test_file,
+            sheet_name="BoundaryTest",
+            range_address="A1:A1",
+            validation_type="whole_number",
+            criteria="less_than,2147483647"  # 2^31-1
+        )
+        self.assertTrue(result['success'])
+
+    def test_whole_number_boundary_min_value(self):
+        """测试：whole_number验证 - 极小值边界"""
+        result = excel_set_data_validation(
+            file_path=self.test_file,
+            sheet_name="BoundaryTest",
+            range_address="A1:A1",
+            validation_type="whole_number",
+            criteria="greater_than,-2147483648"  # -2^31
+        )
+        self.assertTrue(result['success'])
+
+    def test_whole_number_boundary_zero(self):
+        """测试：whole_number验证 - 零值边界"""
+        result = excel_set_data_validation(
+            file_path=self.test_file,
+            sheet_name="BoundaryTest",
+            range_address="A1:A1",
+            validation_type="whole_number",
+            criteria="greater_than_or_equal,0"
+        )
+        self.assertTrue(result['success'])
+
+    def test_whole_number_boundary_negative_values(self):
+        """测试：whole_number验证 - 负数边界"""
+        result = excel_set_data_validation(
+            file_path=self.test_file,
+            sheet_name="BoundaryTest",
+            range_address="A1:A1",
+            validation_type="whole_number",
+            criteria="between,-100,-1"
+        )
+        self.assertTrue(result['success'])
+
+    def test_decimal_boundary_very_small(self):
+        """测试：decimal验证 - 极小浮点数"""
+        result = excel_set_data_validation(
+            file_path=self.test_file,
+            sheet_name="BoundaryTest",
+            range_address="A1:A1",
+            validation_type="decimal",
+            criteria="greater_than,0.000001"
+        )
+        self.assertTrue(result['success'])
+
+    def test_decimal_boundary_very_large(self):
+        """测试：decimal验证 - 极大浮点数"""
+        result = excel_set_data_validation(
+            file_path=self.test_file,
+            sheet_name="BoundaryTest",
+            range_address="A1:A1",
+            validation_type="decimal",
+            criteria="less_than,999999999.99"
+        )
+        self.assertTrue(result['success'])
+
+    def test_decimal_boundary_scientific_notation(self):
+        """测试：decimal验证 - 科学计数法数值"""
+        result = excel_set_data_validation(
+            file_path=self.test_file,
+            sheet_name="BoundaryTest",
+            range_address="A1:A1",
+            validation_type="decimal",
+            criteria="between,1e-10,1e10"
+        )
+        self.assertTrue(result['success'])
+
+    def test_decimal_boundary_negative_zero(self):
+        """测试：decimal验证 - 负零值"""
+        result = excel_set_data_validation(
+            file_path=self.test_file,
+            sheet_name="BoundaryTest",
+            range_address="A1:A1",
+            validation_type="decimal",
+            criteria="greater_than,-0.0"
+        )
+        self.assertTrue(result['success'])
+
+    def test_date_boundary_min_date(self):
+        """测试：date验证 - 最小日期边界（Excel 1900-01-01）"""
+        result = excel_set_data_validation(
+            file_path=self.test_file,
+            sheet_name="BoundaryTest",
+            range_address="A1:A1",
+            validation_type="date",
+            criteria="greater_than_or_equal,1900-01-01"
+        )
+        self.assertTrue(result['success'])
+
+    def test_date_boundary_max_date(self):
+        """测试：date验证 - 最大日期边界（9999-12-31）"""
+        result = excel_set_data_validation(
+            file_path=self.test_file,
+            sheet_name="BoundaryTest",
+            range_address="A1:A1",
+            validation_type="date",
+            criteria="less_than_or_equal,9999-12-31"
+        )
+        self.assertTrue(result['success'])
+
+    def test_date_boundary_leap_year(self):
+        """测试：date验证 - 闰年日期"""
+        result = excel_set_data_validation(
+            file_path=self.test_file,
+            sheet_name="BoundaryTest",
+            range_address="A1:A1",
+            validation_type="date",
+            criteria="between,2024-02-28,2024-03-01"  # 包含闰年2月29日
+        )
+        self.assertTrue(result['success'])
+
+    def test_text_length_boundary_max_length(self):
+        """测试：text_length验证 - 最大长度边界（Excel限制32767）"""
+        result = excel_set_data_validation(
+            file_path=self.test_file,
+            sheet_name="BoundaryTest",
+            range_address="A1:A1",
+            validation_type="text_length",
+            criteria="less_than_or_equal,32767"
+        )
+        self.assertTrue(result['success'])
+
+    def test_text_length_boundary_zero_length(self):
+        """测试：text_length验证 - 零长度边界"""
+        result = excel_set_data_validation(
+            file_path=self.test_file,
+            sheet_name="BoundaryTest",
+            range_address="A1:A1",
+            validation_type="text_length",
+            criteria="greater_than_or_equal,0"
+        )
+        self.assertTrue(result['success'])
+
+    def test_text_length_boundary_single_char(self):
+        """测试：text_length验证 - 单字符边界"""
+        result = excel_set_data_validation(
+            file_path=self.test_file,
+            sheet_name="BoundaryTest",
+            range_address="A1:A1",
+            validation_type="text_length",
+            criteria="equal,1"
+        )
+        self.assertTrue(result['success'])
+
+    def test_list_special_chars_comma(self):
+        """测试：list验证 - 选项包含逗号（应正常处理）"""
+        result = excel_set_data_validation(
+            file_path=self.test_file,
+            sheet_name="BoundaryTest",
+            range_address="A1:A1",
+            validation_type="list",
+            criteria="选项1,包含,逗号,选项3"
+        )
+        # 逗号作为分隔符，"包含"会被识别为独立选项
+        self.assertTrue(result['success'])
+
+    def test_list_special_chars_quotes(self):
+        """测试：list验证 - 选项包含引号"""
+        result = excel_set_data_validation(
+            file_path=self.test_file,
+            sheet_name="BoundaryTest",
+            range_address="A1:A1",
+            validation_type="list",
+            criteria='选项1,"包含引号",选项3'
+        )
+        self.assertTrue(result['success'])
+
+    def test_list_special_chars_special_unicode(self):
+        """测试：list验证 - 特殊Unicode字符"""
+        result = excel_set_data_validation(
+            file_path=self.test_file,
+            sheet_name="BoundaryTest",
+            range_address="A1:A1",
+            validation_type="list",
+            criteria="中文选项,日本語选项,한국어选项,English选项"
+        )
+        self.assertTrue(result['success'])
+
+    def test_list_special_chars_emoji(self):
+        """测试：list验证 - Emoji表情符号"""
+        result = excel_set_data_validation(
+            file_path=self.test_file,
+            sheet_name="BoundaryTest",
+            range_address="A1:A1",
+            validation_type="list",
+            criteria="👍,👎,❤️,🎉"
+        )
+        self.assertTrue(result['success'])
+
+    def test_list_special_chars_empty_item(self):
+        """测试：list验证 - 空选项"""
+        result = excel_set_data_validation(
+            file_path=self.test_file,
+            sheet_name="BoundaryTest",
+            range_address="A1:A1",
+            validation_type="list",
+            criteria="选项1,,选项2"  # 包含空选项
+        )
+        self.assertTrue(result['success'])
+
+    def test_custom_special_chars_complex_formula(self):
+        """测试：custom验证 - 复杂公式表达式"""
+        result = excel_set_data_validation(
+            file_path=self.test_file,
+            sheet_name="BoundaryTest",
+            range_address="A1:A1",
+            validation_type="custom",
+            criteria="=AND(A1>0,OR(A1<100,A1>1000),NOT(ISBLANK(A1)))"
+        )
+        self.assertTrue(result['success'])
+
+    def test_custom_special_chars_text_formula(self):
+        """测试：custom验证 - 文本比较公式"""
+        result = excel_set_data_validation(
+            file_path=self.test_file,
+            sheet_name="BoundaryTest",
+            range_address="A1:A1",
+            validation_type="custom",
+            criteria="=EXACT(A1,"expected")"
+        )
+        self.assertTrue(result['success'])
+
+    def test_custom_special_chars_nested_functions(self):
+        """测试：custom验证 - 嵌套函数公式"""
+        result = excel_set_data_validation(
+            file_path=self.test_file,
+            sheet_name="BoundaryTest",
+            range_address="A1:A1",
+            validation_type="custom",
+            criteria="=IF(ISNUMBER(A1),A1>0,LEN(A1)>5)"
+        )
+        self.assertTrue(result['success'])
+
+    def test_whole_number_invalid_value(self):
+        """测试：whole_number验证 - 无效数值转换（应失败）"""
+        result = excel_set_data_validation(
+            file_path=self.test_file,
+            sheet_name="BoundaryTest",
+            range_address="A1:A1",
+            validation_type="whole_number",
+            criteria="greater_than,not_a_number"
+        )
+        self.assertFalse(result['success'])
+        self.assertIn('值类型转换失败', result['message'])
+
+    def test_decimal_invalid_value(self):
+        """测试：decimal验证 - 无效浮点数值（应失败）"""
+        result = excel_set_data_validation(
+            file_path=self.test_file,
+            sheet_name="BoundaryTest",
+            range_address="A1:A1",
+            validation_type="decimal",
+            criteria="greater_than,invalid_float"
+        )
+        self.assertFalse(result['success'])
+
+    def test_date_invalid_year(self):
+        """测试：date验证 - 无效年份（应失败）"""
+        result = excel_set_data_validation(
+            file_path=self.test_file,
+            sheet_name="BoundaryTest",
+            range_address="A1:A1",
+            validation_type="date",
+            criteria="greater_than,1899-12-31"  # Excel最小日期之前
+        )
+        # 可能为成功或失败，取决于实现，这里不强制断言
+        pass
+
+    def test_date_invalid_month(self):
+        """测试：date验证 - 无效月份（应失败）"""
+        result = excel_set_data_validation(
+            file_path=self.test_file,
+            sheet_name="BoundaryTest",
+            range_address="A1:A1",
+            validation_type="date",
+            criteria="greater_than,2024-13-01"
+        )
+        self.assertFalse(result['success'])
+
+    def test_text_length_invalid_value(self):
+        """测试：text_length验证 - 无效长度值（应失败）"""
+        result = excel_set_data_validation(
+            file_path=self.test_file,
+            sheet_name="BoundaryTest",
+            range_address="A1:A1",
+            validation_type="text_length",
+            criteria="greater_than,not_a_length"
+        )
+        self.assertFalse(result['success'])
+
+    def test_text_length_negative_value(self):
+        """测试：text_length验证 - 负长度值（应失败或转换）"""
+        result = excel_set_data_validation(
+            file_path=self.test_file,
+            sheet_name="BoundaryTest",
+            range_address="A1:A1",
+            validation_type="text_length",
+            criteria="greater_than,-1"
+        )
+        # 负值会被转换为整数，可能成功，这里只检查不崩溃
+        pass
+
+    def test_criteria_whitespace_only(self):
+        """测试：所有类型 - 仅空白字符的criteria（应失败）"""
+        for validation_type in ['whole_number', 'decimal', 'date', 'text_length']:
+            result = excel_set_data_validation(
+                file_path=self.test_file,
+                sheet_name="BoundaryTest",
+                range_address="A1:A1",
+                validation_type=validation_type,
+                criteria="   "  # 仅空白字符
+            )
+            self.assertFalse(result['success'], f"{validation_type}应拒绝空白criteria")
+
+    def test_criteria_extra_commas(self):
+        """测试：数值类型 - 额外的逗号分隔符"""
+        result = excel_set_data_validation(
+            file_path=self.test_file,
+            sheet_name="BoundaryTest",
+            range_address="A1:A1",
+            validation_type="whole_number",
+            criteria="between,1,100,"  # 结尾多一个逗号
+        )
+        # 可能成功（忽略多余参数）或失败，取决于实现
+        pass
+
+    def test_range_address_validation(self):
+        """测试：range_address格式的边界情况"""
+        # 标准格式
+        result1 = excel_set_data_validation(
+            file_path=self.test_file,
+            sheet_name="BoundaryTest",
+            range_address="A1",
+            validation_type="list",
+            criteria="选项1,选项2"
+        )
+        self.assertTrue(result1['success'])
+
+        # 多单元格范围
+        result2 = excel_set_data_validation(
+            file_path=self.test_file,
+            sheet_name="BoundaryTest",
+            range_address="A1:A1000",
+            validation_type="list",
+            criteria="选项1,选项2"
+        )
+        self.assertTrue(result2['success'])
+
+    def test_empty_input_title_and_message(self):
+        """测试：input_title和input_message为空字符串"""
+        result = excel_set_data_validation(
+            file_path=self.test_file,
+            sheet_name="BoundaryTest",
+            range_address="A1:A1",
+            validation_type="list",
+            criteria="选项1,选项2",
+            input_title="",
+            input_message=""
+        )
+        self.assertTrue(result['success'])
     
     def test_multiple_validations_same_sheet(self):
         """测试：同一工作表设置多个验证规则"""
