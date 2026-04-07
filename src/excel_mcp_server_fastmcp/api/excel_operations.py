@@ -964,10 +964,8 @@ class ExcelOperations:
             if streaming:
                 from excel_mcp_server_fastmcp.core.streaming_writer import StreamingWriter
                 if StreamingWriter.is_available():
-                    # 创建空列数据用于插入
-                    empty_cols = [[] for _ in range(count)]
-                    success, message, meta = StreamingWriter.update_range(
-                        file_path, sheet_name, 1, column_index, empty_cols
+                    success, message, meta = StreamingWriter.insert_columns_streaming(
+                        file_path, sheet_name, column_index, count
                     )
                     if success:
                         return {
