@@ -3818,7 +3818,10 @@ def excel_set_data_validation(file_path: str, sheet_name: str, range_address: st
         from openpyxl import load_workbook
         from openpyxl.worksheet.datavalidation import DataValidation
 
+        logger.info(f"[DATA_VALIDATION] 开始设置数据验证 - file_path={file_path}, sheet_name={sheet_name}, range_address={range_address}, validation_type={validation_type}, criteria={criteria}, input_title={input_title}, input_message={input_message}")
+
         wb, ws = ExcelValidator.get_workbook_and_sheet(file_path, sheet_name)
+        logger.info(f"[DATA_VALIDATION] 成功获取工作簿和工作表 - current_validations_count={len(ws.data_validations)}")
 
         # 验证类型映射和检查
         supported_types = ['list', 'whole_number', 'decimal', 'date', 'text_length', 'custom']
@@ -3832,63 +3835,83 @@ def excel_set_data_validation(file_path: str, sheet_name: str, range_address: st
             'text_length': 'textLength',
         }
         openpyxl_type = type_mapping.get(validation_type, validation_type)
+        logger.info(f"[DATA_VALIDATION] 验证类型映射 - validation_type={validation_type} -> openpyxl_type={openpyxl_type}")
 
         # 步骤1: 创建数据验证对象基础参数
         dv_kwargs = {'type': openpyxl_type}
+        logger.debug(f"[DATA_VALIDATION] 初始化 dv_kwargs - type={openpyxl_type}")
 
         # 步骤2: 根据验证类型构建特定参数
         try:
             if validation_type == 'list':
                 # 列表类型：formula1 为列表源
+                logger.info(f"[DATA_VALIDATION] 处理 list 类型 - criteria={criteria}")
                 if not criteria or not criteria.strip():
+                    logger.error(f"[DATA_VALIDATION] list 类型失败 - criteria 为空")
                     return _fail("列表验证类型必须提供 criteria 参数（列表源）",
                                 meta={"error_code": "VALIDATION_FAILED"})
                 dv_kwargs['formula1'] = criteria
                 dv_kwargs['showDropDown'] = True
                 dv_kwargs['allow_blank'] = True
+                logger.info(f"[DATA_VALIDATION] list 类型参数设置完成 - formula1={criteria}, showDropDown=True, allow_blank=True")
             elif validation_type == 'custom':
                 # 自定义公式：formula1 为公式表达式
+                logger.info(f"[DATA_VALIDATION] 处理 custom 类型 - criteria={criteria}")
                 if not criteria or not criteria.strip():
+                    logger.error(f"[DATA_VALIDATION] custom 类型失败 - criteria 为空")
                     return _fail("自定义验证类型必须提供 criteria 参数（公式表达式）",
                                 meta={"error_code": "VALIDATION_FAILED"})
                 dv_kwargs['formula1'] = criteria
                 dv_kwargs['allow_blank'] = True
+                logger.info(f"[DATA_VALIDATION] custom 类型参数设置完成 - formula1={criteria}, allow_blank=True")
             elif validation_type in ['whole_number', 'decimal', 'date', 'text_length']:
                 # 数值/日期/长度类型：需要解析操作符和值
+                logger.info(f"[DATA_VALIDATION] 处理 {validation_type} 类型 - criteria={criteria}")
                 if not criteria or not criteria.strip():
+                    logger.error(f"[DATA_VALIDATION] {validation_type} 类型失败 - criteria 为空")
                     return _fail(f"{validation_type} 验证类型必须提供 criteria 参数（格式: '操作符,值1,值2'）",
                                 meta={"error_code": "VALIDATION_FAILED"})
 
                 parts = [p.strip() for p in criteria.split(',')]
+                logger.debug(f"[DATA_VALIDATION] 解析 criteria 结果 - parts_count={len(parts)}, parts={parts}")
                 if len(parts) < 2:
+                    logger.error(f"[DATA_VALIDATION] criteria 格式错误 - parts_count={len(parts)} < 2")
                     return _fail(f"验证条件格式错误，应为 '操作符,值1,值2'，当前为: {criteria}",
                                 meta={"error_code": "VALIDATION_FAILED"})
 
                 operator = parts[0]
                 value1 = parts[1]
                 value2 = parts[2] if len(parts) > 2 else None
+                logger.debug(f"[DATA_VALIDATION] 解析操作符和值 - operator={operator}, value1={value1}, value2={value2}")
 
                 # 验证操作符
                 valid_operators = ['between', 'notBetween', 'equal', 'notEqual', 'greaterThan',
                                  'lessThan', 'greaterThanOrEqual', 'lessThanOrEqual']
                 if operator not in valid_operators:
+                    logger.error(f"[DATA_VALIDATION] 不支持的操作符 - operator={operator}")
                     return _fail(f"不支持的操作符: {operator}，支持的操作符: {','.join(valid_operators)}",
                                 meta={"error_code": "VALIDATION_FAILED"})
+                logger.debug(f"[DATA_VALIDATION] 操作符验证通过 - operator={operator}")
 
                 # 根据验证类型进行值转换和验证
                 try:
                     if validation_type == 'whole_number':
+                        logger.debug(f"[DATA_VALIDATION] 整数转换 - value1={value1}, value2={value2}")
                         # 整数验证：值必须是整数，自动截断小数部分
                         value1 = str(int(float(value1)))
                         if value2:
                             value2 = str(int(float(value2)))
+                        logger.debug(f"[DATA_VALIDATION] 整数转换完成 - value1={value1}, value2={value2}")
                     elif validation_type == 'decimal':
+                        logger.debug(f"[DATA_VALIDATION] 小数转换 - value1={value1}, value2={value2}")
                         # 小数验证：值可以是小数或整数
                         value1 = str(float(value1))
                         if value2:
                             value2 = str(float(value2))
+                        logger.debug(f"[DATA_VALIDATION] 小数转换完成 - value1={value1}, value2={value2}")
                     elif validation_type == 'date':
                         # 日期验证：验证并标准化日期格式
+                        logger.debug(f"[DATA_VALIDATION] 日期验证和转换 - value1={value1}, value2={value2}")
                         from datetime import datetime
                         try:
                             # 验证并标准化为 YYYY-MM-DD 格式
@@ -3897,15 +3920,20 @@ def excel_set_data_validation(file_path: str, sheet_name: str, range_address: st
                             if value2:
                                 parsed_date2 = datetime.strptime(value2, '%Y-%m-%d')
                                 value2 = parsed_date2.strftime('%Y-%m-%d')
+                            logger.debug(f"[DATA_VALIDATION] 日期转换完成 - value1={value1}, value2={value2}")
                         except ValueError:
+                            logger.error(f"[DATA_VALIDATION] 日期格式错误 - value1={value1}, value2={value2}")
                             return _fail(f"日期格式错误，应为 YYYY-MM-DD 格式，当前: {value1}{',' + value2 if value2 else ''}",
                                         meta={"error_code": "VALIDATION_FAILED"})
                     elif validation_type == 'text_length':
+                        logger.debug(f"[DATA_VALIDATION] 文本长度转换 - value1={value1}, value2={value2}")
                         # 文本长度验证：值必须是整数
                         value1 = str(int(float(value1)))
                         if value2:
                             value2 = str(int(float(value2)))
+                        logger.debug(f"[DATA_VALIDATION] 文本长度转换完成 - value1={value1}, value2={value2}")
                 except ValueError as e:
+                    logger.error(f"[DATA_VALIDATION] 值类型转换失败 - validation_type={validation_type}, error={str(e)}")
                     return _fail(f"值类型转换失败: {str(e)}，验证类型: {validation_type}",
                                 meta={"error_code": "VALIDATION_FAILED"})
 
@@ -3914,15 +3942,20 @@ def excel_set_data_validation(file_path: str, sheet_name: str, range_address: st
                 if value2:
                     dv_kwargs['formula2'] = value2
                 dv_kwargs['allow_blank'] = True
+                logger.info(f"[DATA_VALIDATION] {validation_type} 类型参数设置完成 - operator={operator}, formula1={value1}, formula2={value2}, allow_blank=True")
 
                 # 检查是否需要两个值
                 if operator in ['between', 'notBetween'] and not value2:
+                    logger.error(f"[DATA_VALIDATION] 操作符需要两个值但未提供 - operator={operator}")
                     return _fail(f"操作符 '{operator}' 需要两个值，请提供 '操作符,值1,值2' 格式",
                                 meta={"error_code": "VALIDATION_FAILED"})
         except Exception as e:
+            logger.error(f"[DATA_VALIDATION] 验证条件解析异常 - error={str(e)}, error_type={type(e).__name__}")
             return _fail(f"验证条件解析失败: {str(e)}", meta={"error_code": "VALIDATION_FAILED"})
 
+        logger.info(f"[DATA_VALIDATION] 创建 DataValidation 对象 - dv_kwargs={dv_kwargs}")
         dv = DataValidation(**dv_kwargs)
+        logger.info(f"[DATA_VALIDATION] DataValidation 对象创建成功 - type={dv.type}, operator={getattr(dv, 'operator', 'N/A')}, formula1={dv.formula1}, formula2={getattr(dv, 'formula2', 'N/A')}")
 
         # 设置错误提示
         dv.showErrorMessage = True
@@ -3941,21 +3974,29 @@ def excel_set_data_validation(file_path: str, sheet_name: str, range_address: st
         elif validation_type == 'text_length':
             dv.errorTitle = '输入错误'
             dv.error = '请输入符合长度要求的文本'
+        logger.debug(f"[DATA_VALIDATION] 错误提示设置完成 - errorTitle={dv.errorTitle}, error={dv.error}")
 
         # 设置输入提示
         if input_title or input_message:
             dv.showInputMessage = True
             dv.promptTitle = input_title
             dv.prompt = input_message
+            logger.debug(f"[DATA_VALIDATION] 输入提示设置完成 - showInputMessage=True, promptTitle={input_title}, prompt={input_message}")
 
         # 添加应用到指定范围
+        logger.info(f"[DATA_VALIDATION] 应用验证到范围 - range_address={range_address}")
         dv.add(range_address)
+        logger.debug(f"[DATA_VALIDATION] dv.add 完成 - sqref={dv.sqref if hasattr(dv, 'sqref') else 'N/A'}")
         ws.add_data_validation(dv)
+        logger.info(f"[DATA_VALIDATION] 验证已添加到工作表 - validations_count_before_save={len(ws.data_validations)}")
 
         # 保存文件
         try:
+            logger.info(f"[DATA_VALIDATION] 开始保存文件 - file_path={file_path}")
             wb.save(file_path)
+            logger.info(f"[DATA_VALIDATION] 文件保存成功 - file_path={file_path}")
         except Exception as save_error:
+            logger.error(f"[DATA_VALIDATION] 文件保存失败 - file_path={file_path}, error={str(save_error)}, error_type={type(save_error).__name__}")
             return _fail(f"数据验证设置成功但保存文件失败: {str(save_error)}", 
                         meta={"error_code": "SAVE_FAILED", "validation_data": {
                             'validation_type': validation_type,
@@ -3966,6 +4007,7 @@ def excel_set_data_validation(file_path: str, sheet_name: str, range_address: st
                             'input_message': input_message
                         }})
 
+        logger.info(f"[DATA_VALIDATION] 数据验证设置成功 - validation_count={len(ws.data_validations)}")
         return _ok("数据验证设置成功", data={
             'validation_type': validation_type,
             'criteria': criteria,
@@ -3979,10 +4021,14 @@ def excel_set_data_validation(file_path: str, sheet_name: str, range_address: st
     except Exception as e:
         # 捕获所有异常，包括DataValidationError
         error_msg = str(e)
+        error_type = type(e).__name__
+        logger.error(f"[DATA_VALIDATION] 全局异常捕获 - error_type={error_type}, error_msg={error_msg}")
         if "DataValidationError" in error_msg or "data validation" in error_msg.lower():
+            logger.error(f"[DATA_VALIDATION] 识别为数据验证规则错误 - error_code=VALIDATION_RULE_ERROR")
             return _fail(f"数据验证规则错误: {error_msg}", 
                         meta={"error_code": "VALIDATION_RULE_ERROR", "suggested_fix": "检查验证条件和参数格式"})
         else:
+            logger.error(f"[DATA_VALIDATION] 识别为一般操作失败 - error_code=OPERATION_FAILED")
             return _fail(f"数据验证设置失败: {error_msg}", meta={"error_code": "OPERATION_FAILED"})
 
 
