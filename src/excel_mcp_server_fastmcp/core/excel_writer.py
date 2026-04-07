@@ -860,8 +860,19 @@ class ExcelWriter:
     def _detect_file_format(self) -> str:
         """检测Excel文件格式
 
+        根据文件扩展名检测文件格式。支持的格式：
+        - xlsx: Excel 工作簿（默认格式）
+        - xls: 旧版 Excel 工作簿（仅读取）
+        - xlsm: 启用宏的工作簿
+        - xltx: Excel 模板
+        - xltm: 启用宏的模板
+        - xlsb: 二进制工作簿
+
+        注意：使用 os.path.splitext 获取扩展名后，会转换为小写并去掉前导点。
+        如果扩展名不在支持列表中，将返回默认格式 'xlsx'。
+
         Returns:
-            str: 文件格式 ('xlsx', 'xls', 'xlsm', 'xltx', 'xltm', 'xlsb')，默认返回 'xlsx'
+            str: 文件格式字符串，默认返回 'xlsx'
         """
         if not self.file_path or not os.path.exists(self.file_path):
             logger.debug("无文件路径或文件不存在，使用默认格式 xlsx")
