@@ -941,11 +941,9 @@ class ExcelWriter:
         else:
             logger.debug("没有文件路径或文件不存在，使用空工作簿进行计算")
 
-        # 保存到临时文件（根据检测到的格式）
-        # 对于 xlsm 等格式，openpyxl 需要设置 keep_vba=True 来保留格式
-        keep_vba = file_format == 'xlsm'
-        temp_file_path = TempFileManager.create_temp_excel_file(suffix=f".{file_format}")
-        temp_workbook.save(temp_file_path, keep_vba=keep_vba)
+        # 保存到临时文件（始终使用xlsx格式，不需要保留VBA宏）
+        temp_file_path = TempFileManager.create_temp_excel_file(suffix='.xlsx')
+        temp_workbook.save(temp_file_path)
 
         # 缓存工作簿
         cache.cache_workbook(self.file_path or "temp", temp_workbook, temp_file_path)

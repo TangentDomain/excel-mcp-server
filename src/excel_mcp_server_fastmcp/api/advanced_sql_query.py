@@ -3563,11 +3563,17 @@ class AdvancedSQLQueryEngine:
                 aggregations[alias_name] = expr
             elif hasattr(expr, 'name') and expr.name not in group_by_columns:
                 # 如果是非聚合列且不在GROUP BY中,需要添加到GROUP BY
+                # 跳过窗口函数表达式(窗口函数在GROUP BY之后处理)
+                if isinstance(expr, exp.Window):
+                    continue
                 if isinstance(expr, (exp.Column, exp.Identifier)):
                     group_by_columns.append(expr.name)
                 else:
                     # 修复(REQ-061): 从复杂表达式中提取列引用
                     # 支持SELECT包含表达式(如CASE WHEN/COALESCE)的情况
+                    # 跳过窗口函数表达式
+                    if isinstance(expr, exp.Window):
+                        continue
                     column_refs = self._extract_column_references(expr)
                     for col_name in column_refs:
                         if col_name not in group_by_columns:
