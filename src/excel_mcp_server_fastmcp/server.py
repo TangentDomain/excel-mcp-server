@@ -3814,36 +3814,74 @@ def excel_set_data_validation(file_path: str, sheet_name: str, range_address: st
                 - input_message: 输入提示内容（str）
                 - validation_count: 当前工作表中的验证规则总数（int）
     """
+
+    Args:
+        file_path: Excel文件路径
+        sheet_name: 工作表名称
+        range_address: 单元格范围
+        validation_type: 验证类型
+        criteria: 验证条件
+            - list: 列表源（如 "A1:A10" 或 "选项1,选项2,选项3"）
+            - whole_number/decimal/date/text_length: 格式为 "操作符,值1,值2"
+              操作符: between/notBetween/equal/notEqual/greaterThan/lessThan/greaterThanOrEqual/lessThanOrEqual
+              示例: "between,1,100" 或 "greaterThan,0"
+            - custom: 自定义公式（如 "=AND(A1>0,A1<100)"）
+        input_title: 输入提示标题，默认为空字符串
+        input_message: 输入提示内容，默认为空字符串
+
+    Returns:
+        Dict[str, Any]: 包含验证设置结果的字典：
+            - success: 操作是否成功（bool）
+            - message: 操作结果消息（str）
+            - data: 验证详情（dict），包含以下字段：
+                - validation_type: 验证类型（str）
+                - criteria: 验证条件（str）
+                - range_address: 单元格范围（str）
+                - sheet_name: 工作表名称（str）
+                - input_title: 输入提示标题（str）
+                - input_message: 输入提示内容（str）
+                - validation_count: 当前工作表中的验证规则总数（int）
+    """
     try:
         from openpyxl import load_workbook
         from openpyxl.worksheet.datavalidation import DataValidation
 
-        logger.info(f"[DATA_VALIDATION] 开始设置数据验证 - file_path={file_path}, sheet_name={sheet_name}, range_address={range_address}, validation_type={validation_type}, criteria={criteria}, input_title={input_title}, input_message={input_message}")
+        logger.info(f"[DATA_VALIDATION] === 开始设置数据验证 ===")
+        logger.info(f"[DATA_VALIDATION] 输入参数 - file_path={file_path}, sheet_name={sheet_name}, range_address={range_address}, validation_type={validation_type}, criteria={criteria}, input_title={input_title}, input_message={input_message}")
 
+        logger.info(f"[DATA_VALIDATION] 步骤1: 获取工作簿和工作表")
         wb, ws = ExcelValidator.get_workbook_and_sheet(file_path, sheet_name)
-        logger.info(f"[DATA_VALIDATION] 成功获取工作簿和工作表 - current_validations_count={len(ws.data_validations)}")
+        logger.info(f"[DATA_VALIDATION] 步骤1完成 - 成功获取工作簿和工作表 - current_validations_count={len(ws.data_validations)}")
 
-        # 验证类型映射和检查
+        # 步骤2: 验证类型映射和检查
+        logger.info(f"[DATA_VALIDATION] 步骤2: 验证类型处理")
+        logger.info(f"[DATA_VALIDATION] 步骤2.1: 验证类型检查")
         supported_types = ['list', 'whole_number', 'decimal', 'date', 'text_length', 'custom']
+        logger.debug(f"[DATA_VALIDATION] 支持的验证类型列表 - supported_types={supported_types}")
+        
         if validation_type not in supported_types:
             logger.error(f"[DATA_VALIDATION] 验证类型检查失败 - validation_type={validation_type}, supported_types={supported_types}")
             return _fail(f"不支持的验证类型: {validation_type}，支持的类型: {','.join(supported_types)}",
                         meta={"error_code": "VALIDATION_FAILED"})
-        logger.debug(f"[DATA_VALIDATION] 验证类型检查通过 - validation_type={validation_type}")
+        logger.info(f"[DATA_VALIDATION] 步骤2.1完成 - 验证类型检查通过 - validation_type={validation_type}")
 
-        # 映射验证类型到 openpyxl 要求的格式
+        # 步骤2.2: 映射验证类型到 openpyxl 要求的格式
+        logger.info(f"[DATA_VALIDATION] 步骤2.2: 验证类型映射")
         type_mapping = {
             'whole_number': 'whole',
             'text_length': 'textLength',
         }
         openpyxl_type = type_mapping.get(validation_type, validation_type)
-        logger.info(f"[DATA_VALIDATION] 验证类型映射 - validation_type={validation_type} -> openpyxl_type={openpyxl_type}")
+        logger.info(f"[DATA_VALIDATION] 步骤2.2完成 - 验证类型映射 - validation_type={validation_type} -> openpyxl_type={openpyxl_type}")
 
-        # 步骤1: 创建数据验证对象基础参数
+        # 步骤2.3: 创建数据验证对象基础参数
+        logger.info(f"[DATA_VALIDATION] 步骤2.3: 初始化基础参数")
         dv_kwargs = {'type': openpyxl_type}
-        logger.debug(f"[DATA_VALIDATION] 初始化 dv_kwargs - type={openpyxl_type}")
+        logger.debug(f"[DATA_VALIDATION] dv_kwargs初始化完成 - type={openpyxl_type}, dv_keys={list(dv_kwargs.keys())}")
 
-        # 步骤2: 根据验证类型构建特定参数
+        # 步骤3: 根据验证类型构建参数（详细见函数文档说明）
+        logger.info(f"[DATA_VALIDATION] 步骤3: 根据验证类型构建参数")
+        try:
         try:
             if validation_type == 'list':
                 # 列表类型：formula1 为列表源
@@ -4007,14 +4045,30 @@ def excel_set_data_validation(file_path: str, sheet_name: str, range_address: st
         ws.add_data_validation(dv)
         logger.info(f"[DATA_VALIDATION] 验证已添加到工作表 - validations_count_before_save={len(ws.data_validations)}")
 
-        # 保存文件
+        # 步骤4: 保存文件
+        logger.info(f"[DATA_VALIDATION] 步骤4: 保存文件")
         try:
-            logger.info(f"[DATA_VALIDATION] 开始保存文件 - file_path='{file_path}', file_size_before={os.path.getsize(file_path) if os.path.exists(file_path) else 'N/A'} bytes")
+            logger.info(f"[DATA_VALIDATION] 步骤4.1: 开始保存文件")
+            logger.info(f"[DATA_VALIDATION] 文件信息 - file_path='{file_path}', file_exists={os.path.exists(file_path)}")
+            file_size_before = os.path.getsize(file_path) if os.path.exists(file_path) else 'N/A'
+            logger.info(f"[DATA_VALIDATION] 文件大小 - file_size_before={file_size_before} bytes")
+            
+            logger.info(f"[DATA_VALIDATION] 执行 wb.save() 操作")
             wb.save(file_path)
+            
+            logger.info(f"[DATA_VALIDATION] 步骤4.2: 验证保存结果")
             file_size_after = os.path.getsize(file_path)
             logger.info(f"[DATA_VALIDATION] 文件保存成功 - file_path='{file_path}', file_size_after={file_size_after} bytes, validations_count_final={len(ws.data_validations)}")
+            
+            # 验证文件是否真的保存了
+            if file_size_before != 'N/A' and file_size_before == file_size_after:
+                logger.warning(f"[DATA_VALIDATION] 警告: 文件大小未变化 - before={file_size_before}, after={file_size_after}")
+            else:
+                logger.info(f"[DATA_VALIDATION] 文件大小变化 - {file_size_before} -> {file_size_after} bytes")
+                
         except Exception as save_error:
-            logger.error(f"[DATA_VALIDATION] 文件保存失败 - file_path='{file_path}', error='{str(save_error)}', error_type='{type(save_error).__name__}'")
+            logger.error(f"[DATA_VALIDATION] 步骤4失败: 文件保存异常")
+            logger.error(f"[DATA_VALIDATION] 错误详情 - file_path='{file_path}', error='{str(save_error)}', error_type='{type(save_error).__name__}'")
             return _fail(f"数据验证设置成功但保存文件失败: {str(save_error)}", 
                         meta={"error_code": "SAVE_FAILED", "validation_data": {
                             'validation_type': validation_type,
@@ -4024,6 +4078,8 @@ def excel_set_data_validation(file_path: str, sheet_name: str, range_address: st
                             'input_title': input_title,
                             'input_message': input_message
                         }})
+
+        logger.info(f"[DATA_VALIDATION] 步骤4完成: 文件保存成功")
 
         logger.info(f"[DATA_VALIDATION] 数据验证设置成功 - validation_type='{validation_type}', criteria='{criteria}', range_address='{range_address}', validation_count={len(ws.data_validations)}")
         return _ok("数据验证设置成功", data={
