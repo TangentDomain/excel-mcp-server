@@ -79,14 +79,4 @@
       "notes": "使用 `git commit --amend --no-edit` 修正提交信息，添加正确的type前缀。type必须是feat/fix/refactor/docs/test/chore/perf之一。"
     }
   }
-}    "REQ-072": {
-      "title": "调整cron频率从每小时降至每2小时",
-      "type": "config", 
-      "priority": "P1",
-      "status": "OPEN",
-      "attempts": 0,
-      "source": "FEEDBACK.md #1",
-      "created": "2026-04-07",
-      "description": "根据CEO协调反馈，将ExcelMCP迭代任务的cron频率从`0 * * * *`（每小时）调整为`0 */2 * * *`（每2小时），避免资源浪费，将计算资源分配给其他需要的实例。",
-      "notes": "需要更新cron配置文件，确保新频率生效。监控调整后的执行状态，确保任务正常运行。"
-    }
+}
