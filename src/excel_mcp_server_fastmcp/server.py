@@ -3870,8 +3870,18 @@ def excel_set_data_validation(file_path: str, sheet_name: str, range_address: st
         type_mapping = {
             'whole_number': 'whole',
             'text_length': 'textLength',
+            'decimal': 'decimal',
+            'date': 'date',
+            'list': 'list',
+            'custom': 'custom'
         }
         openpyxl_type = type_mapping.get(validation_type, validation_type)
+        
+        # 验证映射结果
+        if not openpyxl_type:
+            logger.error(f"[DATA_VALIDATION] 验证类型映射失败 - validation_type={validation_type}")
+            return _fail(f"不支持的验证类型: {validation_type}",
+                        meta={"error_code": "VALIDATION_FAILED"})
         logger.info(f"[DATA_VALIDATION] 步骤2.2完成 - 验证类型映射 - validation_type={validation_type} -> openpyxl_type={openpyxl_type}")
 
         # 步骤2.3: 创建数据验证对象基础参数
@@ -3924,15 +3934,30 @@ def excel_set_data_validation(file_path: str, sheet_name: str, range_address: st
                 value2 = parts[2] if len(parts) > 2 else None
                 logger.info(f"[DATA_VALIDATION][{validation_type.upper()}] 参数解析完成 - operator='{operator}', value1='{value1}', value2='{value2}'")
 
-                # 验证操作符
-                valid_operators = ['between', 'notBetween', 'equal', 'notEqual', 'greaterThan',
-                                 'lessThan', 'greaterThanOrEqual', 'lessThanOrEqual']
-                logger.debug(f"[DATA_VALIDATION][{validation_type.upper()}] 开始验证操作符 - operator='{operator}', valid_operators={valid_operators}")
-                if operator not in valid_operators:
-                    logger.error(f"[DATA_VALIDATION][{validation_type.upper()}] 操作符验证失败 - operator='{operator}' not in valid_operators")
-                    return _fail(f"不支持的操作符: {operator}，支持的操作符: {','.join(valid_operators)}",
-                                meta={"error_code": "VALIDATION_FAILED"})
-                logger.info(f"[DATA_VALIDATION][{validation_type.upper()}] 操作符验证通过 - operator='{operator}'")
+                # 验证操作符 - 根据验证类型动态验证
+                type_operators = {
+                    'whole_number': ['between', 'notBetween', 'equal', 'notEqual', 'greaterThan', 'lessThan', 'greaterThanOrEqual', 'lessThanOrEqual'],
+                    'decimal': ['between', 'notBetween', 'equal', 'notEqual', 'greaterThan', 'lessThan', 'greaterThanOrEqual', 'lessThanOrEqual'],
+                    'date': ['between', 'notBetween', 'equal', 'notEqual', 'greaterThan', 'lessThan', 'greaterThanOrEqual', 'lessThanOrEqual'],
+                    'text_length': ['between', 'notBetween', 'equal', 'notEqual', 'greaterThan', 'lessThan', 'greaterThanOrEqual', 'lessThanOrEqual'],
+                    'list': [],
+                    'custom': []
+                }
+                
+                valid_operators = type_operators.get(validation_type, [])
+                if validation_type in ['list', 'custom']:
+                    # 对于list和custom类型，不需要操作符验证
+                    operator = None
+                    value1 = criteria
+                    value2 = None
+                    logger.info(f"[DATA_VALIDATION][{validation_type.upper()}] 使用简单模式 - criteria='{criteria}'")
+                else:
+                    # 对于数值类型，验证操作符
+                    if operator not in valid_operators:
+                        logger.error(f"[DATA_VALIDATION][{validation_type.upper()}] 操作符验证失败 - operator='{operator}' not in valid_operators={valid_operators}")
+                        return _fail(f"不支持的操作符: {operator}，支持的操作符: {','.join(valid_operators)}",
+                                    meta={"error_code": "VALIDATION_FAILED"})
+                    logger.info(f"[DATA_VALIDATION][{validation_type.upper()}] 操作符验证通过 - operator='{operator}'")
 
                 # 根据验证类型进行值转换和验证
                 logger.info(f"[DATA_VALIDATION][{validation_type.upper()}] 开始值类型转换和验证 - validation_type={validation_type}")
@@ -4004,7 +4029,19 @@ def excel_set_data_validation(file_path: str, sheet_name: str, range_address: st
             return _fail(f"验证条件解析失败: {str(e)}", meta={"error_code": "VALIDATION_FAILED"})
 
         logger.info(f"[DATA_VALIDATION] 创建 DataValidation 对象 - dv_kwargs={dv_kwargs}")
-        dv = DataValidation(**dv_kwargs)
+        
+        # 清理和验证参数
+        cleaned_kwargs = {}
+        for key, value in dv_kwargs.items():
+            if value is not None:
+                cleaned_kwargs[key] = value
+        
+        try:
+            dv = DataValidation(**cleaned_kwargs)
+            logger.info(f"[DATA_VALIDATION] DataValidation 对象创建成功 - type='{dv.type}', operator='{getattr(dv, 'operator', 'N/A')}'")
+        except Exception as e:
+            logger.error(f"[DATA_VALIDATION] DataValidation 对象创建失败 - error={str(e)}, kwargs={cleaned_kwargs}")
+            return _fail(f"验证规则创建失败: {str(e)}", meta={"error_code": "VALIDATION_FAILED"})
         logger.info(f"[DATA_VALIDATION] DataValidation 对象创建成功 - type='{dv.type}', operator='{getattr(dv, 'operator', 'N/A')}', formula1='{dv.formula1}', formula2='{getattr(dv, 'formula2', 'N/A')}', showDropDown={getattr(dv, 'showDropDown', 'N/A')}', allow_blank={getattr(dv, 'allow_blank', 'N/A')}')
 
         # 设置错误提示
