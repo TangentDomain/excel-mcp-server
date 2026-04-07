@@ -287,17 +287,17 @@ class ExcelWriter:
 
             # 验证：重新加载文件确认列已插入
             verification_workbook = load_workbook(self.file_path)
-            verification_sheet = verification_workbook[sheet.title]
-            actual_max_column = verification_sheet.max_column
-            expected_max_column = original_max_column + count
+            try:
+                verification_sheet = verification_workbook[sheet.title]
+                actual_max_column = verification_sheet.max_column
+                expected_max_column = original_max_column + count
 
-            if actual_max_column != expected_max_column:
+                if actual_max_column != expected_max_column:
+                    raise Exception(
+                        f"插入列验证失败：期望最大列数为 {expected_max_column}，实际为 {actual_max_column}"
+                    )
+            finally:
                 verification_workbook.close()
-                raise Exception(
-                    f"插入列验证失败：期望最大列数为 {expected_max_column}，实际为 {actual_max_column}"
-                )
-
-            verification_workbook.close()
 
             return OperationResult(
                 success=True,
