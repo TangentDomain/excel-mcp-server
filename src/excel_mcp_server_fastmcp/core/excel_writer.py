@@ -278,8 +278,12 @@ class ExcelWriter:
             # 插入列
             sheet.insert_cols(column_index, count)
 
+            # 记录插入后的最大列数（在关闭前获取）
+            new_max_column = sheet.max_column
+
             # 保存文件
             self._safe_save_workbook(workbook, "插入列")
+            workbook.close()
 
             # 验证：重新加载文件确认列已插入
             verification_workbook = load_workbook(self.file_path)
@@ -295,7 +299,6 @@ class ExcelWriter:
 
             verification_workbook.close()
 
-            workbook.close()
             return OperationResult(
                 success=True,
                 message=f"成功插入{count}列",
@@ -305,7 +308,7 @@ class ExcelWriter:
                     'inserted_at_column': column_index,
                     'inserted_count': count,
                     'original_max_column': original_max_column,
-                    'new_max_column': sheet.max_column
+                    'new_max_column': new_max_column
                 }
             )
 
