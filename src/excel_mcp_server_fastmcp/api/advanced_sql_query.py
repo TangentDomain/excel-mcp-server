@@ -3464,6 +3464,33 @@ class AdvancedSQLQueryEngine:
         except Exception:
             return False
 
+    def _extract_column_references(self, expr: exp.Expression) -> List[str]:
+        """从表达式中提取所有列引用
+
+        Args:
+            expr: SQL表达式对象
+
+        Returns:
+            列名列表
+
+        修复说明(REQ-061):
+        - 支持从复杂表达式(CASE WHEN/COALESCE/函数调用)中提取列引用
+        - 递归遍历表达式树,提取所有Column类型的子节点
+        """
+        columns = []
+        if isinstance(expr, exp.Column):
+            columns.append(expr.name)
+        elif hasattr(expr, 'expressions'):
+            for sub_expr in expr.expressions:
+                columns.extend(self._extract_column_references(sub_expr))
+        elif hasattr(expr, 'this'):
+            columns.extend(self._extract_column_references(expr.this))
+        if hasattr(expr, 'args'):
+            for arg in expr.args.values():
+                if isinstance(arg, exp.Expression):
+                    columns.extend(self._extract_column_references(arg))
+        return columns
+
     def _get_row_value(self, expr: exp.Expression, row: pd.Series) -> Any:
         """获取行中表达式的值"""
         if isinstance(expr, exp.Column):
@@ -3514,6 +3541,13 @@ class AdvancedSQLQueryEngine:
             for group_expr in group_clause.expressions:
                 if isinstance(group_expr, exp.Column):
                     group_by_columns.append(group_expr.name)
+                else:
+                    # 修复(REQ-061): 从复杂表达式中提取列引用
+                    # 支持GROUP BY包含表达式(如CASE WHEN/COALESCE)的情况
+                    column_refs = self._extract_column_references(group_expr)
+                    for col_name in column_refs:
+                        if col_name not in group_by_columns:
+                            group_by_columns.append(col_name)
 
         # 检查是否有聚合函数
         aggregations = {}
@@ -3529,8 +3563,21 @@ class AdvancedSQLQueryEngine:
                 aggregations[alias_name] = expr
             elif hasattr(expr, 'name') and expr.name not in group_by_columns:
                 # 如果是非聚合列且不在GROUP BY中,需要添加到GROUP BY
+                # 跳过窗口函数表达式(窗口函数在GROUP BY之后处理)
+                if isinstance(expr, exp.Window):
+                    continue
                 if isinstance(expr, (exp.Column, exp.Identifier)):
                     group_by_columns.append(expr.name)
+                else:
+                    # 修复(REQ-061): 从复杂表达式中提取列引用
+                    # 支持SELECT包含表达式(如CASE WHEN/COALESCE)的情况
+                    # 跳过窗口函数表达式
+                    if isinstance(expr, exp.Window):
+                        continue
+                    column_refs = self._extract_column_references(expr)
+                    for col_name in column_refs:
+                        if col_name not in group_by_columns:
+                            group_by_columns.append(col_name)
 
         # 保存GROUP BY列到实例变量,供_build_total_row使用
         self._group_by_columns = group_by_columns

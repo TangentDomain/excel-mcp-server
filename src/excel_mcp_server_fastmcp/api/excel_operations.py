@@ -429,7 +429,17 @@ class ExcelOperations:
     # --- 参数验证 ---
     @classmethod
     def _validate_range_format(cls, range_expression: str) -> Dict[str, Any]:
-        """验证范围表达式格式"""
+        """
+        @intention 验证范围表达式格式
+
+        Args:
+            range_expression: 范围表达式，如 'Sheet1!A1:C10'
+
+        Returns:
+            Dict: 验证结果，包含以下字段:
+                - valid (bool): 验证是否通过
+                - error (str, optional): 错误信息，仅在 valid=False 时存在
+        """
         if not range_expression or not range_expression.strip():
             return {'valid': False, 'error': 'range参数不能为空'}
 
@@ -443,7 +453,18 @@ class ExcelOperations:
 
     @classmethod
     def _build_header_range(cls, sheet_name: str, header_row: int, max_columns: Optional[int], dual_row: bool = False) -> str:
-        """构建表头范围表达式，支持单行或双行模式"""
+        """
+        @intention 构建表头范围表达式，支持单行或双行模式
+
+        Args:
+            sheet_name: 工作表名称
+            header_row: 表头起始行号 (1-based)
+            max_columns: 最大列数限制，None表示使用默认值（100列）
+            dual_row: 是否使用双行模式（True时读取两行，False时读取一行）
+
+        Returns:
+            str: 范围表达式，如 'Sheet1!A1:CV2' 或 'Sheet1!A1:Z1'
+        """
         if max_columns:
             # 如果指定了最大列数，使用具体范围
             end_column = get_column_letter(max_columns)
@@ -466,7 +487,16 @@ class ExcelOperations:
 
     @classmethod
     def _parse_header_data(cls, data: List[List], max_columns: Optional[int]) -> List[str]:
-        """解析表头数据"""
+        """
+        @intention 解析表头数据
+
+        Args:
+            data: 单元格数据列表，每个元素可能是 CellInfo 对象或普通值
+            max_columns: 最大列数限制，None表示自动截取到空列
+
+        Returns:
+            List[str]: 解析后的表头字符串列表
+        """
         headers = []
         if data and len(data) > 0:
             first_row = data[0]
@@ -500,7 +530,18 @@ class ExcelOperations:
 
     @classmethod
     def _parse_dual_header_data(cls, data: List[List], max_columns: Optional[int]) -> Dict[str, List[str]]:
-        """解析双行表头数据（字段描述 + 字段名），支持空值fallback机制"""
+        """
+        @intention 解析双行表头数据（字段描述 + 字段名），支持空值fallback机制
+
+        Args:
+            data: 二维数组数据，第一行为字段描述，第二行为字段名
+            max_columns: 最大列数限制，None表示自动截取到空列
+
+        Returns:
+            Dict[str, List[str]]: 包含以下字段的字典:
+                - descriptions (List[str]): 字段描述列表（第1行）
+                - field_names (List[str]): 字段名列表（第2行）
+        """
         descriptions = []
         field_names = []
 
@@ -923,10 +964,8 @@ class ExcelOperations:
             if streaming:
                 from excel_mcp_server_fastmcp.core.streaming_writer import StreamingWriter
                 if StreamingWriter.is_available():
-                    # 创建空列数据用于插入
-                    empty_cols = [[] for _ in range(count)]
-                    success, message, meta = StreamingWriter.update_range(
-                        file_path, sheet_name, 1, column_index, empty_cols
+                    success, message, meta = StreamingWriter.insert_columns_streaming(
+                        file_path, sheet_name, column_index, count
                     )
                     if success:
                         return {
@@ -1506,7 +1545,18 @@ class ExcelOperations:
     # --- 错误处理 ---
     @classmethod
     def _format_error_result(cls, error_message: str) -> Dict[str, Any]:
-        """创建标准化的错误响应"""
+        """
+        @intention 创建标准化的错误响应
+
+        Args:
+            error_message: 错误消息字符串
+
+        Returns:
+            Dict[str, Any]: 标准化的错误结果，包含以下字段:
+                - success (bool): 固定为 False
+                - message (str): 错误消息
+                - data (None): 固定为 None
+        """
         return {
             'success': False,
             'message': error_message,

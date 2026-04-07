@@ -278,24 +278,27 @@ class ExcelWriter:
             # 插入列
             sheet.insert_cols(column_index, count)
 
+            # 记录插入后的最大列数（在关闭前获取）
+            new_max_column = sheet.max_column
+
             # 保存文件
             self._safe_save_workbook(workbook, "插入列")
+            workbook.close()
 
             # 验证：重新加载文件确认列已插入
             verification_workbook = load_workbook(self.file_path)
-            verification_sheet = verification_workbook[sheet.title]
-            actual_max_column = verification_sheet.max_column
-            expected_max_column = original_max_column + count
+            try:
+                verification_sheet = verification_workbook[sheet.title]
+                actual_max_column = verification_sheet.max_column
+                expected_max_column = original_max_column + count
 
-            if actual_max_column != expected_max_column:
+                if actual_max_column != expected_max_column:
+                    raise Exception(
+                        f"插入列验证失败：期望最大列数为 {expected_max_column}，实际为 {actual_max_column}"
+                    )
+            finally:
                 verification_workbook.close()
-                raise Exception(
-                    f"插入列验证失败：期望最大列数为 {expected_max_column}，实际为 {actual_max_column}"
-                )
 
-            verification_workbook.close()
-
-            workbook.close()
             return OperationResult(
                 success=True,
                 message=f"成功插入{count}列",
@@ -305,7 +308,7 @@ class ExcelWriter:
                     'inserted_at_column': column_index,
                     'inserted_count': count,
                     'original_max_column': original_max_column,
-                    'new_max_column': sheet.max_column
+                    'new_max_column': new_max_column
                 }
             )
 
@@ -857,8 +860,19 @@ class ExcelWriter:
     def _detect_file_format(self) -> str:
         """检测Excel文件格式
 
+        根据文件扩展名检测文件格式。支持的格式：
+        - xlsx: Excel 工作簿（默认格式）
+        - xls: 旧版 Excel 工作簿（仅读取）
+        - xlsm: 启用宏的工作簿
+        - xltx: Excel 模板
+        - xltm: 启用宏的模板
+        - xlsb: 二进制工作簿
+
+        注意：使用 os.path.splitext 获取扩展名后，会转换为小写并去掉前导点。
+        如果扩展名不在支持列表中，将返回默认格式 'xlsx'。
+
         Returns:
-            str: 文件格式 ('xlsx', 'xls', 'xlsm', 'xltx', 'xltm', 'xlsb')，默认返回 'xlsx'
+            str: 文件格式字符串，默认返回 'xlsx'
         """
         if not self.file_path or not os.path.exists(self.file_path):
             logger.debug("无文件路径或文件不存在，使用默认格式 xlsx")
@@ -927,11 +941,9 @@ class ExcelWriter:
         else:
             logger.debug("没有文件路径或文件不存在，使用空工作簿进行计算")
 
-        # 保存到临时文件（根据检测到的格式）
-        # 对于 xlsm 等格式，openpyxl 需要设置 keep_vba=True 来保留格式
-        keep_vba = file_format == 'xlsm'
-        temp_file_path = TempFileManager.create_temp_excel_file(suffix=f".{file_format}")
-        temp_workbook.save(temp_file_path, keep_vba=keep_vba)
+        # 保存到临时文件（始终使用xlsx格式，不需要保留VBA宏）
+        temp_file_path = TempFileManager.create_temp_excel_file(suffix='.xlsx')
+        temp_workbook.save(temp_file_path)
 
         # 缓存工作簿
         cache.cache_workbook(self.file_path or "temp", temp_workbook, temp_file_path)

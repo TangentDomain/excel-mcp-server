@@ -14,6 +14,7 @@ from src.excel_mcp_server_fastmcp.core.excel_writer import ExcelWriter
 from src.excel_mcp_server_fastmcp.core.excel_manager import ExcelManager
 from src.excel_mcp_server_fastmcp.models.types import OperationResult, SheetInfo, CellInfo, ModifiedCell
 from src.excel_mcp_server_fastmcp.utils.exceptions import ExcelFileNotFoundError, SheetNotFoundError
+from src.excel_mcp_server_fastmcp.utils.formula_cache import get_formula_cache
 
 
 class TestExcelCore:
@@ -709,10 +710,9 @@ class TestFormulaCalculation:
         assert detected_format == 'xlsm'
 
     def test_detect_file_format_nonexistent(self):
-        """检测不存在的文件格式，应返回默认xlsx"""
-        writer = ExcelWriter("nonexistent.xlsx")
-        detected_format = writer._detect_file_format()
-        assert detected_format == 'xlsx'
+        """检测不存在的文件，应抛出异常"""
+        with pytest.raises(ExcelFileNotFoundError):
+            ExcelWriter("nonexistent.xlsx")
 
     def test_create_temp_workbook_xlsx(self, excel_file_with_formulas):
         """为xlsx文件创建临时工作簿进行公式计算"""

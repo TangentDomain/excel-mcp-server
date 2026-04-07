@@ -769,3 +769,58 @@ class StreamingWriter:
         except Exception as e:
             logger.error(f"流式插入行失败: {e}")
             return False, f"流式写入失败: {str(e)}", {}
+
+    @classmethod
+    def insert_columns_streaming(
+        cls,
+        file_path: str,
+        sheet_name: str,
+        start_column: int,
+        count: int,
+        preserve_formulas: bool = True,
+        preserve_col_widths: bool = True,
+    ) -> Tuple[bool, str, Dict[str, Any]]:
+        """流式插入空列：calamine读取 → 在指定列位置插入空列 → write_only写入
+
+        支持在任意列位置插入空列，保留原有数据右移。
+        Args:
+            file_path: Excel文件路径
+            sheet_name: 目标工作表名
+            start_column: 插入位置列号（1-based）
+            count: 要插入的列数
+            preserve_formulas: 是否保留公式（插入模式下此参数暂无效，因为插入的是新列）
+            preserve_col_widths: 是否保留列宽
+
+        Returns:
+            (success, message, metadata)
+        """
+        if not _HAS_CALAMINE:
+            return False, "calamine未安装，无法使用流式写入", {}
+
+        try:
+            if count < 1:
+                return False, f"插入列数必须>=1，实际: {count}", {}
+            if start_column < 1:
+                return False, f"起始列号必须>=1，实际: {start_column}", {}
+
+            def _modify(rows, header_row, col_map):
+                # 在每行的指定位置插入 count 个空值
+                for row in rows:
+                    for _ in range(count):
+                        row.insert(start_column - 1, None)
+
+                return True, (
+                    f"流式插入 {count} 列到 {sheet_name}!{get_column_letter(start_column)}，"
+                    f"原有数据自动右移"
+                ), rows, {
+                    'action': 'insert_columns_streaming',
+                    'start_column': start_column,
+                    'columns_inserted': count,
+                    'total_columns': max(len(r) for r in rows) if rows else 0,
+                }
+
+            return cls._copy_modify_write(file_path, sheet_name, _modify, preserve_col_widths)
+
+        except Exception as e:
+            logger.error(f"流式插入列失败: {e}")
+            return False, f"流式写入失败: {str(e)}", {}

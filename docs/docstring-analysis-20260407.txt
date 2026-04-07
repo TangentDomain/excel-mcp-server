@@ -1,0 +1,13 @@
+Total functions analyzed: 88
+Functions missing complete docstring:
+  src/excel_mcp_server_fastmcp/server.py:excel_get_range
+  src/excel_mcp_server_fastmcp/server.py:excel_get_headers
+  src/excel_mcp_server_fastmcp/server.py:excel_update_range
+  src/excel_mcp_server_fastmcp/server.py:excel_assess_data_impact
+  src/excel_mcp_server_fastmcp/server.py:excel_get_operation_history
+  src/excel_mcp_server_fastmcp/server.py:excel_create_backup
+  src/excel_mcp_server_fastmcp/server.py:excel_restore_backup
+  src/excel_mcp_server_fastmcp/server.py:excel_list_backups
+  src/excel_mcp_server_fastmcp/server.py:excel_insert_rows
+  src/excel_mcp_server_fastmcp/server.py:excel_insert_columns
+  ... and 78 more
