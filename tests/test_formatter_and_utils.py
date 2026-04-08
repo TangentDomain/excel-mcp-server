@@ -9,9 +9,9 @@ import pytest
 from pathlib import Path
 from openpyxl import Workbook
 
-from src.excel_mcp_server_fastmcp.utils.formatter import format_operation_result
-from src.excel_mcp_server_fastmcp.models.types import OperationResult, CellInfo, SheetInfo, RangeInfo, RangeType
-from src.excel_mcp_server_fastmcp.utils.parsers import RangeParser
+from src.excel_mcp.utils.formatter import format_operation_result
+from src.excel_mcp.models.types import OperationResult, CellInfo, SheetInfo, RangeInfo, RangeType
+from src.excel_mcp.utils.parsers import RangeParser
 
 class TestFormatter:
     """格式化工具测试"""
@@ -137,7 +137,7 @@ class TestIntegration:
         assert file_path.exists()
         
         # 读取数据
-        from src.excel_mcp_server_fastmcp.core.excel_reader import ExcelReader
+        from src.excel_mcp.core.excel_reader import ExcelReader
         reader = ExcelReader(str(file_path))
         result = reader.get_range("Test!A1:A2")
         assert result.success is True
@@ -164,7 +164,7 @@ class TestIntegration:
         wb.save(str(file_path))
         
         # 读取并验证
-        from src.excel_mcp_server_fastmcp.core.excel_reader import ExcelReader
+        from src.excel_mcp.core.excel_reader import ExcelReader
         reader = ExcelReader(str(file_path))
         result = reader.get_range("Data!A1:C4")
         
@@ -181,7 +181,7 @@ class TestIntegration:
         wb.save(str(file_path))
         
         # 第一次读取
-        from src.excel_mcp_server_fastmcp.core.excel_reader import ExcelReader
+        from src.excel_mcp.core.excel_reader import ExcelReader
         reader = ExcelReader(str(file_path))
         result1 = reader.get_range("Ops!A1")
         assert result1.success is True
@@ -197,7 +197,7 @@ class TestIntegration:
         wb.active.title = "Empty"
         wb.save(str(file_path))
         
-        from src.excel_mcp_server_fastmcp.core.excel_reader import ExcelReader
+        from src.excel_mcp.core.excel_reader import ExcelReader
         reader = ExcelReader(str(file_path))
         result = reader.get_range("Empty!A1:A10")
         

@@ -9,7 +9,7 @@ import os
 import tempfile
 import shutil
 from pathlib import Path
-from excel_mcp_server_fastmcp.api.excel_operations import ExcelOperations
+from excel_mcp.api.excel_operations import ExcelOperations
 
 
 

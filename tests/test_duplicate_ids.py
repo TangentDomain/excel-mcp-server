@@ -20,7 +20,7 @@ import unittest.mock
 from pathlib import Path
 from openpyxl import Workbook
 
-from src.excel_mcp_server_fastmcp.api.excel_operations import ExcelOperations
+from src.excel_mcp.api.excel_operations import ExcelOperations
 
 
 class TestExcelCheckDuplicateIds:

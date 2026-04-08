@@ -4,7 +4,7 @@ import os
 import tempfile
 import pytest
 from unittest.mock import patch
-from src.excel_mcp_server_fastmcp.server import SecurityValidator, _validate_path
+from src.excel_mcp.server import SecurityValidator, _validate_path
 
 
 class TestPathTraversal:
@@ -249,14 +249,14 @@ class TestOptionalPathValidation:
 
     def test_operation_history_none_file_path(self):
         """file_path=None时不应报安全错误"""
-        from src.excel_mcp_server_fastmcp.server import excel_get_operation_history
+        from src.excel_mcp.server import excel_get_operation_history
         result = excel_get_operation_history(file_path=None, limit=5)
         assert result['success'] is True
         assert '操作记录' in result['message']
 
     def test_operation_history_valid_file_path(self):
         """file_path有值时正常验证"""
-        from src.excel_mcp_server_fastmcp.server import excel_get_operation_history
+        from src.excel_mcp.server import excel_get_operation_history
         # 路径穿越应被拦截
         result = excel_get_operation_history(file_path='../../etc/passwd', limit=5)
         assert result['success'] is False

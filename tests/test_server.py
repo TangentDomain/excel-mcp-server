@@ -3,7 +3,7 @@ Simplified tests for Server MCP interfaces - more flexible to match actual API
 """
 
 import pytest
-from src.excel_mcp_server_fastmcp.server import (
+from src.excel_mcp.server import (
     excel_list_sheets,
     excel_get_headers,
     excel_get_range,

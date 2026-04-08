@@ -170,10 +170,10 @@ class ExcelOperations:
 
             # 步骤2: 扩展流式写入路径（支持覆盖+插入模式）
             if streaming:
-                from excel_mcp_server_fastmcp.core.streaming_writer import StreamingWriter
+                from excel_mcp.core.streaming_writer import StreamingWriter
                 if StreamingWriter.is_available():
                     try:
-                        from excel_mcp_server_fastmcp.utils.parsers import RangeParser
+                        from excel_mcp.utils.parsers import RangeParser
                         range_info_parsed = RangeParser.parse_range_expression(range_expression)
                         sheet_name = range_info_parsed.sheet_name
 
@@ -928,7 +928,7 @@ class ExcelOperations:
         try:
             # 流式写入路径
             if streaming:
-                from excel_mcp_server_fastmcp.core.streaming_writer import StreamingWriter
+                from excel_mcp.core.streaming_writer import StreamingWriter
                 if StreamingWriter.is_available():
                     # 需要先知道列数来创建空行
                     reader = ExcelReader(file_path)
@@ -1001,7 +1001,7 @@ class ExcelOperations:
         try:
             # 流式写入路径
             if streaming:
-                from excel_mcp_server_fastmcp.core.streaming_writer import StreamingWriter
+                from excel_mcp.core.streaming_writer import StreamingWriter
                 if StreamingWriter.is_available():
                     success, message, meta = StreamingWriter.insert_columns_streaming(
                         file_path, sheet_name, column_index, count
@@ -1360,7 +1360,7 @@ class ExcelOperations:
         try:
             # 流式写入路径
             if streaming:
-                from excel_mcp_server_fastmcp.core.streaming_writer import StreamingWriter
+                from excel_mcp.core.streaming_writer import StreamingWriter
                 if StreamingWriter.is_available():
                     success, message, meta = StreamingWriter.delete_rows(
                         file_path, sheet_name, row_index, count
@@ -1412,7 +1412,7 @@ class ExcelOperations:
 
         try:
             if streaming:
-                from excel_mcp_server_fastmcp.core.streaming_writer import StreamingWriter
+                from excel_mcp.core.streaming_writer import StreamingWriter
                 if StreamingWriter.is_available():
                     success, message, meta = StreamingWriter.batch_delete_rows(
                         file_path, sheet_name, row_numbers
@@ -1432,7 +1432,7 @@ class ExcelOperations:
                         logger.warning(f"流式批量删除行失败，降级到openpyxl: {message}")
 
             # openpyxl 降级路径：合并相邻行号为连续区间，逐区间删除
-            from excel_mcp_server_fastmcp.core.excel_writer import ExcelWriter
+            from excel_mcp.core.excel_writer import ExcelWriter
             writer = ExcelWriter(file_path)
             sorted_rows = sorted(set(row_numbers))
 
@@ -1501,7 +1501,7 @@ class ExcelOperations:
         try:
             # 流式写入路径
             if streaming:
-                from excel_mcp_server_fastmcp.core.streaming_writer import StreamingWriter
+                from excel_mcp.core.streaming_writer import StreamingWriter
                 if StreamingWriter.is_available():
                     success, message, meta = StreamingWriter.delete_columns(
                         file_path, sheet_name, column_index, count
@@ -2341,7 +2341,7 @@ class ExcelOperations:
             headers = [h.value if hasattr(h, 'value') else h for h in headers]
 
             # 步骤3：构建写入数据并使用update_range一次性写入
-            from excel_mcp_server_fastmcp.core.excel_writer import ExcelWriter
+            from excel_mcp.core.excel_writer import ExcelWriter
             writer = ExcelWriter(file_path)
 
             num_cols = len(headers)

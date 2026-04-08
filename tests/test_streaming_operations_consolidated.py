@@ -24,9 +24,9 @@ project_root = Path(__file__).parent.parent
 sys.path.insert(0, str(project_root))
 
 # 导入被测试的模块
-from src.excel_mcp_server_fastmcp.api.excel_operations import ExcelOperations
-from src.excel_mcp_server_fastmcp.core.excel_manager import ExcelManager
-from src.excel_mcp_server_fastmcp.models.types import OperationResult
+from src.excel_mcp.api.excel_operations import ExcelOperations
+from src.excel_mcp.core.excel_manager import ExcelManager
+from src.excel_mcp.models.types import OperationResult
 
 
 class TestCopySheetOperations:

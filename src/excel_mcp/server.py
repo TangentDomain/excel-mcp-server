@@ -4285,11 +4285,11 @@ def excel_write_only_override(
 
         # 优先尝试流式写入（高性能模式）
         try:
-            from excel_mcp_server_fastmcp.core.streaming_writer import StreamingWriter
+            from excel_mcp.core.streaming_writer import StreamingWriter
             
             if StreamingWriter.is_available():
                 # 解析范围表达式
-                from excel_mcp_server_fastmcp.utils.parsers import RangeParser
+                from excel_mcp.utils.parsers import RangeParser
                 range_info = RangeParser.parse_range_expression(f"{sheet_name}!{range_spec}")
                 
                 # 获取起始行列
@@ -4332,7 +4332,7 @@ def excel_write_only_override(
 
         # 降级到传统openpyxl模式（作为备用方案）
         try:
-            from excel_mcp_server_fastmcp.core.excel_writer import ExcelWriter
+            from excel_mcp.core.excel_writer import ExcelWriter
             writer = ExcelWriter(file_path)
             result = writer.update_range(
                 f"{sheet_name}!{range_spec}", 
@@ -4688,7 +4688,7 @@ def main():
     """
     import sys
     if len(sys.argv) > 1 and sys.argv[1] in ('--version', '-v'):
-        from excel_mcp_server_fastmcp import __version__
+        from excel_mcp import __version__
         logger.info(f"excel-mcp-server-fastmcp {__version__}")
         sys.exit(0)
 

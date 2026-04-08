@@ -1,7 +1,7 @@
 """测试 _get_arg 公共方法 — 字符串函数参数提取DRY"""
 import pytest
 import pandas as pd
-from src.excel_mcp_server_fastmcp.api.advanced_sql_query import AdvancedSQLQueryEngine
+from src.excel_mcp.api.advanced_sql_query import AdvancedSQLQueryEngine
 
 
 @pytest.fixture

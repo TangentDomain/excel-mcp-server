@@ -3,7 +3,7 @@ import os
 import pytest
 import pandas as pd
 
-from src.excel_mcp_server_fastmcp.api.advanced_sql_query import AdvancedSQLQueryEngine
+from src.excel_mcp.api.advanced_sql_query import AdvancedSQLQueryEngine
 
 # xdist isolation: run all join type tests in the same worker to avoid file I/O races
 pytestmark = pytest.mark.xdist_group("join_types")

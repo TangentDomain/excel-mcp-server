@@ -2,7 +2,7 @@
 import pytest
 import pandas as pd
 import numpy as np
-from src.excel_mcp_server_fastmcp.api.advanced_sql_query import (
+from src.excel_mcp.api.advanced_sql_query import (
     execute_advanced_sql_query,
     AdvancedSQLQueryEngine,
 )

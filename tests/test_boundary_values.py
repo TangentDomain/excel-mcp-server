@@ -13,7 +13,7 @@ from openpyxl import Workbook
 import sys
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', 'src'))
 
-from excel_mcp_server_fastmcp.api.advanced_sql_query import AdvancedSQLQueryEngine, _safe_float_comparison
+from excel_mcp.api.advanced_sql_query import AdvancedSQLQueryEngine, _safe_float_comparison
 
 
 def _get_column_data(result, col_name):

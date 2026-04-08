@@ -30,7 +30,7 @@ project_root = Path(__file__).parent.parent
 sys.path.insert(0, str(project_root))
 
 # 导入被测试的模块
-from src.excel_mcp_server_fastmcp.api.advanced_sql_query import AdvancedSQLQueryEngine, execute_advanced_sql_query
+from src.excel_mcp.api.advanced_sql_query import AdvancedSQLQueryEngine, execute_advanced_sql_query
 
 
 def _get_column_index(headers, column_name):

@@ -8,7 +8,7 @@ import pytest
 from datetime import datetime
 
 # 导入server模块的JsonFormatter
-from src.excel_mcp_server_fastmcp.server import JsonFormatter
+from src.excel_mcp.server import JsonFormatter
 
 
 class TestJsonFormatter:

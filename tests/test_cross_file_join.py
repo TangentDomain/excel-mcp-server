@@ -10,7 +10,7 @@ import openpyxl
 
 # 源码路径导入
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', 'src'))
-from excel_mcp_server_fastmcp.api.advanced_sql_query import AdvancedSQLQueryEngine
+from excel_mcp.api.advanced_sql_query import AdvancedSQLQueryEngine
 
 
 # === Fixtures ===

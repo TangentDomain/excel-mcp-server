@@ -1,95 +1,46 @@
-{
-  "REQUIREMENTS": {
-    "REQ-053": {
-      "title": "ORDER BY 浮点/混合类型列返回0行",
-      "type": "fix",
-      "priority": "P1",
-      "status": "DONE",
-      "attempts": 4,
-      "resolution": "误报。验证代码中表名写错（FROM Sheet应为FROM Sheet1）。ORDER BY功能本身正常工作，混合类型处理已实现（转为str排序）。错误时返回有意义的StructuredSQLError提示。",
-      "source": "极端用例测试",
-      "created": "2026-04-04",
-      "closed": "2026-04-08",
-      "description": "ORDER BY 数值列 DESC/ASC 返回0行。经验证为验证代码表名错误，ORDER BY功能正常。",
-      "notes": "已验证：FROM Sheet1 ORDER BY 值 DESC 正确返回21行（含表头）。FROM Sheet 返回有意义的错误提示。"
-    },
-    "REQ-066": {
-      "title": "数据验证写入失败（67%失败率）",
-      "type": "fix",
-      "priority": "P1",
-      "status": "DONE",
-      "attempts": 2,
-      "source": "董事长全面测试报告（107次调用，25.2%错误率）",
-      "created": "2026-04-06",
-      "description": "数据验证（write_data_validation）写入失败率高达67%。修复：添加wb.close()确保工作簿正确关闭，防止文件句柄泄漏导致后续操作失败。"
-    },
-    "REQ-067": {
-      "title": "插入列后实际未插入但报成功",
-      "type": "fix",
-      "priority": "P1",
-      "status": "DONE",
-      "attempts": 2,
-      "source": "董事长全面测试报告",
-      "created": "2026-04-06",
-      "closed": "2026-04-08",
-      "description": "调用insert_columns插入列后，返回成功但实际列未插入。已修复并通过869个测试用例验证。"
-    },
-    "REQ-068": {
-      "title": "公式计算报'不支持的文件格式'",
-      "type": "fix",
-      "priority": "P1",
-      "status": "DONE",
-      "attempts": 2,
-      "source": "董事长全面测试报告",
-      "created": "2026-04-06",
-      "closed": "2026-04-08",
-      "description": "apply_formula执行公式计算时报'不支持的文件格式'错误。已修复并通过全量测试验证。"
-    },
-    "REQ-069": {
-      "title": "写入覆盖功能异常（OperationResult无get属性）",
-      "type": "fix",
-      "priority": "P1",
-      "status": "DONE",
-      "attempts": 2,
-      "source": "董事长全面测试报告",
-      "created": "2026-04-06",
-      "closed": "2026-04-08",
-      "description": "写入覆盖操作报OperationResult对象无get属性错误。已统一用属性访问替代dict方法，通过全量测试验证。"
-    },
-    "REQ-070": {
-      "title": "双行表头识别不一致（describe_table vs get_headers）",
-      "type": "fix",
-      "priority": "P1",
-      "status": "DONE",
-      "attempts": 2,
-      "source": "董事长全面测试报告",
-      "created": "2026-04-06",
-      "closed": "2026-04-08",
-      "description": "describe_table和get_headers对双行表头的识别结果不一致。已统一表头解析逻辑，通过全量测试验证。"
-    },
-    "REQ-071": {
-      "title": "修复Conventional Commits提交格式违规",
-      "type": "fix",
-      "priority": "P2",
-      "status": "DONE",
-      "attempts": 2,
-      "source": "FEEDBACK.md #1",
-      "created": "2026-04-06",
-      "description": "提交 `4d230c9` 违反规范，缺少type前缀。",
-      "notes": "使用 `git commit --amend --no-edit` 修正提交信息，添加正确的type前缀。type必须是feat/fix/refactor/docs/test/chore/perf之一。",
-      "resolution": "使用git commit --amend --no-edit修正提交信息，添加'fix:'前缀，符合Conventional Commits规范。"
-    },
-    "REQ-072": {
-      "title": "调整cron频率从每小时降至每2小时",
-      "type": "config",
-      "priority": "P1",
-      "status": "DONE",
-      "attempts": 1,
-      "source": "FEEDBACK.md #1",
-      "created": "2026-04-07",
-      "closed": "2026-04-08",
-      "description": "根据CEO协调反馈，将ExcelMCP迭代任务的cron频率从`0 * * * *`（每小时）调整为`0 */2 * * *`（每2小时）。",
-      "notes": "已通过openclaw cron edit更新，下次执行时间已自动调整。"
-    }
-  }
-}
+# ExcelMCP 项目重构需求
+
+## 背景
+质量抽检发现ExcelMCP项目存在结构问题，影响可维护性和标准化程度。虽然当前功能正常，但项目结构需要重构以符合Python包标准。
+
+## 需求详情
+
+### REQ-EXCEL-001: Python包标准化重构
+- **类型**: 项目重构
+- **优先级**: P1
+- **状态**: OPEN
+- **创建时间**: 2026-04-08
+- **来源**: 自迭代质量抽检反馈
+
+### 具体要求
+1. **目录结构重组**
+   - 创建标准的Python包结构: `src/excel_mcp/` 包目录
+   - 将现有Python模块移入包内
+   - 建立正确的`__init__.py`文件结构
+
+2. **包管理文件完善**
+   - 完善pyproject.toml配置
+   - 添加依赖版本锁定
+   - 定义正确的包入口点
+
+3. **项目结构规范化**
+   - 添加setup.py作为备选安装方式
+   - 创建requirements.txt锁定生产依赖
+   - 添加development requirements for dev依赖
+
+4. **模块重构**
+   - 保持现有API接口不变
+   - 重构内部模块组织
+   - 确保所有测试继续通过
+
+### 验收标准
+- [ ] 项目符合Python包标准布局
+- [ ] 可通过`pip install .`正确安装
+- [ ] 所有现有功能保持不变
+- [ ] 测试套件全部通过
+- [ ] 文档同步更新
+
+### 影响评估
+- **风险**: 低（重构不改变API）
+- **工作量**: 中等（需要重新组织结构）
+- **收益**: 提升可维护性和标准化程度

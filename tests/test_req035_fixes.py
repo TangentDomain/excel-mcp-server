@@ -16,8 +16,8 @@ import openpyxl
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', 'src'))
 
-from excel_mcp_server_fastmcp.api.excel_operations import ExcelOperations
-from excel_mcp_server_fastmcp.api.advanced_sql_query import AdvancedSQLQueryEngine
+from excel_mcp.api.excel_operations import ExcelOperations
+from excel_mcp.api.advanced_sql_query import AdvancedSQLQueryEngine
 
 
 @pytest.fixture

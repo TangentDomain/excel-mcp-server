@@ -38,7 +38,7 @@ class TestLargeFileOptimization(unittest.TestCase):
 
     def test_file_size_detection(self):
         """测试文件大小检测"""
-        from src.excel_mcp_server_fastmcp.core.excel_reader import _get_file_size, _is_large_file, _LARGE_FILE_THRESHOLD
+        from src.excel_mcp.core.excel_reader import _get_file_size, _is_large_file, _LARGE_FILE_THRESHOLD
 
         # 小文件
         small_path = self._create_test_file(rows=100)
@@ -55,7 +55,7 @@ class TestLargeFileOptimization(unittest.TestCase):
 
     def test_small_file_uses_standard_path(self):
         """测试小文件使用标准路径（非优化模式）"""
-        from src.excel_mcp_server_fastmcp.core.excel_reader import ExcelReader
+        from src.excel_mcp.core.excel_reader import ExcelReader
 
         path = self._create_test_file(rows=100, cols=5)
         try:
@@ -75,7 +75,7 @@ class TestLargeFileOptimization(unittest.TestCase):
 
     def test_large_file_flag(self):
         """测试大文件标志设置正确"""
-        from src.excel_mcp_server_fastmcp.core.excel_reader import ExcelReader
+        from src.excel_mcp.core.excel_reader import ExcelReader
 
         # 创建一个正常大小的文件，然后手动设置_is_large来测试优化路径
         path = self._create_test_file(rows=500, cols=5)
@@ -89,7 +89,7 @@ class TestLargeFileOptimization(unittest.TestCase):
 
     def test_get_range_with_file_size_metadata(self):
         """测试范围读取包含文件大小元数据"""
-        from src.excel_mcp_server_fastmcp.core.excel_reader import ExcelReader
+        from src.excel_mcp.core.excel_reader import ExcelReader
 
         path = self._create_test_file(rows=200, cols=5)
         try:
@@ -104,7 +104,7 @@ class TestLargeFileOptimization(unittest.TestCase):
 
     def test_optimized_range_read_produces_correct_data(self):
         """测试优化路径产生的数据与标准路径一致"""
-        from src.excel_mcp_server_fastmcp.core.excel_reader import ExcelReader
+        from src.excel_mcp.core.excel_reader import ExcelReader
 
         path = self._create_test_file(rows=200, cols=5)
         try:
@@ -133,7 +133,7 @@ class TestLargeFileOptimization(unittest.TestCase):
 
     def test_optimized_range_read_limited_rows(self):
         """测试优化路径只加载请求的行"""
-        from src.excel_mcp_server_fastmcp.core.excel_reader import ExcelReader
+        from src.excel_mcp.core.excel_reader import ExcelReader
 
         path = self._create_test_file(rows=1000, cols=5)
         try:
@@ -154,7 +154,7 @@ class TestLargeFileOptimization(unittest.TestCase):
 
     def test_list_sheets_file_size_metadata(self):
         """测试list_sheets包含文件大小元数据"""
-        from src.excel_mcp_server_fastmcp.core.excel_reader import ExcelReader
+        from src.excel_mcp.core.excel_reader import ExcelReader
 
         path = self._create_test_file(rows=100, cols=5)
         try:

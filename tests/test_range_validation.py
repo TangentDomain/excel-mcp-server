@@ -5,7 +5,7 @@
 """
 
 import pytest
-from src.excel_mcp_server_fastmcp.utils.validators import ExcelValidator, DataValidationError
+from src.excel_mcp.utils.validators import ExcelValidator, DataValidationError
 
 
 class TestRangeValidation:
