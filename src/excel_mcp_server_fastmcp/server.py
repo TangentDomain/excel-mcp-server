@@ -3814,6 +3814,7 @@ def excel_set_data_validation(file_path: str, sheet_name: str, range_address: st
                 - input_message: 输入提示内容（str）
                 - validation_count: 当前工作表中的验证规则总数（int）
     """
+    wb = None
     try:
         from openpyxl import load_workbook
         from openpyxl.worksheet.datavalidation import DataValidation
@@ -4030,6 +4031,9 @@ def excel_set_data_validation(file_path: str, sheet_name: str, range_address: st
         else:
             logger.error(f"[DATA_VALIDATION] 识别为一般操作失败 - error_code=OPERATION_FAILED")
             return _fail(f"数据验证设置失败: {error_msg}", meta={"error_code": "OPERATION_FAILED"})
+    finally:
+        if wb is not None:
+            wb.close()
 
 
 @mcp.tool()
@@ -4043,6 +4047,7 @@ def excel_clear_validation(file_path: str, sheet_name: str = None, range_address
         sheet_name: 工作表名称，默认为None
         range_address: 单元格范围，默认为None
     """
+    wb = None
     try:
         from openpyxl import load_workbook
         
@@ -4088,6 +4093,9 @@ def excel_clear_validation(file_path: str, sheet_name: str = None, range_address
         
     except Exception as e:
         return _fail("数据验证清除失败", meta={"error_code": "OPERATION_FAILED"})
+    finally:
+        if wb is not None:
+            wb.close()
 
 
 # ==================== 条件格式工具 ====================
