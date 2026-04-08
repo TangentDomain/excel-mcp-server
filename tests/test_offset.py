@@ -4,7 +4,7 @@ import pandas as pd
 import tempfile
 import os
 
-from excel_mcp.api.advanced_sql_query import AdvancedSQLQueryEngine
+from excel_mcp_server_fastmcp.api.advanced_sql_query import AdvancedSQLQueryEngine
 
 
 @pytest.fixture

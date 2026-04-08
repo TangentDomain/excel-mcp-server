@@ -13,10 +13,10 @@ import json
 from dataclasses import dataclass
 from typing import Any, Dict, List, Optional
 
-from src.excel_mcp.core.excel_writer import ExcelWriter
-from src.excel_mcp.core.excel_manager import ExcelManager
-from src.excel_mcp.models.types import OperationResult
-from src.excel_mcp.utils.formatter import (
+from src.excel_mcp_server_fastmcp.core.excel_writer import ExcelWriter
+from src.excel_mcp_server_fastmcp.core.excel_manager import ExcelManager
+from src.excel_mcp_server_fastmcp.models.types import OperationResult
+from src.excel_mcp_server_fastmcp.utils.formatter import (
     format_operation_result,
     _serialize_to_json_dict,
     _convert_to_compact_array_format,
@@ -108,7 +108,7 @@ class TestExcelFeatures:
 
     def test_file_reading_cache_performance(self, sample_excel_file):
         """测试文件读取缓存性能优化"""
-        from src.excel_mcp.core.excel_reader import ExcelReader
+        from src.excel_mcp_server_fastmcp.core.excel_reader import ExcelReader
 
         reader = ExcelReader(sample_excel_file)
 
@@ -128,7 +128,7 @@ class TestExcelFeatures:
 
     def test_workbook_caching_optimization(self, sample_excel_file):
         """测试工作簿缓存优化"""
-        from src.excel_mcp.core.excel_reader import ExcelReader
+        from src.excel_mcp_server_fastmcp.core.excel_reader import ExcelReader
         manager = ExcelManager(sample_excel_file)
         reader = ExcelReader(sample_excel_file)
 
@@ -231,8 +231,8 @@ class TestExcelFeatures:
 
     def test_unified_error_handling(self, sample_excel_file):
         """测试统一错误处理机制"""
-        from src.excel_mcp.core.excel_reader import ExcelReader
-        from src.excel_mcp.core.excel_writer import ExcelWriter
+        from src.excel_mcp_server_fastmcp.core.excel_reader import ExcelReader
+        from src.excel_mcp_server_fastmcp.core.excel_writer import ExcelWriter
 
         reader = ExcelReader(sample_excel_file)
         writer = ExcelWriter(sample_excel_file)
@@ -306,7 +306,7 @@ class TestExcelFeatures:
 
     def test_excel_version_compatibility(self, sample_excel_file):
         """测试Excel版本兼容性"""
-        from src.excel_mcp.core.excel_reader import ExcelReader
+        from src.excel_mcp_server_fastmcp.core.excel_reader import ExcelReader
 
         reader = ExcelReader(sample_excel_file)
         result = reader.list_sheets()
@@ -379,7 +379,7 @@ class TestExcelFeatures:
         assert write_result.success is True
 
         # 3. 读取数据验证
-        from src.excel_mcp.core.excel_reader import ExcelReader
+        from src.excel_mcp_server_fastmcp.core.excel_reader import ExcelReader
         reader = ExcelReader(str(file_path))
         read_result = reader.get_range("数据表!A1:C3")
         assert read_result.success is True
@@ -393,7 +393,7 @@ class TestExcelFeatures:
     def test_optimization_features_compatibility(self, sample_excel_file):
         """测试优化功能兼容性"""
         # 确保所有优化功能可以协同工作
-        from src.excel_mcp.core.excel_reader import ExcelReader
+        from src.excel_mcp_server_fastmcp.core.excel_reader import ExcelReader
 
         reader = ExcelReader(sample_excel_file)
         writer = ExcelWriter(sample_excel_file)

@@ -11,9 +11,9 @@ from pathlib import Path
 import os
 import re
 
-from src.excel_mcp.core.excel_search import ExcelSearcher
-from src.excel_mcp.models.types import OperationResult
-from src.excel_mcp.utils.exceptions import ExcelFileNotFoundError
+from src.excel_mcp_server_fastmcp.core.excel_search import ExcelSearcher
+from src.excel_mcp_server_fastmcp.models.types import OperationResult
+from src.excel_mcp_server_fastmcp.utils.exceptions import ExcelFileNotFoundError
 
 
 class TestExcelSearch:

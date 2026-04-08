@@ -49,7 +49,7 @@ class TestBatchOperations:
 
     def test_batch_update_ranges(self, workbook):
         """Batch update multiple ranges in a single file."""
-        from src.excel_mcp.server import excel_batch_update_ranges
+        from src.excel_mcp_server_fastmcp.server import excel_batch_update_ranges
 
         updates = [
             {"range": "B2:B3", "data": [["超级火球术"], ["超级冰冻术"]], "sheet": "技能配置"},
@@ -71,7 +71,7 @@ class TestBatchOperations:
 
     def test_batch_update_partial_failure(self, workbook):
         """Failed range should not block others."""
-        from src.excel_mcp.server import excel_batch_update_ranges
+        from src.excel_mcp_server_fastmcp.server import excel_batch_update_ranges
 
         updates = [
             {"range": "B2:B2", "data": [["新名称"]], "sheet": "技能配置"},
@@ -85,7 +85,7 @@ class TestBatchOperations:
 
     def test_merge_multiple_files_append(self, tmp_path):
         """Merge two files with append mode."""
-        from src.excel_mcp.server import excel_merge_multiple_files
+        from src.excel_mcp_server_fastmcp.server import excel_merge_multiple_files
 
         file1 = str(tmp_path / "source1.xlsx")
         _create_workbook(file1, "技能表", ["id", "name"], [[1, "火球术"], [2, "冰冻术"]])
@@ -110,7 +110,7 @@ class TestChartOperations:
 
     def test_create_column_chart(self, chart_workbook):
         """Create a column chart on a sheet."""
-        from src.excel_mcp.server import excel_create_chart
+        from src.excel_mcp_server_fastmcp.server import excel_create_chart
 
         result = excel_create_chart(
             chart_workbook, "角色属性", "column", "B1:F4",
@@ -121,7 +121,7 @@ class TestChartOperations:
 
     def test_create_pie_chart(self, chart_workbook):
         """Create a pie chart."""
-        from src.excel_mcp.server import excel_create_chart
+        from src.excel_mcp_server_fastmcp.server import excel_create_chart
 
         result = excel_create_chart(
             chart_workbook, "角色属性", "pie", "B1:B4", title="角色占比"
@@ -131,7 +131,7 @@ class TestChartOperations:
 
     def test_invalid_chart_type(self, chart_workbook):
         """Reject unsupported chart types."""
-        from src.excel_mcp.server import excel_create_chart
+        from src.excel_mcp_server_fastmcp.server import excel_create_chart
 
         result = excel_create_chart(
             chart_workbook, "角色属性", "radar", "A1:C5"
@@ -144,7 +144,7 @@ class TestDataValidation:
 
     def test_set_list_validation(self, workbook):
         """Set a list-type data validation."""
-        from src.excel_mcp.server import excel_set_data_validation
+        from src.excel_mcp_server_fastmcp.server import excel_set_data_validation
 
         result = excel_set_data_validation(
             workbook, "技能配置", "C2:C10", "list",
@@ -155,7 +155,7 @@ class TestDataValidation:
 
     def test_set_validation_nonexistent_sheet(self, workbook):
         """Reject non-existent sheet."""
-        from src.excel_mcp.server import excel_set_data_validation
+        from src.excel_mcp_server_fastmcp.server import excel_set_data_validation
 
         result = excel_set_data_validation(
             workbook, "不存在", "A1:A10", "list", "test"
@@ -164,7 +164,7 @@ class TestDataValidation:
 
     def test_clear_validation(self, workbook):
         """Clear all validations on a sheet."""
-        from src.excel_mcp.server import (
+        from src.excel_mcp_server_fastmcp.server import (
             excel_set_data_validation,
             excel_clear_validation,
         )
@@ -179,7 +179,7 @@ class TestDataValidation:
 
     def test_set_whole_number_validation(self, workbook):
         """Set a whole number data validation."""
-        from src.excel_mcp.server import excel_set_data_validation
+        from src.excel_mcp_server_fastmcp.server import excel_set_data_validation
 
         result = excel_set_data_validation(
             workbook, "技能配置", "E2:E10", "whole_number",
@@ -191,7 +191,7 @@ class TestDataValidation:
 
     def test_set_decimal_validation(self, workbook):
         """Set a decimal data validation."""
-        from src.excel_mcp.server import excel_set_data_validation
+        from src.excel_mcp_server_fastmcp.server import excel_set_data_validation
 
         result = excel_set_data_validation(
             workbook, "技能配置", "E2:E10", "decimal",
@@ -202,7 +202,7 @@ class TestDataValidation:
 
     def test_set_date_validation(self, workbook):
         """Set a date data validation."""
-        from src.excel_mcp.server import excel_set_data_validation
+        from src.excel_mcp_server_fastmcp.server import excel_set_data_validation
 
         result = excel_set_data_validation(
             workbook, "技能配置", "F2:F10", "date",
@@ -213,7 +213,7 @@ class TestDataValidation:
 
     def test_set_text_length_validation(self, workbook):
         """Set a text length data validation."""
-        from src.excel_mcp.server import excel_set_data_validation
+        from src.excel_mcp_server_fastmcp.server import excel_set_data_validation
 
         result = excel_set_data_validation(
             workbook, "技能配置", "B2:B10", "text_length",
@@ -224,7 +224,7 @@ class TestDataValidation:
 
     def test_set_custom_validation(self, workbook):
         """Set a custom formula data validation."""
-        from src.excel_mcp.server import excel_set_data_validation
+        from src.excel_mcp_server_fastmcp.server import excel_set_data_validation
 
         result = excel_set_data_validation(
             workbook, "技能配置", "D2:D10", "custom",
@@ -235,7 +235,7 @@ class TestDataValidation:
 
     def test_validation_operators(self, workbook):
         """Test various validation operators."""
-        from src.excel_mcp.server import excel_set_data_validation
+        from src.excel_mcp_server_fastmcp.server import excel_set_data_validation
 
         operators_tests = [
             ("equal,5", "equal"),
@@ -257,7 +257,7 @@ class TestDataValidation:
 
     def test_invalid_validation_type(self, workbook):
         """Reject invalid validation types."""
-        from src.excel_mcp.server import excel_set_data_validation
+        from src.excel_mcp_server_fastmcp.server import excel_set_data_validation
 
         result = excel_set_data_validation(
             workbook, "技能配置", "A1:A10", "invalid_type", "test"
@@ -267,7 +267,7 @@ class TestDataValidation:
 
     def test_invalid_criteria_format(self, workbook):
         """Reject invalid criteria format."""
-        from src.excel_mcp.server import excel_set_data_validation
+        from src.excel_mcp_server_fastmcp.server import excel_set_data_validation
 
         result = excel_set_data_validation(
             workbook, "技能配置", "A1:A10", "whole_number", "invalid_format"
@@ -277,7 +277,7 @@ class TestDataValidation:
 
     def test_clear_validation_by_range(self, workbook):
         """Clear validations for a specific range."""
-        from src.excel_mcp.server import (
+        from src.excel_mcp_server_fastmcp.server import (
             excel_set_data_validation,
             excel_clear_validation,
         )
@@ -298,7 +298,7 @@ class TestConditionalFormatting:
 
     def test_add_cell_value_format(self, workbook):
         """Add a cell-value conditional format."""
-        from src.excel_mcp.server import excel_add_conditional_format
+        from src.excel_mcp_server_fastmcp.server import excel_add_conditional_format
 
         result = excel_add_conditional_format(
             workbook, "技能配置", "D2:D5", "cellValue",
@@ -309,7 +309,7 @@ class TestConditionalFormatting:
 
     def test_add_format_nonexistent_sheet(self, workbook):
         """Reject non-existent sheet."""
-        from src.excel_mcp.server import excel_add_conditional_format
+        from src.excel_mcp_server_fastmcp.server import excel_add_conditional_format
 
         result = excel_add_conditional_format(
             workbook, "不存在", "A1:A10", "cellValue", ">=0"
@@ -318,7 +318,7 @@ class TestConditionalFormatting:
 
     def test_clear_conditional_format(self, workbook):
         """Clear conditional formatting on a sheet."""
-        from src.excel_mcp.server import (
+        from src.excel_mcp_server_fastmcp.server import (
             excel_add_conditional_format,
             excel_clear_conditional_format,
         )

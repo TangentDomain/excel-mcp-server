@@ -10,7 +10,7 @@ import os
 from unittest.mock import patch, MagicMock
 from datetime import datetime
 
-from src.excel_mcp.server import (
+from src.excel_mcp_server_fastmcp.server import (
     OperationLogger,
     excel_assess_data_impact,
     excel_create_backup,
@@ -22,8 +22,8 @@ from src.excel_mcp.server import (
     _generate_assessment_recommendations,
     _predict_operation_result
 )
-from src.excel_mcp.utils.validators import ExcelValidator, DataValidationError
-from src.excel_mcp.api.excel_operations import ExcelOperations
+from src.excel_mcp_server_fastmcp.utils.validators import ExcelValidator, DataValidationError
+from src.excel_mcp_server_fastmcp.api.excel_operations import ExcelOperations
 
 class TestOperationLogger:
     """测试操作日志记录器"""
@@ -348,7 +348,7 @@ class TestIntegrationSecurityWorkflow:
         import shutil
         shutil.rmtree(self.temp_dir, ignore_errors=True)
 
-    @patch('src.excel_mcp.server.ExcelOperations.get_range')
+    @patch('src.excel_mcp_server_fastmcp.server.ExcelOperations.get_range')
     def test_complete_safe_update_workflow(self, mock_get_range):
         """测试完整的安全更新工作流程"""
         # 模拟现有数据
@@ -403,7 +403,7 @@ class TestIntegrationSecurityWorkflow:
         with pytest.raises(DataValidationError):
             ExcelValidator.validate_range_expression("A1:C10")  # 缺少工作表名
 
-    @patch('src.excel_mcp.server.ExcelOperations.get_range')
+    @patch('src.excel_mcp_server_fastmcp.server.ExcelOperations.get_range')
     def test_high_risk_operation_detection(self, mock_get_range):
         """测试高风险操作检测"""
         # 模拟大量数据

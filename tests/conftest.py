@@ -20,7 +20,7 @@ logging.getLogger('openpyxl').setLevel(logging.ERROR)
 def clear_sql_engine_cache():
     """在每个测试之前清除SQL引擎缓存，避免并行测试时的缓存污染"""
     try:
-        from excel_mcp.api.advanced_sql_query import _get_engine
+        from excel_mcp_server_fastmcp.api.advanced_sql_query import _get_engine
         engine = _get_engine()
         engine.clear_cache()
     except ImportError:

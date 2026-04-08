@@ -54,7 +54,7 @@ class TestUpsertUpdate:
 
     def test_update_existing_row(self, workbook):
         """Update an existing row by key."""
-        from src.excel_mcp.api.excel_operations import ExcelOperations
+        from src.excel_mcp_server_fastmcp.api.excel_operations import ExcelOperations
         result = ExcelOperations.upsert_row(
             workbook, "技能配置",
             key_column="skill_id", key_value=1001,
@@ -67,7 +67,7 @@ class TestUpsertUpdate:
 
     def test_update_persists(self, workbook):
         """Updated values are persisted in the file."""
-        from src.excel_mcp.api.excel_operations import ExcelOperations
+        from src.excel_mcp_server_fastmcp.api.excel_operations import ExcelOperations
         ExcelOperations.upsert_row(
             workbook, "技能配置",
             key_column="skill_id", key_value=1002,
@@ -81,7 +81,7 @@ class TestUpsertUpdate:
 
     def test_update_does_not_affect_other_rows(self, workbook):
         """Updating one row doesn't change other rows."""
-        from src.excel_mcp.api.excel_operations import ExcelOperations
+        from src.excel_mcp_server_fastmcp.api.excel_operations import ExcelOperations
         ExcelOperations.upsert_row(
             workbook, "技能配置",
             key_column="skill_id", key_value=1001,
@@ -95,7 +95,7 @@ class TestUpsertUpdate:
 
     def test_update_string_key(self, workbook):
         """Upsert with string key value."""
-        from src.excel_mcp.api.excel_operations import ExcelOperations
+        from src.excel_mcp_server_fastmcp.api.excel_operations import ExcelOperations
         result = ExcelOperations.upsert_row(
             workbook, "技能配置",
             key_column="skill_name", key_value="斩击",
@@ -110,7 +110,7 @@ class TestUpsertInsert:
 
     def test_insert_new_row(self, workbook):
         """Insert a new row when key doesn't exist."""
-        from src.excel_mcp.api.excel_operations import ExcelOperations
+        from src.excel_mcp_server_fastmcp.api.excel_operations import ExcelOperations
         result = ExcelOperations.upsert_row(
             workbook, "技能配置",
             key_column="skill_id", key_value=1004,
@@ -122,7 +122,7 @@ class TestUpsertInsert:
 
     def test_insert_persists(self, workbook):
         """Inserted row is persisted in the file."""
-        from src.excel_mcp.api.excel_operations import ExcelOperations
+        from src.excel_mcp_server_fastmcp.api.excel_operations import ExcelOperations
         ExcelOperations.upsert_row(
             workbook, "技能配置",
             key_column="skill_id", key_value=1005,
@@ -136,7 +136,7 @@ class TestUpsertInsert:
 
     def test_insert_key_auto_filled(self, workbook):
         """Key column value is auto-filled even if not in updates dict."""
-        from src.excel_mcp.api.excel_operations import ExcelOperations
+        from src.excel_mcp_server_fastmcp.api.excel_operations import ExcelOperations
         result = ExcelOperations.upsert_row(
             workbook, "技能配置",
             key_column="skill_id", key_value=1006,
@@ -155,7 +155,7 @@ class TestUpsertDualHeader:
 
     def test_update_dual_header(self, dual_header_workbook):
         """Update with dual-header (header_row=2)."""
-        from src.excel_mcp.api.excel_operations import ExcelOperations
+        from src.excel_mcp_server_fastmcp.api.excel_operations import ExcelOperations
         result = ExcelOperations.upsert_row(
             dual_header_workbook, "装备配置",
             key_column="equip_id", key_value=2001,
@@ -167,7 +167,7 @@ class TestUpsertDualHeader:
 
     def test_insert_dual_header(self, dual_header_workbook):
         """Insert with dual-header."""
-        from src.excel_mcp.api.excel_operations import ExcelOperations
+        from src.excel_mcp_server_fastmcp.api.excel_operations import ExcelOperations
         result = ExcelOperations.upsert_row(
             dual_header_workbook, "装备配置",
             key_column="equip_id", key_value=2004,
@@ -183,7 +183,7 @@ class TestUpsertErrors:
 
     def test_nonexistent_sheet(self, workbook):
         """Error when sheet doesn't exist."""
-        from src.excel_mcp.api.excel_operations import ExcelOperations
+        from src.excel_mcp_server_fastmcp.api.excel_operations import ExcelOperations
         result = ExcelOperations.upsert_row(
             workbook, "不存在的表",
             key_column="skill_id", key_value=1001,
@@ -194,7 +194,7 @@ class TestUpsertErrors:
 
     def test_nonexistent_key_column(self, workbook):
         """Error when key column doesn't exist."""
-        from src.excel_mcp.api.excel_operations import ExcelOperations
+        from src.excel_mcp_server_fastmcp.api.excel_operations import ExcelOperations
         result = ExcelOperations.upsert_row(
             workbook, "技能配置",
             key_column="不存在的列", key_value=1001,
@@ -205,7 +205,7 @@ class TestUpsertErrors:
 
     def test_empty_updates(self, workbook):
         """Error when updates dict is empty."""
-        from src.excel_mcp.api.excel_operations import ExcelOperations
+        from src.excel_mcp_server_fastmcp.api.excel_operations import ExcelOperations
         result = ExcelOperations.upsert_row(
             workbook, "技能配置",
             key_column="skill_id", key_value=1001,
@@ -215,7 +215,7 @@ class TestUpsertErrors:
 
     def test_none_key_value(self, workbook):
         """Error when key_value is None."""
-        from src.excel_mcp.api.excel_operations import ExcelOperations
+        from src.excel_mcp_server_fastmcp.api.excel_operations import ExcelOperations
         result = ExcelOperations.upsert_row(
             workbook, "技能配置",
             key_column="skill_id", key_value=None,
@@ -241,7 +241,7 @@ class TestBatchInsertRows:
 
     def test_batch_insert_basic(self, batch_workbook):
         """Batch insert multiple rows."""
-        from src.excel_mcp.api.excel_operations import ExcelOperations
+        from src.excel_mcp_server_fastmcp.api.excel_operations import ExcelOperations
         data = [
             {"monster_id": 3003, "monster_name": "巨龙", "level": 50, "hp": 5000},
             {"monster_id": 3004, "monster_name": "骷髅兵", "level": 3, "hp": 50},
@@ -254,7 +254,7 @@ class TestBatchInsertRows:
 
     def test_batch_insert_persists(self, batch_workbook):
         """Batch inserted rows are persisted."""
-        from src.excel_mcp.api.excel_operations import ExcelOperations
+        from src.excel_mcp_server_fastmcp.api.excel_operations import ExcelOperations
         data = [
             {"monster_id": 3005, "monster_name": "恶魔", "hp": 800},
         ]
@@ -267,7 +267,7 @@ class TestBatchInsertRows:
 
     def test_batch_insert_single_row(self, batch_workbook):
         """Batch insert with single row."""
-        from src.excel_mcp.api.excel_operations import ExcelOperations
+        from src.excel_mcp_server_fastmcp.api.excel_operations import ExcelOperations
         data = [{"monster_id": 3006, "monster_name": "精灵"}]
         result = ExcelOperations.batch_insert_rows(batch_workbook, "怪物配置", data)
         assert result['success'] is True
@@ -275,13 +275,13 @@ class TestBatchInsertRows:
 
     def test_batch_insert_empty_data(self, batch_workbook):
         """Error when data is empty."""
-        from src.excel_mcp.api.excel_operations import ExcelOperations
+        from src.excel_mcp_server_fastmcp.api.excel_operations import ExcelOperations
         result = ExcelOperations.batch_insert_rows(batch_workbook, "怪物配置", [])
         assert result['success'] is False
 
     def test_batch_insert_nonexistent_sheet(self, batch_workbook):
         """Error when sheet doesn't exist."""
-        from src.excel_mcp.api.excel_operations import ExcelOperations
+        from src.excel_mcp_server_fastmcp.api.excel_operations import ExcelOperations
         result = ExcelOperations.batch_insert_rows(
             batch_workbook, "不存在的表",
             [{"monster_id": 1}]
@@ -291,7 +291,7 @@ class TestBatchInsertRows:
 
     def test_batch_insert_unknown_columns(self, batch_workbook):
         """Unknown columns are ignored and reported."""
-        from src.excel_mcp.api.excel_operations import ExcelOperations
+        from src.excel_mcp_server_fastmcp.api.excel_operations import ExcelOperations
         data = [
             {"monster_id": 3007, "monster_name": "幽灵", "unknown_col": "ignored"},
         ]

@@ -5,7 +5,7 @@ import os
 
 # 添加源码路径（worktree兼容）
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', 'src'))
-from src.excel_mcp.api.advanced_sql_query import AdvancedSQLQueryEngine
+from src.excel_mcp_server_fastmcp.api.advanced_sql_query import AdvancedSQLQueryEngine
 
 
 @pytest.fixture

@@ -5,7 +5,7 @@ import os
 import tempfile
 import unittest
 from unittest.mock import patch, MagicMock
-from excel_mcp.server import excel_create_pivot_table
+from excel_mcp_server_fastmcp.server import excel_create_pivot_table
 
 
 class TestPivotTable(unittest.TestCase):

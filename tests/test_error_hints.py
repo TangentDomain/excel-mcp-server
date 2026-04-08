@@ -4,7 +4,7 @@
 """
 
 import pytest
-from src.excel_mcp.server import _fail, _wrap, _ERROR_HINTS, _infer_error_code
+from src.excel_mcp_server_fastmcp.server import _fail, _wrap, _ERROR_HINTS, _infer_error_code
 
 
 class TestCentralizedErrorHints:

@@ -13,7 +13,7 @@ import sys
 project_root = Path(__file__).parent
 sys.path.insert(0, str(project_root / "src"))
 
-from excel_mcp.core.smart_config_recommender import SmartConfigurationRecommender
+from excel_mcp_server_fastmcp.core.smart_config_recommender import SmartConfigurationRecommender
 
 
 def create_test_excel_data():
@@ -71,7 +71,7 @@ def test_game_type_detection():
     """测试游戏类型检测"""
     print("\n🧪 测试2: 游戏类型检测")
     
-    from excel_mcp.core.smart_config_recommender import GameTypeDetector
+    from excel_mcp_server_fastmcp.core.smart_config_recommender import GameTypeDetector
     
     detector = GameTypeDetector()
     excel_data = create_test_excel_data()
@@ -95,7 +95,7 @@ def test_configuration_analyzer():
     """测试配置分析器"""
     print("\n🧪 测试3: 配置分析器")
     
-    from excel_mcp.core.smart_config_recommender import ConfigurationAnalyzer
+    from excel_mcp_server_fastmcp.core.smart_config_recommender import ConfigurationAnalyzer
     
     analyzer = ConfigurationAnalyzer()
     excel_data = create_test_excel_data()
@@ -173,7 +173,7 @@ def test_integration_with_server():
     
     try:
         # 检查是否可以正确导入server模块
-        from excel_mcp.server import mcp, SMART_CONFIG_AVAILABLE, SMART_CONFIG_TOOLS_AVAILABLE
+        from excel_mcp_server_fastmcp.server import mcp, SMART_CONFIG_AVAILABLE, SMART_CONFIG_TOOLS_AVAILABLE
         print("✅ MCP服务器模块导入成功")
         
         # 检查mcp对象是否可用
@@ -184,7 +184,7 @@ def test_integration_with_server():
             print("✅ 智能配置工具状态: 可用")
             
             # 检查智能配置工具函数是否存在
-            from excel_mcp.server import recommend_excel_config, analyze_game_patterns, generate_validation_rules, optimize_data_structure
+            from excel_mcp_server_fastmcp.server import recommend_excel_config, analyze_game_patterns, generate_validation_rules, optimize_data_structure
             print("✅ 智能配置工具函数导入成功")
             
             return True

@@ -7,7 +7,7 @@ GAME_CONFIG = os.path.join(os.path.dirname(__file__), "test_data", "game_config.
 
 @pytest.fixture
 def engine():
-    from src.excel_mcp.api.advanced_sql_query import AdvancedSQLQueryEngine
+    from src.excel_mcp_server_fastmcp.api.advanced_sql_query import AdvancedSQLQueryEngine
     return AdvancedSQLQueryEngine()
 
 

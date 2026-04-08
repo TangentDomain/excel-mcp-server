@@ -7,7 +7,7 @@ import time
 # 确保能导入包
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', 'src'))
 
-from excel_mcp.server import ToolCallTracker, _track_call, _tracker
+from excel_mcp_server_fastmcp.server import ToolCallTracker, _track_call, _tracker
 
 
 class TestToolCallTracker:

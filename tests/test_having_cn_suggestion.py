@@ -8,7 +8,7 @@ import pytest
 import sys
 sys.path.insert(0, 'src')
 
-from excel_mcp.api.advanced_sql_query import execute_advanced_sql_query
+from excel_mcp_server_fastmcp.api.advanced_sql_query import execute_advanced_sql_query
 
 GAME_CONFIG = 'tests/test_data/game_config.xlsx'
 

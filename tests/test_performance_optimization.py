@@ -10,8 +10,8 @@ import pytest
 import pandas as pd
 import numpy as np
 
-from src.excel_mcp.api.advanced_sql_query import AdvancedSQLQueryEngine
-from src.excel_mcp.api.excel_operations import ExcelOperations
+from src.excel_mcp_server_fastmcp.api.advanced_sql_query import AdvancedSQLQueryEngine
+from src.excel_mcp_server_fastmcp.api.excel_operations import ExcelOperations
 
 
 @pytest.fixture
@@ -308,7 +308,7 @@ class TestConcurrentBatchOperations:
 
     def test_parallel_validate_batch_data(self):
         """测试并行数据验证"""
-        from src.excel_mcp.utils.concurrent_utils import parallel_validate_batch_data
+        from src.excel_mcp_server_fastmcp.utils.concurrent_utils import parallel_validate_batch_data
 
         rows = [{"id": i, "name": f"item_{i}"} for i in range(1000)]
 
@@ -323,7 +323,7 @@ class TestConcurrentBatchOperations:
 
     def test_parallel_validate_batch_data_with_errors(self):
         """测试并行数据验证（含错误行）"""
-        from src.excel_mcp.utils.concurrent_utils import parallel_validate_batch_data
+        from src.excel_mcp_server_fastmcp.utils.concurrent_utils import parallel_validate_batch_data
 
         rows = [{"id": i, "name": f"item_{i}"} for i in range(100)]
         rows[10]["id"] = -1
@@ -341,14 +341,14 @@ class TestConcurrentBatchOperations:
 
     def test_parallel_validate_empty(self):
         """测试空数据并行验证"""
-        from src.excel_mcp.utils.concurrent_utils import parallel_validate_batch_data
+        from src.excel_mcp_server_fastmcp.utils.concurrent_utils import parallel_validate_batch_data
 
         errors = parallel_validate_batch_data([], lambda r: None)
         assert errors == []
 
     def test_parallel_group_execute(self):
         """测试并行分组执行"""
-        from src.excel_mcp.utils.concurrent_utils import parallel_group_execute
+        from src.excel_mcp_server_fastmcp.utils.concurrent_utils import parallel_group_execute
 
         groups = {
             "A": [1, 2, 3],

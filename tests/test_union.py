@@ -3,7 +3,7 @@ import pytest
 import os
 
 PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-from src.excel_mcp.api.advanced_sql_query import AdvancedSQLQueryEngine
+from src.excel_mcp_server_fastmcp.api.advanced_sql_query import AdvancedSQLQueryEngine
 
 TEST_FILE = os.path.join(PROJECT_ROOT, "tests", "test_data", "game_config.xlsx")
 

@@ -10,14 +10,14 @@ import tempfile
 from pathlib import Path
 from dataclasses import FrozenInstanceError
 
-from src.excel_mcp.utils.exceptions import (
+from src.excel_mcp_server_fastmcp.utils.exceptions import (
     ExcelException,
     ExcelFileNotFoundError,
     SheetNotFoundError,
     DataValidationError,
     OperationLimitError
 )
-from src.excel_mcp.models.types import (
+from src.excel_mcp_server_fastmcp.models.types import (
     SheetInfo, RangeInfo, CellInfo, SearchMatch, ModifiedCell,
     OperationResult, RangeType, MatchType
 )

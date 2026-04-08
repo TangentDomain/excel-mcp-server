@@ -33,7 +33,7 @@ class TestCOALESCEGroupByMultiColumn:
 
     def test_coalesce_multi_column_groupby_count(self, multi_col_groupby_file):
         """COALESCE + 2列GROUP BY + COUNT应返回4行（每列组合一行）"""
-        from excel_mcp.api.advanced_sql_query import execute_advanced_sql_query
+        from excel_mcp_server_fastmcp.api.advanced_sql_query import execute_advanced_sql_query
 
         sql = "SELECT COALESCE(类型, '未知') as t, 等级, COUNT(*) as cnt FROM test_data GROUP BY 类型, 等级"
         result = execute_advanced_sql_query(multi_col_groupby_file, sql)
@@ -45,7 +45,7 @@ class TestCOALESCEGroupByMultiColumn:
 
     def test_coalesce_multi_column_groupby_values(self, multi_col_groupby_file):
         """COALESCE + 多列GROUP BY：每行等级值应正确"""
-        from excel_mcp.api.advanced_sql_query import execute_advanced_sql_query
+        from excel_mcp_server_fastmcp.api.advanced_sql_query import execute_advanced_sql_query
 
         sql = "SELECT COALESCE(类型, '未知') as t, 等级 FROM test_data GROUP BY 类型, 等级"
         result = execute_advanced_sql_query(multi_col_groupby_file, sql)
@@ -56,7 +56,7 @@ class TestCOALESCEGroupByMultiColumn:
 
     def test_coalesce_multi_column_groupby_with_avg(self, multi_col_groupby_file):
         """COALESCE + 多列GROUP BY + AVG聚合"""
-        from excel_mcp.api.advanced_sql_query import execute_advanced_sql_query
+        from excel_mcp_server_fastmcp.api.advanced_sql_query import execute_advanced_sql_query
 
         sql = "SELECT COALESCE(类型, '未知') as t, 等级, AVG(伤害) as avg_dmg FROM test_data GROUP BY 类型, 等级"
         result = execute_advanced_sql_query(multi_col_groupby_file, sql)
@@ -70,7 +70,7 @@ class TestCaseWhenGroupByMultiColumn:
 
     def test_case_when_multi_column_groupby(self, multi_col_groupby_file):
         """CASE WHEN + 2列GROUP BY应返回正确行数"""
-        from excel_mcp.api.advanced_sql_query import execute_advanced_sql_query
+        from excel_mcp_server_fastmcp.api.advanced_sql_query import execute_advanced_sql_query
 
         sql = "SELECT CASE WHEN 类型='法师' THEN '魔法' ELSE '物理' END as c, 等级, COUNT(*) as cnt FROM test_data GROUP BY 类型, 等级"
         result = execute_advanced_sql_query(multi_col_groupby_file, sql)
@@ -79,7 +79,7 @@ class TestCaseWhenGroupByMultiColumn:
 
     def test_case_when_multi_column_values(self, multi_col_groupby_file):
         """CASE WHEN + 多列GROUP BY：等级列值应正确"""
-        from excel_mcp.api.advanced_sql_query import execute_advanced_sql_query
+        from excel_mcp_server_fastmcp.api.advanced_sql_query import execute_advanced_sql_query
 
         sql = "SELECT CASE WHEN 类型='法师' THEN '魔法' ELSE '物理' END as c, 等级 FROM test_data GROUP BY 类型, 等级"
         result = execute_advanced_sql_query(multi_col_groupby_file, sql)
@@ -94,7 +94,7 @@ class TestComputedGroupByRegression:
 
     def test_coalesce_single_column_groupby(self, multi_col_groupby_file):
         """COALESCE + 单列GROUP BY（回归）"""
-        from excel_mcp.api.advanced_sql_query import execute_advanced_sql_query
+        from excel_mcp_server_fastmcp.api.advanced_sql_query import execute_advanced_sql_query
 
         sql = "SELECT COALESCE(类型, '未知') as t, COUNT(*) as cnt FROM test_data GROUP BY 类型"
         result = execute_advanced_sql_query(multi_col_groupby_file, sql)
@@ -104,7 +104,7 @@ class TestComputedGroupByRegression:
 
     def test_coalesce_with_avg_aggregate(self, multi_col_groupby_file):
         """COALESCE + AVG聚合（回归）"""
-        from excel_mcp.api.advanced_sql_query import execute_advanced_sql_query
+        from excel_mcp_server_fastmcp.api.advanced_sql_query import execute_advanced_sql_query
 
         sql = "SELECT COALESCE(类型, '未知') as t, AVG(伤害) as avg_dmg FROM test_data GROUP BY 类型"
         result = execute_advanced_sql_query(multi_col_groupby_file, sql)
@@ -121,7 +121,7 @@ class TestComputedGroupByRegression:
 
     def test_coalesce_in_where_with_groupby(self, multi_col_groupby_file):
         """COALESCE在WHERE+GROUP BY中（回归）"""
-        from excel_mcp.api.advanced_sql_query import execute_advanced_sql_query
+        from excel_mcp_server_fastmcp.api.advanced_sql_query import execute_advanced_sql_query
 
         sql = "SELECT 等级, COUNT(*) as cnt FROM test_data WHERE COALESCE(类型, '未知')='法师' GROUP BY 等级"
         result = execute_advanced_sql_query(multi_col_groupby_file, sql)
@@ -131,7 +131,7 @@ class TestComputedGroupByRegression:
 
     def test_case_when_in_select_no_groupby(self, multi_col_groupby_file):
         """CASE WHEN在SELECT中无GROUP BY（回归）"""
-        from excel_mcp.api.advanced_sql_query import execute_advanced_sql_query
+        from excel_mcp_server_fastmcp.api.advanced_sql_query import execute_advanced_sql_query
 
         sql = "SELECT 类型, CASE WHEN 伤害>100 THEN '高' ELSE '低' END as level FROM test_data"
         result = execute_advanced_sql_query(multi_col_groupby_file, sql)

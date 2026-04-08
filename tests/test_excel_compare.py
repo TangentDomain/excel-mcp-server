@@ -10,12 +10,12 @@ import os
 from pathlib import Path
 from unittest.mock import Mock, patch
 
-from src.excel_mcp.core.excel_compare import ExcelComparer
-from src.excel_mcp.models.types import (
+from src.excel_mcp_server_fastmcp.core.excel_compare import ExcelComparer
+from src.excel_mcp_server_fastmcp.models.types import (
     ComparisonOptions, OperationResult, ComparisonResult,
     DifferenceType, RowDifference, FieldDifference
 )
-from src.excel_mcp.utils.exceptions import ExcelFileNotFoundError, SheetNotFoundError
+from src.excel_mcp_server_fastmcp.utils.exceptions import ExcelFileNotFoundError, SheetNotFoundError
 
 
 class TestExcelComparer:
@@ -37,8 +37,8 @@ class TestExcelComparer:
         comparer = ExcelComparer(options)
         assert comparer.options is options
 
-    @patch('src.excel_mcp.core.excel_compare.load_workbook')
-    @patch('src.excel_mcp.utils.validators.ExcelValidator.validate_file_path')
+    @patch('src.excel_mcp_server_fastmcp.core.excel_compare.load_workbook')
+    @patch('src.excel_mcp_server_fastmcp.utils.validators.ExcelValidator.validate_file_path')
     def test_compare_files_identical(self, mock_validate, mock_load_workbook):
         """测试比较两个相同的文件"""
         # Mock文件验证
@@ -63,8 +63,8 @@ class TestExcelComparer:
         assert isinstance(result, OperationResult)
         assert result.success is True
 
-    @patch('src.excel_mcp.core.excel_compare.load_workbook')
-    @patch('src.excel_mcp.utils.validators.ExcelValidator.validate_file_path')
+    @patch('src.excel_mcp_server_fastmcp.core.excel_compare.load_workbook')
+    @patch('src.excel_mcp_server_fastmcp.utils.validators.ExcelValidator.validate_file_path')
     def test_compare_files_different(self, mock_validate, mock_load_workbook):
         """测试比较两个不同的文件"""
         # Mock文件验证
@@ -92,7 +92,7 @@ class TestExcelComparer:
         """测试比较不存在的文件"""
         comparer = ExcelComparer()
 
-        with patch('src.excel_mcp.utils.validators.ExcelValidator.validate_file_path') as mock_validate:
+        with patch('src.excel_mcp_server_fastmcp.utils.validators.ExcelValidator.validate_file_path') as mock_validate:
             mock_validate.side_effect = ExcelFileNotFoundError("文件不存在")
 
             result = comparer.compare_files("nonexistent1.xlsx", "nonexistent2.xlsx")
@@ -125,8 +125,8 @@ class TestExcelComparer:
         assert hasattr(comparer, '_generate_comparison_summary')
         assert callable(getattr(comparer, '_generate_comparison_summary'))
 
-    @patch('src.excel_mcp.core.excel_compare.load_workbook')
-    @patch('src.excel_mcp.utils.validators.ExcelValidator.validate_file_path')
+    @patch('src.excel_mcp_server_fastmcp.core.excel_compare.load_workbook')
+    @patch('src.excel_mcp_server_fastmcp.utils.validators.ExcelValidator.validate_file_path')
     def test_compare_files_with_options(self, mock_validate, mock_load_workbook):
         """测试使用特定选项比较文件"""
         mock_validate.side_effect = lambda x: x
@@ -151,7 +151,7 @@ class TestExcelComparer:
         """测试比较文件时的异常处理"""
         comparer = ExcelComparer()
 
-        with patch('src.excel_mcp.utils.validators.ExcelValidator.validate_file_path') as mock_validate:
+        with patch('src.excel_mcp_server_fastmcp.utils.validators.ExcelValidator.validate_file_path') as mock_validate:
             mock_validate.side_effect = Exception("意外错误")
 
             result = comparer.compare_files("file1.xlsx", "file2.xlsx")

@@ -25,7 +25,7 @@ def test_core_functionality():
     # 1. 测试list_sheets
     print("\n📋 测试1: 列出工作表")
     try:
-        from excel_mcp.api.excel_operations import ExcelOperations
+        from excel_mcp_server_fastmcp.api.excel_operations import ExcelOperations
         ops = ExcelOperations()
         result = ops.list_sheets(test_file)
         print(f"✅ 工作表列表: {result}")
@@ -100,7 +100,7 @@ def test_core_functionality():
     # 7. 测试智能配置工具
     print("\n📋 测试7: 智能配置推荐")
     try:
-        from excel_mcp.core.smart_config_recommender import SmartConfigurationRecommender
+        from excel_mcp_server_fastmcp.core.smart_config_recommender import SmartConfigurationRecommender
         recommender = SmartConfigurationRecommender()
         
         # 读取测试数据
