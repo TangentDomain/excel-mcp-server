@@ -38,9 +38,12 @@ class ExcelWriter:
         初始化Excel写入器
 
         Args:
-            file_path: Excel文件路径
+            file_path: Excel文件路径（允许空字符串，用于临时计算场景）
         """
-        self.file_path = ExcelValidator.validate_file_path(file_path)
+        if file_path:
+            self.file_path = ExcelValidator.validate_file_path(file_path)
+        else:
+            self.file_path = ""
 
     def _check_file_lock(self) -> None:
         """检查文件是否被锁定

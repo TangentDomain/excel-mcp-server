@@ -352,30 +352,36 @@ class ExcelOperations:
 
             # 步骤3: 解析双行表头信息
             header_info = cls._parse_dual_header_data(result.data, max_columns)
+            is_dual_header = header_info.get('is_dual_header', False)
+
+            # 如果是双行表头，field_names用第2行；否则用第1行
+            effective_headers = header_info['field_names'] if is_dual_header else header_info['descriptions']
 
             return {
                 'success': True,
                 # 向后兼容：直接提供核心字段在顶层
-                'field_names': header_info['field_names'],    # 字段名（第2行）
-                'descriptions': header_info['descriptions'],  # 字段描述（第1行）
-                'headers': header_info['field_names'],        # 向后兼容别名
-                'header_count': len(header_info['field_names']),  # 向后兼容
-                'sheet_name': sheet_name,  # 向后兼容
+                'field_names': header_info['field_names'],
+                'descriptions': header_info['descriptions'],
+                'headers': effective_headers,
+                'header_count': len(effective_headers),
+                'sheet_name': sheet_name,
+                'is_dual_header': is_dual_header,
                 # 统一data字段，集中核心数据
                 'data': {
                     'field_names': header_info['field_names'],
                     'descriptions': header_info['descriptions'],
-                    'headers': header_info['field_names'],
-                    'dual_rows': True  # 标识使用了双行模式
+                    'headers': effective_headers,
+                    'is_dual_header': is_dual_header
                 },
                 'meta': {
                     'sheet_name': sheet_name,
                     'header_row': header_row,
-                    'header_count': len(header_info['field_names']),
+                    'header_count': len(effective_headers),
                     'max_columns': max_columns,
-                    'dual_row_mode': True
+                    'dual_row_mode': is_dual_header,
+                    'header_type': 'dual' if is_dual_header else 'single'
                 },
-                'message': f"成功获取{len(header_info['field_names'])}个表头字段（描述+字段名）"
+                'message': f"成功获取{len(effective_headers)}个表头字段（{'双行表头：描述+字段名' if is_dual_header else '单行表头'}）"
             }
 
         except Exception as e:
@@ -546,10 +552,10 @@ class ExcelOperations:
         field_names = []
 
         if not data or len(data) < 2:
-            # 如果数据不足两行，返回空结果
             return {
                 'descriptions': descriptions,
-                'field_names': field_names
+                'field_names': field_names,
+                'is_dual_header': False
             }
 
         # 解析第一行（字段描述）
@@ -561,6 +567,30 @@ class ExcelOperations:
         max_cols = max(len(first_row), len(second_row))  # 改为取最大值，不遗漏任何列
         if max_columns:
             max_cols = min(max_cols, max_columns)
+
+        # 检测是否为双行表头（与server.py的_detect_dual_header逻辑一致）
+        # 注意：data中的元素可能是CellInfo对象，需要通过.value访问实际值
+        def _cell_str(c):
+            if c is None: return None
+            if hasattr(c, 'value'): return c.value
+            return c
+
+        is_dual_header = False
+        # 需要至少2列才能判断
+        if len(first_row) >= 2 and len(second_row) >= 2:
+            # 第二行是否全是有效英文字段名
+            second_row_strs = [_cell_str(c) for c in second_row if _cell_str(c) is not None]
+            all_valid_names = all(
+                isinstance(v, str) and v.strip() and v.strip()[0].isalpha() and v.strip()[0].isascii()
+                for v in second_row_strs
+            )
+            # 第一行是否有中文
+            first_row_strs = [_cell_str(c) for c in first_row if _cell_str(c) is not None]
+            any_chinese = any(
+                isinstance(v, str) and any('\u4e00' <= ch <= '\u9fff' for ch in v)
+                for v in first_row_strs
+            )
+            is_dual_header = all_valid_names and any_chinese and len(second_row_strs) >= 2
 
         for i in range(max_cols):
             # 处理字段描述（第1行）
@@ -576,13 +606,21 @@ class ExcelOperations:
             # 🆕 智能Fallback机制
             column_letter = get_column_letter(i + 1)  # 1-based列名：A, B, C...
 
-            # 描述为空时使用列标识作为fallback
-            if not desc_str:
-                desc_str = f"列{column_letter}"  # 中文：列A, 列B, 列C...
-
-            # 字段名为空时使用列名作为fallback
-            if not name_str:
-                name_str = column_letter.lower()  # 小写：a, b, c...
+            if is_dual_header:
+                # 双行模式：第1行描述，第2行字段名
+                if not desc_str:
+                    desc_str = f"列{column_letter}"
+                if not name_str:
+                    name_str = column_letter.lower()
+            else:
+                # 单行模式：第1行就是字段名，描述为空
+                if not desc_str and name_str:
+                    desc_str = name_str
+                    name_str = ""
+                elif not desc_str:
+                    desc_str = f"列{column_letter}"
+                if not name_str:
+                    name_str = ""  # 单行模式不需要fallback字段名
 
             # 🆕 检查是否应该停止（简化的停止条件）
             # 只有在没有指定max_columns时才进行智能停止
@@ -627,7 +665,8 @@ class ExcelOperations:
 
         return {
             'descriptions': descriptions,
-            'field_names': field_names
+            'field_names': field_names,
+            'is_dual_header': is_dual_header
         }
 
     @classmethod

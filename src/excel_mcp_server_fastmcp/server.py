@@ -768,7 +768,17 @@ def _strip_defaults(obj: Any, depth: int = 0) -> Any:
     return cleaned
 
 
-def _wrap(result: dict, meta: dict = None) -> dict:
+def _ensure_dict(result) -> dict:
+    """将OperationResult等dataclass转换为dict，已是dict则原样返回。"""
+    if isinstance(result, dict):
+        return result
+    if hasattr(result, '__dataclass_fields__'):
+        from dataclasses import asdict
+        return asdict(result)
+    return result
+
+
+def _wrap(result, meta: dict = None) -> dict:
     """包装Operations层返回，metadata→meta，添加上下文meta，统一success字段。
     
     统一返回格式：{success, message, data, meta}
@@ -776,6 +786,7 @@ def _wrap(result: dict, meta: dict = None) -> dict:
     - metadata→meta：Operations层的metadata自动映射到meta
     - error→message：确保AI只需检查message键
     """
+    result = _ensure_dict(result)
     if not isinstance(result, dict):
         return result
     # 统一error→message，确保AI只需检查message键
@@ -1071,6 +1082,7 @@ def excel_get_range(
 
     # 调用原始函数
     result = ExcelOperations.get_range(file_path, range, include_formatting)
+    result = _ensure_dict(result)
 
     # 如果成功，添加验证信息到结果中
     if result.get('success'):
@@ -1212,6 +1224,7 @@ def excel_update_range(
         use_streaming = streaming and not preserve_formulas
         # 插入模式会自动使用流式插入，覆盖模式使用流式覆盖
         result = ExcelOperations.update_range(file_path, range, data, preserve_formulas, insert_mode, use_streaming)
+        result = _ensure_dict(result)
 
         # 记录操作结果
         operation_logger.log_operation("operation_result", {
@@ -1264,6 +1277,7 @@ def excel_assess_data_impact(
 
     # 获取当前数据
     current_data_result = ExcelOperations.get_range(file_path, range)
+    current_data_result = _ensure_dict(current_data_result)
 
     if not current_data_result.get('success'):
         return _fail(f"无法预览操作: {current_data_result.get('message', '未知错误')}", meta={"error_code": "PREVIEW_FAILED"})
@@ -1961,8 +1975,7 @@ def excel_delete_sheet(
 
     try:
         result = ExcelOperations.delete_sheet(file_path, sheet_name)
-
-        # 记录操作结果
+        result = _ensure_dict(result)
         operation_logger.log_operation("operation_result", {
             "success": result.get('success', False),
             "deleted_sheet": result.get('deleted_sheet', ''),
@@ -2102,7 +2115,7 @@ def excel_batch_insert_rows(
             except Exception:
                 # 降级：用SQL引擎
                 sql = f"SELECT * FROM {sheet_name} WHERE {condition} LIMIT 1"
-                query_result = ExcelOperations.query(file_path, sql)
+                query_result = _ensure_dict(ExcelOperations.query(file_path, sql))
                 if query_result.get('success', False):
                     qdata = query_result.get('data', [])
                     if isinstance(qdata, list) and len(qdata) > 1:
@@ -2206,7 +2219,7 @@ def excel_delete_rows(
             except Exception:
                 # 降级：用SQL引擎执行
                 sql = f"SELECT * FROM {sheet_name} WHERE {condition}"
-                query_result = ExcelOperations.query(file_path, sql)
+                query_result = _ensure_dict(ExcelOperations.query(file_path, sql))
                 if not query_result.get('success', False):
                     return _fail(f"条件查询失败: {query_result.get('message', '未知错误')}",
                                  meta={"error_code": "CONDITION_QUERY_FAILED"})
@@ -2245,7 +2258,7 @@ def excel_delete_rows(
                            data={'deleted_rows': 0, 'condition': condition})
 
             # 使用批量删除（一次文件I/O代替N次）- REQ-032 多线程优化
-            result = ExcelOperations.batch_delete_rows(file_path, sheet_name, row_numbers, streaming)
+            result = _ensure_dict(ExcelOperations.batch_delete_rows(file_path, sheet_name, row_numbers, streaming))
             total_deleted = result.get('data', {}).get('deleted_rows', result.get('metadata', {}).get('deleted_rows', 0))
 
             operation_logger.log_operation("operation_result", {
@@ -2284,7 +2297,7 @@ def excel_delete_rows(
     })
 
     try:
-        result = ExcelOperations.delete_rows(file_path, sheet_name, row_index, count, streaming)
+        result = _ensure_dict(ExcelOperations.delete_rows(file_path, sheet_name, row_index, count, streaming))
 
         # 记录操作结果
         operation_logger.log_operation("operation_result", {
@@ -2334,7 +2347,7 @@ def excel_delete_columns(
     })
 
     try:
-        result = ExcelOperations.delete_columns(file_path, sheet_name, column_index, count, streaming)
+        result = _ensure_dict(ExcelOperations.delete_columns(file_path, sheet_name, column_index, count, streaming))
 
         # 记录操作结果
         operation_logger.log_operation("operation_result", {
@@ -2852,7 +2865,7 @@ def excel_format_cells(
         range = f"{sheet_name}!{range}"
     
     # 调用原始函数
-    result = ExcelOperations.format_cells(file_path, sheet_name, range, formatting, preset)
+    result = _ensure_dict(ExcelOperations.format_cells(file_path, sheet_name, range, formatting, preset))
     
     # 如果成功但data为null（无实际格式更改），添加说明
     if result.get('success') and result.get('data') is None:
