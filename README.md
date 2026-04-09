@@ -2,10 +2,10 @@
 
 # 🎮 ExcelMCP: 让游戏策划用嘴说话的Excel神器
 
-[![PyPI](https://img.shields.io/pypi/v/excel-mcp-server-fastmcp.svg)](https://pypi.org/project/excel-mcp-server-fastmcp/v1.7.19)
+[![PyPI](https://img.shields.io/pypi/v/excel-mcp-server-fastmcp.svg)](https://pypi.org/project/excel-mcp-server-fastmcp/v1.8.8)
 [![CI](https://github.com/TangentDomain/excel-mcp-server/actions/workflows/ci.yml/badge.svg)](https://github.com/TangentDomain/excel-mcp-server/actions/workflows/ci.yml)
-![Tests](https://img.shields.io/badge/tests-851-brightgreen.svg)
-![Tools](https://img.shields.io/badge/tools-53-green.svg)
+![Tests](https://img.shields.io/badge/tests-920-brightgreen.svg)
+![Tools](https://img.shields.io/badge/tools-41-green.svg)
 ![GitHub stars](https://img.shields.io/github/stars/TangentDomain/excel-mcp-server?style=social&label=Stars)
 
 > **🚀 游戏策划必备：用中文/SQL直接操作Excel，告别手动VBA！**
@@ -16,13 +16,17 @@
 
 ---
 
-## 🚀 最新更新 (v1.7.19)
+## 🚀 最新更新 (v1.8.8)
+
+### ✨ 新功能
+- **行号支持**：`_ROW_NUMBER_` 虚拟列，SELECT 和 UPDATE 都可用，精确定位重复记录
+- **IN/NOT IN 修复**：UPDATE 的 IN 子句静默失败问题已修复（流式写入自动降级）
+- **写入增强**：列名匹配失败自动降级到传统 openpyxl 路径，写入验证+重复检测
 
 ### 🐛 BUG修复
-- **excel_create_pivot_table修复**: Sheet不存在时错误码从OPERATION_FAILED改为SHEET_NOT_FOUND，与其他函数保持一致
-
-### 📋 验证
-- **REQ-051验证**: 边缘测试脚本函数名正确，无需修改
+- **P0**：IN 子句 UPDATE 多行时静默失败（流式写入列名不匹配）
+- **P1**：流式写入阈值优化（50→200行），减少误触发概率
+- **pivot_table 错误码统一**：Sheet 不存在时返回 SHEET_NOT_FOUND
 
 ### 🎮 游戏场景支持
 - **技能系统**：CTE查询、平衡分析、批量调整
@@ -46,7 +50,6 @@
 
 ## 🚀 快速开始(1分钟)
 
-> 💡 **😱 第一次用？** → 先看 [🎮 3分钟视频教程](VIDEO_TUTORIALS.md)  
 > 💡 **🔥 急用命令？** → [📋 30秒快速参考](docs/QUICK_REFERENCE.md)
 
 ### 🔥 一键安装，即刻使用！
@@ -102,54 +105,10 @@ pip install excel-mcp-server-fastmcp
 
 ---
 
-## 🚀 3分钟快速开始
-
-### 🎯 新用户必读（3分钟快速上手）
-
-#### 第一步：准备Excel文件
-把你的游戏配置表放到桌面：
-```
-~/Desktop/技能表.xlsx
-~/Desktop/装备表.xlsx  
-~/Desktop/怪物配置表.xlsx
-```
-
-#### 第二步：安装工具（1分钟）
-```bash
-# 安装uv（如果还没安装）
-curl -LsSf https://astral.sh/uv/install.sh | sh
-
-# 安装ExcelMCP
-uvx excel-mcp-server-fastmcp
-```
-
-#### 第三步：开始使用（1分钟）
-打开你常用的AI客户端（Claude Desktop/Cursor/Cherry Studio），配置MCP后，直接说：
-```
-# 基础操作
-"读取技能表"
-"把法师技能攻击力加20%" 
-"找出所有史诗装备"
-
-# 进阶操作  
-"关联技能表和职业表，统计技能数量"
-"分析技能平衡性，找出数值异常的技能"
-```
-
-#### ✅ 成功标志
-当你收到类似这样的回复，说明配置成功：
-```
-✅ 成功读取技能表
-📊 表格信息：3个sheet，127行数据
-💡 发现技能数据，可以开始分析...
-```
-
----
-
 ## 🎮 游戏开发场景演示 (所见即所得！)
 
 ### 🎯 策划日常工作示例
-> 🎯 **真实案例**: 以下所有操作都已通过53个游戏专用工具验证  
+> 🎯 **真实案例**: 以下所有操作都已通过41个MCP工具验证  
 > 🎮 **支持游戏**: RPG、MMO、卡牌、塔防、射击、策略等各类游戏  
 > ⚡ **性能表现**: 支持10万+数据批量处理，响应时间 <1秒
 
@@ -191,7 +150,7 @@ uvx excel-mcp-server-fastmcp
 | **批量修改** | 🟢 一条指令搞定 | 🔴 手动操作 | 🟡 需要详细描述 | 🟡 需要循环处理 |
 | **错误处理** | 🟢 智能提示 | 🔴 容易出错 | 🟡 依赖 AI 能力 | 🔴 需要异常处理 |
 | **游戏优化** | 🟢 专属优化 | 🔴 通用功能 | 🔴 不专业 | 🟡 需要游戏知识 |
-| **响应速度** | 🟢 < 5秒 | 🟢 即时 | 🟡 10-30秒 | 🟢 3-10秒 |
+| **响应速度** | 🟢 < 3秒 | 🟢 即时 | 🟡 10-30秒 | 🟢 3-10秒 |
 | **数据规模** | 🟢 10万行×1000列 | 🟢 无限制 | 🔴 有限制 | 🟢 内存限制 |
 
 ### 优势场景分析
@@ -302,7 +261,7 @@ UPDATE 数据表 SET 状态 = '已处理' WHERE _ROW_NUMBER_ = 5
 UPDATE 数据表 SET 值 = 100 WHERE _ROW_NUMBER_ BETWEEN 10 AND 50
 ```
 
-> ⚠️ **注意**：`_ROW_NUMBER_` 仅在 **UPDATE 的 WHERE 条件**中可用，不能用于 SELECT 查询。行号从1开始计数，对应Excel的数据行（不含表头）。
+> ⚠️ **注意**：`_ROW_NUMBER_` 在 **SELECT 查询和 UPDATE 的 WHERE 条件**中都可用。不能用于 SET 赋值。行号从1开始计数，对应Excel的数据行（不含表头）。
 
 ---
 
@@ -396,7 +355,7 @@ GitHub Issues → 使用 Bug 报告模板
 
 ## 📈 技术规格
 
-- **响应速度**:小文件 < 1秒,大文件 < 5秒
+- **响应速度**:小文件 < 1秒,大文件 < 3秒
 - **数据规模**:10万行 × 1000列
 - **工具数量**:53 个游戏专用工具
 - **内存占用**:< 100MB(典型文件)
