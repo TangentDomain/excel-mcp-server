@@ -1994,7 +1994,7 @@ class AdvancedSQLQueryEngine:
         # 支持的窗口函数类型
         supported_funcs = {'RowNumber', 'Rank', 'DenseRank'}
         if func_type not in supported_funcs:
-            raise ValueError(f"不支持的窗口函数: {func_type}.支持的: ROW_NUMBER, RANK, DENSE_RANK")
+            raise ValueError(f"不支持的窗口函数: {func_type}。💡 支持的窗口函数: ROW_NUMBER, RANK, DENSE_RANK（均需配合 OVER(ORDER BY ...) 使用）")
 
         if select_alias_map is None:
             select_alias_map = {}
@@ -2035,7 +2035,7 @@ class AdvancedSQLQueryEngine:
         handler = _window_dispatch.get(func_type)
         if handler:
             return handler(df, partition_cols, order_cols, ascending)
-        raise ValueError(f"不支持的窗口函数: {func_type}")
+        raise ValueError(f"不支持的窗口函数: {func_type}。💡 支持的窗口函数: ROW_NUMBER, RANK, DENSE_RANK（均需配合 OVER(ORDER BY ...) 使用）")
 
     def _resolve_window_column(self, col_name: str, df_columns: list,
                                 select_alias_map: Dict[str, str]) -> str:
@@ -2613,7 +2613,7 @@ class AdvancedSQLQueryEngine:
             # COALESCE在数学表达式中(向量化)
             return self._evaluate_coalesce_vectorized(expr, df)
         else:
-            raise ValueError(f"不支持的数学表达式部分: {expr}")
+            raise ValueError(f"不支持的数学运算: {expr}。💡 WHERE子句暂不支持算术运算，建议用子查询替代")
 
     def _is_string_function(self, expr) -> bool:
         """检查是否为字符串函数"""
@@ -2669,7 +2669,7 @@ class AdvancedSQLQueryEngine:
             n = self._get_arg(expr, 'expression', 1, int)
             return val_series.str.slice(-n)
 
-        raise ValueError(f"不支持的字符串函数: {func_name}")
+        raise ValueError(f"不支持的字符串函数: {func_name}。💡 支持的字符串函数: UPPER, LOWER, CONCAT, SUBSTRING, TRIM, LENGTH, REPLACE")
 
     # 逐行字符串函数分发表:一元操作,统一模式 op(val)
     _ROW_STR_OPS = {
@@ -2735,7 +2735,11 @@ class AdvancedSQLQueryEngine:
         elif isinstance(expr, exp.Case):
             return self._evaluate_case_expression(expr, df)
         else:
-            raise ValueError(f"不支持的表达式类型: {type(expr).__name__}")
+            raise ValueError(
+                f"不支持的表达式类型: {type(expr).__name__}。"
+                f"\n💡 建议: 检查SQL语法，常用表达式支持: 列引用、字面量、算术运算(+,-,*,/)、字符串函数(UPPER/LOWER/CONCAT)、CASE WHEN。"
+                f"\n🔧 如需复杂计算，可用子查询替代: SELECT * FROM (SELECT ..., (A+B) as total FROM table) WHERE total > 100"
+            )
 
     def _literal_value(self, expr) -> Any:
         """提取字面量值"""
@@ -2998,7 +3002,7 @@ class AdvancedSQLQueryEngine:
                 right_expr = child.right
                 break
             else:
-                raise ValueError("JOIN ON多条件暂不支持,请使用单个等值连接条件")
+                raise ValueError("JOIN ON多条件暂不支持。💡 建议拆分为多个单条件JOIN或使用子查询")
         else:
             raise ValueError(f"JOIN ON条件格式不支持,请使用等值连接: ON a.id = b.id")
 
@@ -3122,14 +3126,14 @@ class AdvancedSQLQueryEngine:
             left = self._sql_condition_to_pandas(condition.left, df)
             right = self._sql_condition_to_pandas(condition.right, df)
             if left is None or right is None:
-                raise ValueError("AND条件包含不支持的子查询类型,需使用逐行过滤")
+                raise ValueError("AND条件包含不支持的子查询类型。💡 建议将复杂子查询改为JOIN或逐行过滤")
             return f"({left}) & ({right})"
 
         elif isinstance(condition, exp.Or):
             left = self._sql_condition_to_pandas(condition.left, df)
             right = self._sql_condition_to_pandas(condition.right, df)
             if left is None or right is None:
-                raise ValueError("OR条件包含不支持的子查询类型,需使用逐行过滤")
+                raise ValueError("OR条件包含不支持的子查询类型。💡 建议将复杂子查询改为JOIN或逐行过滤")
             return f"({left}) | ({right})"
 
         elif isinstance(condition, exp.Paren):
@@ -3289,7 +3293,11 @@ class AdvancedSQLQueryEngine:
             raise ValueError(f"无法找到聚合函数 {func_name} 对应的列.可用列: {list(df.columns)}")
 
         else:
-            raise ValueError(f"不支持的表达式类型: {type(expr)}")
+            raise ValueError(
+                f"不支持的表达式类型: {type(expr).__name__}。"
+                f"\n💡 建议: 聚合函数(SUM/COUNT/AVG/MAX/MIN)需要配合列名使用，如 SUM(列名)。"
+                f"\n🔧 检查SELECT列表中是否有不支持的函数调用。"
+            )
 
     def _expression_to_value(self, expr: exp.Expression, df) -> Union[str, int, float]:
         """将表达式转换为值"""
@@ -3331,7 +3339,11 @@ class AdvancedSQLQueryEngine:
                 raise ValueError(f"标量子查询执行失败: {e}")
 
         else:
-            raise ValueError(f"不支持的表达式类型: {type(expr)}")
+            raise ValueError(
+                f"不支持的表达式类型: {type(expr).__name__}。"
+                f"\n💡 WHERE子句支持: 比较运算(=,!=,>,<,>=,<=)、逻辑运算(AND,OR,NOT)、LIKE、IN、BETWEEN、IS NULL。"
+                f"\n🔧 不支持算术运算(如 A+B>10)，建议用子查询: SELECT * FROM (SELECT ..., (A+B) as t FROM tbl) WHERE t>10"
+            )
 
     def _apply_row_filter(self, condition: exp.Expression, df) -> pd.DataFrame:
         """逐行应用过滤条件(备用方案),使用apply替代iterrows提升性能"""

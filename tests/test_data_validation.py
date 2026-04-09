@@ -6,6 +6,7 @@
 import unittest
 import tempfile
 import os
+import pytest
 from unittest.mock import patch, MagicMock
 import sys
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', 'src'))
@@ -808,7 +809,7 @@ class TestDataValidationBoundary(unittest.TestCase):
         for config in validation_configs:
             result = excel_set_data_validation(
                 file_path=self.test_file,
-                sheet_name="IntegrationTest",
+                sheet_name="BoundaryTest",
                 range_address=config['range'],
                 validation_type=config['type'],
                 criteria=config['criteria']
