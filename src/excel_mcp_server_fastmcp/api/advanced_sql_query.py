@@ -2379,6 +2379,10 @@ class AdvancedSQLQueryEngine:
                     alias_name = f"{alias_name}_{i}"
             used_aliases.add(alias_name)
 
+            # 解包Paren: (伤害 * 1.2) → 伤害 * 1.2
+            while isinstance(original_expr, exp.Paren):
+                original_expr = original_expr.this
+
             # 计算表达式值
             try:
                 if isinstance(original_expr, exp.Column):
@@ -2560,6 +2564,7 @@ class AdvancedSQLQueryEngine:
         exp.Coalesce, exp.Case, exp.Exists,
         exp.Upper, exp.Lower, exp.Trim, exp.Length,
         exp.Concat, exp.Replace, exp.Substring, exp.Left, exp.Right,
+        exp.Add, exp.Sub, exp.Mul, exp.Div, exp.Mod,
     })
 
     # HAVING空结果建议分发表:(stat_func, op_str, label)
@@ -2871,13 +2876,14 @@ class AdvancedSQLQueryEngine:
             # 性能优化:为大数据集创建索引(如果JOIN列存在且数据量大)
             if on_clause and total_memory_mb > 10:  # 大于10MB的数据集使用索引优化
                 # 提前解析ON条件来决定是否需要索引
-                left_on_col, right_on_col = self._parse_join_on_condition(on_clause, left_table, right_table, right_alias)
+                left_on_col, right_on_col, _non_equi = self._parse_join_on_condition(on_clause, left_table, right_table, right_alias)
                 
-                # 为JOIN列创建索引(如果数据量大)
-                if left_on_col and left_on_col in result_df.columns:
-                    result_df = result_df.set_index(left_on_col, inplace=False)
-                if right_on_col and right_on_col in right_df.columns:
-                    right_df = right_df.set_index(right_on_col, inplace=False)
+                # 非等值连接不需要索引优化
+                if not _non_equi and left_on_col:
+                    if left_on_col in result_df.columns:
+                        result_df = result_df.set_index(left_on_col, inplace=False)
+                    if right_on_col and right_on_col in right_df.columns:
+                        right_df = right_df.set_index(right_on_col, inplace=False)
 
             if join_kind == 'cross':
                 # CROSS JOIN: 笛卡尔积,不需要ON条件
@@ -2889,10 +2895,9 @@ class AdvancedSQLQueryEngine:
                     hint="JOIN必须包含ON条件,例如:... JOIN 表2 ON 表1.id = 表2.id."
                 )
             else:
-                left_on_col, right_on_col = self._parse_join_on_condition(on_clause, left_table, right_table, right_alias)
-
-                # 验证列存在
-                if left_on_col not in result_df.columns:
+                left_on_col, right_on_col, non_equi_cond = self._parse_join_on_condition(on_clause, left_table, right_table, right_alias)
+                # 等值连接:验证列存在
+                if not non_equi_cond and left_on_col:
                     raise StructuredSQLError(
                         "column_not_found",
                         f"左表 '{left_table}' 没有列 '{left_on_col}'.可用列: {list(result_df.columns)}",
@@ -2962,21 +2967,29 @@ class AdvancedSQLQueryEngine:
                     how=join_kind
                 )
 
-            # 合并后删除重复的ON列(右表侧)
+            # 非等值连接: cross join + row filter
+            if non_equi_cond is not None:
+                # 执行cross join
+                result_df = result_df.merge(right_df_renamed, how='cross')
+                # 使用已有的行过滤逻辑
+                result_df = self._apply_row_filter(non_equi_cond, result_df)
+
             if actual_right_on and actual_right_on in result_df.columns and actual_right_on != left_on_col:
                 result_df = result_df.drop(columns=[actual_right_on])
 
         return result_df
 
-    def _parse_join_on_condition(self, on_clause, left_table: str, right_table: str, right_alias: str) -> Tuple[str, str]:
+    def _parse_join_on_condition(self, on_clause, left_table: str, right_table: str, right_alias: str):
         """
-        解析JOIN ON条件,返回(左列, 右列)
+        解析JOIN ON条件
 
-        支持格式:
-        - ON a.id = b.id(带表别名)
-        - ON id = id(不带别名,自动匹配)
-        - ON a.id = id(混合)
+        等值连接返回 (left_col, right_col, None)
+        非等值连接返回 (None, None, on_clause)
         """
+        # 非等值连接: 返回条件用于cross+filter
+        if isinstance(on_clause, (exp.GT, exp.GTE, exp.LT, exp.LTE, exp.NEQ)):
+            return (None, None, on_clause)
+
         if isinstance(on_clause, exp.EQ):
             left_expr = on_clause.left
             right_expr = on_clause.right
@@ -3015,16 +3028,16 @@ class AdvancedSQLQueryEngine:
             resolved_left_tbl = self._table_aliases.get(left_tbl, left_tbl)
             if resolved_left_tbl == right_table or left_tbl == right_alias:
                 # 左表达式实际指向右表,交换
-                return right_col, left_col
+                return right_col, left_col, None
         if right_tbl:
             resolved_right_tbl = self._table_aliases.get(right_tbl, right_tbl)
             if resolved_right_tbl == left_table:
                 # 右表达式实际指向左表,交换
-                return right_col, left_col
+                return right_col, left_col, None
 
         # 无表限定符:根据列是否存在于左右表来判断
         # 默认左=左表, 右=右表
-        return left_col, right_col
+        return left_col, right_col, None
 
     def _apply_where_clause(self, parsed_sql: exp.Expression, df) -> pd.DataFrame:
         """应用WHERE条件"""
@@ -3068,7 +3081,7 @@ class AdvancedSQLQueryEngine:
         except (ValueError, TypeError):
             return expr.this
 
-    def _in_to_pandas(self, in_expr: exp.In, df) -> str:
+    def _in_to_pandas(self, in_expr: exp.In, df, negate: bool = False) -> str:
         """将IN/NOT IN条件转换为pandas表达式(支持子查询和值列表)
 
         Args:
@@ -3459,8 +3472,15 @@ class AdvancedSQLQueryEngine:
 
         try:
             parsed_inner = sqlglot.parse_one(inner_sql)
-            sub_result = self._execute_query(parsed_inner, self._current_worksheets)
-            return len(sub_result) > 0
+            # 保存外部查询状态,避免_execute_query内部重置覆盖
+            saved_aliases = dict(self._table_aliases)
+            saved_worksheets = dict(self._current_worksheets)
+            try:
+                sub_result = self._execute_query(parsed_inner, saved_worksheets)
+                return len(sub_result) > 0
+            finally:
+                self._table_aliases = saved_aliases
+                self._current_worksheets = saved_worksheets
         except Exception:
             return False
 
@@ -4027,6 +4047,9 @@ class AdvancedSQLQueryEngine:
             if isinstance(select_expr, exp.Star):
                 continue
             alias_name, original_expr = self._extract_select_alias(select_expr, i)
+            # 解包Paren表达式
+            while isinstance(original_expr, exp.Paren):
+                original_expr = original_expr.this
             aliases[alias_name] = original_expr
         return aliases
 
