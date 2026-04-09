@@ -621,7 +621,7 @@ class TestDataValidationBoundary(unittest.TestCase):
             sheet_name="BoundaryTest",
             range_address="A1:A1",
             validation_type="custom",
-            criteria="=EXACT(A1,"expected")"
+            criteria='=EXACT(A1,"expected")'
         )
         self.assertTrue(result['success'])
 
