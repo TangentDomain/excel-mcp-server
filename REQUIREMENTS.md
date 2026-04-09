@@ -62,7 +62,7 @@ REQ-EXCEL-002 (P2) - 添加自动化测试配置
 > 测试日期：2026-04-09 | 测试SQL查询25+条 | 工具函数15+个 | 发现问题12个
 
 ### REQ-EXCEL-003 (P0): IN/NOT IN 操作符内部错误
-- **状态**: OPEN
+- **状态**: DONE
 - **来源**: L1 用户直接反馈（Bug #1）
 - **问题**: `AdvancedSQLQueryEngine._in_to_pandas() got an unexpected keyword argument 'negate'`
 - **影响**: 所有使用IN和NOT IN的查询全部失败
