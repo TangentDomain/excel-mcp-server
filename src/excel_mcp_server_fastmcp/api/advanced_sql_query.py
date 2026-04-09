@@ -3134,7 +3134,14 @@ class AdvancedSQLQueryEngine:
     @staticmethod
     def _parse_literal_value(expr: exp.Literal) -> Any:
         """将SQL Literal解析为Python值(字符串->str,数字->int/float)"""
-        if expr.is_string:
+        # 处理SQLGlot 27.29.0的is_string属性bug
+        try:
+            is_string = expr.is_string
+        except KeyError:
+            # 如果is_string属性访问失败，基于this的内容判断是否为字符串
+            is_string = isinstance(expr.this, str) or (isinstance(expr.this, str) and expr.this.startswith("'"))
+        
+        if is_string:
             return expr.this
         try:
             return float(expr.this) if '.' in str(expr.this) else int(expr.this)

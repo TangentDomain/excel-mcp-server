@@ -25,18 +25,8 @@ echo "轮次: $ROUND_NUM" >> "$TASK_FILE"
 # 分析 OPEN 需求
 echo "### OPEN 需求分析" >> "$TASK_FILE"
 
-if python3 -c "
-import sys
-import json
-sys.path.insert(0, 'src')
-try:
-    with open('REQUIREMENTS.md', 'r', encoding='utf-8') as f:
-        content = f.read()
-        if 'PAUSED' in content and 'OPEN' in content:
-            print('发现OPEN/PAUSED需求，需要优先处理')
-else:
-    print('REQUIREMENTS.md 读取失败')
-"; then
+# 检查是否有 OPEN 需求
+if grep -q "状态: OPEN" REQUIREMENTS.md; then
     echo "✅ 已发现 OPEN 需求，将进入子任务执行" >> "$TASK_FILE"
 else
     echo "❌ 未发现有效 OPEN 需求" >> "$TASK_FILE"
