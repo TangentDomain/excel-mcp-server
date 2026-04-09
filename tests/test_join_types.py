@@ -1,9 +1,11 @@
 """测试 RIGHT JOIN, FULL JOIN, CROSS JOIN 支持"""
 import os
+import sys
 import pytest
 import pandas as pd
 
-from src.excel_mcp_server_fastmcp.api.advanced_sql_query import AdvancedSQLQueryEngine
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', 'src'))
+from excel_mcp_server_fastmcp.api.advanced_sql_query import AdvancedSQLQueryEngine
 
 # xdist isolation: run all join type tests in the same worker to avoid file I/O races
 pytestmark = pytest.mark.xdist_group("join_types")

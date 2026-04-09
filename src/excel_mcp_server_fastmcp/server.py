@@ -3923,9 +3923,22 @@ def excel_set_data_validation(file_path: str, sheet_name: str, range_address: st
                 value2 = parts[2] if len(parts) > 2 else None
                 logger.debug(f"[DATA_VALIDATION] 解析操作符和值 - operator={operator}, value1={value1}, value2={value2}")
 
-                # 验证操作符
-                valid_operators = ['between', 'notBetween', 'equal', 'notEqual', 'greaterThan',
-                                 'lessThan', 'greaterThanOrEqual', 'lessThanOrEqual']
+                # 操作符名映射：支持 snake_case 和 camelCase
+                operator_alias = {
+                    'between': 'between', 'not_between': 'notBetween',
+                    'equal': 'equal', 'not_equal': 'notEqual',
+                    'greater_than': 'greaterThan', 'less_than': 'lessThan',
+                    'greater_than_or_equal': 'greaterThanOrEqual', 'less_than_or_equal': 'lessThanOrEqual',
+                    'notBetween': 'notBetween', 'greaterThan': 'greaterThan',
+                    'lessThan': 'lessThan', 'greaterThanOrEqual': 'greaterThanOrEqual',
+                    'lessThanOrEqual': 'lessThanOrEqual', 'notEqual': 'notEqual',
+                }
+                operator = operator_alias.get(operator)
+                if not operator:
+                    logger.error(f"[DATA_VALIDATION] 不支持的操作符 - operator={parts[0]}")
+                    return _fail(f"不支持的操作符: {parts[0]}，支持的操作符: {','.join(sorted(set(operator_alias.values())))}",
+                                meta={"error_code": "VALIDATION_FAILED"})
+                valid_operators = list(set(operator_alias.values()))
                 if operator not in valid_operators:
                     logger.error(f"[DATA_VALIDATION] 不支持的操作符 - operator={operator}")
                     return _fail(f"不支持的操作符: {operator}，支持的操作符: {','.join(valid_operators)}",

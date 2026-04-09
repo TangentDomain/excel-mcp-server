@@ -2897,7 +2897,7 @@ class AdvancedSQLQueryEngine:
             else:
                 left_on_col, right_on_col, non_equi_cond = self._parse_join_on_condition(on_clause, left_table, right_table, right_alias)
                 # 等值连接:验证列存在
-                if not non_equi_cond and left_on_col:
+                if not non_equi_cond and left_on_col and left_on_col not in result_df.columns:
                     raise StructuredSQLError(
                         "column_not_found",
                         f"左表 '{left_table}' 没有列 '{left_on_col}'.可用列: {list(result_df.columns)}",
