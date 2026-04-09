@@ -2904,7 +2904,7 @@ class AdvancedSQLQueryEngine:
                         hint="请检查ON条件中左表的列名拼写.",
                         context={"table": left_table, "column_requested": left_on_col, "available_columns": list(result_df.columns)}
                     )
-                if right_on_col not in right_df.columns:
+                if right_on_col and right_on_col not in right_df.columns:
                     raise StructuredSQLError(
                         "column_not_found",
                         f"右表 '{right_table}' 没有列 '{right_on_col}'.可用列: {list(right_df.columns)}",
@@ -2959,6 +2959,10 @@ class AdvancedSQLQueryEngine:
                 # 恢复原始列名
                 for old_col, new_col in temp_col_mapping.items():
                     result_df = result_df.rename(columns={new_col: old_col})
+            elif non_equi_cond is not None:
+                # 非等值连接: cross join + row filter
+                result_df = result_df.merge(right_df_renamed, how='cross')
+                result_df = self._apply_row_filter(non_equi_cond, result_df)
             else:
                 result_df = result_df.merge(
                     right_df_renamed,
@@ -2967,13 +2971,7 @@ class AdvancedSQLQueryEngine:
                     how=join_kind
                 )
 
-            # 非等值连接: cross join + row filter
-            if non_equi_cond is not None:
-                # 执行cross join
-                result_df = result_df.merge(right_df_renamed, how='cross')
-                # 使用已有的行过滤逻辑
-                result_df = self._apply_row_filter(non_equi_cond, result_df)
-
+            # 合并后删除重复的ON列(右表侧)
             if actual_right_on and actual_right_on in result_df.columns and actual_right_on != left_on_col:
                 result_df = result_df.drop(columns=[actual_right_on])
 
