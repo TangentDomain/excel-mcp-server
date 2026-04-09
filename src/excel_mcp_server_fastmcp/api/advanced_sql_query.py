@@ -2230,6 +2230,10 @@ class AdvancedSQLQueryEngine:
 
         base_df = effective_data[from_table].copy()
 
+        # 添加行号虚拟列 _ROW_NUMBER_ (SELECT和UPDATE通用)
+        if '_ROW_NUMBER_' not in base_df.columns:
+            base_df['_ROW_NUMBER_'] = range(1, len(base_df) + 1)
+
         # 构建表别名映射
         self._table_aliases = {}
         self._table_aliases[from_table] = from_table
