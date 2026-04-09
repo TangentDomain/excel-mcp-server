@@ -136,11 +136,12 @@ REQ-EXCEL-002 (P2) - 添加自动化测试配置
 ## 窗口函数扩展（SQL差距分析 2026-04-09）
 
 ### REQ-EXCEL-014 (P0): LAG / LEAD 窗口函数
-- **状态**: OPEN
+- **状态**: DONE
 - **来源**: SQL差距分析报告
 - **问题**: 缺少LAG/LEAD，无法取前N行/后N行的值（如对比前后等级属性变化）
 - **验收**: `LAG(col, N) OVER (PARTITION BY ... ORDER BY ...)` 和 `LEAD(col, N) OVER (...)` 可用
 - **替代方案**: 自JOIN偏移行（复杂度高）
+- **完成时间**: 2026-04-09
 
 ### REQ-EXCEL-015 (P0): GROUP_CONCAT 聚合函数
 - **状态**: OPEN

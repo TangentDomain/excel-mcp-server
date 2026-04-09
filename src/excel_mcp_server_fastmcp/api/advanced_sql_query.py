@@ -4212,6 +4212,43 @@ class AdvancedSQLQueryEngine:
             col_name = self._extract_agg_column(expr.this, "COUNT")
             return grouped[col_name].count()
 
+        # GROUP_CONCAT 特殊处理
+        if func_name == 'groupconcat':
+            # GROUP_CONCAT(col, separator) - sqlglot MySQL 方言将语法解析为:
+            # GROUP_CONCAT(col, sep) -> GroupConcat(this=Concat(...), separator=None)
+            # 其中 Concat 的 expressions=[col, sep]
+            # GROUP_CONCAT(col SEPARATOR sep) -> GroupConcat(this=col, separator=sep)
+            separator = ','
+            col_name = None
+            is_distinct = False
+
+            # 检查是否为 DISTINCT
+            if isinstance(expr.this, exp.Distinct):
+                is_distinct = True
+                target = expr.this.expressions[0]
+            else:
+                target = expr.this
+
+            # 检查是否为 Concat 表达式（MySQL 方言对 GROUP_CONCAT(col, sep) 的解析）
+            if isinstance(target, exp.Concat):
+                concat_exprs = target.expressions
+                if len(concat_exprs) >= 1:
+                    col_name = self._extract_agg_column(concat_exprs[0], "GROUP_CONCAT")
+                if len(concat_exprs) >= 2 and isinstance(concat_exprs[1], exp.Literal):
+                    separator = concat_exprs[1].this
+            else:
+                # 标准形式：GROUP_CONCAT(col SEPARATOR sep) 或 GROUP_CONCAT(col)
+                col_name = self._extract_agg_column(target, "GROUP_CONCAT")
+                sep_arg = expr.args.get('separator')
+                if sep_arg and isinstance(sep_arg, exp.Literal):
+                    separator = sep_arg.this
+
+            # 执行拼接
+            if is_distinct:
+                return grouped[col_name].apply(lambda x: separator.join(str(v) for v in set(x) if v is not None and v != ''))
+            else:
+                return grouped[col_name].apply(lambda x: separator.join(str(v) for v in x if v is not None and v != ''))
+
         # 其他聚合函数不支持 *
         if isinstance(expr.this, exp.Star):
             raise ValueError(f"函数 {func_name} 不支持 * 参数")
