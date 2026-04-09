@@ -77,27 +77,21 @@ pip install excel-mcp-server-fastmcp
 
 ### 🔗 AI 客户端配置(1分钟)
 
-#### Claude Desktop(推荐)
-```json
-{
-  "mcpServers": {
-    "excelmcp": {
-      "command": "uvx",
-      "args": ["excel-mcp-server-fastmcp"]
-    }
-  }
-}
-```
-
-#### Cursor
+#### Cursor（推荐）
 - 设置 → MCP → Add Server
 - Name: `excelmcp`
 - Command: `uvx`
-- Args: `["excel-mcp-server-fastmcp"]`
+- Args: `"excel-mcp-server-fastmcp"`
+
+#### Claude Code
+```bash
+# 在项目中添加MCP服务器
+claude mcp add excelmcp -- uvx excel-mcp-server-fastmcp
+```
 
 #### 其他客户端
-- Cherry Studio / VSCode + Continue:同样配置
-- OpenClaw:内置支持,无需配置
+- Cherry Studio / VSCode + Continue: 同样配置
+- OpenClaw: 内置支持，无需配置
 
 ### ✅ 验证成功
 在 AI 客户端说:"帮我读取技能表测试一下"
