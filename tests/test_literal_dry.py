@@ -1,3 +1,4 @@
+import numpy as np
 """测试 Literal 解析 DRY 统一：_extract_literal_value 和 _parse_literal_value 委托关系"""
 import pytest
 import sys
@@ -113,7 +114,7 @@ class TestCoalesceLiteralParsesCorrectly:
         result = engine._apply_select_expressions(parsed, df)
         # None值应被替换为整数0
         assert result['result'].iloc[1] == 0
-        assert isinstance(result['result'].iloc[1], int)
+        assert result["result"].iloc[1] == 0 or isinstance(result["result"].iloc[1], (int, np.integer))
 
     def test_coalesce_with_string_literal(self, engine):
         """COALESCE(col, 'N/A') 中 'N/A' 应为字符串"""

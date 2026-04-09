@@ -15,15 +15,9 @@
     "REQ-054": {
       "title": "嵌套子查询只返回1行",
       "type": "fix",
-<<<<<<< HEAD
-      "priority": "P1",
-      "status": "IN-PROGRESS",
-      "attempts": 5,
-=======
       "priority": "P2",
       "status": "OPEN",
       "attempts": 1,
->>>>>>> develop
       "last_failure": "",
       "source": "极端用例测试",
       "created": "2026-04-04",
@@ -66,32 +60,8 @@
       "description": "ROW_NUMBER() OVER (ORDER BY ...)、RANK() OVER (PARTITION BY ... ORDER BY ...)、SUM(值) OVER (PARTITION BY ...) 均返回0行。底层可用 pandas rolling/groupby.shift/transform 模拟。使用频率低，P3优先级。",
       "notes": "验证代码：\n```\npython3 -c \"\nimport sys; sys.path.insert(0,\"src\")\nfrom excel_mcp_server_fastmcp.api.advanced_sql_query import execute_advanced_sql_query\nr = execute_advanced_sql_query(\"/tmp/extreme-test.xlsx\",\"SELECT ID, 分类, 值, RANK() OVER (PARTITION BY 分类 ORDER BY 值 DESC) as rk FROM Sheet\")\nprint(len(r[\"data\"]), \"rows\")  # 预期20行\n```\n"
     },
-<<<<<<< HEAD
-=======
-    "REQ-058": {
-      "title": "COALESCE 对 NULL 值不生效",
-      "type": "fix",
-      "priority": "P1",
       "status": "OPEN",
       "attempts": 1,
-      "last_failure": "",
-      "source": "极端用例测试",
-      "created": "2026-04-04",
-      "description": "COALESCE(值, 0) 对ID=2的空值行返回空字符串\"\"而非0。可能是因为空单元格被读为空字符串而非NULL。",
-      "notes": "验证代码：\n```\npython3 -c \"\nimport sys; sys.path.insert(0,\"src\")\nfrom excel_mcp_server_fastmcp.api.advanced_sql_query import execute_advanced_sql_query\nr = execute_advanced_sql_query(\"/tmp/extreme-test.xlsx\",\"SELECT ID, COALESCE(值, 0) as safe_val FROM Sheet WHERE ID = 2\")\nprint(r[\"data\"][1])  # 预期 [2, \"空值测试\", 0]，实际 [2, \"空值测试\", \"\"]\n```\n修复后第二行第三个值必须是0。"
-    },
->>>>>>> develop
-    "REQ-059": {
-      "title": "HAVING 不过滤 TOTAL 行",
-      "type": "fix",
-      "priority": "P1",
-<<<<<<< HEAD
-      "status": "IN-PROGRESS",
-      "attempts": 6,
-=======
-      "status": "OPEN",
-      "attempts": 1,
->>>>>>> develop
       "last_failure": "",
       "source": "极端用例测试",
       "created": "2026-04-04",
@@ -109,9 +79,6 @@
       "created": "2026-04-04",
       "description": "WHERE 分类 IN (SELECT DISTINCT 分类 FROM Sheet WHERE 值 > 500) 应只返回B类（值>500的行），但实际返回了全部20行。子查询结果没有正确传递给IN条件。",
       "notes": "验证代码：\n```\npython3 -c \"\nimport sys; sys.path.insert(0,\"src\")\nfrom excel_mcp_server_fastmcp.api.advanced_sql_query import execute_advanced_sql_query\nr = execute_advanced_sql_query(\"/tmp/extreme-test.xlsx\",\"SELECT ID, 名称 FROM Sheet WHERE 分类 IN (SELECT DISTINCT 分类 FROM Sheet WHERE 值 > 500)\")\nprint(len(r[\"data\"])-1, \"rows\")  # 预期9行（所有B类），实际返回了20行\n```\n修复后应返回9行B类数据。"
-<<<<<<< HEAD
-=======
-    },
     "REQ-061": {
       "title": "GROUP BY 聚合逻辑 bug",
       "type": "fix",
