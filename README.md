@@ -287,6 +287,23 @@ uvx excel-mcp-server-fastmcp
 "生成各关卡完成率统计报表,标记完成率低于50%的关卡"
 ```
 
+### 🔢 行号定位更新（高级用法）
+
+当表中存在**重复记录**，无法通过字段值唯一确定要更新的行时，可使用 `_ROW_NUMBER_` 虚拟列精确定位：
+
+```sql
+-- 按行号列表更新（最常用）
+UPDATE LootList SET PropType = '主武器' WHERE _ROW_NUMBER_ IN (11, 21, 36)
+
+-- 按单个行号更新
+UPDATE 数据表 SET 状态 = '已处理' WHERE _ROW_NUMBER_ = 5
+
+-- 按行号范围更新
+UPDATE 数据表 SET 值 = 100 WHERE _ROW_NUMBER_ BETWEEN 10 AND 50
+```
+
+> ⚠️ **注意**：`_ROW_NUMBER_` 仅在 **UPDATE 的 WHERE 条件**中可用，不能用于 SELECT 查询。行号从1开始计数，对应Excel的数据行（不含表头）。
+
 ---
 
 ## 🎮 现在试试！3分钟体验ExcelMCP神奇功能

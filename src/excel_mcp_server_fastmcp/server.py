@@ -2483,7 +2483,18 @@ def excel_update_query(
     update_expression: str,
     dry_run: bool = False
 ) -> Dict[str, Any]:
-    """SQL批量修改。dry_run=True预览变更不实际写入。示例: UPDATE 技能表 SET 伤害=200 WHERE 等级>=5
+    """SQL批量修改。dry_run=True预览变更不实际写入。
+
+    示例::
+        UPDATE 技能表 SET 伤害=200 WHERE 等级>=5
+        UPDATE LootList SET PropType='主武器' WHERE _ROW_NUMBER_ IN (11,21,36)
+        UPDATE 数据表 SET 状态='已处理' WHERE _ROW_NUMBER_ BETWEEN 10 AND 50
+
+    行号支持(_ROW_NUMBER_):
+        在UPDATE的WHERE条件中可使用 _ROW_NUMBER_ 虚拟列，基于Excel数据行号(不含表头)精确定位行。
+        适用于：有重复记录无法用字段值唯一确定行的场景。
+        注意：_ROW_NUMBER_ 仅在UPDATE中可用，SELECT查询暂不支持。
+        不允许对 _ROW_NUMBER_ 本身执行SET操作。
 
     Args:
         file_path: Excel文件路径

@@ -4698,6 +4698,25 @@ class AdvancedSQLQueryEngine:
         SET表达式支持: 列=常量, 列=列, 列=算术表达式(如 伤害*1.1)
         WHERE条件复用查询引擎的所有条件语法
 
+        行号支持(_ROW_NUMBER_):
+            在WHERE条件中可使用 _ROW_NUMBER_ 虚拟列，值为Excel数据行号(从1开始,不含表头)。
+            适用场景: 表中存在重复记录,无法通过字段值唯一确定目标行时。
+
+            用法示例::
+                UPDATE LootList SET PropType='主武器' WHERE _ROW_NUMBER_ IN (11,21,36)
+                UPDATE 数据表 SET 状态='已处理' WHERE _ROW_NUMBER_ BETWEEN 10 AND 50
+                UPDATE 表 SET 值=100 WHERE _ROW_NUMBER_ = 5
+
+            限制:
+                - _ROW_NUMBER_ 仅在UPDATE的WHERE条件中可用,SELECT查询暂不支持
+                - 不允许对 _ROW_NUMBER_ 本身执行SET操作(会报错)
+                - 行号基于DataFrame索引+2(表头偏移),与Excel显示行号一致
+
+        写入策略:
+            - 小规模更新(<200行或<500单元格或文件<5MB): 传统openpyxl写入(可靠)
+            - 大规模更新: 流式calamine+write_only写入(高性能,不保留单元格格式)
+            - 流式写入列名匹配失败时自动降级到传统路径
+
         Args:
             file_path: Excel文件路径
             sql: UPDATE SQL语句
@@ -4705,7 +4724,7 @@ class AdvancedSQLQueryEngine:
             dry_run: 预览模式,只返回影响行数不实际修改
 
         Returns:
-            Dict: 更新结果
+            Dict: 更新结果,包含success/message/affected_rows/changes/verification等字段
         """
         start_time = time.time()
 
@@ -5232,6 +5251,11 @@ def execute_advanced_update_query(
 ) -> Dict[str, Any]:
     """
     便捷函数:执行UPDATE SQL语句
+
+    支持行号定位更新(_ROW_NUMBER_)::
+        UPDATE 表 SET 列=值 WHERE _ROW_NUMBER_ IN (行号列表)
+        UPDATE 表 SET 列=值 WHERE _ROW_NUMBER_ = 行号
+        UPDATE 表 SET 列=值 WHERE _ROW_NUMBER_ BETWEEN 起始 AND 结束
 
     Args:
         file_path: Excel文件路径
