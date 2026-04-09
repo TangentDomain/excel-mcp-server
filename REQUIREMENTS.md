@@ -130,3 +130,46 @@ REQ-EXCEL-002 (P2) - 添加自动化测试配置
 - **问题**: 文档说支持highlight类型但实际只支持cellValue和formula
 - **验收**: 要么实现highlight类型，要么文档与实际一致
 
+---
+
+## 窗口函数扩展（SQL差距分析 2026-04-09）
+
+### REQ-EXCEL-014 (P0): LAG / LEAD 窗口函数
+- **状态**: OPEN
+- **来源**: SQL差距分析报告
+- **问题**: 缺少LAG/LEAD，无法取前N行/后N行的值（如对比前后等级属性变化）
+- **验收**: `LAG(col, N) OVER (PARTITION BY ... ORDER BY ...)` 和 `LEAD(col, N) OVER (...)` 可用
+- **替代方案**: 自JOIN偏移行（复杂度高）
+
+### REQ-EXCEL-015 (P0): GROUP_CONCAT 聚合函数
+- **状态**: OPEN
+- **来源**: SQL差距分析报告
+- **问题**: 缺少GROUP_CONCAT，无法在分组内拼接字符串（如同组内拼接所有技能名）
+- **验收**: `SELECT dept, GROUP_CONCAT(name) FROM t GROUP BY dept` 可用
+- **替代方案**: 应用层聚合
+
+### REQ-EXCEL-016 (P0): FIRST_VALUE / LAST_VALUE 窗口函数
+- **状态**: OPEN
+- **来源**: SQL差距分析报告
+- **问题**: 缺少FIRST_VALUE/LAST_VALUE，无法取分组内首/末行值
+- **验收**: `FIRST_VALUE(col) OVER (PARTITION BY ... ORDER BY ...)` 可用
+- **替代方案**: 子查询+LIMIT 1（复杂度高）
+
+### REQ-EXCEL-017 (P1): NTILE 窗口函数
+- **状态**: OPEN
+- **来源**: SQL差距分析报告
+- **问题**: 缺少NTILE，无法将分组均分为N桶
+- **验收**: `NTILE(N) OVER (PARTITION BY ... ORDER BY ...)` 可用
+
+### REQ-EXCEL-018 (P1): PERCENT_RANK / CUME_DIST 窗口函数
+- **状态**: OPEN
+- **来源**: SQL差距分析报告
+- **问题**: 缺少百分比排名和累积分布函数
+- **验收**: `PERCENT_RANK() OVER (...)` 和 `CUME_DIST() OVER (...)` 可用
+
+### REQ-EXCEL-019 (P1): COUNT() OVER () 窗口聚合
+- **状态**: OPEN
+- **来源**: SQL差距分析报告
+- **问题**: COUNT()作为窗口函数不可用（仅作为普通聚合可用）
+- **验收**: `COUNT(*) OVER (PARTITION BY ...)` 返回分组内总数
+
