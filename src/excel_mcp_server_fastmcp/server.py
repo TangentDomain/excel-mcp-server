@@ -2856,6 +2856,13 @@ def excel_format_cells(
             }
         )
     
+    # 参数校验：sheet_name是必需参数
+    if not sheet_name or not sheet_name.strip():
+        return _fail(
+            '缺少必需参数 sheet_name（工作表名称）。请提供有效的工作表名称，如 "Sheet1"。可通过 excel_list_sheets(file) 查看可用工作表。',
+            meta={"error_code": "MISSING_REQUIRED_PARAM", "param": "sheet_name", "hint": "sheet_name 为必需参数"}
+        )
+
     # 参数兼容性处理：如果提供了start_cell和end_cell，构建range表达式
     if start_cell and end_cell:
         range = f"{start_cell}:{end_cell}"
@@ -3280,8 +3287,9 @@ def excel_batch_update_ranges(file_path: str, updates: List[Dict[str, Any]]) -> 
                 else:
                     ws = wb.active
 
-                # 解析范围并更新数据
-                min_col, min_row, max_col, max_row = range_boundaries(range_spec)
+                # 解析范围并更新数据（去除可能的sheet前缀）
+                clean_range = range_spec.split('!')[-1] if '!' in range_spec else range_spec
+                min_col, min_row, max_col, max_row = range_boundaries(clean_range)
 
                 # 写入数据
                 for row_idx, row_data in enumerate(data):
@@ -3829,6 +3837,23 @@ def excel_set_data_validation(file_path: str, sheet_name: str, range_address: st
     """
     wb = None
     try:
+        # 参数校验：sheet_name是必需参数
+        if not sheet_name or not sheet_name.strip():
+            return _fail(
+                '缺少必需参数 sheet_name（工作表名称）。请提供有效的工作表名称，如 "Sheet1"。可通过 excel_list_sheets(file) 查看可用工作表。',
+                meta={"error_code": "MISSING_REQUIRED_PARAM", "param": "sheet_name", "hint": "sheet_name 为必需参数"}
+            )
+        if not range_address or not range_address.strip():
+            return _fail(
+                '缺少必需参数 range_address（单元格范围）。请提供有效的范围，如 "A1:C10"。',
+                meta={"error_code": "MISSING_REQUIRED_PARAM", "param": "range_address", "hint": "range_address 为必需参数"}
+            )
+        if not validation_type or not validation_type.strip():
+            return _fail(
+                '缺少必需参数 validation_type（验证类型）。支持的类型: list, whole_number, decimal, date, text_length, custom',
+                meta={"error_code": "MISSING_REQUIRED_PARAM", "param": "validation_type", "hint": "validation_type 为必需参数"}
+            )
+
         from openpyxl import load_workbook
         from openpyxl.worksheet.datavalidation import DataValidation
 
@@ -4123,8 +4148,8 @@ def excel_add_conditional_format(file_path: str, sheet_name: str, range_address:
         file_path: Excel文件路径
         sheet_name: 工作表名称
         range_address: 单元格范围
-        format_type: 格式类型
-        criteria: 条件表达式
+        format_type: 格式类型，支持 cellValue(单元格值)、formula(公式)、highlight(高亮整个范围)
+        criteria: 条件表达式（highlight类型可忽略或设为任意值）
         format_style: 格式样式，默认为"lightRed"
     """
     try:
@@ -4153,8 +4178,10 @@ def excel_add_conditional_format(file_path: str, sheet_name: str, range_address:
             rule = CellIsRule(operator="greaterThanOrEqual", formula=[criteria], stopIfTrue=True)
         elif format_type == "formula":
             rule = FormulaRule(formula=[criteria], stopIfTrue=True)
+        elif format_type == "highlight":
+            rule = FormulaRule(formula=["TRUE"], stopIfTrue=True)
         else:
-            return _fail("不支持的格式类型", meta={"error_code": "INVALID_PARAMETER", "hint": "支持的类型: cellValue, formula"})
+            return _fail("不支持的格式类型", meta={"error_code": "INVALID_PARAMETER", "hint": "支持的类型: cellValue, formula, highlight"})
         
         # 添加格式
         rule.fill = fill
@@ -4352,7 +4379,7 @@ def excel_write_only_override(
                 return {
                     'success': True,
                     'message': f"传统模式覆盖完成: {result.message}",
-                    'data': result,
+                    'data': _ensure_dict(result),
                     'metadata': {
                         'file_path': file_path,
                         'sheet_name': sheet_name,

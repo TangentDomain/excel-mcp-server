@@ -107,25 +107,25 @@ REQ-EXCEL-002 (P2) - 添加自动化测试配置
 - **验收**: CTE中支持计算表达式
 
 ### REQ-EXCEL-010 (P2): batch_update_ranges 参数格式不一致
-- **状态**: OPEN
+- **状态**: DONE
 - **来源**: L1 用户直接反馈（工具问题 #1）
 - **问题**: updates参数需要sheet_name但文档不清晰，range含sheet名时报错
 - **验收**: 参数格式统一，文档明确
 
 ### REQ-EXCEL-011 (P2): set_data_validation / format_cells 缺少 sheet_name 提示
-- **状态**: OPEN
+- **状态**: DONE
 - **来源**: L1 用户直接反馈（工具问题 #2/#3）
 - **问题**: 必需参数未在错误提示中明确说明
 - **验收**: 缺少必需参数时给出明确提示
 
 ### REQ-EXCEL-012 (P2): write_only_override 返回类型错误
-- **状态**: OPEN
+- **状态**: DONE
 - **来源**: L1 用户直接反馈（工具问题 #4）
 - **问题**: 返回OperationResult对象而非dict
 - **验收**: 返回类型一致且符合文档说明
 
 ### REQ-EXCEL-013 (P2): add_conditional_format 不支持的格式类型
-- **状态**: OPEN
+- **状态**: DONE
 - **来源**: L1 用户直接反馈（工具问题 #5）
 - **问题**: 文档说支持highlight类型但实际只支持cellValue和formula
 - **验收**: 要么实现highlight类型，要么文档与实际一致
