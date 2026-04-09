@@ -54,3 +54,79 @@ REQ-EXCEL-002 (P2) - 添加自动化测试配置
 - ✅ 核心API功能有测试覆盖
 优先级: P2 (体验改进)
 
+---
+
+## 用户反馈需求（2026-04-09 测试报告）
+
+> 来源：用户提供的ExcelMCP测试报告（complex_test.xlsx + 问题报告）
+> 测试日期：2026-04-09 | 测试SQL查询25+条 | 工具函数15+个 | 发现问题12个
+
+### REQ-EXCEL-003 (P0): IN/NOT IN 操作符内部错误
+- **状态**: OPEN
+- **来源**: L1 用户直接反馈（Bug #1）
+- **问题**: `AdvancedSQLQueryEngine._in_to_pandas() got an unexpected keyword argument 'negate'`
+- **影响**: 所有使用IN和NOT IN的查询全部失败
+- **复现**: `SELECT 技能名称, 伤害 FROM 技能配置 WHERE 技能ID IN (1, 3, 5, 7, 9)`
+- **验收**: IN和NOT IN查询正常执行并返回正确结果
+
+### REQ-EXCEL-004 (P0): EXISTS 子查询返回错误结果
+- **状态**: OPEN
+- **来源**: L1 用户直接反馈（Bug #2）
+- **问题**: EXISTS子查询返回所有行而非过滤后的结果
+- **复现**: `SELECT ... WHERE EXISTS (SELECT 1 FROM s2 WHERE s2.技能ID = 技能配置.技能ID AND s2.伤害 > 200)`
+- **验收**: EXISTS子查询只返回满足条件的行
+
+### REQ-EXCEL-005 (P1): SELECT 子句不支持计算表达式
+- **状态**: OPEN
+- **来源**: L1 用户直接反馈（限制 #1）
+- **问题**: `SELECT 技能名称, (伤害 * 1.2) as 预期伤害` 报错"不支持的表达式"
+- **验收**: SELECT中支持算术运算(* / + -)
+
+### REQ-EXCEL-006 (P1): WHERE 子句不支持算术表达式
+- **状态**: OPEN
+- **来源**: L1 用户直接反馈（限制 #2）
+- **问题**: `WHERE 力量 + 敏捷 + 智力 > 180` 报错"不支持的表达式类型"
+- **验收**: WHERE中支持算术运算比较
+
+### REQ-EXCEL-007 (P1): ORDER BY 不能使用 SELECT 别名
+- **状态**: OPEN
+- **来源**: L1 用户直接反馈（限制 #3）
+- **问题**: ORDER BY用别名报"列不存在"
+- **验收**: ORDER BY支持SELECT中定义的别名
+
+### REQ-EXCEL-008 (P1): JOIN 只支持等值连接
+- **状态**: OPEN
+- **来源**: L1 用户直接反馈（限制 #4）
+- **问题**: `ON s.等级限制 <= e.等级限制` 报"请使用等值连接"
+- **验收**: JOIN ON支持非等值比较(<= >= < >)
+
+### REQ-EXCEL-009 (P1): CTE 不支持复杂表达式
+- **状态**: OPEN
+- **来源**: L1 用户直接反馈（限制 #5）
+- **问题**: WITH子句中使用算术表达式报错
+- **验收**: CTE中支持计算表达式
+
+### REQ-EXCEL-010 (P2): batch_update_ranges 参数格式不一致
+- **状态**: OPEN
+- **来源**: L1 用户直接反馈（工具问题 #1）
+- **问题**: updates参数需要sheet_name但文档不清晰，range含sheet名时报错
+- **验收**: 参数格式统一，文档明确
+
+### REQ-EXCEL-011 (P2): set_data_validation / format_cells 缺少 sheet_name 提示
+- **状态**: OPEN
+- **来源**: L1 用户直接反馈（工具问题 #2/#3）
+- **问题**: 必需参数未在错误提示中明确说明
+- **验收**: 缺少必需参数时给出明确提示
+
+### REQ-EXCEL-012 (P2): write_only_override 返回类型错误
+- **状态**: OPEN
+- **来源**: L1 用户直接反馈（工具问题 #4）
+- **问题**: 返回OperationResult对象而非dict
+- **验收**: 返回类型一致且符合文档说明
+
+### REQ-EXCEL-013 (P2): add_conditional_format 不支持的格式类型
+- **状态**: OPEN
+- **来源**: L1 用户直接反馈（工具问题 #5）
+- **问题**: 文档说支持highlight类型但实际只支持cellValue和formula
+- **验收**: 要么实现highlight类型，要么文档与实际一致
+
