@@ -4976,6 +4976,12 @@ class AdvancedSQLQueryEngine:
                         file_path, sheet_name, modify_fn, preserve_col_widths=True
                     )
                     
+                    # P0: 如果流式写入列名全部匹配失败，立即降级到传统写入
+                    if success and meta.get('columns_matched', 0) == 0:
+                        logger.warning(f"流式写入列名全部匹配失败，降级到传统写入。失败列: {meta.get('columns_failed', [])}")
+                        success = False
+                        message = f"列名匹配全部失败，降级到传统写入: {meta.get('columns_failed', [])}"
+                    
                     if success:
                         # 流式写入后验证实际写入
                         write_verified = False
