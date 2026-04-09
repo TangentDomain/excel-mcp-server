@@ -70,11 +70,12 @@ REQ-EXCEL-002 (P2) - 添加自动化测试配置
 - **验收**: IN和NOT IN查询正常执行并返回正确结果
 
 ### REQ-EXCEL-004 (P0): EXISTS 子查询返回错误结果
-- **状态**: OPEN
+- **状态**: DONE
 - **来源**: L1 用户直接反馈（Bug #2）
 - **问题**: EXISTS子查询返回所有行而非过滤后的结果
 - **复现**: `SELECT ... WHERE EXISTS (SELECT 1 FROM s2 WHERE s2.技能ID = 技能配置.技能ID AND s2.伤害 > 200)`
 - **验收**: EXISTS子查询只返回满足条件的行
+- **修复时间**: 2026-04-09
 
 ### REQ-EXCEL-005 (P1): SELECT 子句不支持计算表达式
 - **状态**: OPEN
