@@ -107,12 +107,9 @@ class TestExcelFormulas:
         assert 'success' in result
 
     def test_evaluate_formula_without_context(self):
-        """Test evaluating formula without file context returns error"""
-        # Without context_sheet, the API creates ExcelWriter("") which fails validation
+        """Test evaluating formula without file context works (standalone calculation)"""
         result = excel_evaluate_formula("SUM(1, 2, 3)")
-
-        # This is expected to fail due to file validation
-        assert result['success'] is False
+        assert result['success'] is True
 
     def test_set_formula_and_verify(self, sample_excel_file, temp_dir):
         """Test setting a formula and reading it back"""

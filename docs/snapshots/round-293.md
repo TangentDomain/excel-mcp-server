@@ -1,82 +1,22 @@
 {
   "REQUIREMENTS": {
-    "REQ-053": {
-      "title": "ORDER BY 浮点/混合类型列返回0行",
-      "type": "fix",
-      "priority": "P1",
-      "status": "PAUSED",
-      "attempts": 4,
-      "last_failure": "连续4次attempt未完成，ORDER BY混合类型排序涉及pandas底层限制，需更深层方案",
-      "source": "极端用例测试",
-      "created": "2026-04-04",
-      "description": "ORDER BY 数值列 DESC/ASC 返回0行。ORDER BY ID DESC（整数列）正常，但 ORDER BY 值 DESC（含NULL、超大数1.5E10、负数、零值、小数的混合列）返回0行。可能原因是dtype解析时混合类型导致排序失败。",
-      "notes": "验证代码：\n```\npython3 -c \"\nimport sys; sys.path.insert(0,\"src\")\nfrom excel_mcp_server_fastmcp.api.advanced_sql_query import execute_advanced_sql_query\nr = execute_advanced_sql_query(\"/tmp/extreme-test.xlsx\",\"SELECT ID, 值 FROM Sheet ORDER BY 值 DESC\")\nprint(len(r[\"data\"]), \"rows\")  # 预期20行，实际0行\n\"\n```\n修复后必须跑验证代码，输出20 rows才能标DONE。"
-    },
-    "REQ-066": {
-      "title": "数据验证写入失败（67%失败率）",
-      "type": "fix",
+    "REQ-036": {
+      "title": "边缘案例自动化测试：每轮自动搜索并验证奇怪场景",
+      "type": "feature",
       "priority": "P1",
       "status": "IN-PROGRESS",
-      "attempts": 2,
-      "source": "董事长全面测试报告（107次调用，25.2%错误率）",
-      "created": "2026-04-06",
-      "description": "数据验证（write_data_validation）写入失败率高达67%。需要排查验证规则的创建逻辑，确保各种验证类型（整数、小数、列表、文本长度等）都能正确写入。",
-      "notes": "董事长测试报告发现，P1优先级。需要覆盖所有验证类型进行测试。"
-    },
-    "REQ-067": {
-      "title": "插入列后实际未插入但报成功",
-      "type": "fix",
-      "priority": "P1",
-      "status": "OPEN",
-      "attempts": 1,
-      "source": "董事长全面测试报告",
-      "created": "2026-04-06",
-      "description": "调用insert_columns插入列后，返回成功但实际列未插入。可能是openpyxl操作后未正确保存，或insert逻辑有误。",
-      "notes": "需要验证insert_columns的完整流程：创建→插入→保存→验证。"
-    },
-    "REQ-068": {
-      "title": "公式计算报'不支持的文件格式'",
-      "type": "fix",
-      "priority": "P1",
-      "status": "OPEN",
-      "attempts": 1,
-      "source": "董事长全面测试报告",
-      "created": "2026-04-06",
-      "description": "apply_formula执行公式计算时报'不支持的文件格式'错误。需要排查公式应用时的文件格式检测逻辑。",
-      "notes": "可能与文件扩展名或openpyxl/calamine引擎选择有关。"
-    },
-    "REQ-069": {
-      "title": "写入覆盖功能异常（OperationResult无get属性）",
-      "type": "fix",
-      "priority": "P1",
-      "status": "OPEN",
-      "attempts": 1,
-      "source": "董事长全面测试报告",
-      "created": "2026-04-06",
-      "description": "写入覆盖操作报OperationResult对象无get属性错误。OperationResult可能是dataclass或Pydantic model，代码中用dict.get()方式访问导致AttributeError。",
-      "notes": "检查所有使用OperationResult的地方，统一用属性访问而非dict方法。"
-    },
-    "REQ-070": {
-      "title": "双行表头识别不一致（describe_table vs get_headers）",
-      "type": "fix",
-      "priority": "P1",
-      "status": "OPEN",
-      "attempts": 1,
-      "source": "董事长全面测试报告",
-      "created": "2026-04-06",
-      "description": "describe_table和get_headers对双行表头的识别结果不一致。需要统一表头解析逻辑，确保同一文件两种API返回一致的表头信息。",
-      "notes": "需要定义明确的表头识别规则，特别是合并单元格和双行表头的场景。"
-    },
-    "REQ-071": {
-      "title": "修复Conventional Commits提交格式违规",
-      "type": "fix",
-      "priority": "P2",
-      "status": "OPEN",
-      "attempts": 1,
-      "source": "FEEDBACK.md #1",
-      "created": "2026-04-06",
-      "description": "提交 `4d230c9` 违反规范，缺少type前缀，格式为 `[REQ-065] DONE + 新增REQ-066~070` 而非 `[REQ-065] type: DONE + 新增REQ-066~070`。需要修正提交信息，添加正确的type前缀（如feat:或fix:），确保符合CONVENTIONAL_COMMITS.md规范。",
-      "notes": "使用 `git commit --amend --no-edit` 修正提交信息，添加正确的type前缀。type必须是feat/fix/refactor/docs/test/chore/perf之一。"
+      "source": "CEO",
+      "attempts": 20,
+      "last_failure": "",
+      "description": "每轮执行时，自动搜索一些稀奇古怪的Excel使用场景（如超长公式、特殊字符sheet名、合并单元格+筛选、数据透视表嵌套、条件格式+VBA、超大文件性能等），用uvx安装的MCP工具实际调用测试，记录是否崩溃/返回错误/正常处理。",
+      "acceptance_criteria": [
+        "每轮至少测试1个新边缘案例",
+        "测试结果记录到docs/EDGE-CASE-TESTS.md",
+        "格式：日期、案例描述、操作步骤、预期结果、实际结果、是否通过",
+        "崩溃或错误自动创建REQ",
+        "优先从Stack Overflow/GitHub Issues搜索真实用户遇到的奇怪问题"
+      ],
+      "notes": "第243轮10案例6通过4失败(REQ-038/039/040)；第245轮10案例9通过1失败(REQ-041)；第247轮5案例全通过(REQ-042修复)；第248轮16案例15通过1信息；第249轮16案例13通过3信息(含server.py修复)；第250轮15案例12通过2信息1失败(||拼接不支持)；第252轮33案例33全通过(核心API稳定性验证)；第253轮25案例11通过11信息3失败(streaming写入不可见)；第254轮20案例20全通过(含check_duplicate_ids列名查找bug修复+发布v1.7.6)；第255轮30案例25通过3信息2失败(T132/T133 ROUND/ABS不支持+T141嵌套聚合计算列丢失)；第256轮20案例19通过1失败(T168 evaluate_formula独立数学表达式不支持)；第257轮20案例(T211-T230)20全通过(REQ-044/045/046验证+batch_insert_rows_at CellInfo bug修复+SQL子查询+空表边界)；第259轮20案例(T256-T275)17通过3信息0失败；第260轮20案例(T276-T295)12通过1失败5信息2依赖(convert_format CSV→xlsx不支持)；第261轮20案例(T296-T315)19通过1信息0失败(T315 Sheet自身对比NoneType bug已修复+发布v1.7.10)；第262轮20案例(T316-T335)20全通过(format_cells number_format bug修复+发布v1.7.11)；第263轮21案例(T336-T355)0失败19信息2通过(测试脚本参数名不匹配，无新BUG)；第264轮20案例(T356-T375)17通过3信息0失败(DataValidationError 3参数调用BUG+ExcelWriter缺失导入BUG，已修复+发布v1.7.12)；第265轮20案例(T376-T395)14通过6信息0失败(excel_describe_table缺失@mcp.tool装饰器BUG，已修复+发布v1.7.13)；第266轮20案例(T396-T415)15通过4失败1错误0实际BUG(excel_list_charts AttributeError修复+clear_validation范围匹配BUG修复+错误码SHEET_NOT_FOUND修正+发布v1.7.14)；第267轮20案例(T416-T435)MCP冒烟通过，边缘测试脚本执行较慢但无新BUG发现；第268轮测试脚本函数名不匹配(excel_create_workbook→excel_create_file)，MCP冒烟通过"
     }
   }
 }

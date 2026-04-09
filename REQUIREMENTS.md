@@ -1,82 +1,132 @@
-{
-  "REQUIREMENTS": {
-    "REQ-053": {
-      "title": "ORDER BY 浮点/混合类型列返回0行",
-      "type": "fix",
-      "priority": "P1",
-      "status": "PAUSED",
-      "attempts": 4,
-      "last_failure": "连续4次attempt未完成，ORDER BY混合类型排序涉及pandas底层限制，需更深层方案",
-      "source": "极端用例测试",
-      "created": "2026-04-04",
-      "description": "ORDER BY 数值列 DESC/ASC 返回0行。ORDER BY ID DESC（整数列）正常，但 ORDER BY 值 DESC（含NULL、超大数1.5E10、负数、零值、小数的混合列）返回0行。可能原因是dtype解析时混合类型导致排序失败。",
-      "notes": "验证代码：\n```\npython3 -c \"\nimport sys; sys.path.insert(0,\"src\")\nfrom excel_mcp_server_fastmcp.api.advanced_sql_query import execute_advanced_sql_query\nr = execute_advanced_sql_query(\"/tmp/extreme-test.xlsx\",\"SELECT ID, 值 FROM Sheet ORDER BY 值 DESC\")\nprint(len(r[\"data\"]), \"rows\")  # 预期20行，实际0行\n\"\n```\n修复后必须跑验证代码，输出20 rows才能标DONE。"
-    },
-    "REQ-066": {
-      "title": "数据验证写入失败（67%失败率）",
-      "type": "fix",
-      "priority": "P1",
-      "status": "OPEN",
-      "attempts": 1,
-      "source": "董事长全面测试报告（107次调用，25.2%错误率）",
-      "created": "2026-04-06",
-      "description": "数据验证（write_data_validation）写入失败率高达67%。需要排查验证规则的创建逻辑，确保各种验证类型（整数、小数、列表、文本长度等）都能正确写入。",
-      "notes": "董事长测试报告发现，P1优先级。需要覆盖所有验证类型进行测试。"
-    },
-    "REQ-067": {
-      "title": "插入列后实际未插入但报成功",
-      "type": "fix",
-      "priority": "P1",
-      "status": "OPEN",
-      "attempts": 1,
-      "source": "董事长全面测试报告",
-      "created": "2026-04-06",
-      "description": "调用insert_columns插入列后，返回成功但实际列未插入。可能是openpyxl操作后未正确保存，或insert逻辑有误。",
-      "notes": "需要验证insert_columns的完整流程：创建→插入→保存→验证。"
-    },
-    "REQ-068": {
-      "title": "公式计算报'不支持的文件格式'",
-      "type": "fix",
-      "priority": "P1",
-      "status": "OPEN",
-      "attempts": 1,
-      "source": "董事长全面测试报告",
-      "created": "2026-04-06",
-      "description": "apply_formula执行公式计算时报'不支持的文件格式'错误。需要排查公式应用时的文件格式检测逻辑。",
-      "notes": "可能与文件扩展名或openpyxl/calamine引擎选择有关。"
-    },
-    "REQ-069": {
-      "title": "写入覆盖功能异常（OperationResult无get属性）",
-      "type": "fix",
-      "priority": "P1",
-      "status": "OPEN",
-      "attempts": 1,
-      "source": "董事长全面测试报告",
-      "created": "2026-04-06",
-      "description": "写入覆盖操作报OperationResult对象无get属性错误。OperationResult可能是dataclass或Pydantic model，代码中用dict.get()方式访问导致AttributeError。",
-      "notes": "检查所有使用OperationResult的地方，统一用属性访问而非dict方法。"
-    },
-    "REQ-070": {
-      "title": "双行表头识别不一致（describe_table vs get_headers）",
-      "type": "fix",
-      "priority": "P1",
-      "status": "OPEN",
-      "attempts": 1,
-      "source": "董事长全面测试报告",
-      "created": "2026-04-06",
-      "description": "describe_table和get_headers对双行表头的识别结果不一致。需要统一表头解析逻辑，确保同一文件两种API返回一致的表头信息。",
-      "notes": "需要定义明确的表头识别规则，特别是合并单元格和双行表头的场景。"
-    },
-    "REQ-071": {
-      "title": "修复Conventional Commits提交格式违规",
-      "type": "fix",
-      "priority": "P2",
-      "status": "OPEN",
-      "attempts": 1,
-      "source": "FEEDBACK.md #1",
-      "created": "2026-04-06",
-      "description": "提交 `4d230c9` 违反规范，缺少type前缀，格式为 `[REQ-065] DONE + 新增REQ-066~070` 而非 `[REQ-065] type: DONE + 新增REQ-066~070`。需要修正提交信息，添加正确的type前缀（如feat:或fix:），确保符合CONVENTIONAL_COMMITS.md规范。",
-      "notes": "使用 `git commit --amend --no-edit` 修正提交信息，添加正确的type前缀。type必须是feat/fix/refactor/docs/test/chore/perf之一。"
-    }
-  }
-}
+# ExcelMCP 项目重构需求
+
+## 背景
+质量抽检发现ExcelMCP项目存在结构问题，影响可维护性和标准化程度。虽然当前功能正常，但项目结构需要重构以符合Python包标准。
+
+## 需求详情
+
+### REQ-EXCEL-001: Python包标准化重构
+- **类型**: 项目重构
+- **优先级**: P1
+- **状态**: DONE
+- **创建时间**: 2026-04-08
+- **来源**: 自迭代质量抽检反馈
+
+### 具体要求
+1. **目录结构重组**
+   - 创建标准的Python包结构: `src/excel_mcp/` 包目录
+   - 将现有Python模块移入包内
+   - 建立正确的`__init__.py`文件结构
+
+2. **包管理文件完善**
+   - 完善pyproject.toml配置
+   - 添加依赖版本锁定
+   - 定义正确的包入口点
+
+3. **项目结构规范化**
+   - 添加setup.py作为备选安装方式
+   - 创建requirements.txt锁定生产依赖
+   - 添加development requirements for dev依赖
+
+4. **模块重构**
+   - 保持现有API接口不变
+   - 重构内部模块组织
+   - 确保所有测试继续通过
+
+### 验收标准
+- [ ] 项目符合Python包标准布局
+- [ ] 可通过`pip install .`正确安装
+- [ ] 所有现有功能保持不变
+- [ ] 测试套件全部通过
+- [ ] 文档同步更新
+
+### 影响评估
+- **风险**: 低（重构不改变API）
+- **工作量**: 中等（需要重新组织结构）
+- **收益**: 提升可维护性和标准化程度
+REQ-EXCEL-002 (P2) - 添加自动化测试配置
+=======================
+来源: 质量抽检反馈 #6
+需求: 在package.json中添加test脚本，建立GitHub Actions CI/CD，为核心API功能添加单元测试验证
+验证规则: 
+- ✅ npm test 命令可执行
+- ✅ GitHub Actions配置文件存在
+- ✅ 核心API功能有测试覆盖
+优先级: P2 (体验改进)
+
+---
+
+## 用户反馈需求（2026-04-09 测试报告）
+
+> 来源：用户提供的ExcelMCP测试报告（complex_test.xlsx + 问题报告）
+> 测试日期：2026-04-09 | 测试SQL查询25+条 | 工具函数15+个 | 发现问题12个
+
+### REQ-EXCEL-003 (P0): IN/NOT IN 操作符内部错误
+- **状态**: OPEN
+- **来源**: L1 用户直接反馈（Bug #1）
+- **问题**: `AdvancedSQLQueryEngine._in_to_pandas() got an unexpected keyword argument 'negate'`
+- **影响**: 所有使用IN和NOT IN的查询全部失败
+- **复现**: `SELECT 技能名称, 伤害 FROM 技能配置 WHERE 技能ID IN (1, 3, 5, 7, 9)`
+- **验收**: IN和NOT IN查询正常执行并返回正确结果
+
+### REQ-EXCEL-004 (P0): EXISTS 子查询返回错误结果
+- **状态**: OPEN
+- **来源**: L1 用户直接反馈（Bug #2）
+- **问题**: EXISTS子查询返回所有行而非过滤后的结果
+- **复现**: `SELECT ... WHERE EXISTS (SELECT 1 FROM s2 WHERE s2.技能ID = 技能配置.技能ID AND s2.伤害 > 200)`
+- **验收**: EXISTS子查询只返回满足条件的行
+
+### REQ-EXCEL-005 (P1): SELECT 子句不支持计算表达式
+- **状态**: OPEN
+- **来源**: L1 用户直接反馈（限制 #1）
+- **问题**: `SELECT 技能名称, (伤害 * 1.2) as 预期伤害` 报错"不支持的表达式"
+- **验收**: SELECT中支持算术运算(* / + -)
+
+### REQ-EXCEL-006 (P1): WHERE 子句不支持算术表达式
+- **状态**: OPEN
+- **来源**: L1 用户直接反馈（限制 #2）
+- **问题**: `WHERE 力量 + 敏捷 + 智力 > 180` 报错"不支持的表达式类型"
+- **验收**: WHERE中支持算术运算比较
+
+### REQ-EXCEL-007 (P1): ORDER BY 不能使用 SELECT 别名
+- **状态**: OPEN
+- **来源**: L1 用户直接反馈（限制 #3）
+- **问题**: ORDER BY用别名报"列不存在"
+- **验收**: ORDER BY支持SELECT中定义的别名
+
+### REQ-EXCEL-008 (P1): JOIN 只支持等值连接
+- **状态**: OPEN
+- **来源**: L1 用户直接反馈（限制 #4）
+- **问题**: `ON s.等级限制 <= e.等级限制` 报"请使用等值连接"
+- **验收**: JOIN ON支持非等值比较(<= >= < >)
+
+### REQ-EXCEL-009 (P1): CTE 不支持复杂表达式
+- **状态**: OPEN
+- **来源**: L1 用户直接反馈（限制 #5）
+- **问题**: WITH子句中使用算术表达式报错
+- **验收**: CTE中支持计算表达式
+
+### REQ-EXCEL-010 (P2): batch_update_ranges 参数格式不一致
+- **状态**: OPEN
+- **来源**: L1 用户直接反馈（工具问题 #1）
+- **问题**: updates参数需要sheet_name但文档不清晰，range含sheet名时报错
+- **验收**: 参数格式统一，文档明确
+
+### REQ-EXCEL-011 (P2): set_data_validation / format_cells 缺少 sheet_name 提示
+- **状态**: OPEN
+- **来源**: L1 用户直接反馈（工具问题 #2/#3）
+- **问题**: 必需参数未在错误提示中明确说明
+- **验收**: 缺少必需参数时给出明确提示
+
+### REQ-EXCEL-012 (P2): write_only_override 返回类型错误
+- **状态**: OPEN
+- **来源**: L1 用户直接反馈（工具问题 #4）
+- **问题**: 返回OperationResult对象而非dict
+- **验收**: 返回类型一致且符合文档说明
+
+### REQ-EXCEL-013 (P2): add_conditional_format 不支持的格式类型
+- **状态**: OPEN
+- **来源**: L1 用户直接反馈（工具问题 #5）
+- **问题**: 文档说支持highlight类型但实际只支持cellValue和formula
+- **验收**: 要么实现highlight类型，要么文档与实际一致
+
