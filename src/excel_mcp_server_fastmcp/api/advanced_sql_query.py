@@ -4620,6 +4620,70 @@ class AdvancedSQLQueryEngine:
             result['execution_time_ms'] = round(elapsed_ms, 1)
         return result
 
+    def _verify_streaming_write(self, file_path: str, sheet_name: str,
+                                  changes: list, en_to_cn_map: dict = None) -> Dict[str, Any]:
+        """验证流式写入是否实际生效
+        
+        重新读取文件，抽样检查changes中的修改是否反映到文件中。
+        """
+        if not StreamingWriter.is_available() or not changes:
+            return {'verified': True, 'unverified': []}
+        
+        try:
+            from ..core.streaming_writer import CalamineWorkbook
+            cal_wb = CalamineWorkbook.from_path(file_path)
+            verify_rows = cal_wb.get_sheet_by_name(sheet_name).to_python()
+            cal_wb.close()
+            
+            if not verify_rows:
+                return {'verified': False, 'unverified': changes}
+            
+            # 构建col_map(和_copy_modify_write一致)
+            col_map = {}
+            for col_idx, cell_val in enumerate(verify_rows[0], 1):
+                if cell_val is not None:
+                    col_map[str(cell_val).strip()] = col_idx
+            
+            unverified = []
+            # 抽样验证: 最多检查前5个change
+            sample = changes[:5] if len(changes) > 5 else changes
+            
+            for change in sample:
+                col_name = change['column']
+                col_idx = None
+                
+                if col_name in col_map:
+                    col_idx = col_map[col_name]
+                elif en_to_cn_map:
+                    cn_name = en_to_cn_map.get(col_name)
+                    if cn_name and cn_name in col_map:
+                        col_idx = col_map[cn_name]
+                else:
+                    col_stripped = str(col_name).strip().lower()
+                    for k, v in col_map.items():
+                        if str(k).strip().lower() == col_stripped:
+                            col_idx = v
+                            break
+                
+                if col_idx is None:
+                    unverified.append(change)
+                    continue
+                
+                row_idx = change['row'] - 1
+                if row_idx < len(verify_rows):
+                    actual_val = str(verify_rows[row_idx][col_idx - 1]) if col_idx - 1 < len(verify_rows[row_idx]) else None
+                    expected = str(change['new_value'])
+                    if actual_val != expected:
+                        unverified.append(change)
+            
+            return {
+                'verified': len(unverified) == 0,
+                'unverified': unverified
+            }
+        except Exception as e:
+            logger.warning(f"写入验证异常: {e}")
+            return {'verified': True, 'unverified': []}  # 验证失败不阻塞
+
     def execute_update_query(
         self,
         file_path: str,
@@ -4703,6 +4767,9 @@ class AdvancedSQLQueryEngine:
         df = worksheets_data[matched_sheet].copy()
         original_df = df.copy()
 
+        # P1: 添加行号虚拟列 _ROW_NUMBER_
+        df['_ROW_NUMBER_'] = range(1, len(df) + 1)
+
         # 中文列名替换
         cn_map = {}
         desc_map = self._header_descriptions.get(matched_sheet, {})
@@ -4723,6 +4790,8 @@ class AdvancedSQLQueryEngine:
                 # 中文列名替换
                 if col_name in cn_map:
                     col_name = cn_map[col_name]
+                if col_name == '_ROW_NUMBER_':
+                    return self._update_error('_ROW_NUMBER_ 是虚拟列，不允许修改')
                 if col_name not in df.columns:
                     suggestion = self._suggest_column_name(col_name, list(df.columns))
                     return self._update_error(
@@ -4749,6 +4818,19 @@ class AdvancedSQLQueryEngine:
         if filtered_df.empty:
             return {'success': True, 'message': '没有匹配WHERE条件的行,无需更新',
                     'affected_rows': 0, 'changes': [], 'execution_time_ms': 0}
+
+        # P1: 重复行检测
+        warnings = []
+        match_ratio = len(filtered_df) / len(df) if len(df) > 0 else 0
+        if match_ratio > 0.5:
+            warnings.append(f"WHERE条件匹配了 {len(filtered_df)}/{len(df)} 行({match_ratio*100:.0f}%)，请确认条件是否正确")
+        
+        # 检测完全重复行(排除_ROW_NUMBER_)
+        check_cols = [c for c in filtered_df.columns if c != '_ROW_NUMBER_']
+        dup_mask = filtered_df[check_cols].duplicated(keep=False)
+        dup_count = dup_mask.sum()
+        if dup_count > 0:
+            warnings.append(f"发现 {dup_count} 行完全重复的记录（可用 _ROW_NUMBER_ 精确定位）")
 
         affected_indices = filtered_df.index.tolist()
         changes = []
@@ -4780,24 +4862,33 @@ class AdvancedSQLQueryEngine:
 
         if not changes:
             elapsed = (time.time() - start_time) * 1000
-            return {'success': True,
+            result = {'success': True,
                     'message': f'匹配 {len(affected_indices)} 行,但值无变化',
                     'affected_rows': len(affected_indices),
                     'changes': [], 'execution_time_ms': round(elapsed, 1)}
+            if warnings:
+                result['warnings'] = warnings
+            return result
 
         if dry_run:
             elapsed = (time.time() - start_time) * 1000
-            return {'success': True,
+            result = {'success': True,
                     'message': f'[预览] 将修改 {len(changes)} 个单元格({len(affected_indices)} 行)',
                     'affected_rows': len(affected_indices),
                     'changes': changes, 'dry_run': True,
                     'execution_time_ms': round(elapsed, 1)}
+            if warnings:
+                result['warnings'] = warnings
+            return result
 
         # 写回Excel(事务保护:失败自动回滚)
         try:
-            return self._write_changes_to_excel(
+            result = self._write_changes_to_excel(
                 file_path, matched_sheet, changes, df,
                 len(affected_indices), start_time)
+            if warnings:
+                result['warnings'] = warnings
+            return result
         except Exception as e:
             elapsed = (time.time() - start_time) * 1000
             return {'success': False,
@@ -4827,57 +4918,107 @@ class AdvancedSQLQueryEngine:
 
                 if use_streaming and StreamingWriter.is_available():
                     # 使用流式写入(高性能路径)
-                    # _copy_modify_write 会传递 (rows, header_row=1, col_map) 给 modify_fn
-                    # col_map: {列名: 列索引(1-based)}
-                    # rows: 包含表头行的所有行数据(0-based索引)
-                    # header_row: 表头行数(固定为1)
-                    # change['row']: 1-based的Excel行号(execute_update_query中 int(idx)+2)
+                    # col_map: {Excel表头(中文): 列索引(1-based)}
+                    # change['column']: 英文列名(来自pandas DataFrame)
+                    # 需要通过英→中映射翻译列名
+                    
+                    # 构建英→中列名映射
+                    en_to_cn_map = {}
+                    header_desc = getattr(self, '_header_descriptions', {})
+                    desc_for_sheet = header_desc.get(sheet_name, {})
+                    for en_col, cn_desc in desc_for_sheet.items():
+                        en_to_cn_map[en_col] = cn_desc
                     
                     def modify_fn(rows, header_row, col_map):
-                        """修改函数:应用UPDATE变更到行数据
-
-                        Args:
-                            rows: 行数据列表
-                            header_row: 表头行
-                            col_map: 列名到列索引的映射
-                        """
-                        modified_rows = [row[:] for row in rows]  # 深拷贝
+                        """修改函数:应用UPDATE变更到行数据"""
+                        modified_rows = [row[:] for row in rows]
+                        failed_cols = set()
+                        matched_count = 0
                         
                         for change in changes:
                             col_name = change['column']
-                            # 在col_map中查找列索引
-                            col_idx = col_map.get(col_name) or col_map.get(str(col_name))
+                            col_idx = None
+                            
+                            # 策略1: 精确匹配
+                            if col_name in col_map:
+                                col_idx = col_map[col_name]
+                            else:
+                                # 策略2: 英→中映射
+                                cn_name = en_to_cn_map.get(col_name)
+                                if cn_name and cn_name in col_map:
+                                    col_idx = col_map[cn_name]
+                                else:
+                                    # 策略3: strip+大小写不敏感
+                                    col_stripped = str(col_name).strip().lower()
+                                    for k, v in col_map.items():
+                                        if str(k).strip().lower() == col_stripped:
+                                            col_idx = v
+                                            break
+                            
                             if col_idx is None:
+                                failed_cols.add(col_name)
                                 continue
                             
-                            # change['row']是1-based的Excel行号
-                            # rows是0-based的列表(rows[0]是表头)
-                            # 所以 Excel行号N -> rows[N-1]
+                            matched_count += 1
                             list_idx = change['row'] - 1
-                            
                             if 0 <= list_idx < len(modified_rows):
                                 row = modified_rows[list_idx]
                                 while len(row) < col_idx:
                                     row.append('')
                                 row[col_idx - 1] = change['new_value']
                         
-                        return True, "流式写入完成", modified_rows, {}
+                        return True, f"流式写入完成, 匹配{matched_count}列, 失败{len(failed_cols)}列", modified_rows, {
+                            'columns_matched': matched_count,
+                            'columns_failed': list(failed_cols)
+                        }
                     
                     success, message, meta = StreamingWriter._copy_modify_write(
                         file_path, sheet_name, modify_fn, preserve_col_widths=True
                     )
                     
                     if success:
+                        # 流式写入后验证实际写入
+                        write_verified = False
+                        verify_result = self._verify_streaming_write(file_path, sheet_name, changes, en_to_cn_map)
+                        write_verified = verify_result['verified']
+                        unverified = verify_result['unverified']
+                        
+                        if not write_verified and len(unverified) == len(changes):
+                            # 所有change都没生效，回滚
+                            if backup_path and os.path.exists(backup_path):
+                                shutil.copy2(backup_path, file_path)
+                                os.remove(backup_path)
+                            self._df_cache.pop(file_path, None)
+                            failed_cols_info = meta.get('columns_failed', [])
+                            extra_hint = f"（列名匹配失败: {failed_cols_info}）" if failed_cols_info else ""
+                            elapsed = (time.time() - start_time) * 1000
+                            return {
+                                'success': False,
+                                'message': f'写入验证失败：{len(changes)}个修改均未生效，已自动回滚{extra_hint}',
+                                'affected_rows': 0,
+                                'changes': changes,
+                                'error_code': 'WRITE_VERIFICATION_FAILED',
+                                'execution_time_ms': round(elapsed, 1)
+                            }
+                        
                         self._df_cache.pop(file_path, None)
                         elapsed = (time.time() - start_time) * 1000
-                        return {
+                        result = {
                             'success': True,
                             'message': f'流式更新 {len(changes)} 个单元格({affected_rows} 行)',
                             'affected_rows': affected_rows,
                             'changes': changes,
                             'execution_time_ms': round(elapsed, 1),
-                            'method': 'streaming'
+                            'method': 'streaming',
+                            'verification': {
+                                'verified': write_verified,
+                                'columns_matched': meta.get('columns_matched', len(changes)),
+                                'columns_failed': meta.get('columns_failed', [])
+                            }
                         }
+                        if not write_verified and unverified:
+                            result['message'] += f' (警告: {len(unverified)}/{len(changes)}个修改验证失败)'
+                        return result
                     else:
                         # 流式写入失败,降级到传统方式
                         logger.warning(f"流式写入失败,降级到传统方式: {message}")
