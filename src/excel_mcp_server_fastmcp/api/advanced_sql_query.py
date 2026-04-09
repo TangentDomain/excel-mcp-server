@@ -1060,8 +1060,8 @@ class AdvancedSQLQueryEngine:
                 except Exception:
                     pass
 
-            # 清理特殊字符,但保持中文
-            clean_col = re.sub(r'[^\w\u4e00-\u9fff\s]', '_', clean_col)
+            # 清理特殊字符,但保持中文和括号(Excel列名如"刷新时间(小时)")
+            clean_col = re.sub(r'[^\w\u4e00-\u9fff\s()]', '_', clean_col)
             clean_col = re.sub(r'\s+', '_', clean_col)
 
             # 确保列名不为空且不以数字开头
@@ -2483,6 +2483,27 @@ class AdvancedSQLQueryEngine:
                     except Exception as sub_e:
                         raise ValueError(f"标量子查询执行失败: {sub_e}")
 
+                elif isinstance(original_expr, exp.Anonymous):
+                    # 处理含括号的列名(如"刷新时间(小时)"被sqlglot解析为Anonymous函数)
+                    anon_name = original_expr.this
+                    # 重建完整列名:函数名+括号内容
+                    if original_expr.expressions:
+                        inner = ', '.join(str(e) for e in original_expr.expressions)
+                        full_name = f"{anon_name}({inner})"
+                    else:
+                        full_name = anon_name
+                    # 检查完整列名或函数名是否匹配实际列
+                    if full_name in df.columns:
+                        result_data[alias_name] = df[full_name]
+                    elif anon_name in df.columns:
+                        result_data[alias_name] = df[anon_name]
+                    else:
+                        raise ValueError(
+                            f"不支持的函数调用: {original_expr}。"
+                            f"💡 如果'{full_name}'是含括号的列名,列名不匹配。"
+                            f"\n🔧 可用列: {list(df.columns)}"
+                        )
+
                 else:
                     # 其他表达式,尝试作为列处理
                     if hasattr(original_expr, 'name') and original_expr.name in df.columns:
@@ -2532,13 +2553,22 @@ class AdvancedSQLQueryEngine:
             return select_expr.name, select_expr
         if self._is_aggregate_function(select_expr):
             return self._generate_aggregate_alias(select_expr), select_expr
+        if isinstance(select_expr, exp.Anonymous):
+            # 含括号的列名:重建完整名作为别名
+            anon_name = select_expr.this
+            if select_expr.expressions:
+                inner = ', '.join(str(e) for e in select_expr.expressions)
+                full_name = f"{anon_name}({inner})"
+            else:
+                full_name = anon_name
+            return full_name, select_expr
         if hasattr(select_expr, 'name') and select_expr.name:
             return select_expr.name, select_expr
         return f"col_{index}", select_expr
 
     def _is_mathematical_expression(self, expr) -> bool:
         """检查是否为数学表达式"""
-        return isinstance(expr, (exp.Add, exp.Sub, exp.Mul, exp.Div, exp.Mod))
+        return isinstance(expr, (exp.Add, exp.Sub, exp.Mul, exp.Div, exp.Mod, exp.Nullif))
 
     # 数学运算符分发表:二元运算符统一处理
     _MATH_BINARY_OPS = {
@@ -2565,6 +2595,7 @@ class AdvancedSQLQueryEngine:
         exp.Upper, exp.Lower, exp.Trim, exp.Length,
         exp.Concat, exp.Replace, exp.Substring, exp.Left, exp.Right,
         exp.Add, exp.Sub, exp.Mul, exp.Div, exp.Mod,
+        exp.Nullif, exp.All, exp.Any, exp.Anonymous,
     })
 
     # HAVING空结果建议分发表:(stat_func, op_str, label)
@@ -2612,6 +2643,16 @@ class AdvancedSQLQueryEngine:
         elif isinstance(expr, exp.Coalesce):
             # COALESCE在数学表达式中(向量化)
             return self._evaluate_coalesce_vectorized(expr, df)
+        elif isinstance(expr, exp.Nullif):
+            # NULLIF(a, b): 如果a等于b则返回NULL,否则返回a
+            left = self._evaluate_math_expression(expr.this, df)
+            right = self._evaluate_math_expression(expr.expression, df)
+            # 向量化:对齐Series,逐元素比较
+            if isinstance(left, pd.Series) or isinstance(right, pd.Series):
+                left = left if isinstance(left, pd.Series) else pd.Series([left] * len(df), index=df.index)
+                right = right if isinstance(right, pd.Series) else pd.Series([right] * len(df), index=df.index)
+                return left.where(left != right, other=None)
+            return None if left == right else left
         else:
             raise ValueError(f"不支持的数学运算: {expr}。💡 WHERE子句暂不支持算术运算，建议用子查询替代")
 
@@ -2734,6 +2775,19 @@ class AdvancedSQLQueryEngine:
             return self._evaluate_string_function(expr, df)
         elif isinstance(expr, exp.Case):
             return self._evaluate_case_expression(expr, df)
+        elif isinstance(expr, exp.Anonymous):
+            # 含括号的列名
+            anon_name = expr.this
+            if expr.expressions:
+                inner = ', '.join(str(e) for e in expr.expressions)
+                full_name = f"{anon_name}({inner})"
+            else:
+                full_name = anon_name
+            if full_name in df.columns:
+                return df[full_name]
+            if anon_name in df.columns:
+                return df[anon_name]
+            raise ValueError(f"列 '{full_name}' 不存在。可用列: {list(df.columns)}")
         else:
             raise ValueError(
                 f"不支持的表达式类型: {type(expr).__name__}。"
@@ -3355,6 +3409,10 @@ class AdvancedSQLQueryEngine:
         try:
             op_type = type(condition)
             if op_type in self._COMPARISON_OPS:
+                # 检查右侧是否为ALL/ANY子查询
+                right_expr = condition.right
+                if isinstance(right_expr, (exp.All, exp.Any)):
+                    return self._evaluate_all_any_comparison(condition, row)
                 left_val = self._get_row_value(condition.left, row)
                 right_val = self._get_row_value(condition.right, row)
                 try:
@@ -3404,10 +3462,79 @@ class AdvancedSQLQueryEngine:
             elif isinstance(condition, exp.Exists):
                 return self._evaluate_exists_for_row(condition, row)
 
+            elif isinstance(condition, (exp.All, exp.Any)):
+                return self._evaluate_all_any_for_row(condition, row)
+
             # 其他条件类型...
 
             return True
 
+        except Exception:
+            return False
+
+    def _evaluate_all_any_comparison(self, condition, row: pd.Series) -> bool:
+        """评估 col > ALL/ANY (SELECT ...) 子查询比较
+        
+        sqlglot将 col > ALL (SELECT ...) 解析为 GT(this=col, expression=All(this=Subquery(...))).
+        ALL: 所有子查询结果都必须满足比较条件
+        ANY/SOME: 至少一个子查询结果满足比较条件
+        """
+        try:
+            left_val = self._get_row_value(condition.left, row)
+            quantifier = condition.right  # All or Any node
+            subquery_node = quantifier.this
+            if isinstance(subquery_node, exp.Subquery):
+                subquery_node = subquery_node.this
+            if not (hasattr(self, '_current_worksheets') and self._current_worksheets):
+                return False
+            sub_result = self._execute_subquery(
+                condition.right if isinstance(condition.right, exp.Subquery) else condition.right,
+                self._current_worksheets
+            )
+            if sub_result.empty:
+                # ALL: 空集返回True( vacuous truth)
+                # ANY: 空集返回False
+                return isinstance(quantifier, exp.All)
+            
+            sub_values = sub_result.iloc[:, 0].dropna().tolist()
+            if not sub_values:
+                return isinstance(quantifier, exp.All)
+            
+            op_type = type(condition)
+            op_func = self._COMPARISON_OPS.get(op_type)
+            if op_func is None:
+                return False
+            
+            if isinstance(quantifier, exp.All):
+                # ALL: 每个子查询值都必须满足条件
+                return all(op_func(left_val, sv) for sv in sub_values)
+            else:
+                # ANY/SOME: 至少一个子查询值满足条件
+                return any(op_func(left_val, sv) for sv in sub_values)
+        except Exception:
+            return False
+
+    def _evaluate_all_any_for_row(self, condition, row: pd.Series) -> bool:
+        """评估ALL/ANY/SOME子查询比较 (如 WHERE 伤害 > ALL (SELECT ...))"""
+        # sqlglot将 col > ALL (SELECT ...) 解析为 GT(this=col, expression=All(...))
+        # 所以需要从父节点获取比较运算符和左操作数
+        # 但这里condition本身就是All/Any节点,我们需要从调用上下文获取
+        # 实际上sqlglot把 ALL/ANY 作为比较操作的expression,所以condition是All/Any
+        # 我们需要重新从WHERE条件树中找到完整的比较节点
+        # 简化方案:在_apply_row_filter中特殊处理,这里只处理单独出现的情况
+        try:
+            subquery = condition.this if isinstance(condition.this, (exp.Subquery, exp.Select)) else None
+            if subquery is None:
+                return False
+            if not (hasattr(self, '_current_worksheets') and self._current_worksheets):
+                return False
+            sub_result = self._execute_subquery(subquery, self._current_worksheets)
+            if sub_result.empty:
+                return True  # ALL:空集为真; ANY:空集为假(但这里简化处理)
+            sub_values = sub_result.iloc[:, 0].dropna().tolist()
+            if not sub_values:
+                return isinstance(condition, exp.All)
+            return True  # 实际比较在_apply_row_filter中处理
         except Exception:
             return False
 
@@ -3541,6 +3668,17 @@ class AdvancedSQLQueryEngine:
 
         elif self._is_string_function(expr):
             return self._evaluate_string_function_for_row(expr, row)
+
+        elif isinstance(expr, exp.Anonymous):
+            # 含括号的列名(如"刷新时间(小时)")被sqlglot解析为Anonymous
+            anon_name = expr.this
+            if expr.expressions:
+                inner = ', '.join(str(e) for e in expr.expressions)
+                full_name = f"{anon_name}({inner})"
+            else:
+                full_name = anon_name
+            val = row.get(full_name) if full_name in row.index else row.get(anon_name)
+            return val
 
         else:
             return None
@@ -4114,6 +4252,21 @@ class AdvancedSQLQueryEngine:
                 df[temp_col] = self._evaluate_coalesce_vectorized(expr, df)
             elif self._is_mathematical_expression(expr):
                 df[temp_col] = self._evaluate_math_expression(expr, df)
+            elif isinstance(expr, exp.Anonymous):
+                # 含括号的列名(如"刷新时间(小时)")
+                anon_name = expr.this
+                if expr.expressions:
+                    inner = ', '.join(str(e) for e in expr.expressions)
+                    full_name = f"{anon_name}({inner})"
+                else:
+                    full_name = anon_name
+                if full_name in df.columns:
+                    df[temp_col] = df[full_name]
+                elif anon_name in df.columns:
+                    df[temp_col] = df[anon_name]
+                else:
+                    return None
+                return temp_col
             else:
                 return None
             return temp_col
