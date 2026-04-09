@@ -1,5 +1,5 @@
 """
-窗口函数测试 - ROW_NUMBER, RANK, DENSE_RANK
+窗口函数测试 - ROW_NUMBER, RANK, DENSE_RANK, LAG, LEAD
 """
 import os
 import pytest
@@ -298,3 +298,156 @@ class TestWindowEdgeCases:
         # 第3行: rank=3 (跳过2), dense_rank=2 (不跳过)
         assert rows[2]['r'] == 3
         assert rows[2]['dr'] == 2
+
+
+class TestLag:
+    """LAG() 测试"""
+
+    def test_lag_basic(self, game_config):
+        """基本LAG: 获取前一行的伤害值"""
+        from src.excel_mcp_server_fastmcp.api.advanced_sql_query import execute_advanced_sql_query
+        result = execute_advanced_sql_query(
+            game_config,
+            "SELECT skill_name, damage, LAG(damage, 1) OVER (ORDER BY damage DESC) as prev_damage FROM 技能配置"
+        )
+        assert result['success'] is True, f"Query failed: {result.get('message')}"
+        rows = _get_rows(result)
+        assert len(rows) == 8
+        # 第一行LAG应该是NULL（没有前一行）
+        assert pd.isna(rows[0]['prev_damage']) or rows[0]['prev_damage'] is None
+        # 第二行LAG应该是第一行的伤害(250)
+        assert rows[1]['prev_damage'] == 250
+
+    def test_lag_partition(self, game_config):
+        """LAG with PARTITION BY: 每个职业内前一行"""
+        from src.excel_mcp_server_fastmcp.api.advanced_sql_query import execute_advanced_sql_query
+        result = execute_advanced_sql_query(
+            game_config,
+            "SELECT skill_name, skill_type, damage, LAG(damage, 1) OVER (PARTITION BY skill_type ORDER BY damage DESC) as prev_damage FROM 技能配置"
+        )
+        assert result['success'] is True, f"Query failed: {result.get('message')}"
+        rows = _get_rows(result)
+
+        # 法师分组的第一行LAG应该是NULL
+        mages = [r for r in rows if r['skill_type'] == 'mage']
+        mage_damages = sorted([r['damage'] for r in mages], reverse=True)
+        assert len(mages) == 4
+        # 检查法师分区内LAG正确
+        for i, mage in enumerate(sorted(mages, key=lambda x: x['damage'], reverse=True)):
+            if i == 0:
+                assert pd.isna(mage['prev_damage']) or mage['prev_damage'] is None
+            else:
+                assert mage['prev_damage'] == mage_damages[i - 1]
+
+    def test_lag_offset_2(self, game_config):
+        """LAG with offset 2: 获取前两行的值"""
+        from src.excel_mcp_server_fastmcp.api.advanced_sql_query import execute_advanced_sql_query
+        result = execute_advanced_sql_query(
+            game_config,
+            "SELECT skill_name, damage, LAG(damage, 2) OVER (ORDER BY damage DESC) as prev2_damage FROM 技能配置"
+        )
+        assert result['success'] is True, f"Query failed: {result.get('message')}"
+        rows = _get_rows(result)
+        # 前两行LAG应该是NULL
+        assert pd.isna(rows[0]['prev2_damage']) or rows[0]['prev2_damage'] is None
+        assert pd.isna(rows[1]['prev2_damage']) or rows[1]['prev2_damage'] is None
+        # 第三行LAG应该是第一行的值
+        assert rows[2]['prev2_damage'] == rows[0]['damage']
+
+    def test_lag_default_value(self, game_config):
+        """LAG with default value: 为NULL提供默认值"""
+        from src.excel_mcp_server_fastmcp.api.advanced_sql_query import execute_advanced_sql_query
+        result = execute_advanced_sql_query(
+            game_config,
+            "SELECT skill_name, damage, LAG(damage, 1, 0) OVER (ORDER BY damage DESC) as prev_damage FROM 技能配置"
+        )
+        assert result['success'] is True, f"Query failed: {result.get('message')}"
+        rows = _get_rows(result)
+        # 第一行LAG应该使用默认值0
+        assert rows[0]['prev_damage'] == 0
+
+    def test_lag_no_order_by_error(self, game_config):
+        """LAG without ORDER BY should error"""
+        from src.excel_mcp_server_fastmcp.api.advanced_sql_query import execute_advanced_sql_query
+        result = execute_advanced_sql_query(
+            game_config,
+            "SELECT skill_name, damage, LAG(damage, 1) OVER () as prev_damage FROM 技能配置"
+        )
+        assert result['success'] is False
+        assert '需要 ORDER BY' in result['message']
+
+
+class TestLead:
+    """LEAD() 测试"""
+
+    def test_lead_basic(self, game_config):
+        """基本LEAD: 获取后一行的伤害值"""
+        from src.excel_mcp_server_fastmcp.api.advanced_sql_query import execute_advanced_sql_query
+        result = execute_advanced_sql_query(
+            game_config,
+            "SELECT skill_name, damage, LEAD(damage, 1) OVER (ORDER BY damage DESC) as next_damage FROM 技能配置"
+        )
+        assert result['success'] is True, f"Query failed: {result.get('message')}"
+        rows = _get_rows(result)
+        assert len(rows) == 8
+        # 最后一行LEAD应该是NULL（没有后一行）
+        assert pd.isna(rows[-1]['next_damage']) or rows[-1]['next_damage'] is None
+        # 第一行LEAD应该是第二行的伤害(220)
+        assert rows[0]['next_damage'] == 220
+
+    def test_lead_partition(self, game_config):
+        """LEAD with PARTITION BY: 每个职业内后一行"""
+        from src.excel_mcp_server_fastmcp.api.advanced_sql_query import execute_advanced_sql_query
+        result = execute_advanced_sql_query(
+            game_config,
+            "SELECT skill_name, skill_type, damage, LEAD(damage, 1) OVER (PARTITION BY skill_type ORDER BY damage DESC) as next_damage FROM 技能配置"
+        )
+        assert result['success'] is True, f"Query failed: {result.get('message')}"
+        rows = _get_rows(result)
+
+        # 法师分组的最后一行LEAD应该是NULL
+        mages = [r for r in rows if r['skill_type'] == 'mage']
+        mage_damages = sorted([r['damage'] for r in mages], reverse=True)
+        assert len(mages) == 4
+        # 检查法师分区内LEAD正确
+        sorted_mages = sorted(mages, key=lambda x: x['damage'], reverse=True)
+        for i in range(len(sorted_mages)):
+            if i == len(sorted_mages) - 1:
+                assert pd.isna(sorted_mages[i]['next_damage']) or sorted_mages[i]['next_damage'] is None
+            else:
+                assert sorted_mages[i]['next_damage'] == mage_damages[i + 1]
+
+    def test_lead_offset_2(self, game_config):
+        """LEAD with offset 2: 获取后两行的值"""
+        from src.excel_mcp_server_fastmcp.api.advanced_sql_query import execute_advanced_sql_query
+        result = execute_advanced_sql_query(
+            game_config,
+            "SELECT skill_name, damage, LEAD(damage, 2) OVER (ORDER BY damage DESC) as next2_damage FROM 技能配置"
+        )
+        assert result['success'] is True, f"Query failed: {result.get('message')}"
+        rows = _get_rows(result)
+        # 最后两行LEAD应该是NULL
+        assert pd.isna(rows[-1]['next2_damage']) or rows[-1]['next2_damage'] is None
+        assert pd.isna(rows[-2]['next2_damage']) or rows[-2]['next2_damage'] is None
+
+    def test_lead_default_value(self, game_config):
+        """LEAD with default value: 为NULL提供默认值"""
+        from src.excel_mcp_server_fastmcp.api.advanced_sql_query import execute_advanced_sql_query
+        result = execute_advanced_sql_query(
+            game_config,
+            "SELECT skill_name, damage, LEAD(damage, 1, 0) OVER (ORDER BY damage DESC) as next_damage FROM 技能配置"
+        )
+        assert result['success'] is True, f"Query failed: {result.get('message')}"
+        rows = _get_rows(result)
+        # 最后一行LEAD应该使用默认值0
+        assert rows[-1]['next_damage'] == 0
+
+    def test_lead_no_order_by_error(self, game_config):
+        """LEAD without ORDER BY should error"""
+        from src.excel_mcp_server_fastmcp.api.advanced_sql_query import execute_advanced_sql_query
+        result = execute_advanced_sql_query(
+            game_config,
+            "SELECT skill_name, damage, LEAD(damage, 1) OVER () as next_damage FROM 技能配置"
+        )
+        assert result['success'] is False
+        assert '需要 ORDER BY' in result['message']
