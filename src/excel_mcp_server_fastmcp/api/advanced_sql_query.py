@@ -1943,7 +1943,7 @@ class AdvancedSQLQueryEngine:
     def _apply_window_functions(self, parsed_sql: exp.Expression, df) -> pd.DataFrame:
         """
         计算窗口函数并将结果添加到DataFrame
-        支持: ROW_NUMBER, RANK, DENSE_RANK
+        支持: ROW_NUMBER, RANK, DENSE_RANK, PERCENT_RANK, CUME_DIST
         语法: func() OVER ([PARTITION BY col ...] ORDER BY col [ASC|DESC] ...)
         """
         if not self._has_window_function(parsed_sql):
@@ -1992,9 +1992,9 @@ class AdvancedSQLQueryEngine:
         func_type = type(window_expr.this).__name__
 
         # 支持的窗口函数类型
-        supported_funcs = {'RowNumber', 'Rank', 'DenseRank', 'Ntile', 'Lag', 'Lead', 'FirstValue', 'LastValue'}
+        supported_funcs = {'RowNumber', 'Rank', 'DenseRank', 'Count', 'Ntile', 'PercentRank', 'CumeDist', 'Lag', 'Lead', 'FirstValue', 'LastValue'}
         if func_type not in supported_funcs:
-            raise ValueError(f"不支持的窗口函数: {func_type}。💡 支持的窗口函数: ROW_NUMBER, RANK, DENSE_RANK, NTILE, LAG, LEAD, FIRST_VALUE, LAST_VALUE（均需配合 OVER(ORDER BY ...) 使用）")
+            raise ValueError(f"不支持的窗口函数: {func_type}。💡 支持的窗口函数: ROW_NUMBER, RANK, DENSE_RANK, COUNT(*) OVER, NTILE, PERCENT_RANK, CUME_DIST, LAG, LEAD, FIRST_VALUE, LAST_VALUE（均需配合 OVER(ORDER BY ...) 使用）")
 
         if select_alias_map is None:
             select_alias_map = {}
@@ -2027,6 +2027,9 @@ class AdvancedSQLQueryEngine:
                 raise ValueError(f"窗口函数中列 '{col}' 不存在.可用列: {list(df.columns)}.{suggestion}")
 
         # 窗口函数分发表
+        # COUNT(*) OVER() 需要特殊处理
+        if func_type == 'Count':
+            return self._compute_count_window(window_expr, df, partition_cols)
         # LAG/LEAD/FIRST_VALUE/LAST_VALUE需要window_expr参数来解析列名
         if func_type in ('Lag', 'Lead', 'FirstValue', 'LastValue'):
             if func_type == 'Lag':
@@ -2041,16 +2044,18 @@ class AdvancedSQLQueryEngine:
             # NTILE 需要从 window_expr 中解析桶数参数
             return self._compute_ntile(window_expr, df, partition_cols, order_cols, ascending, select_alias_map)
         else:
-            # ROW_NUMBER, RANK, DENSE_RANK使用原有签名
+            # ROW_NUMBER, RANK, DENSE_RANK, PERCENT_RANK, CUME_DIST使用原有签名
             _window_dispatch = {
                 'RowNumber': self._compute_row_number,
                 'Rank': self._compute_rank,
                 'DenseRank': self._compute_dense_rank,
+                'PercentRank': self._compute_percent_rank,
+                'CumeDist': self._compute_cume_dist,
             }
             handler = _window_dispatch.get(func_type)
             if handler:
                 return handler(df, partition_cols, order_cols, ascending)
-        raise ValueError(f"不支持的窗口函数: {func_type}。💡 支持的窗口函数: ROW_NUMBER, RANK, DENSE_RANK, LAG, LEAD, FIRST_VALUE, LAST_VALUE（均需配合 OVER(ORDER BY ...) 使用）")
+        raise ValueError(f"不支持的窗口函数: {func_type}。💡 支持的窗口函数: ROW_NUMBER, RANK, DENSE_RANK, COUNT(*) OVER, NTILE, PERCENT_RANK, CUME_DIST, LAG, LEAD, FIRST_VALUE, LAST_VALUE（均需配合 OVER(ORDER BY ...) 使用）")
 
     def _resolve_window_column(self, col_name: str, df_columns: list,
                                 select_alias_map: Dict[str, str]) -> str:
@@ -2078,6 +2083,60 @@ class AdvancedSQLQueryEngine:
                             return c
 
         return col_name  # 未找到映射,返回原名
+
+    def _compute_count_window(self, window_expr: exp.Window, df: pd.DataFrame, partition_cols: list) -> pd.Series:
+        """COUNT() OVER(): 返回每个分区的总行数
+        
+        支持:
+        - COUNT(*) OVER (PARTITION BY col): 计算分区内的所有行数
+        - COUNT(col) OVER (PARTITION BY col): 计算分区内col不为NULL的行数
+        """
+        # 解析COUNT函数的参数
+        count_func = window_expr.this
+        count_all = False
+        count_col = None
+        is_distinct = False
+
+        # 检查是否为COUNT(*)
+        if isinstance(count_func.this, exp.Star):
+            count_all = True
+        # 检查是否为DISTINCT
+        elif isinstance(count_func.this, exp.Distinct):
+            is_distinct = True
+            count_col = self._extract_agg_column(count_func.this.expressions[0], "COUNT(DISTINCT)")
+        else:
+            # COUNT(col)
+            count_col = self._extract_agg_column(count_func.this, "COUNT")
+
+        # 验证列存在
+        if count_col and count_col not in df.columns:
+            suggestion = self._suggest_column_name(count_col, list(df.columns))
+            raise ValueError(f"COUNT() 窗口函数中列 '{count_col}' 不存在.可用列: {list(df.columns)}.{suggestion}")
+
+        def compute_count_in_group(group):
+            """在分组内计算COUNT"""
+            if count_all:
+                # COUNT(*): 计算所有行
+                return pd.Series([len(group)] * len(group), index=group.index)
+            elif is_distinct:
+                # COUNT(DISTINCT col): 计算不同值的数量
+                unique_count = group[count_col].nunique()
+                return pd.Series([unique_count] * len(group), index=group.index)
+            else:
+                # COUNT(col): 计算非NULL值的数量
+                non_null_count = group[count_col].count()
+                return pd.Series([non_null_count] * len(group), index=group.index)
+
+        if partition_cols:
+            grouped = df.groupby(partition_cols, sort=False)
+            result = grouped.apply(compute_count_in_group, include_groups=False)
+            if isinstance(result.index, pd.MultiIndex):
+                result = result.droplevel(result.index.names[:-1])
+        else:
+            # 无PARTITION BY: 全表作为一个分区
+            result = compute_count_in_group(df)
+
+        return result.astype(int)
 
     def _compute_row_number(self, df: pd.DataFrame, partition_cols: list,
                             order_cols: list, ascending: list) -> pd.Series:
@@ -2176,6 +2235,84 @@ class AdvancedSQLQueryEngine:
                 result = result.droplevel(result.index.names[:-1])
         else:
             result = assign_dense_rank(df)
+
+        return result
+
+    def _compute_percent_rank(self, df: pd.DataFrame, partition_cols: list,
+                              order_cols: list, ascending: list) -> pd.Series:
+        """PERCENT_RANK: 返回行的相对排名百分比
+        
+        公式: (rank - 1) / (total_rows - 1)
+        - 第一行: percent_rank = 0
+        - 最后一行: percent_rank = 1
+        - 只有一行: percent_rank = 0
+        """
+        if not order_cols:
+            raise ValueError("PERCENT_RANK() 窗口函数需要 ORDER BY 子句")
+
+        if partition_cols:
+            grouped = df.groupby(partition_cols, sort=False)
+        else:
+            grouped = None
+
+        def assign_percent_rank(group):
+            """为分组内的行计算百分比排名"""
+            sorted_group = group.sort_values(order_cols, ascending=ascending)
+            group_size = len(sorted_group)
+            
+            if group_size == 1:
+                # 只有一行时，percent_rank = 0
+                return pd.Series([0.0], index=group.index)
+            
+            # 使用RANK方法计算排名（相同值相同排名，下一个排名跳过）
+            rank_series = sorted_group[order_cols[0]].rank(method='first', ascending=ascending[0])
+            # 计算百分比排名: (rank - 1) / (n - 1)
+            percent_rank = (rank_series - 1) / (group_size - 1)
+            
+            return percent_rank.reindex(group.index)
+
+        if grouped is not None:
+            result = grouped.apply(assign_percent_rank, include_groups=False)
+            if isinstance(result.index, pd.MultiIndex):
+                result = result.droplevel(result.index.names[:-1])
+        else:
+            result = assign_percent_rank(df)
+
+        return result
+
+    def _compute_cume_dist(self, df: pd.DataFrame, partition_cols: list,
+                          order_cols: list, ascending: list) -> pd.Series:
+        """CUME_DIST: 返回累积分布值
+        
+        公式: number_of_rows_with_value <= current_value / total_rows
+        - 返回值范围: (0, 1]
+        - 第一行: cume_dist = 1 / n (最小值)
+        - 最后一行: cume_dist = 1 (最大值)
+        """
+        if not order_cols:
+            raise ValueError("CUME_DIST() 窗口函数需要 ORDER BY 子句")
+
+        if partition_cols:
+            grouped = df.groupby(partition_cols, sort=False)
+        else:
+            grouped = None
+
+        def assign_cume_dist(group):
+            """为分组内的行计算累积分布"""
+            sorted_group = group.sort_values(order_cols, ascending=ascending)
+            group_size = len(sorted_group)
+            
+            # 计算累积分布: 对于每一行，计算小于等于当前值的行数 / 总行数
+            cume_dist = sorted_group[order_cols[0]].rank(method='max', ascending=ascending[0]) / group_size
+            
+            return cume_dist.reindex(group.index)
+
+        if grouped is not None:
+            result = grouped.apply(assign_cume_dist, include_groups=False)
+            if isinstance(result.index, pd.MultiIndex):
+                result = result.droplevel(result.index.names[:-1])
+        else:
+            result = assign_cume_dist(df)
 
         return result
 
