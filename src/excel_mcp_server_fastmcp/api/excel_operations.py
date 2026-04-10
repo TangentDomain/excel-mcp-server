@@ -2153,57 +2153,34 @@ class ExcelOperations:
                     'duplicates': []
                 }
 
-            # 收集ID数据
-            ids_with_rows = []
-            # 处理流式写入后 max_row 可能为 None 的情况
-            if ws.max_row is None:
-# read_only模式下max_row=None，逐行扫描直到连续N行为空
-                max_scan = 10000  # 安全上限
-                consecutive_empty = 0
-                empty_threshold = 10  # 连续N行为空则停止
-                for row in range(header_row + 1, header_row + 1 + max_scan):
-                    try:
-                        cell_value = ws.cell(row=row, column=col_idx).value
-                        if cell_value is not None:
-                            ids_with_rows.append((cell_value, row))
-                            consecutive_empty = 0
-                        else:
-                            consecutive_empty += 1
-                            if consecutive_empty >= empty_threshold:
-                                break
-                    except Exception:
-                        consecutive_empty += 1
-                        if consecutive_empty >= empty_threshold:
-                            break
-            else:
-                # 正常情况：max_row 存在
-                for row in range(header_row + 1, ws.max_row + 1):
-                    cell_value = ws.cell(row=row, column=col_idx).value
-                    if cell_value is not None:  # 跳过空值
-                        ids_with_rows.append((cell_value, row))
+            # 单次遍历收集ID并构建行号映射
+            id_to_rows = {}  # id_value -> [row_numbers]
+            total_ids = 0
 
-            # 统计ID出现次数
-            id_counter = Counter([id_val for id_val, _ in ids_with_rows])
-            total_ids = len(ids_with_rows)
-            unique_ids = len(id_counter)
+            for row_idx, row_data in enumerate(
+                ws.iter_rows(min_row=header_row + 1, min_col=col_idx, max_col=col_idx, values_only=True),
+                start=header_row + 1
+            ):
+                cell_value = row_data[0] if row_data else None
+                if cell_value is not None:
+                    total_ids += 1
+                    if cell_value not in id_to_rows:
+                        id_to_rows[cell_value] = []
+                    id_to_rows[cell_value].append(row_idx)
 
-            # 查找重复的ID
+            # 直接从映射构建重复列表（无需额外遍历）
             duplicates = []
             duplicate_count = 0
-
-            for id_value, count in id_counter.items():
-                if count > 1:
+            for id_value, rows in id_to_rows.items():
+                if len(rows) > 1:
                     duplicate_count += 1
-                    # 找到该ID的所有行号
-                    rows = [row for id_val, row in ids_with_rows if id_val == id_value]
-                    # 使用绝对行号（Excel中的实际行号）
-                    absolute_rows = rows
-
                     duplicates.append({
                         'id_value': id_value,
-                        'count': count,
-                        'rows': absolute_rows
+                        'count': len(rows),
+                        'rows': rows
                     })
+
+            unique_ids = len(id_to_rows)
 
             has_duplicates = duplicate_count > 0
 

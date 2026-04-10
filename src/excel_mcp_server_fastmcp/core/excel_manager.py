@@ -604,74 +604,34 @@ class ExcelManager:
                 error=f"源工作表 '{source_name}' 为空或读取失败"
             )
 
-        # 收集所有工作表数据（保持其他工作表不变）
-        all_sheets_data = {}
-        for sn in cal_wb.sheet_names:
-            all_sheets_data[sn] = cal_wb.get_sheet_by_name(sn).to_python()
-
-        # 处理名称冲突
+        # 处理名称冲突（只需检查sheet_names列表，无需读取数据）
+        existing_names = set(cal_wb.sheet_names)
         base_name = new_name
         counter = 1
-        # 自动生成的名称允许静默清理
         new_name = self._sanitize_sheet_name(new_name)
-        while new_name in all_sheets_data:
+        while new_name in existing_names:
             new_name = f"{base_name}_{counter}"
             counter += 1
             if counter > 100:
                 raise DataValidationError(f"无法生成唯一工作表名称: {base_name}")
 
-        # 添加新工作表数据
-        all_sheets_data[new_name] = list(source_rows)
-
-        # 读取列宽信息
-        col_widths = {}
+        # 只在openpyxl中用copy_worksheet复制，保留格式和列宽
+        # 对于大文件，先用calamine读取源数据，再用openpyxl直接添加新sheet
+        wb = load_workbook(self.file_path)
         try:
-            wb_meta = load_workbook(self.file_path)
-            if source_name in wb_meta.sheetnames:
-                ws_meta = wb_meta[source_name]
-                col_widths = {
-                    col_letter: dim.width
-                    for col_letter, dim in ws_meta.column_dimensions.items()
-                    if dim.width
-                }
-            wb_meta.close()
-        except Exception as e:
-            logger.warning(f"读取列宽失败，跳过: {e}")
+            source_ws = wb[source_name]
+            new_ws = wb.copy_worksheet(source_ws)
+            new_ws.title = new_name
 
-        # write_only写入所有工作表
-        wb_out = Workbook(write_only=True)
-        sheet_order = list(cal_wb.sheet_names)
-        sheet_order.append(new_name)
+            if index is not None and 0 <= index < len(wb.sheetnames):
+                # 移动到指定位置
+                sheet_list = wb.sheetnames
+                current_idx = sheet_list.index(new_name)
+                wb.move_sheet(new_name, offset=index - current_idx)
 
-        for sn in sheet_order:
-            if sn not in all_sheets_data:
-                continue
-            ws = wb_out.create_sheet(title=sn)
-            sheet_rows = all_sheets_data[sn]
-
-            # 为新工作表设置源工作表的列宽
-            if sn == new_name and col_widths:
-                for col_letter, width in col_widths.items():
-                    try:
-                        ws.column_dimensions[col_letter].width = width
-                    except Exception:
-                        pass
-
-            for row in sheet_rows:
-                ws.append(row)
-
-        # 原子替换
-        fd, tmp_path = tempfile.mkstemp(suffix='.xlsx', dir=os.path.dirname(self.file_path))
-        os.close(fd)
-
-        try:
-            wb_out.save(tmp_path)
-            wb_out.close()
-            shutil.move(tmp_path, self.file_path)
-        except Exception:
-            if os.path.exists(tmp_path):
-                os.unlink(tmp_path)
-            raise
+            wb.save(self.file_path)
+        finally:
+            wb.close()
 
         total_rows = len(source_rows)
         total_cols = max(len(row) for row in source_rows) if source_rows else 0
@@ -679,7 +639,7 @@ class ExcelManager:
         return OperationResult(
             success=True,
             data={
-                'index': len(sheet_order) - 1,
+                'index': len(cal_wb.sheet_names),
                 'name': new_name,
                 'max_row': total_rows,
                 'max_column': total_cols,
@@ -693,7 +653,7 @@ class ExcelManager:
                 'copied_rows': total_rows,
                 'copied_columns': total_cols,
                 'mode': 'streaming',
-                'col_widths_preserved': len(col_widths) > 0
+                'col_widths_preserved': True
             }
         )
 

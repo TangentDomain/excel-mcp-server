@@ -588,8 +588,8 @@ class AdvancedSQLQueryEngine:
 
             # 清理ANSI转义序列(终端粘贴可能带入的不可见字符)
             sql = re.sub(r'\x1b\[[0-9;]*[a-zA-Z]', '', sql)
-            # 清理残余控制字符
-            sql = re.sub(r'[\x00-\x1f\x7f]', '', sql)
+            # 清理残余控制字符(保留\t\n\r,它们在SQL中有意义)
+            sql = re.sub(r'[\x00-\x08\x0b\x0c\x0e-\x1f\x7f]', '', sql)
             # 清理残余的ANSI括号伪影:未配对的[后紧跟非ASCII字符
             # 有效的SQL Server标识符 [名称] 有配对的],ANSI伪影 [中文 无配对
             if sql.count('[') != sql.count(']'):
@@ -1314,15 +1314,7 @@ class AdvancedSQLQueryEngine:
         return df
 
     def _validate_sql_support(self, parsed_sql: exp.Expression) -> Dict[str, Any]:
-        """
-        验证SQL语法支持范围
-
-        Args:
-            parsed_sql: 解析后的SQL表达式
-
-        Returns:
-            Dict[str, Any]: 验证结果
-        """
+        """验证SQL语法支持范围"""
         try:
             # 检查是否为SELECT语句,UNION,EXCEPT或INTERSECT
             if not isinstance(parsed_sql, (exp.Select, exp.Union, exp.Except, exp.Intersect)):
@@ -1331,16 +1323,21 @@ class AdvancedSQLQueryEngine:
                     'error': '只支持SELECT查询语句,不支持INSERT,UPDATE,DELETE等操作'
                 }
 
-            # 子查询支持已实现,不再拒绝
-            # IN子查询,标量子查询,EXISTS子查询均支持
+            # 检测FETCH NEXT → 建议用LIMIT
+            if list(parsed_sql.find_all(exp.Fetch)):
+                return {'valid': False, 'error': '不支持FETCH/NEXT语法,请用LIMIT:SELECT ... LIMIT 10'}
 
-            # CTE (WITH) 支持
-            with_clause = parsed_sql.args.get('with') or parsed_sql.args.get('with_')
-            if with_clause:
-                return {'valid': True}  # CTE在_execute_query中处理
-            # UNION/UNION ALL 支持已实现
-            # EXCEPT/INTERSECT 支持已实现
-            # 窗口函数支持已实现 (ROW_NUMBER, RANK, DENSE_RANK)
+            # 检测NATURAL JOIN
+            for join in parsed_sql.find_all(exp.Join):
+                if join.args.get('kind') == 'NATURAL' or join.args.get('natural'):
+                    return {'valid': False, 'error': '不支持NATURAL JOIN,请改用显式ON条件:JOIN t2 ON t1.col = t2.col'}
+
+            # LATERAL JOIN: 由_apply_lateral_join处理，此处不拒绝
+
+            # 检测WITH RECURSIVE
+            with_clause = parsed_sql.args.get('with')
+            if with_clause and getattr(with_clause, 'recursive', False):
+                return {'valid': False, 'error': '不支持递归CTE(WITH RECURSIVE),请改用普通CTE或子查询'}
 
             return {'valid': True}
 
@@ -1992,19 +1989,31 @@ class AdvancedSQLQueryEngine:
         func_type = type(window_expr.this).__name__
 
         # 支持的窗口函数类型
+        _window_agg_funcs = {'Avg', 'Sum', 'Count', 'Min', 'Max'}
         supported_funcs = {'RowNumber', 'Rank', 'DenseRank', 'Lag', 'Lead',
-                           'FirstValue', 'LastValue', 'Ntile', 'PercentRank', 'CumeDist'}
+                           'FirstValue', 'LastValue', 'Ntile', 'PercentRank', 'CumeDist',
+                           'Count'} | _window_agg_funcs
         if func_type not in supported_funcs:
-            raise ValueError(f"不支持的窗口函数: {func_type}。💡 支持的窗口函数: ROW_NUMBER, RANK, DENSE_RANK, LAG, LEAD, FIRST_VALUE, LAST_VALUE, NTILE, PERCENT_RANK, CUME_DIST")
+            raise ValueError(f"不支持的窗口函数: {func_type}")
 
         if select_alias_map is None:
             select_alias_map = {}
+
+        # 辅助函数：解析列名（处理JOIN列映射）
+        def resolve_col_name(col_node):
+            col_name = col_node.name if hasattr(col_node, 'name') and col_node.name else str(col_node)
+            # 检查JOIN列映射
+            if hasattr(self, '_join_column_mapping') and col_name not in df.columns:
+                for table_alias, col_map in self._join_column_mapping.items():
+                    if col_name in col_map and col_map[col_name] in df.columns:
+                        return col_map[col_name]
+            return col_name
 
         # 解析 PARTITION BY
         partition_by = window_expr.args.get('partition_by', [])
         partition_cols = []
         for col in partition_by:
-            col_name = col.name if hasattr(col, 'name') and col.name else str(col)
+            col_name = resolve_col_name(col)
             partition_cols.append(col_name)
 
         # 解析 ORDER BY
@@ -2014,8 +2023,8 @@ class AdvancedSQLQueryEngine:
         if order:
             for ordered_expr in order.expressions:
                 col = ordered_expr.this
-                col_name = col.name if hasattr(col, 'name') and col.name else str(col)
-                # 如果列名不在DataFrame中,尝试映射
+                col_name = resolve_col_name(col)
+                # 如果列名仍不在DataFrame中,尝试聚合别名映射
                 if col_name not in df.columns:
                     col_name = self._resolve_window_column(col_name, df.columns, select_alias_map)
                 order_cols.append(col_name)
@@ -2046,7 +2055,12 @@ class AdvancedSQLQueryEngine:
             if func_type in ('Lag', 'Lead', 'FirstValue', 'LastValue', 'Ntile'):
                 return handler(df, partition_cols, order_cols, ascending, window_expr)
             return handler(df, partition_cols, order_cols, ascending)
-        raise ValueError(f"不支持的窗口函数: {func_type}。💡 支持的窗口函数: ROW_NUMBER, RANK, DENSE_RANK, LAG, LEAD, FIRST_VALUE, LAST_VALUE, NTILE, PERCENT_RANK, CUME_DIST")
+
+        # 窗口聚合函数: AVG/SUM/COUNT/MIN/MAX OVER (...)
+        if func_type in _window_agg_funcs:
+            return self._compute_window_aggregate(func_type, df, partition_cols, order_cols, ascending, window_expr)
+
+        raise ValueError(f"不支持的窗口函数: {func_type}")
 
     def _resolve_window_column(self, col_name: str, df_columns: list,
                                 select_alias_map: Dict[str, str]) -> str:
@@ -2079,36 +2093,20 @@ class AdvancedSQLQueryEngine:
                             order_cols: list, ascending: list) -> pd.Series:
         """ROW_NUMBER: 分区内从1开始的连续编号"""
         if not partition_cols and not order_cols:
-            # 无PARTITION BY也无ORDER BY: 按原始行顺序编号
             return pd.Series(range(1, len(df) + 1), index=df.index, dtype=int)
 
+        # 排序后用 cumcount 计算行号，避免 groupby.apply 的 pandas 版本兼容问题
+        if order_cols:
+            sorted_df = df.sort_values(order_cols, ascending=ascending)
+        else:
+            sorted_df = df
+
         if partition_cols:
-            grouped = df.groupby(partition_cols, sort=False)
+            result = sorted_df.groupby(partition_cols, sort=False).cumcount() + 1
         else:
-            grouped = None  # 全表作为一个分区
+            result = pd.Series(range(1, len(sorted_df) + 1), index=sorted_df.index, dtype=int)
 
-        def assign_row_number(group):
-            """为分组内的行分配行号.
-
-            Args:
-                group: pandas分组对象
-            """
-            if order_cols:
-                sorted_group = group.sort_values(order_cols, ascending=ascending)
-                result = pd.Series(range(1, len(sorted_group) + 1), index=sorted_group.index, dtype=int)
-                return result.reindex(group.index)
-            else:
-                return pd.Series(range(1, len(group) + 1), index=group.index, dtype=int)
-
-        if grouped is not None:
-            result = grouped.apply(assign_row_number, include_groups=False)
-            # groupby.apply可能返回MultiIndex Series,需要展平
-            if isinstance(result.index, pd.MultiIndex):
-                result = result.droplevel(result.index.names[:-1])
-        else:
-            result = assign_row_number(df)
-
-        return result
+        return result.reindex(df.index).astype(int)
 
     def _compute_rank(self, df: pd.DataFrame, partition_cols: list,
                       order_cols: list, ascending: list) -> pd.Series:
@@ -2116,32 +2114,12 @@ class AdvancedSQLQueryEngine:
         if not order_cols:
             raise ValueError("RANK() 窗口函数需要 ORDER BY 子句")
 
+        sorted_df = df.sort_values(order_cols, ascending=ascending)
         if partition_cols:
-            grouped = df.groupby(partition_cols, sort=False)
+            result = sorted_df.groupby(partition_cols, sort=False)[order_cols[0]].rank(method='min', ascending=ascending[0])
         else:
-            grouped = None
-
-        def assign_rank(group):
-            """为分组内的行分配排名.
-
-            Args:
-                group: pandas分组对象
-            """
-            sorted_group = group.sort_values(order_cols, ascending=ascending)
-            # 使用pandas rank(method='first')模拟RANK行为
-            # RANK: 相同值取相同排名,下一个排名跳过
-            rank_series = sorted_group[order_cols[0]].rank(method='min', ascending=ascending[0])
-            rank_series = rank_series.astype(int)
-            return rank_series.reindex(group.index)
-
-        if grouped is not None:
-            result = grouped.apply(assign_rank, include_groups=False)
-            if isinstance(result.index, pd.MultiIndex):
-                result = result.droplevel(result.index.names[:-1])
-        else:
-            result = assign_rank(df)
-
-        return result
+            result = sorted_df[order_cols[0]].rank(method='min', ascending=ascending[0])
+        return result.reindex(df.index).astype(int)
 
     def _compute_dense_rank(self, df: pd.DataFrame, partition_cols: list,
                             order_cols: list, ascending: list) -> pd.Series:
@@ -2149,31 +2127,12 @@ class AdvancedSQLQueryEngine:
         if not order_cols:
             raise ValueError("DENSE_RANK() 窗口函数需要 ORDER BY 子句")
 
+        sorted_df = df.sort_values(order_cols, ascending=ascending)
         if partition_cols:
-            grouped = df.groupby(partition_cols, sort=False)
+            result = sorted_df.groupby(partition_cols, sort=False)[order_cols[0]].rank(method='dense', ascending=ascending[0])
         else:
-            grouped = None
-
-        def assign_dense_rank(group):
-            """为分组内的行分配密集排名.
-
-            Args:
-                group: pandas分组对象
-            """
-            sorted_group = group.sort_values(order_cols, ascending=ascending)
-            # DENSE_RANK: 相同值取相同排名,下一个排名连续
-            rank_series = sorted_group[order_cols[0]].rank(method='dense', ascending=ascending[0])
-            rank_series = rank_series.astype(int)
-            return rank_series.reindex(group.index)
-
-        if grouped is not None:
-            result = grouped.apply(assign_dense_rank, include_groups=False)
-            if isinstance(result.index, pd.MultiIndex):
-                result = result.droplevel(result.index.names[:-1])
-        else:
-            result = assign_dense_rank(df)
-
-        return result
+            result = sorted_df[order_cols[0]].rank(method='dense', ascending=ascending[0])
+        return result.reindex(df.index).astype(int)
 
     def _compute_lag(self, df: pd.DataFrame, partition_cols: list,
                      order_cols: list, ascending: list, window_expr) -> pd.Series:
@@ -2291,6 +2250,83 @@ class AdvancedSQLQueryEngine:
             rank = sorted_df[order_cols[0]].rank(method='max', ascending=ascending[0])
             n = len(sorted_df)
             result = (rank / n).reindex(df.index)
+        return result
+
+    def _compute_window_aggregate(self, func_type: str, df: pd.DataFrame,
+                                   partition_cols: list, order_cols: list,
+                                   ascending: list, window_expr) -> pd.Series:
+        """窗口聚合函数: AVG/SUM/COUNT/MIN/MAX OVER (...)
+
+        无ORDER BY时计算整个分区的聚合值;
+        有ORDER BY时计算累计聚合值(running aggregate)。
+        """
+        func = window_expr.this
+        # 提取列名
+        inner = func.this
+        if isinstance(inner, exp.Star):
+            # COUNT(*) OVER (...)
+            col_name = None
+        else:
+            col_name = inner.name if hasattr(inner, 'name') else str(inner)
+            # JOIN列映射
+            if hasattr(self, '_join_column_mapping') and col_name not in df.columns:
+                for _, col_map in self._join_column_mapping.items():
+                    if col_name in col_map and col_map[col_name] in df.columns:
+                        col_name = col_map[col_name]
+                        break
+
+        numeric_col = col_name and col_name in df.columns
+        if numeric_col and func_type != 'Count':
+            series = pd.to_numeric(df[col_name], errors='coerce')
+        elif col_name is None:
+            # COUNT(*)
+            series = pd.Series(1, index=df.index)
+        else:
+            series = df[col_name]
+
+        if partition_cols:
+            grouped = series.groupby([df[c] for c in partition_cols], sort=False)
+        else:
+            grouped = None
+
+        # 有ORDER BY → 累计聚合; 无ORDER BY → 分区整体聚合
+        if order_cols:
+            sorted_df = df.sort_values(order_cols, ascending=ascending)
+            if partition_cols:
+                sorted_group = series.reindex(sorted_df.index).groupby(
+                    [df[c].reindex(sorted_df.index) for c in partition_cols], sort=False)
+            else:
+                sorted_group = None
+
+            if func_type == 'Sum':
+                result = sorted_group.cumsum() if sorted_group else series.reindex(sorted_df.index).cumsum()
+            elif func_type == 'Count':
+                result = sorted_group.cumcount() + 1 if sorted_group else pd.Series(range(1, len(df)+1), index=sorted_df.index)
+            elif func_type == 'Min':
+                result = sorted_group.cummin() if sorted_group else series.reindex(sorted_df.index).cummin()
+            elif func_type == 'Max':
+                result = sorted_group.cummax() if sorted_group else series.reindex(sorted_df.index).cummax()
+            elif func_type == 'Avg':
+                if sorted_group:
+                    cumsum = sorted_group.cumsum()
+                    cumcount = sorted_group.cumcount() + 1
+                    result = cumsum / cumcount
+                else:
+                    s = series.reindex(sorted_df.index)
+                    result = s.cumsum() / pd.Series(range(1, len(s)+1), index=s.index)
+            else:
+                raise ValueError(f"不支持的窗口聚合函数: {func_type}")
+            result = result.reindex(df.index)
+        else:
+            # 无ORDER BY: 分区整体聚合
+            agg_map = {'Avg': 'mean', 'Sum': 'sum', 'Count': 'count', 'Min': 'min', 'Max': 'max'}
+            agg_func = agg_map[func_type]
+            if grouped is not None:
+                result = grouped.transform(agg_func)
+            else:
+                val = series.agg(agg_func)
+                result = pd.Series(val, index=df.index)
+
         return result
 
     def _execute_query(
@@ -2489,8 +2525,10 @@ class AdvancedSQLQueryEngine:
         # 按SELECT表达式顺序处理列
         for i, select_expr in enumerate(parsed_sql.expressions):
             if isinstance(select_expr, exp.Star):
-                # SELECT *: 返回所有列
+                # SELECT *: 返回所有列(排除内部临时列)
                 for col in df.columns:
+                    if col == '_ROW_NUMBER_' or col.startswith('_window_'):
+                        continue
                     if col not in result_data:
                         result_data[col] = df[col]
                         ordered_columns.append(col)
@@ -2498,6 +2536,10 @@ class AdvancedSQLQueryEngine:
 
             # 处理别名
             alias_name, original_expr = self._extract_select_alias(select_expr, i)
+
+            # 如果是窗口函数且别名已存在于result_data(被SELECT *展开),跳过
+            if isinstance(original_expr, exp.Window) and alias_name in result_data:
+                continue
 
             # 处理重复别名:当多个SELECT列解析为相同名称时,添加表前缀
             if alias_name in used_aliases and isinstance(original_expr, exp.Column):
@@ -3018,6 +3060,14 @@ class AdvancedSQLQueryEngine:
 
             # 解析右表
             right_table_expr = join.this
+
+            # LATERAL JOIN: 关联子查询，逐行执行
+            if isinstance(right_table_expr, exp.Lateral):
+                result_df = self._apply_lateral_join(
+                    join, right_table_expr, result_df,
+                    worksheets_data, left_table, join_kind
+                )
+                continue
             if hasattr(right_table_expr, 'this'):
                 right_table = right_table_expr.this if isinstance(right_table_expr.this, str) else (
                     right_table_expr.this.name if hasattr(right_table_expr.this, 'name') else str(right_table_expr.this)
@@ -3183,28 +3233,18 @@ class AdvancedSQLQueryEngine:
             left_expr = on_clause.left
             right_expr = on_clause.right
         elif isinstance(on_clause, exp.And):
-            # 多条件JOIN暂不支持,取第一个等值条件
             for child in on_clause.find_all(exp.EQ):
                 left_expr = child.left
                 right_expr = child.right
                 break
             else:
-                raise ValueError("JOIN ON多条件暂不支持。💡 建议拆分为多个单条件JOIN或使用子查询")
+                raise ValueError("JOIN ON多条件暂不支持。建议拆分为多个单条件JOIN或使用子查询")
         else:
             raise ValueError(f"JOIN ON条件格式不支持,请使用等值连接: ON a.id = b.id")
 
-        def resolve_column(col_expr) -> str:
-            """解析列表达式,返回列名和表名.
-
-            Args:
-                col_expr: SQLGlot列表达式
-
-            Returns:
-                tuple: (列名, 表名或None)
-            """
+        def resolve_column(col_expr) -> tuple:
             if isinstance(col_expr, exp.Column):
                 col_name = col_expr.name
-                # 检查是否有表限定符
                 table_part = col_expr.table if hasattr(col_expr, 'table') and col_expr.table else None
                 return col_name, table_part
             return str(col_expr), None
@@ -3216,17 +3256,343 @@ class AdvancedSQLQueryEngine:
         if left_tbl:
             resolved_left_tbl = self._table_aliases.get(left_tbl, left_tbl)
             if resolved_left_tbl == right_table or left_tbl == right_alias:
-                # 左表达式实际指向右表,交换
                 return right_col, left_col, None
         if right_tbl:
             resolved_right_tbl = self._table_aliases.get(right_tbl, right_tbl)
             if resolved_right_tbl == left_table:
-                # 右表达式实际指向左表,交换
                 return right_col, left_col, None
 
-        # 无表限定符:根据列是否存在于左右表来判断
-        # 默认左=左表, 右=右表
         return left_col, right_col, None
+
+    def _apply_lateral_join(self, join, lateral_node, left_df, worksheets_data, left_table, join_kind):
+        """
+        执行LATERAL JOIN: 对左表每行执行关联子查询，合并结果。
+
+        LATERAL子查询可以引用左表的列（通过别名.列名）。
+        策略：将子查询中引用左表的列替换为当前行的字面值，逐行执行。
+
+        Args:
+            join: sqlglot Join节点
+            lateral_node: exp.Lateral节点
+            left_df: 左表DataFrame
+            worksheets_data: 所有工作表数据
+            left_table: 左表名（或别名）
+            join_kind: JOIN类型(inner/left/cross)
+
+        Returns:
+            pd.DataFrame: JOIN后的结果
+        """
+        subquery_expr = lateral_node.this  # exp.Subquery
+        lateral_alias = lateral_node.alias or '_lateral'
+
+        # ON条件
+        on_clause = join.args.get('on')
+
+        # 收集子查询中引用左表的列 (如 p.ColName)
+        # left_table可能是表名(Players)或别名(p)，需要收集所有可能的引用方式
+        left_aliases = {left_table}
+        for alias, real_name in self._table_aliases.items():
+            if real_name == left_table:
+                left_aliases.add(alias)
+        inner_select = subquery_expr.this if isinstance(subquery_expr, exp.Subquery) else subquery_expr
+        # correlated_refs: {(table_alias, col_name)}
+        correlated_refs = {}
+        for col in inner_select.find_all(exp.Column):
+            if col.table in left_aliases and col.name in left_df.columns:
+                correlated_refs[(col.table, col.name)] = True
+
+        # 优化：尝试pandas原生执行（避免逐行parse_one开销）
+        lateral_results = self._apply_lateral_pandas(
+            inner_select, left_df, correlated_refs,
+            worksheets_data, lateral_alias
+        )
+        if lateral_results is None:
+            # 降级：逐行SQL解析执行
+            lateral_results = self._apply_lateral_sql_fallback(
+                inner_select, left_df, correlated_refs, worksheets_data
+            )
+
+        # 构建结果
+        # 推断LATERAL列名
+        sample_lateral = None
+        for r in lateral_results:
+            if r is not None and len(r) > 0:
+                sample_lateral = r
+                break
+
+        all_rows = []
+        for i, row in left_df.iterrows():
+            lateral_df = lateral_results[i]
+            if lateral_df is not None and len(lateral_df) > 0:
+                for _, lr in lateral_df.iterrows():
+                    combined = dict(row)
+                    for col in lr.index:
+                        col_name = f"{lateral_alias}.{col}"
+                        combined[col_name] = lr[col]
+                    all_rows.append(combined)
+            elif join_kind in ('left', 'cross'):
+                combined = dict(row)
+                if sample_lateral is not None:
+                    for col in sample_lateral.columns:
+                        col_name = f"{lateral_alias}.{col}"
+                        combined[col_name] = None
+                all_rows.append(combined)
+
+        if not all_rows:
+            return left_df.iloc[0:0]
+
+        result_df = pd.DataFrame(all_rows)
+
+        if on_clause is not None:
+            result_df = self._apply_row_filter(on_clause, result_df)
+
+        return result_df
+
+    def _apply_lateral_pandas(self, inner_select, left_df, correlated_refs,
+                              worksheets_data, lateral_alias):
+        """优化LATERAL执行：用pandas原生操作替代逐行SQL解析。
+
+        支持的模式:
+        - SELECT agg_fn(col) FROM table WHERE alias.col = val [ORDER BY ... LIMIT n]
+        - SELECT col FROM table WHERE alias.col = val [ORDER BY ... LIMIT n]
+
+        Returns:
+            list[df|None] 或 None(无法优化时降级)
+        """
+        from_ = inner_select.args.get('from')
+        if not from_:
+            return None
+
+        # 1. 解析FROM表名
+        from_table = from_.this
+        table_name = from_table.name if hasattr(from_table, 'name') else str(from_table)
+        # 匹配工作表名（不区分大小写）
+        sheet_name = None
+        for s in worksheets_data:
+            if s == table_name or s.lower() == table_name.lower():
+                sheet_name = s
+                break
+        if sheet_name is None:
+            return None
+
+        right_df = worksheets_data[sheet_name]
+
+        # 2. 解析WHERE中的关联条件: 必须是 alias.col = alias.col 形式
+        where_clause = inner_select.args.get('where')
+        if not where_clause:
+            return None
+
+        # 提取WHERE中的等值关联条件
+        where_expr = where_clause.this
+        lateral_col_map = {}  # {right_col_name: left_col_name}
+        remaining_conditions = []
+
+        if isinstance(where_expr, exp.EQ):
+            left_cond, right_cond = where_expr.this, where_expr.expression
+            if self._extract_correlated_eq(left_cond, right_cond, left_df.columns,
+                                           correlated_refs, right_df, lateral_col_map):
+                pass
+            elif self._extract_correlated_eq(right_cond, left_cond, left_df.columns,
+                                             correlated_refs, right_df, lateral_col_map):
+                pass
+            else:
+                return None  # 无法识别的WHERE条件
+        elif isinstance(where_expr, exp.And):
+            # 处理AND连接的多个条件
+            for child in [where_expr.this, where_expr.expression]:
+                if isinstance(child, exp.EQ):
+                    l, r = child.this, child.expression
+                    if not self._extract_correlated_eq(l, r, left_df.columns,
+                                                       correlated_refs, right_df, lateral_col_map):
+                        if not self._extract_correlated_eq(r, l, left_df.columns,
+                                                           correlated_refs, right_df, lateral_col_map):
+                            return None
+                else:
+                    return None
+        else:
+            return None
+
+        if not lateral_col_map:
+            return None
+
+        # 3. 解析SELECT列和聚合
+        select_exprs = inner_select.args.get('expressions', [])
+        agg_info = self._parse_lateral_select(select_exprs, right_df.columns)
+        if agg_info is None:
+            return None
+
+        # 4. 解析ORDER BY + LIMIT
+        order_col = None
+        order_desc = False
+        limit_n = None
+
+        order_by = inner_select.args.get('order')
+        if order_by:
+            for ordered in order_by.expressions:
+                order_col_expr = ordered.this
+                if hasattr(order_col_expr, 'name'):
+                    order_col = order_col_expr.name
+                    desc_str = str(ordered.args.get('desc', '')).lower()
+                    order_desc = desc_str == 'true' or ordered.desc
+
+        limit_expr = inner_select.args.get('limit')
+        if limit_expr:
+            try:
+                limit_n = int(limit_expr.this.name if hasattr(limit_expr.this, 'name') else str(limit_expr.this))
+            except (ValueError, AttributeError):
+                pass
+
+        # 5. 批量执行：预分组右表数据
+        # lateral_col_map: {right_col: left_col}
+        # 按 right_df 的关联列分组
+        right_group_cols = list(lateral_col_map.keys())
+        left_group_cols = list(lateral_col_map.values())
+
+        right_grouped = right_df.groupby(right_group_cols)
+
+        # 6. 对每个left行查找对应的right分组并计算结果
+        results = []
+        for idx, row in left_df.iterrows():
+            # 构建查找key
+            try:
+                key = tuple(row[c] for c in left_group_cols)
+                if len(key) == 1:
+                    key = key[0]
+                group = right_grouped.get_group(key)
+            except (KeyError, ValueError):
+                results.append(None)
+                continue
+
+            # 应用ORDER BY
+            if order_col and order_col in group.columns:
+                group = group.sort_values(order_col, ascending=not order_desc)
+            # 应用LIMIT
+            if limit_n is not None:
+                group = group.head(limit_n)
+
+            if agg_info['type'] == 'raw':
+                # SELECT col [AS alias] FROM ... (无聚合)
+                col_pairs = agg_info['columns']
+                source_cols = [c[0] for c in col_pairs]
+                alias_map = {c[0]: c[1] for c in col_pairs if c[0] != c[1]}
+                result_df = group[source_cols].reset_index(drop=True)
+                if alias_map:
+                    result_df = result_df.rename(columns=alias_map)
+            elif agg_info['type'] == 'agg':
+                # SELECT agg_fn(col) FROM ...
+                row_result = {}
+                for alias, (fn, col) in agg_info['aggs'].items():
+                    if fn == 'max':
+                        row_result[alias] = group[col].max()
+                    elif fn == 'min':
+                        row_result[alias] = group[col].min()
+                    elif fn == 'sum':
+                        row_result[alias] = group[col].sum()
+                    elif fn == 'avg':
+                        row_result[alias] = group[col].mean()
+                    elif fn == 'count':
+                        row_result[alias] = group[col].count()
+                    else:
+                        return None  # 不支持的聚合函数
+                result_df = pd.DataFrame([row_result])
+            else:
+                return None
+
+            results.append(result_df if len(result_df) > 0 else None)
+
+        return results
+
+    def _extract_correlated_eq(self, left_cond, right_cond, left_cols,
+                               correlated_refs, right_df, lateral_col_map):
+        """尝试从等值条件中提取关联映射。
+
+        检查 left_cond 是否是关联引用(alias.col), right_cond 是否是右表列。
+        如果匹配，将映射添加到 lateral_col_map。
+
+        Returns:
+            bool: 是否成功提取
+        """
+        if not isinstance(left_cond, exp.Column) or not isinstance(right_cond, exp.Column):
+            return False
+
+        # left_cond 应该是关联引用 (alias.col where alias refers to left table)
+        if left_cond.table and (left_cond.table, left_cond.name) in correlated_refs:
+            # right_cond 应该是右表列
+            if right_cond.name in right_df.columns:
+                lateral_col_map[right_cond.name] = left_cond.name
+                return True
+        return False
+
+    def _parse_lateral_select(self, select_exprs, right_cols):
+        """解析LATERAL子查询的SELECT部分。
+
+        Returns:
+            dict: {'type': 'raw'|'agg', 'columns': [(col_name, alias)], 'aggs': {alias: (fn, col)}}
+            或 None(无法解析)
+        """
+        if not select_exprs:
+            return None
+
+        has_agg = False
+        raw_cols = []  # [(source_col_name, output_alias)]
+        aggs = {}
+
+        for expr in select_exprs:
+            # 处理 AS 别名: Alias(this=Column('Score'), alias='top')
+            inner_expr = expr.this if isinstance(expr, exp.Alias) else expr
+            alias = expr.alias if isinstance(expr, exp.Alias) else None
+
+            # 检查是否是聚合函数
+            if isinstance(inner_expr, (exp.Max, exp.Min, exp.Sum, exp.Avg, exp.Count)):
+                agg_fn = type(inner_expr).__name__.lower()
+                agg_inner = inner_expr.this
+                agg_col = agg_inner.name if hasattr(agg_inner, 'name') else None
+                alias = alias or f'{agg_fn}({agg_col})'
+                if agg_col:
+                    aggs[alias] = (agg_fn, agg_col)
+                    has_agg = True
+                else:
+                    return None
+            elif isinstance(inner_expr, exp.Column):
+                col_name = inner_expr.name
+                if col_name in right_cols:
+                    raw_cols.append((col_name, alias or col_name))
+                else:
+                    return None
+            elif isinstance(inner_expr, exp.Star):
+                for c in right_cols:
+                    raw_cols.append((c, c))
+            else:
+                return None  # 不支持的表达式
+
+        if has_agg:
+            return {'type': 'agg', 'aggs': aggs}
+        else:
+            return {'type': 'raw', 'columns': raw_cols}
+
+    def _apply_lateral_sql_fallback(self, inner_select, left_df, correlated_refs,
+                                     worksheets_data):
+        """LATERAL降级路径：逐行SQL解析执行（慢但通用）"""
+        lateral_results = []
+        for idx, row in left_df.iterrows():
+            lateral_sql = inner_select.sql(dialect='mysql')
+            for (tbl_alias, col_name) in correlated_refs:
+                val = row[col_name]
+                placeholder = f'{tbl_alias}.{col_name}'
+                if isinstance(val, (int, float)):
+                    lateral_sql = lateral_sql.replace(placeholder, str(val))
+                elif isinstance(val, str):
+                    lateral_sql = lateral_sql.replace(placeholder, f"'{val}'")
+                elif val is None:
+                    lateral_sql = lateral_sql.replace(placeholder, 'NULL')
+
+            try:
+                lateral_parsed = sqlglot.parse_one(lateral_sql, read='mysql')
+                result = self._execute_query(lateral_parsed, worksheets_data)
+                lateral_results.append(result)
+            except Exception:
+                lateral_results.append(None)
+        return lateral_results
 
     def _apply_where_clause(self, parsed_sql: exp.Expression, df) -> pd.DataFrame:
         """应用WHERE条件"""
@@ -4040,7 +4406,18 @@ class AdvancedSQLQueryEngine:
         # 获取子查询的FROM表
         from_table, from_subquery = self._get_from_table(inner_select)
         if from_subquery is not None:
-            raise ValueError("不支持嵌套FROM子查询(FROM子查询中不能再包含FROM子查询)")
+            # 嵌套FROM子查询：递归执行内层子查询，结果作为临时表
+            inner_result = self._execute_subquery(from_subquery, worksheets_data)
+            # 用内层结果替换worksheets_data中的数据
+            inner_alias = getattr(from_subquery, 'alias', None)
+            if not inner_alias:
+                inner_alias = from_subquery.alias if hasattr(from_subquery, 'alias') else '_nested_sub'
+            worksheets_data = {**worksheets_data, inner_alias: inner_result}
+            # 修改内层select的FROM为临时表名
+            inner_select_copy = inner_select.copy()
+            inner_select_copy.set('from', exp.From(this=exp.Table(this=exp.to_identifier(inner_alias))))
+            result = self._execute_query(inner_select_copy, worksheets_data)
+            return result
         if from_table not in worksheets_data:
             raise ValueError(f"子查询中表 '{from_table}' 不存在.可用表: {list(worksheets_data.keys())}")
 
@@ -4978,12 +5355,17 @@ class AdvancedSQLQueryEngine:
             else:
                 return self._update_error(f'不支持的SET表达式: {set_item}')
 
+        # 设置当前工作表数据供子查询使用（IN子查询可能需要）
+        self._current_worksheets = worksheets_data
+
         # 应用WHERE条件筛选（支持窗口函数预处理）
         where_clause = parsed.args.get('where')
         if where_clause:
-            # 预处理: 检测WHERE中是否有窗口函数，如果有则先计算为临时列
+            # 预处理: 只处理WHERE直接条件中的窗口函数，跳过IN子查询内部的
             where_expr = where_clause.this
-            window_nodes = list(where_expr.find_all(exp.Window))
+            in_nodes = list(where_expr.find_all(exp.In))
+            window_nodes = [n for n in where_expr.find_all(exp.Window)
+                           if not any(n in list(in_node.walk()) for in_node in in_nodes)]
             if window_nodes:
                 df = self._precompute_update_window_where(df, where_expr, window_nodes)
                 # 重新解析WHERE（窗口函数已被替换为临时列引用）
@@ -5081,6 +5463,233 @@ class AdvancedSQLQueryEngine:
                     'message': f'写入Excel失败,已自动回滚: {e}',
                     'affected_rows': 0, 'changes': changes,
                     'execution_time_ms': round(elapsed, 1)}
+
+    def execute_insert_query(self, file_path: str, sql: str,
+                            sheet_name: Optional[str] = None,
+                            dry_run: bool = False) -> Dict[str, Any]:
+        """执行INSERT语句"""
+        start_time = time.time()
+
+        if not os.path.exists(file_path):
+            return {'success': False, 'message': f'文件不存在: {file_path}'}
+
+        if not SQLGLOT_AVAILABLE:
+            return {'success': False, 'message': 'SQLGLOT未安装'}
+
+        sql = re.sub(r'\x1b\[[0-9;]*[a-zA-Z]', '', sql)
+
+        try:
+            parsed = sqlglot.parse_one(sql, read='mysql')
+        except ParseError as e:
+            return {'success': False, 'message': f'SQL语法错误: {e}'}
+
+        if not isinstance(parsed, exp.Insert):
+            return {'success': False, 'message': '只支持INSERT语句'}
+
+        # 提取表名和列名
+        schema = parsed.this
+        if isinstance(schema, exp.Schema):
+            table_node = schema.this
+            col_nodes = schema.expressions
+        elif isinstance(schema, exp.Table):
+            table_node = schema
+            col_nodes = None
+        else:
+            return {'success': False, 'message': f'INSERT目标格式不支持: {type(schema).__name__}'}
+
+        table_name = table_node.name
+        specified_cols = [c.name for c in col_nodes] if col_nodes else None
+
+        # 加载数据
+        worksheets_data = self._load_data_with_cache(file_path, sheet_name)
+
+        # 匹配工作表
+        matched_sheet = None
+        for s in worksheets_data:
+            if s == table_name or s.lower() == table_name.lower():
+                matched_sheet = s
+                break
+        if not matched_sheet:
+            return {'success': False, 'message': f"工作表 '{table_name}' 不存在.可用: {list(worksheets_data.keys())}"}
+
+        df = worksheets_data[matched_sheet]
+        col_names = specified_cols if specified_cols else list(df.columns)
+
+        # 验证列名
+        for col in col_names:
+            if col not in df.columns:
+                return {'success': False, 'message': f"列 '{col}' 不存在.可用: {list(df.columns)}"}
+
+        # 提取VALUES
+        values_node = parsed.expression
+        if not isinstance(values_node, (exp.Values, exp.Select)):
+            return {'success': False, 'message': f'VALUES格式不支持,请使用 INSERT INTO ... VALUES (...)'}
+
+        if isinstance(values_node, exp.Select):
+            return {'success': False, 'message': 'INSERT ... SELECT 暂不支持,请使用VALUES'}
+
+        rows = []
+        for tuple_expr in values_node.expressions:
+            if not isinstance(tuple_expr, exp.Tuple):
+                continue
+            row = {}
+            for i, val_expr in enumerate(tuple_expr.expressions):
+                if i >= len(col_names):
+                    break
+                row[col_names[i]] = self._eval_insert_value(val_expr)
+            rows.append(row)
+
+        if not rows:
+            return {'success': False, 'message': '没有数据可插入'}
+
+        if dry_run:
+            elapsed = (time.time() - start_time) * 1000
+            return {'success': True, 'message': f'[预览] 将插入 {len(rows)} 行',
+                    'affected_rows': len(rows), 'data': rows, 'dry_run': True,
+                    'execution_time_ms': round(elapsed, 1)}
+
+        # 写入Excel
+        try:
+            from .excel_operations import ExcelOperations
+            result = ExcelOperations.batch_insert_rows(
+                file_path, matched_sheet, rows, streaming=True
+            )
+            elapsed = (time.time() - start_time) * 1000
+            if result.get('success'):
+                return {'success': True,
+                        'message': f'成功插入 {len(rows)} 行到 {matched_sheet}',
+                        'affected_rows': len(rows),
+                        'execution_time_ms': round(elapsed, 1)}
+            else:
+                return {'success': False,
+                        'message': f'写入失败: {result.get("message", "")}',
+                        'affected_rows': 0, 'execution_time_ms': round(elapsed, 1)}
+        except Exception as e:
+            elapsed = (time.time() - start_time) * 1000
+            return {'success': False, 'message': f'INSERT执行失败: {e}',
+                    'affected_rows': 0, 'execution_time_ms': round(elapsed, 1)}
+
+    def _eval_insert_value(self, val_expr) -> Any:
+        """将sqlglot表达式转为Python值"""
+        if isinstance(val_expr, exp.Literal):
+            v = val_expr.this
+            if val_expr.is_string:
+                return v
+            try:
+                return int(v)
+            except ValueError:
+                try:
+                    return float(v)
+                except ValueError:
+                    return v
+        elif isinstance(val_expr, exp.Null):
+            return None
+        elif isinstance(val_expr, (exp.Neg,)):
+            inner = self._eval_insert_value(val_expr.this)
+            return -inner if isinstance(inner, (int, float)) else inner
+        elif isinstance(val_expr, exp.Column):
+            return val_expr.name
+        else:
+            return str(val_expr)
+
+    def execute_delete_query(self, file_path: str, sql: str,
+                            sheet_name: Optional[str] = None,
+                            dry_run: bool = False) -> Dict[str, Any]:
+        """执行DELETE语句"""
+        start_time = time.time()
+
+        if not os.path.exists(file_path):
+            return {'success': False, 'message': f'文件不存在: {file_path}'}
+
+        if not SQLGLOT_AVAILABLE:
+            return {'success': False, 'message': 'SQLGLOT未安装'}
+
+        sql = re.sub(r'\x1b\[[0-9;]*[a-zA-Z]', '', sql)
+
+        try:
+            parsed = sqlglot.parse_one(sql, read='mysql')
+        except ParseError as e:
+            return {'success': False, 'message': f'SQL语法错误: {e}'}
+
+        if not isinstance(parsed, exp.Delete):
+            return {'success': False, 'message': '只支持DELETE语句'}
+
+        # 提取表名
+        table_name = parsed.this.name
+
+        # 加载数据
+        worksheets_data = self._load_data_with_cache(file_path, sheet_name)
+        self._current_worksheets = worksheets_data
+
+        # 匹配工作表
+        matched_sheet = None
+        for s in worksheets_data:
+            if s == table_name or s.lower() == table_name.lower():
+                matched_sheet = s
+                break
+        if not matched_sheet:
+            return {'success': False, 'message': f"工作表 '{table_name}' 不存在.可用: {list(worksheets_data.keys())}"}
+
+        df = worksheets_data[matched_sheet].copy()
+        df['_ROW_NUMBER_'] = range(1, len(df) + 1)
+
+        # WHERE条件（必须）
+        where_clause = parsed.args.get('where')
+        if not where_clause:
+            return {'success': False,
+                    'message': 'DELETE必须指定WHERE条件(防止误删全表).如需清空请逐行删除或使用excel_delete_rows工具'}
+
+        # 中文列名替换
+        cn_map = {}
+        desc_map = self._header_descriptions.get(matched_sheet, {})
+        for en_col, cn_desc in desc_map.items():
+            if en_col in df.columns:
+                cn_map[cn_desc] = en_col
+
+        # WHERE过滤（复用UPDATE的逻辑）
+        try:
+            condition_str = self._sql_condition_to_pandas(where_clause.this, df)
+            if condition_str:
+                filtered_df = df.query(condition_str)
+            else:
+                filtered_df = self._apply_row_filter(where_clause.this, df)
+        except Exception as e:
+            filtered_df = self._apply_row_filter(where_clause.this, df)
+
+        if filtered_df.empty:
+            elapsed = (time.time() - start_time) * 1000
+            return {'success': True, 'message': '没有匹配WHERE条件的行,无需删除',
+                    'affected_rows': 0, 'execution_time_ms': round(elapsed, 1)}
+
+        row_numbers = filtered_df['_ROW_NUMBER_'].tolist()
+
+        if dry_run:
+            elapsed = (time.time() - start_time) * 1000
+            return {'success': True,
+                    'message': f'[预览] 将删除 {len(row_numbers)} 行',
+                    'affected_rows': len(row_numbers), 'dry_run': True,
+                    'execution_time_ms': round(elapsed, 1)}
+
+        # 写入Excel
+        try:
+            from .excel_operations import ExcelOperations
+            result = ExcelOperations.batch_delete_rows(
+                file_path, matched_sheet, row_numbers, streaming=True
+            )
+            elapsed = (time.time() - start_time) * 1000
+            if result.get('success'):
+                return {'success': True,
+                        'message': f'成功删除 {len(row_numbers)} 行',
+                        'affected_rows': len(row_numbers),
+                        'execution_time_ms': round(elapsed, 1)}
+            else:
+                return {'success': False,
+                        'message': f'删除失败: {result.get("message", "")}',
+                        'affected_rows': 0, 'execution_time_ms': round(elapsed, 1)}
+        except Exception as e:
+            elapsed = (time.time() - start_time) * 1000
+            return {'success': False, 'message': f'DELETE执行失败: {e}',
+                    'affected_rows': 0, 'execution_time_ms': round(elapsed, 1)}
 
     def _write_changes_to_excel(self, file_path: str, sheet_name: str,
                                 changes: list, df: pd.DataFrame,
@@ -5455,3 +6064,33 @@ def execute_advanced_update_query(
             'affected_rows': 0, 'changes': [],
             'query_info': {'error_type': 'engine_error', 'details': str(e)}
         }
+
+
+def execute_advanced_insert_query(
+    file_path: str,
+    sql: str,
+    dry_run: bool = False
+) -> Dict[str, Any]:
+    """执行INSERT SQL语句"""
+    try:
+        engine = _get_engine()
+        return engine.execute_insert_query(file_path=file_path, sql=sql, dry_run=dry_run)
+    except ImportError as e:
+        return {'success': False, 'message': f'SQLGLOT未安装: {e}', 'affected_rows': 0}
+    except Exception as e:
+        return {'success': False, 'message': f'INSERT执行失败: {e}', 'affected_rows': 0}
+
+
+def execute_advanced_delete_query(
+    file_path: str,
+    sql: str,
+    dry_run: bool = False
+) -> Dict[str, Any]:
+    """执行DELETE SQL语句"""
+    try:
+        engine = _get_engine()
+        return engine.execute_delete_query(file_path=file_path, sql=sql, dry_run=dry_run)
+    except ImportError as e:
+        return {'success': False, 'message': f'SQLGLOT未安装: {e}', 'affected_rows': 0}
+    except Exception as e:
+        return {'success': False, 'message': f'DELETE执行失败: {e}', 'affected_rows': 0}

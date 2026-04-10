@@ -390,8 +390,8 @@ class ExcelConverter:
             merged_files = 0
             total_sheets = 0
 
-            # 多文件时使用并行读取（>2个文件启用线程池）
-            _use_parallel = len(input_files) > 2
+            # 多文件时使用并行读取（>8个文件启用线程池，避免小文件集的线程开销）
+            _use_parallel = len(input_files) > 8
 
             if _use_parallel:
                 from ..utils.concurrent_utils import parallel_read_files

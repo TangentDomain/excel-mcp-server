@@ -210,3 +210,114 @@ class TestUpdateWithWindow:
         assert result['success'] is True
         # 3个LootID分组，每组1行被标记
         assert result.get('affected_rows', 0) == 3
+
+
+# ==================== 窗口聚合函数 ====================
+
+class TestWindowAggregate:
+    def test_avg_over_partition(self, loot_file):
+        """AVG() OVER (PARTITION BY) 分区平均"""
+        engine = AdvancedSQLQueryEngine()
+        result = engine.execute_sql_query(
+            loot_file,
+            "SELECT LootID, Level, AVG(Level) OVER (PARTITION BY LootID) AS avg_level FROM LootList WHERE LootID = 92000011"
+        )
+        assert result['success'] is True
+        data = result['data']
+        # 所有行的avg_level应相同(45.0)
+        for row in data[1:]:
+            assert float(row[2]) == 45.0
+
+    def test_sum_over(self, loot_file):
+        """SUM() OVER () 全表求和"""
+        engine = AdvancedSQLQueryEngine()
+        result = engine.execute_sql_query(
+            loot_file,
+            "SELECT PropID, SUM(Level) OVER () AS total_level FROM LootList WHERE LootID = 92000011"
+        )
+        assert result['success'] is True
+        # 所有行的total_level相同
+        total = result['data'][1][1]
+        for row in result['data'][2:]:
+            assert row[1] == total
+
+    def test_count_over_partition(self, loot_file):
+        """COUNT() OVER (PARTITION BY) 分区计数"""
+        engine = AdvancedSQLQueryEngine()
+        result = engine.execute_sql_query(
+            loot_file,
+            "SELECT LootID, COUNT(Level) OVER (PARTITION BY LootID) AS cnt FROM LootList WHERE LootID = 92000011"
+        )
+        assert result['success'] is True
+        # 每行cnt应为6
+        for row in result['data'][1:]:
+            assert row[1] == 6
+
+    def test_min_max_over(self, loot_file):
+        """MIN/MAX OVER 分区极值"""
+        engine = AdvancedSQLQueryEngine()
+        result = engine.execute_sql_query(
+            loot_file,
+            "SELECT LootID, Level, MIN(Level) OVER (PARTITION BY LootID) AS min_lv, MAX(Level) OVER (PARTITION BY LootID) AS max_lv FROM LootList WHERE LootID = 92000011"
+        )
+        assert result['success'] is True
+        for row in result['data'][1:]:
+            assert row[2] == 40  # min
+            assert row[3] == 50  # max
+
+    def test_running_sum(self, loot_file):
+        """SUM() OVER (ORDER BY) 累计求和"""
+        engine = AdvancedSQLQueryEngine()
+        result = engine.execute_sql_query(
+            loot_file,
+            "SELECT PropID, Level, SUM(Level) OVER (ORDER BY Level) AS running_sum FROM LootList WHERE LootID = 92000011"
+        )
+        assert result['success'] is True
+        # 所有running_sum应大于0且不等于0
+        for row in result['data'][1:]:
+            assert float(row[2]) > 0
+
+    def test_avg_over_with_join(self, loot_file):
+        """JOIN + AVG() OVER 跨表窗口聚合"""
+        engine = AdvancedSQLQueryEngine()
+        result = engine.execute_sql_query(
+            loot_file,
+            "SELECT l.LootID, l.Level, AVG(l.Level) OVER (PARTITION BY l.LootID) AS avg_level FROM LootList l WHERE l.LootID = 92000011"
+        )
+        assert result['success'] is True
+
+
+# ==================== 嵌套FROM子查询 ====================
+
+class TestNestedFromSubquery:
+    def test_two_level_nested(self, loot_file):
+        """两层嵌套FROM子查询"""
+        engine = AdvancedSQLQueryEngine()
+        result = engine.execute_sql_query(
+            loot_file,
+            "SELECT * FROM (SELECT LootID, COUNT(*) as cnt FROM LootList GROUP BY LootID) t WHERE cnt > 3"
+        )
+        assert result['success'] is True
+
+    def test_three_level_nested(self, loot_file):
+        """三层嵌套FROM子查询"""
+        engine = AdvancedSQLQueryEngine()
+        result = engine.execute_sql_query(
+            loot_file,
+            "SELECT * FROM (SELECT * FROM (SELECT LootID, AVG(Level) as avg_lv FROM LootList GROUP BY LootID) t1 WHERE avg_lv > 35) t2"
+        )
+        assert result['success'] is True
+
+    def test_nested_from_with_window(self, loot_file):
+        """嵌套FROM + 窗口函数"""
+        engine = AdvancedSQLQueryEngine()
+        result = engine.execute_sql_query(
+            loot_file,
+            "SELECT * FROM (SELECT LootID, Level, ROW_NUMBER() OVER (PARTITION BY LootID ORDER BY Level DESC) as rn FROM LootList) t WHERE rn = 1"
+        )
+        assert result['success'] is True
+        # 每个LootID只返回1行
+        loot_ids = set()
+        for row in result['data'][1:]:
+            loot_ids.add(row[0])
+        assert len(loot_ids) == 3  # 3个不同的LootID
