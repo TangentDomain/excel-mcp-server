@@ -4,8 +4,8 @@
 
 [![PyPI](https://img.shields.io/pypi/v/excel-mcp-server-fastmcp.svg)](https://pypi.org/project/excel-mcp-server-fastmcp/v1.8.9)
 [![CI](https://github.com/TangentDomain/excel-mcp-server/actions/workflows/ci.yml/badge.svg)](https://github.com/TangentDomain/excel-mcp-server/actions/workflows/ci.yml)
-![Tests](https://img.shields.io/badge/tests-920-brightgreen.svg)
-![Tools](https://img.shields.io/badge/tools-41-green.svg)
+![Tests](https://img.shields.io/badge/tests-968-brightgreen.svg)
+![Tools](https://img.shields.io/badge/tools-52-green.svg)
 ![GitHub stars](https://img.shields.io/github/stars/TangentDomain/excel-mcp-server?style=social&label=Stars)
 
 > **🚀 游戏策划必备：用中文/SQL直接操作Excel，告别手动VBA！**
@@ -368,7 +368,7 @@ GitHub Issues → 使用 Bug 报告模板
 
 - **响应速度**:小文件 < 1秒,大文件 < 3秒
 - **数据规模**:10万行 × 1000列
-- **工具数量**:53 个游戏专用工具
+- **工具数量**:52 个游戏专用工具
 - **内存占用**:< 100MB(典型文件)
 - **支持格式**:.xlsx、.xlsm、.xlsb
 
