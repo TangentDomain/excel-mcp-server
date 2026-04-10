@@ -27,14 +27,20 @@ def dept_skills(tmp_path):
 
 
 def _get_rows(result):
-    """提取数据行（返回dict列表，跳过表头行）"""
+    """提取数据行（返回dict列表，跳过表头行和TOTAL行）"""
     if not result.get('success'):
         return []
     data = result.get('data', [])
     if not data or not isinstance(data[0], list):
         return []
     headers = data[0]
-    return [dict(zip(headers, row)) for row in data[1:]]
+    rows = []
+    for row in data[1:]:
+        # 跳过 TOTAL 汇总行（第一列为 'TOTAL'）
+        if row and row[0] == 'TOTAL':
+            continue
+        rows.append(dict(zip(headers, row)))
+    return rows
 
 
 class TestGroupConcat:
@@ -42,7 +48,7 @@ class TestGroupConcat:
 
     def test_group_concat_basic(self, dept_skills):
         """基本 GROUP_CONCAT: 按部门拼接技能名"""
-        from src.excel_mcp_server_fastmcp.api.advanced_sql_query import execute_advanced_sql_query
+        from excel_mcp_server_fastmcp.api.advanced_sql_query import execute_advanced_sql_query
         result = execute_advanced_sql_query(
             dept_skills,
             "SELECT 部门, GROUP_CONCAT(技能名称) as 技能列表 FROM 技能配置 GROUP BY 部门"
@@ -74,7 +80,7 @@ class TestGroupConcat:
 
     def test_group_concat_with_separator(self, dept_skills):
         """GROUP_CONCAT 自定义分隔符"""
-        from src.excel_mcp_server_fastmcp.api.advanced_sql_query import execute_advanced_sql_query
+        from excel_mcp_server_fastmcp.api.advanced_sql_query import execute_advanced_sql_query
         result = execute_advanced_sql_query(
             dept_skills,
             "SELECT 部门, GROUP_CONCAT(skill_name, '|') as skills FROM 技能配置 GROUP BY 部门"
@@ -91,7 +97,7 @@ class TestGroupConcat:
 
     def test_group_concat_with_count(self, dept_skills):
         """GROUP_CONCAT 与其他聚合函数组合"""
-        from src.excel_mcp_server_fastmcp.api.advanced_sql_query import execute_advanced_sql_query
+        from excel_mcp_server_fastmcp.api.advanced_sql_query import execute_advanced_sql_query
         result = execute_advanced_sql_query(
             dept_skills,
             "SELECT 部门, COUNT(*) as cnt, GROUP_CONCAT(技能名称) as skills FROM 技能配置 GROUP BY 部门"
@@ -108,7 +114,7 @@ class TestGroupConcat:
 
     def test_group_concat_auto_alias(self, dept_skills):
         """GROUP_CONCAT 无别名时自动生成列名"""
-        from src.excel_mcp_server_fastmcp.api.advanced_sql_query import execute_advanced_sql_query
+        from excel_mcp_server_fastmcp.api.advanced_sql_query import execute_advanced_sql_query
         result = execute_advanced_sql_query(
             dept_skills,
             "SELECT 部门, GROUP_CONCAT(skill_name) FROM 技能配置 GROUP BY 部门"
@@ -122,7 +128,7 @@ class TestGroupConcat:
 
     def test_group_concat_having(self, dept_skills):
         """GROUP_CONCAT 与 HAVING 子句"""
-        from src.excel_mcp_server_fastmcp.api.advanced_sql_query import execute_advanced_sql_query
+        from excel_mcp_server_fastmcp.api.advanced_sql_query import execute_advanced_sql_query
         result = execute_advanced_sql_query(
             dept_skills,
             "SELECT 部门, GROUP_CONCAT(技能名称) as skills FROM 技能配置 GROUP BY 部门 HAVING COUNT(*) >= 2"

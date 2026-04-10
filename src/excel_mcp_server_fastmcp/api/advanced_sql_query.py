@@ -2835,13 +2835,29 @@ class AdvancedSQLQueryEngine:
 
     def _evaluate_math_expression(self, expr, df: pd.DataFrame):
         """计算数学表达式"""
+        # 解包Paren: (a + b) -> a + b
+        if isinstance(expr, exp.Paren):
+            return self._evaluate_math_expression(expr.this, df)
+
         op_type = type(expr)
         if op_type in self._MATH_BINARY_OPS:
             left = self._evaluate_math_expression(expr.left, df)
             right = self._evaluate_math_expression(expr.right, df)
             return self._MATH_BINARY_OPS[op_type](left, right)
         elif isinstance(expr, exp.Column):
-            return df[expr.name]
+            # 处理列引用，支持表限定符（如 t.column_name）
+            col_name = expr.name
+            table_part = expr.table if hasattr(expr, 'table') and expr.table else None
+            qualified = f"{table_part}.{col_name}" if table_part else None
+
+            # 先尝试直接使用qualified列名
+            if qualified and qualified in df.columns:
+                return df[qualified]
+            # 如果qualified不存在，尝试简单列名
+            elif col_name in df.columns:
+                return df[col_name]
+            else:
+                raise ValueError(f"列 '{qualified or col_name}' 不存在")
         elif isinstance(expr, exp.Literal):
             return self._expression_to_value(expr, df)
         elif isinstance(expr, exp.Coalesce):
@@ -3863,6 +3879,34 @@ class AdvancedSQLQueryEngine:
         """获取行中表达式的值"""
         if isinstance(expr, exp.Column):
             col_name = expr.name
+            table_part = expr.table if hasattr(expr, 'table') and expr.table else None
+            
+            # 支持表别名限定符 (a.column)
+            if table_part:
+                # 优先尝试表别名格式: table_part.column
+                qualified_col = f"{table_part}.{col_name}"
+                if qualified_col in row.index:
+                    return row.get(qualified_col)
+                
+                # 尝试pandas merge后的格式: table_part_column
+                pandas_suffix_col = f"{table_part}_{col_name}"
+                if pandas_suffix_col in row.index:
+                    return row.get(pandas_suffix_col)
+                
+                # 尝试JOIN映射中的列名
+                if hasattr(self, '_join_column_mapping') and table_part in self._join_column_mapping:
+                    mapped_col = self._join_column_mapping[table_part].get(col_name)
+                    if mapped_col and mapped_col in row.index:
+                        return row.get(mapped_col)
+                
+                # 尝试表别名解析后的格式
+                if hasattr(self, '_table_aliases') and table_part in self._table_aliases:
+                    resolved_table = self._table_aliases[table_part]
+                    resolved_col = f"{resolved_table}_{col_name}"
+                    if resolved_col in row.index:
+                        return row.get(resolved_col)
+            
+            # 最后尝试原始列名
             return row.get(col_name)
 
         elif isinstance(expr, exp.Literal):
@@ -3957,6 +4001,29 @@ class AdvancedSQLQueryEngine:
                     for col_name in column_refs:
                         if col_name not in group_by_columns:
                             group_by_columns.append(col_name)
+
+        # 处理HAVING子句中的聚合函数(REQ-EXCEL-015)
+        # HAVING可以引用不在SELECT中的聚合函数(如HAVING COUNT(*) > 1)
+        # 需要提前计算这些聚合函数,以便在_apply_having_clause中使用
+        having_aggregations = {}
+        having_clause = parsed_sql.args.get('having')
+        if having_clause:
+            having_agg_funcs = self._extract_agg_funcs_from_expr(having_clause.this)
+            for agg_func in having_agg_funcs:
+                agg_sql = agg_func.sql()
+                # 检查是否已经在SELECT中
+                if agg_sql not in [aggr.sql() for aggr in aggregations.values()]:
+                    # 生成临时列名
+                    temp_alias = f"_having_agg_{len(having_aggregations)}"
+                    having_aggregations[temp_alias] = agg_func
+
+        # 合并HAVING聚合到aggregations中
+        aggregations.update(having_aggregations)
+
+        # 保存HAVING聚合映射供_apply_having_clause使用
+        self._having_agg_in_select_map = {}
+        for temp_alias, agg_func in having_aggregations.items():
+            self._having_agg_in_select_map[agg_func.sql()] = temp_alias
 
         # 保存GROUP BY列到实例变量,供_build_total_row使用
         self._group_by_columns = group_by_columns
@@ -4415,6 +4482,37 @@ class AdvancedSQLQueryEngine:
                 auto_alias = self._generate_aggregate_alias(select_expr)
                 self._having_agg_alias_map[agg_sql] = auto_alias
 
+        # 合并HAVING聚合映射(HAVING中但不在SELECT中的聚合函数,如HAVING COUNT(*) > 1)
+        # 这些聚合函数在_apply_group_by_aggregation中已计算并存储在_having_agg_in_select_map
+        if hasattr(self, '_having_agg_in_select_map') and self._having_agg_in_select_map:
+            self._having_agg_alias_map.update(self._having_agg_in_select_map)
+
+        # 收集HAVING子句中使用的聚合函数(包括不在SELECT中的)
+        having_agg_funcs = self._extract_agg_funcs_from_expr(having_clause.this)
+
+        # 为HAVING中使用的但不在SELECT中的聚合函数创建临时列
+        temp_columns = []
+        for agg_func in having_agg_funcs:
+            agg_sql = agg_func.sql()
+            if agg_sql not in self._having_agg_alias_map:
+                # 创建临时列名
+                temp_col_name = f"_having_temp_{len(temp_columns)}"
+                # 计算聚合值
+                try:
+                    # 使用groupby对象计算聚合
+                    if hasattr(self, '_group_by_columns') and self._group_by_columns:
+                        grouped = df.groupby(self._group_by_columns, sort=False, dropna=False)
+                        agg_result = self._apply_aggregation_function(agg_func, grouped, df)
+                        df[temp_col_name] = agg_result.values
+                    else:
+                        # 全表聚合
+                        agg_result = self._apply_aggregation_function(agg_func, None, df)
+                        df[temp_col_name] = agg_result
+                    self._having_agg_alias_map[agg_sql] = temp_col_name
+                    temp_columns.append(temp_col_name)
+                except Exception:
+                    pass  # 忽略计算失败的聚合
+
         # HAVING子句处理类似于WHERE,但作用于聚合后的数据
         try:
             condition_str = self._sql_condition_to_pandas(having_clause.this, df)
@@ -4424,13 +4522,32 @@ class AdvancedSQLQueryEngine:
 
         if condition_str:
             try:
-                return df.query(condition_str)
+                result_df = df.query(condition_str)
             except Exception:
                 # 备用方案:逐行过滤
                 return self._apply_row_filter(having_clause.this, df)
+        else:
+            result_df = df
+
+        # 清理临时列（在查询执行之后）
+        for temp_col in temp_columns:
+            if temp_col in result_df.columns:
+                del result_df[temp_col]
+
+        return result_df
 
         logger.warning("HAVING条件转换为pandas表达式失败,回退到逐行过滤: %s", having_clause.this)
         return self._apply_row_filter(having_clause.this, df)
+
+    def _extract_agg_funcs_from_expr(self, expr: exp.Expression) -> List[exp.Expression]:
+        """递归提取表达式中的所有聚合函数"""
+        agg_funcs = []
+        if isinstance(expr, exp.AggFunc):
+            agg_funcs.append(expr)
+        # 递归处理子表达式
+        for child in expr.iter_expressions():
+            agg_funcs.extend(self._extract_agg_funcs_from_expr(child))
+        return agg_funcs
 
     def _extract_select_aliases(self, parsed_sql: exp.Expression) -> Dict[str, Any]:
         """提取SELECT子句中的别名映射(委托_extract_select_alias统一逻辑)
