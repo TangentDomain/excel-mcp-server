@@ -451,3 +451,141 @@ class TestLead:
         )
         assert result['success'] is False
         assert '需要 ORDER BY' in result['message']
+
+
+class TestFirstValue:
+    """FIRST_VALUE() 测试"""
+
+    def test_first_value_basic(self, game_config):
+        """基本FIRST_VALUE: 获取按伤害排序后第一行的伤害值"""
+        from src.excel_mcp_server_fastmcp.api.advanced_sql_query import execute_advanced_sql_query
+        result = execute_advanced_sql_query(
+            game_config,
+            "SELECT skill_name, damage, FIRST_VALUE(damage) OVER (ORDER BY damage DESC) as first_damage FROM 技能配置"
+        )
+        assert result['success'] is True, f"Query failed: {result.get('message')}"
+        rows = _get_rows(result)
+        assert len(rows) == 8
+        # 所有行都应该返回第一行的伤害值(250)
+        assert all(r['first_damage'] == 250 for r in rows)
+
+    def test_first_value_partition(self, game_config):
+        """FIRST_VALUE with PARTITION BY: 每个职业内第一行的伤害值"""
+        from src.excel_mcp_server_fastmcp.api.advanced_sql_query import execute_advanced_sql_query
+        result = execute_advanced_sql_query(
+            game_config,
+            "SELECT skill_name, skill_type, damage, FIRST_VALUE(damage) OVER (PARTITION BY skill_type ORDER BY damage DESC) as first_damage FROM 技能配置"
+        )
+        assert result['success'] is True, f"Query failed: {result.get('message')}"
+        rows = _get_rows(result)
+
+        # 法师分组：所有法师行应该返回法师最高的伤害值(250)
+        mages = [r for r in rows if r['skill_type'] == 'mage']
+        assert len(mages) == 4
+        assert all(r['first_damage'] == 250 for r in mages)
+
+        # 战士分组：所有战士行应该返回战士最高的伤害值(200)
+        warriors = [r for r in rows if r['skill_type'] == 'warrior']
+        assert len(warriors) == 2
+        assert all(r['first_damage'] == 200 for r in warriors)
+
+    def test_first_value_order_by_asc(self, game_config):
+        """FIRST_VALUE ORDER BY ASC: 获取排序后第一行（最小值）"""
+        from src.excel_mcp_server_fastmcp.api.advanced_sql_query import execute_advanced_sql_query
+        result = execute_advanced_sql_query(
+            game_config,
+            "SELECT skill_name, damage, FIRST_VALUE(damage) OVER (ORDER BY damage ASC) as first_damage FROM 技能配置"
+        )
+        assert result['success'] is True, f"Query failed: {result.get('message')}"
+        rows = _get_rows(result)
+        # 所有行都应该返回第一行的伤害值(0)
+        assert all(r['first_damage'] == 0 for r in rows)
+
+    def test_first_value_no_order_by_error(self, game_config):
+        """FIRST_VALUE without ORDER BY should error"""
+        from src.excel_mcp_server_fastmcp.api.advanced_sql_query import execute_advanced_sql_query
+        result = execute_advanced_sql_query(
+            game_config,
+            "SELECT skill_name, damage, FIRST_VALUE(damage) OVER () as first_damage FROM 技能配置"
+        )
+        assert result['success'] is False
+        assert '需要 ORDER BY' in result['message']
+
+
+class TestLastValue:
+    """LAST_VALUE() 测试"""
+
+    def test_last_value_basic(self, game_config):
+        """基本LAST_VALUE: 获取按伤害排序后最后一行的伤害值"""
+        from src.excel_mcp_server_fastmcp.api.advanced_sql_query import execute_advanced_sql_query
+        result = execute_advanced_sql_query(
+            game_config,
+            "SELECT skill_name, damage, LAST_VALUE(damage) OVER (ORDER BY damage DESC) as last_damage FROM 技能配置"
+        )
+        assert result['success'] is True, f"Query failed: {result.get('message')}"
+        rows = _get_rows(result)
+        assert len(rows) == 8
+        # 所有行都应该返回最后一行的伤害值(0)
+        assert all(r['last_damage'] == 0 for r in rows)
+
+    def test_last_value_partition(self, game_config):
+        """LAST_VALUE with PARTITION BY: 每个职业内最后一行的伤害值"""
+        from src.excel_mcp_server_fastmcp.api.advanced_sql_query import execute_advanced_sql_query
+        result = execute_advanced_sql_query(
+            game_config,
+            "SELECT skill_name, skill_type, damage, LAST_VALUE(damage) OVER (PARTITION BY skill_type ORDER BY damage DESC) as last_damage FROM 技能配置"
+        )
+        assert result['success'] is True, f"Query failed: {result.get('message')}"
+        rows = _get_rows(result)
+
+        # 法师分组：所有法师行应该返回法师最低的伤害值(150)
+        mages = [r for r in rows if r['skill_type'] == 'mage']
+        assert len(mages) == 4
+        assert all(r['last_damage'] == 150 for r in mages)
+
+        # 战士分组：所有战士行应该返回战士最低的伤害值(190)
+        warriors = [r for r in rows if r['skill_type'] == 'warrior']
+        assert len(warriors) == 2
+        assert all(r['last_damage'] == 190 for r in warriors)
+
+    def test_last_value_order_by_asc(self, game_config):
+        """LAST_VALUE ORDER BY ASC: 获取排序后最后一行（最大值）"""
+        from src.excel_mcp_server_fastmcp.api.advanced_sql_query import execute_advanced_sql_query
+        result = execute_advanced_sql_query(
+            game_config,
+            "SELECT skill_name, damage, LAST_VALUE(damage) OVER (ORDER BY damage ASC) as last_damage FROM 技能配置"
+        )
+        assert result['success'] is True, f"Query failed: {result.get('message')}"
+        rows = _get_rows(result)
+        # 所有行都应该返回最后一行的伤害值(250)
+        assert all(r['last_damage'] == 250 for r in rows)
+
+    def test_last_value_no_order_by_error(self, game_config):
+        """LAST_VALUE without ORDER BY should error"""
+        from src.excel_mcp_server_fastmcp.api.advanced_sql_query import execute_advanced_sql_query
+        result = execute_advanced_sql_query(
+            game_config,
+            "SELECT skill_name, damage, LAST_VALUE(damage) OVER () as last_damage FROM 技能配置"
+        )
+        assert result['success'] is False
+        assert '需要 ORDER BY' in result['message']
+
+
+class TestFirstLastValueCombo:
+    """FIRST_VALUE 和 LAST_VALUE 组合测试"""
+
+    def test_first_last_value_combo(self, game_config):
+        """同时使用FIRST_VALUE和LAST_VALUE"""
+        from src.excel_mcp_server_fastmcp.api.advanced_sql_query import execute_advanced_sql_query
+        result = execute_advanced_sql_query(
+            game_config,
+            "SELECT skill_name, skill_type, damage, FIRST_VALUE(damage) OVER (PARTITION BY skill_type ORDER BY damage DESC) as first_dmg, LAST_VALUE(damage) OVER (PARTITION BY skill_type ORDER BY damage DESC) as last_dmg FROM 技能配置"
+        )
+        assert result['success'] is True, f"Query failed: {result.get('message')}"
+        rows = _get_rows(result)
+
+        # 法师分组：first_dmg=250(最高), last_dmg=150(最低)
+        mages = [r for r in rows if r['skill_type'] == 'mage']
+        assert len(mages) == 4
+        assert all(r['first_dmg'] == 250 for r in mages)
+        assert all(r['last_dmg'] == 150 for r in mages)

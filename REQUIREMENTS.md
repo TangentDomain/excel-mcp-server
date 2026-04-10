@@ -151,11 +151,12 @@ REQ-EXCEL-002 (P2) - 添加自动化测试配置
 - **替代方案**: 应用层聚合
 
 ### REQ-EXCEL-016 (P0): FIRST_VALUE / LAST_VALUE 窗口函数
-- **状态**: OPEN
+- **状态**: DONE
 - **来源**: SQL差距分析报告
 - **问题**: 缺少FIRST_VALUE/LAST_VALUE，无法取分组内首/末行值
 - **验收**: `FIRST_VALUE(col) OVER (PARTITION BY ... ORDER BY ...)` 可用
 - **替代方案**: 子查询+LIMIT 1（复杂度高）
+- **完成时间**: 2026-04-10
 
 ### REQ-EXCEL-017 (P1): NTILE 窗口函数
 - **状态**: OPEN

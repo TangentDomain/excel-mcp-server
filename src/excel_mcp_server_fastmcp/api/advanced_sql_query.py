@@ -239,7 +239,7 @@ def _parse_error_hint(err_str: str, sql: str) -> str:
         select_raw = sql[select_match.start(1):select_match.end(1)]
         # 检查原始SQL中两个标识符之间是否缺少逗号
         # 模式:单词 + 空格(非逗号) + 单词,其中两个都不是SQL关键字
-        keywords_in_select = {'AS', 'DISTINCT', 'CASE', 'WHEN', 'THEN', 'ELSE', 'END', 'AND', 'OR', 'NOT', 'IN', 'BETWEEN', 'LIKE', 'IS', 'NULL', 'TRUE', 'FALSE', 'COUNT', 'SUM', 'AVG', 'MIN', 'MAX', 'UPPER', 'LOWER', 'TRIM', 'LENGTH', 'CONCAT', 'REPLACE', 'SUBSTRING', 'LEFT', 'RIGHT', 'COALESCE', 'IFNULL', 'CAST', 'ROW_NUMBER', 'RANK', 'DENSE_RANK', 'LAG', 'LEAD', 'OVER', 'PARTITION', 'ASC', 'DESC', 'ON'}
+        keywords_in_select = {'AS', 'DISTINCT', 'CASE', 'WHEN', 'THEN', 'ELSE', 'END', 'AND', 'OR', 'NOT', 'IN', 'BETWEEN', 'LIKE', 'IS', 'NULL', 'TRUE', 'FALSE', 'COUNT', 'SUM', 'AVG', 'MIN', 'MAX', 'UPPER', 'LOWER', 'TRIM', 'LENGTH', 'CONCAT', 'REPLACE', 'SUBSTRING', 'LEFT', 'RIGHT', 'COALESCE', 'IFNULL', 'CAST', 'ROW_NUMBER', 'RANK', 'DENSE_RANK', 'LAG', 'LEAD', 'FIRST_VALUE', 'LAST_VALUE', 'OVER', 'PARTITION', 'ASC', 'DESC', 'ON'}
         # 匹配:标识符 + 空格 + 标识符(中间无逗号)
         adjacent_pairs = re.finditer(r'([A-Za-z_]\w*)\s+([A-Za-z_]\w*)', select_raw)
         for m in adjacent_pairs:
@@ -356,7 +356,7 @@ def _generate_value_error_hint(err_str: str) -> str:
         return "请检查ON条件中的列名,确认列属于哪个表."
     # 窗口函数
     if "不支持的窗口函数" in err_str:
-        return "仅支持 ROW_NUMBER,RANK,DENSE_RANK,LAG,LEAD 窗口函数."
+        return "仅支持 ROW_NUMBER,RANK,DENSE_RANK,LAG,LEAD,FIRST_VALUE,LAST_VALUE 窗口函数."
     if "需要 ORDER BY" in err_str:
         return "该窗口函数必须包含 ORDER BY 子句."
     # UNION
@@ -1992,9 +1992,9 @@ class AdvancedSQLQueryEngine:
         func_type = type(window_expr.this).__name__
 
         # 支持的窗口函数类型
-        supported_funcs = {'RowNumber', 'Rank', 'DenseRank', 'Lag', 'Lead'}
+        supported_funcs = {'RowNumber', 'Rank', 'DenseRank', 'Lag', 'Lead', 'FirstValue', 'LastValue'}
         if func_type not in supported_funcs:
-            raise ValueError(f"不支持的窗口函数: {func_type}。💡 支持的窗口函数: ROW_NUMBER, RANK, DENSE_RANK, LAG, LEAD（均需配合 OVER(ORDER BY ...) 使用）")
+            raise ValueError(f"不支持的窗口函数: {func_type}。💡 支持的窗口函数: ROW_NUMBER, RANK, DENSE_RANK, LAG, LEAD, FIRST_VALUE, LAST_VALUE（均需配合 OVER(ORDER BY ...) 使用）")
 
         if select_alias_map is None:
             select_alias_map = {}
@@ -2027,12 +2027,16 @@ class AdvancedSQLQueryEngine:
                 raise ValueError(f"窗口函数中列 '{col}' 不存在.可用列: {list(df.columns)}.{suggestion}")
 
         # 窗口函数分发表
-        # LAG/LEAD需要window_expr参数来解析列名和偏移量
-        if func_type in ('Lag', 'Lead'):
+        # LAG/LEAD/FIRST_VALUE/LAST_VALUE需要window_expr参数来解析列名
+        if func_type in ('Lag', 'Lead', 'FirstValue', 'LastValue'):
             if func_type == 'Lag':
                 return self._compute_lag(window_expr, df, partition_cols, order_cols, ascending, select_alias_map)
-            else:
+            elif func_type == 'Lead':
                 return self._compute_lead(window_expr, df, partition_cols, order_cols, ascending, select_alias_map)
+            elif func_type == 'FirstValue':
+                return self._compute_first_value(window_expr, df, partition_cols, order_cols, ascending, select_alias_map)
+            else:  # LastValue
+                return self._compute_last_value(window_expr, df, partition_cols, order_cols, ascending, select_alias_map)
         else:
             # ROW_NUMBER, RANK, DENSE_RANK使用原有签名
             _window_dispatch = {
@@ -2043,7 +2047,7 @@ class AdvancedSQLQueryEngine:
             handler = _window_dispatch.get(func_type)
             if handler:
                 return handler(df, partition_cols, order_cols, ascending)
-        raise ValueError(f"不支持的窗口函数: {func_type}。💡 支持的窗口函数: ROW_NUMBER, RANK, DENSE_RANK, LAG, LEAD（均需配合 OVER(ORDER BY ...) 使用）")
+        raise ValueError(f"不支持的窗口函数: {func_type}。💡 支持的窗口函数: ROW_NUMBER, RANK, DENSE_RANK, LAG, LEAD, FIRST_VALUE, LAST_VALUE（均需配合 OVER(ORDER BY ...) 使用）")
 
     def _resolve_window_column(self, col_name: str, df_columns: list,
                                 select_alias_map: Dict[str, str]) -> str:
@@ -2279,6 +2283,84 @@ class AdvancedSQLQueryEngine:
                 result = result.droplevel(result.index.names[:-1])
         else:
             result = compute_lead_in_group(df)
+
+        return result
+
+    def _compute_first_value(self, window_expr: exp.Window, df: pd.DataFrame, partition_cols: list,
+                             order_cols: list, ascending: list, select_alias_map: Dict) -> pd.Series:
+        """FIRST_VALUE: 获取分区内排序后第一行的值"""
+        if not order_cols:
+            raise ValueError("FIRST_VALUE() 窗口函数需要 ORDER BY 子句")
+
+        # 解析目标列
+        first_value_func = window_expr.this
+        target_col_expr = first_value_func.this
+        target_col = target_col_expr.name if hasattr(target_col_expr, 'name') else str(target_col_expr)
+
+        # 验证目标列存在
+        if target_col not in df.columns:
+            suggestion = self._suggest_column_name(target_col, list(df.columns))
+            raise ValueError(f"FIRST_VALUE() 函数中列 '{target_col}' 不存在.可用列: {list(df.columns)}.{suggestion}")
+
+        # 分组计算FIRST_VALUE
+        if partition_cols:
+            grouped = df.groupby(partition_cols, sort=False)
+        else:
+            grouped = None
+
+        def compute_first_value_in_group(group):
+            """在分组内计算FIRST_VALUE"""
+            sorted_group = group.sort_values(order_cols, ascending=ascending)
+            # 获取第一行的值
+            first_val = sorted_group[target_col].iloc[0] if len(sorted_group) > 0 else None
+            # 所有行都返回第一行的值
+            return pd.Series([first_val] * len(group), index=group.index)
+
+        if grouped is not None:
+            result = grouped.apply(compute_first_value_in_group, include_groups=False)
+            if isinstance(result.index, pd.MultiIndex):
+                result = result.droplevel(result.index.names[:-1])
+        else:
+            result = compute_first_value_in_group(df)
+
+        return result
+
+    def _compute_last_value(self, window_expr: exp.Window, df: pd.DataFrame, partition_cols: list,
+                            order_cols: list, ascending: list, select_alias_map: Dict) -> pd.Series:
+        """LAST_VALUE: 获取分区内排序后最后一行的值"""
+        if not order_cols:
+            raise ValueError("LAST_VALUE() 窗口函数需要 ORDER BY 子句")
+
+        # 解析目标列
+        last_value_func = window_expr.this
+        target_col_expr = last_value_func.this
+        target_col = target_col_expr.name if hasattr(target_col_expr, 'name') else str(target_col_expr)
+
+        # 验证目标列存在
+        if target_col not in df.columns:
+            suggestion = self._suggest_column_name(target_col, list(df.columns))
+            raise ValueError(f"LAST_VALUE() 函数中列 '{target_col}' 不存在.可用列: {list(df.columns)}.{suggestion}")
+
+        # 分组计算LAST_VALUE
+        if partition_cols:
+            grouped = df.groupby(partition_cols, sort=False)
+        else:
+            grouped = None
+
+        def compute_last_value_in_group(group):
+            """在分组内计算LAST_VALUE"""
+            sorted_group = group.sort_values(order_cols, ascending=ascending)
+            # 获取最后一行的值
+            last_val = sorted_group[target_col].iloc[-1] if len(sorted_group) > 0 else None
+            # 所有行都返回最后一行的值
+            return pd.Series([last_val] * len(group), index=group.index)
+
+        if grouped is not None:
+            result = grouped.apply(compute_last_value_in_group, include_groups=False)
+            if isinstance(result.index, pd.MultiIndex):
+                result = result.droplevel(result.index.names[:-1])
+        else:
+            result = compute_last_value_in_group(df)
 
         return result
 
