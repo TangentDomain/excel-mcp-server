@@ -1981,6 +1981,26 @@ class AdvancedSQLQueryEngine:
             result = self._compute_window_function(original_expr, df, select_alias_map)
             df[col_name] = result
 
+        # 按第一个窗口函数的ORDER BY排序输出（无外部ORDER BY时的自然顺序）
+        for select_expr in parsed_sql.expressions:
+            original_expr = select_expr.this if isinstance(select_expr, exp.Alias) else select_expr
+            if isinstance(original_expr, exp.Window):
+                order = original_expr.args.get('order')
+                if order:
+                    order_cols = []
+                    ascending = []
+                    for item in order.expressions:
+                        col = item.this.name if hasattr(item.this, 'name') else str(item.this)
+                        # 跳过聚合表达式列（GROUP BY后的场景，排序列可能不存在）
+                        if col not in df.columns:
+                            continue
+                        desc = item.args.get('desc', False)
+                        order_cols.append(col)
+                        ascending.append(not desc)
+                    if order_cols:
+                        df = df.sort_values(order_cols, ascending=ascending, kind='mergesort')
+                break  # 只按第一个窗口函数排序
+
         return df
 
     def _compute_window_function(self, window_expr: exp.Window, df: pd.DataFrame,
@@ -1991,7 +2011,7 @@ class AdvancedSQLQueryEngine:
         # 支持的窗口函数类型
         _window_agg_funcs = {'Avg', 'Sum', 'Count', 'Min', 'Max'}
         supported_funcs = {'RowNumber', 'Rank', 'DenseRank', 'Lag', 'Lead',
-                           'FirstValue', 'LastValue', 'Ntile', 'PercentRank', 'CumeDist',
+                           'FirstValue', 'LastValue', 'NthValue', 'Ntile', 'PercentRank', 'CumeDist',
                            'Count'} | _window_agg_funcs
         if func_type not in supported_funcs:
             raise ValueError(f"不支持的窗口函数: {func_type}")
@@ -2045,15 +2065,15 @@ class AdvancedSQLQueryEngine:
             'Lead': self._compute_lead,
             'FirstValue': self._compute_first_value,
             'LastValue': self._compute_last_value,
+            'NthValue': self._compute_nth_value,
             'Ntile': self._compute_ntile,
             'PercentRank': self._compute_percent_rank,
             'CumeDist': self._compute_cume_dist,
         }
         handler = _window_dispatch.get(func_type)
         if handler:
-            # 需要额外参数的函数传入window_expr
-            if func_type in ('Lag', 'Lead', 'FirstValue', 'LastValue', 'Ntile'):
-                return handler(df, partition_cols, order_cols, ascending, window_expr)
+            if func_type in ('Lag', 'Lead', 'FirstValue', 'LastValue', 'NthValue', 'Ntile'):
+                return handler(window_expr, df, partition_cols, order_cols, ascending, select_alias_map or {})
             return handler(df, partition_cols, order_cols, ascending)
 
         # 窗口聚合函数: AVG/SUM/COUNT/MIN/MAX OVER (...)
@@ -2187,87 +2207,6 @@ class AdvancedSQLQueryEngine:
         else:
             result = sorted_df[order_cols[0]].rank(method='dense', ascending=ascending[0])
         return result.reindex(df.index).astype(int)
-
-    def _compute_lag(self, df: pd.DataFrame, partition_cols: list,
-                     order_cols: list, ascending: list, window_expr) -> pd.Series:
-        """LAG: 取分区内前N行的值"""
-        func = window_expr.this
-        col_name = func.this.name if hasattr(func.this, 'name') else str(func.this)
-        offset_expr = func.args.get('offset')
-        offset = int(offset_expr.this) if offset_expr else 1
-
-        sorted_df = df.sort_values(order_cols, ascending=ascending) if order_cols else df
-        if partition_cols:
-            result = sorted_df.groupby(partition_cols, sort=False)[col_name].shift(offset)
-            result = result.reindex(df.index)
-        else:
-            result = sorted_df[col_name].shift(offset).reindex(df.index)
-        return result
-
-    def _compute_lead(self, df: pd.DataFrame, partition_cols: list,
-                      order_cols: list, ascending: list, window_expr) -> pd.Series:
-        """LEAD: 取分区内后N行的值"""
-        func = window_expr.this
-        col_name = func.this.name if hasattr(func.this, 'name') else str(func.this)
-        offset_expr = func.args.get('offset')
-        offset = int(offset_expr.this) if offset_expr else 1
-
-        sorted_df = df.sort_values(order_cols, ascending=ascending) if order_cols else df
-        if partition_cols:
-            result = sorted_df.groupby(partition_cols, sort=False)[col_name].shift(-offset)
-            result = result.reindex(df.index)
-        else:
-            result = sorted_df[col_name].shift(-offset).reindex(df.index)
-        return result
-
-    def _compute_first_value(self, df: pd.DataFrame, partition_cols: list,
-                             order_cols: list, ascending: list, window_expr) -> pd.Series:
-        """FIRST_VALUE: 分区内按排序的第一个值"""
-        func = window_expr.this
-        col_name = func.this.name if hasattr(func.this, 'name') else str(func.this)
-
-        sorted_df = df.sort_values(order_cols, ascending=ascending) if order_cols else df
-        if partition_cols:
-            result = sorted_df.groupby(partition_cols, sort=False)[col_name].transform('first')
-            result = result.reindex(df.index)
-        else:
-            result = pd.Series(sorted_df[col_name].iloc[0], index=df.index)
-        return result
-
-    def _compute_last_value(self, df: pd.DataFrame, partition_cols: list,
-                            order_cols: list, ascending: list, window_expr) -> pd.Series:
-        """LAST_VALUE: 分区内按排序的最后一个值"""
-        func = window_expr.this
-        col_name = func.this.name if hasattr(func.this, 'name') else str(func.this)
-
-        sorted_df = df.sort_values(order_cols, ascending=ascending) if order_cols else df
-        if partition_cols:
-            result = sorted_df.groupby(partition_cols, sort=False)[col_name].transform('last')
-            result = result.reindex(df.index)
-        else:
-            result = pd.Series(sorted_df[col_name].iloc[-1], index=df.index)
-        return result
-
-    def _compute_ntile(self, df: pd.DataFrame, partition_cols: list,
-                       order_cols: list, ascending: list, window_expr) -> pd.Series:
-        """NTILE: 将分区内的行分为N个桶"""
-        func = window_expr.this
-        n_expr = func.this
-        num_buckets = int(n_expr.this) if hasattr(n_expr, 'this') else int(str(n_expr))
-
-        sorted_df = df.sort_values(order_cols, ascending=ascending) if order_cols else df
-        result = pd.Series(0, index=df.index, dtype=int)
-
-        if partition_cols:
-            for _, group in sorted_df.groupby(partition_cols, sort=False):
-                n = len(group)
-                for i, idx in enumerate(group.index):
-                    result[idx] = (i * num_buckets) // n + 1
-        else:
-            n = len(sorted_df)
-            for i, idx in enumerate(sorted_df.index):
-                result[idx] = (i * num_buckets) // n + 1
-        return result
 
     def _compute_percent_rank(self, df: pd.DataFrame, partition_cols: list,
                               order_cols: list, ascending: list) -> pd.Series:
@@ -2551,7 +2490,12 @@ class AdvancedSQLQueryEngine:
         if hasattr(lag_func, 'args') and 'default' in lag_func.args:
             default_arg = lag_func.args['default']
             if default_arg:
-                default_value = default_arg.this if hasattr(default_arg, 'this') else None
+                raw = default_arg.this if hasattr(default_arg, 'this') else None
+                if raw is not None:
+                    try:
+                        default_value = float(raw) if '.' in str(raw) else int(raw)
+                    except (ValueError, TypeError):
+                        default_value = raw
 
         # 验证目标列存在
         if target_col not in df.columns:
@@ -2560,26 +2504,19 @@ class AdvancedSQLQueryEngine:
 
         # 分组计算LAG
         if partition_cols:
-            grouped = df.groupby(partition_cols, sort=False)
+            result = pd.Series(None, index=df.index, dtype=float)
+            for _, group in df.groupby(partition_cols, sort=False):
+                sorted_group = group.sort_values(order_cols, ascending=ascending)
+                lagged = sorted_group[target_col].shift(periods=offset)
+                if default_value is not None:
+                    lagged = lagged.fillna(default_value)
+                result.loc[group.index] = lagged.reindex(group.index).values
         else:
-            grouped = None
-
-        def compute_lag_in_group(group):
-            """在分组内计算LAG"""
-            sorted_group = group.sort_values(order_cols, ascending=ascending)
-            # 使用shift获取前N行的值
-            lagged = sorted_group[target_col].shift(periods=offset)
-            # 填充默认值（如果有）
+            sorted_df = df.sort_values(order_cols, ascending=ascending)
+            lagged = sorted_df[target_col].shift(periods=offset)
             if default_value is not None:
                 lagged = lagged.fillna(default_value)
-            return lagged.reindex(group.index)
-
-        if grouped is not None:
-            result = grouped.apply(compute_lag_in_group, include_groups=False)
-            if isinstance(result.index, pd.MultiIndex):
-                result = result.droplevel(result.index.names[:-1])
-        else:
-            result = compute_lag_in_group(df)
+            result = lagged.reindex(df.index)
 
         return result
 
@@ -2606,7 +2543,12 @@ class AdvancedSQLQueryEngine:
         if hasattr(lead_func, 'args') and 'default' in lead_func.args:
             default_arg = lead_func.args['default']
             if default_arg:
-                default_value = default_arg.this if hasattr(default_arg, 'this') else None
+                raw = default_arg.this if hasattr(default_arg, 'this') else None
+                if raw is not None:
+                    try:
+                        default_value = float(raw) if '.' in str(raw) else int(raw)
+                    except (ValueError, TypeError):
+                        default_value = raw
 
         # 验证目标列存在
         if target_col not in df.columns:
@@ -2615,26 +2557,19 @@ class AdvancedSQLQueryEngine:
 
         # 分组计算LEAD
         if partition_cols:
-            grouped = df.groupby(partition_cols, sort=False)
+            result = pd.Series(None, index=df.index, dtype=float)
+            for _, group in df.groupby(partition_cols, sort=False):
+                sorted_group = group.sort_values(order_cols, ascending=ascending)
+                led = sorted_group[target_col].shift(periods=-offset)
+                if default_value is not None:
+                    led = led.fillna(default_value)
+                result.loc[group.index] = led.reindex(group.index).values
         else:
-            grouped = None
-
-        def compute_lead_in_group(group):
-            """在分组内计算LEAD"""
-            sorted_group = group.sort_values(order_cols, ascending=ascending)
-            # 使用shift获取后N行的值（负数偏移）
-            led = sorted_group[target_col].shift(periods=-offset)
-            # 填充默认值（如果有）
+            sorted_df = df.sort_values(order_cols, ascending=ascending)
+            led = sorted_df[target_col].shift(periods=-offset)
             if default_value is not None:
                 led = led.fillna(default_value)
-            return led.reindex(group.index)
-
-        if grouped is not None:
-            result = grouped.apply(compute_lead_in_group, include_groups=False)
-            if isinstance(result.index, pd.MultiIndex):
-                result = result.droplevel(result.index.names[:-1])
-        else:
-            result = compute_lead_in_group(df)
+            result = led.reindex(df.index)
 
         return result
 
@@ -2644,36 +2579,24 @@ class AdvancedSQLQueryEngine:
         if not order_cols:
             raise ValueError("FIRST_VALUE() 窗口函数需要 ORDER BY 子句")
 
-        # 解析目标列
         first_value_func = window_expr.this
         target_col_expr = first_value_func.this
         target_col = target_col_expr.name if hasattr(target_col_expr, 'name') else str(target_col_expr)
 
-        # 验证目标列存在
         if target_col not in df.columns:
             suggestion = self._suggest_column_name(target_col, list(df.columns))
             raise ValueError(f"FIRST_VALUE() 函数中列 '{target_col}' 不存在.可用列: {list(df.columns)}.{suggestion}")
 
-        # 分组计算FIRST_VALUE
+        result = pd.Series(None, index=df.index, dtype=df[target_col].dtype)
         if partition_cols:
-            grouped = df.groupby(partition_cols, sort=False)
+            for _, group in df.groupby(partition_cols, sort=False):
+                sorted_group = group.sort_values(order_cols, ascending=ascending)
+                first_val = sorted_group[target_col].iloc[0] if len(sorted_group) > 0 else None
+                result.loc[group.index] = first_val
         else:
-            grouped = None
-
-        def compute_first_value_in_group(group):
-            """在分组内计算FIRST_VALUE"""
-            sorted_group = group.sort_values(order_cols, ascending=ascending)
-            # 获取第一行的值
-            first_val = sorted_group[target_col].iloc[0] if len(sorted_group) > 0 else None
-            # 所有行都返回第一行的值
-            return pd.Series([first_val] * len(group), index=group.index)
-
-        if grouped is not None:
-            result = grouped.apply(compute_first_value_in_group, include_groups=False)
-            if isinstance(result.index, pd.MultiIndex):
-                result = result.droplevel(result.index.names[:-1])
-        else:
-            result = compute_first_value_in_group(df)
+            sorted_df = df.sort_values(order_cols, ascending=ascending)
+            first_val = sorted_df[target_col].iloc[0] if len(sorted_df) > 0 else None
+            result[:] = first_val
 
         return result
 
@@ -2683,36 +2606,54 @@ class AdvancedSQLQueryEngine:
         if not order_cols:
             raise ValueError("LAST_VALUE() 窗口函数需要 ORDER BY 子句")
 
-        # 解析目标列
         last_value_func = window_expr.this
         target_col_expr = last_value_func.this
         target_col = target_col_expr.name if hasattr(target_col_expr, 'name') else str(target_col_expr)
 
-        # 验证目标列存在
         if target_col not in df.columns:
             suggestion = self._suggest_column_name(target_col, list(df.columns))
             raise ValueError(f"LAST_VALUE() 函数中列 '{target_col}' 不存在.可用列: {list(df.columns)}.{suggestion}")
 
-        # 分组计算LAST_VALUE
+        result = pd.Series(None, index=df.index, dtype=df[target_col].dtype)
         if partition_cols:
-            grouped = df.groupby(partition_cols, sort=False)
+            for _, group in df.groupby(partition_cols, sort=False):
+                sorted_group = group.sort_values(order_cols, ascending=ascending)
+                last_val = sorted_group[target_col].iloc[-1] if len(sorted_group) > 0 else None
+                result.loc[group.index] = last_val
         else:
-            grouped = None
+            sorted_df = df.sort_values(order_cols, ascending=ascending)
+            last_val = sorted_df[target_col].iloc[-1] if len(sorted_df) > 0 else None
+            result[:] = last_val
 
-        def compute_last_value_in_group(group):
-            """在分组内计算LAST_VALUE"""
-            sorted_group = group.sort_values(order_cols, ascending=ascending)
-            # 获取最后一行的值
-            last_val = sorted_group[target_col].iloc[-1] if len(sorted_group) > 0 else None
-            # 所有行都返回最后一行的值
-            return pd.Series([last_val] * len(group), index=group.index)
+        return result
 
-        if grouped is not None:
-            result = grouped.apply(compute_last_value_in_group, include_groups=False)
-            if isinstance(result.index, pd.MultiIndex):
-                result = result.droplevel(result.index.names[:-1])
+    def _compute_nth_value(self, window_expr: exp.Window, df: pd.DataFrame, partition_cols: list,
+                           order_cols: list, ascending: list, select_alias_map: Dict) -> pd.Series:
+        """NTH_VALUE: 获取分区内排序后第N行的值"""
+        if not order_cols:
+            raise ValueError("NTH_VALUE() 窗口函数需要 ORDER BY 子句")
+
+        nth_func = window_expr.this
+        target_col_expr = nth_func.this
+        target_col = target_col_expr.name if hasattr(target_col_expr, 'name') else str(target_col_expr)
+
+        # 解析 N 参数
+        nth_expr = nth_func.args.get('offset') or (nth_func.expressions[1] if len(nth_func.expressions) > 1 else None)
+        n = int(nth_expr.this) if nth_expr and hasattr(nth_expr, 'this') else 1
+
+        if target_col not in df.columns:
+            raise ValueError(f"NTH_VALUE() 函数中列 '{target_col}' 不存在.可用列: {list(df.columns)}")
+
+        result = pd.Series(None, index=df.index, dtype=df[target_col].dtype)
+        if partition_cols:
+            for _, group in df.groupby(partition_cols, sort=False):
+                sorted_group = group.sort_values(order_cols, ascending=ascending)
+                nth_val = sorted_group[target_col].iloc[n - 1] if n <= len(sorted_group) else None
+                result.loc[group.index] = nth_val
         else:
-            result = compute_last_value_in_group(df)
+            sorted_df = df.sort_values(order_cols, ascending=ascending)
+            nth_val = sorted_df[target_col].iloc[n - 1] if n <= len(sorted_df) else None
+            result[:] = nth_val
 
         return result
 
@@ -6428,19 +6369,19 @@ class AdvancedSQLQueryEngine:
                 lock_fd.close()
 
     def _serialize_value(self, val: Any) -> Any:
-        """智能序列化值:数值保持数值类型,None/NaN转空字符串,numpy->Python原生"""
+        """智能序列化值:数值保持数值类型,None/NaN转None,numpy->Python原生"""
         if val is None or (isinstance(val, float) and np.isnan(val)):
-            return ''
+            return None
         if isinstance(val, (np.integer,)):
             return int(val)
         if isinstance(val, (np.floating,)):
             f = float(val)
             if np.isnan(f):
-                return ''
+                return None
             return int(f) if f == int(f) else round(f, 2)
         if isinstance(val, float):
             if np.isnan(val):
-                return ''
+                return None
             return int(val) if val == int(val) else round(val, 2)
         return val
 
