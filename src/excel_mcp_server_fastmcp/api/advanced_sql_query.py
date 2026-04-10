@@ -1992,9 +1992,9 @@ class AdvancedSQLQueryEngine:
         func_type = type(window_expr.this).__name__
 
         # 支持的窗口函数类型
-        supported_funcs = {'RowNumber', 'Rank', 'DenseRank', 'Lag', 'Lead', 'FirstValue', 'LastValue'}
+        supported_funcs = {'RowNumber', 'Rank', 'DenseRank', 'Ntile', 'Lag', 'Lead', 'FirstValue', 'LastValue'}
         if func_type not in supported_funcs:
-            raise ValueError(f"不支持的窗口函数: {func_type}。💡 支持的窗口函数: ROW_NUMBER, RANK, DENSE_RANK, LAG, LEAD, FIRST_VALUE, LAST_VALUE（均需配合 OVER(ORDER BY ...) 使用）")
+            raise ValueError(f"不支持的窗口函数: {func_type}。💡 支持的窗口函数: ROW_NUMBER, RANK, DENSE_RANK, NTILE, LAG, LEAD, FIRST_VALUE, LAST_VALUE（均需配合 OVER(ORDER BY ...) 使用）")
 
         if select_alias_map is None:
             select_alias_map = {}
@@ -2037,6 +2037,9 @@ class AdvancedSQLQueryEngine:
                 return self._compute_first_value(window_expr, df, partition_cols, order_cols, ascending, select_alias_map)
             else:  # LastValue
                 return self._compute_last_value(window_expr, df, partition_cols, order_cols, ascending, select_alias_map)
+        elif func_type == 'Ntile':
+            # NTILE 需要从 window_expr 中解析桶数参数
+            return self._compute_ntile(window_expr, df, partition_cols, order_cols, ascending, select_alias_map)
         else:
             # ROW_NUMBER, RANK, DENSE_RANK使用原有签名
             _window_dispatch = {
@@ -2173,6 +2176,73 @@ class AdvancedSQLQueryEngine:
                 result = result.droplevel(result.index.names[:-1])
         else:
             result = assign_dense_rank(df)
+
+        return result
+
+    def _compute_ntile(self, window_expr: exp.Window, df: pd.DataFrame, partition_cols: list,
+                      order_cols: list, ascending: list, select_alias_map: Dict) -> pd.Series:
+        """NTILE: 将分组内的行均匀分为N个桶（桶号从1到N）"""
+        if not order_cols:
+            raise ValueError("NTILE() 窗口函数需要 ORDER BY 子句")
+
+        # 解析桶数参数
+        ntile_func = window_expr.this
+        bucket_count = 1
+        # NTILE的参数直接存储在ntile_func.this中（是一个Literal）
+        if hasattr(ntile_func, 'this') and isinstance(ntile_func.this, exp.Literal):
+            bucket_count = int(ntile_func.this.this)
+        elif hasattr(ntile_func, 'this'):
+            # 尝试从表达式解析整数
+            try:
+                bucket_count = int(str(ntile_func.this).strip())
+            except (ValueError, TypeError):
+                bucket_count = 1
+
+        # 验证桶数
+        if bucket_count < 1:
+            raise ValueError("NTILE() 的桶数参数必须大于等于 1")
+
+        # 分组计算NTILE
+        if partition_cols:
+            grouped = df.groupby(partition_cols, sort=False)
+        else:
+            grouped = None
+
+        def assign_ntile_buckets(group):
+            """为分组内的行分配桶号
+            
+            NTILE算法：将行均匀分配到N个桶中
+            - 每个桶分配尽可能相等的行数
+            - 行数多的桶在前面（按排序顺序）
+            - 例如：8行分成3个桶 → 桶大小为3,3,2
+            """
+            sorted_group = group.sort_values(order_cols, ascending=ascending)
+            group_size = len(sorted_group)
+            
+            # 计算每个桶的行数
+            base_size = group_size // bucket_count  # 每个桶的基础行数
+            remainder = group_size % bucket_count  # 余数：前remainder个桶多一行
+            
+            # 创建桶号数组
+            bucket_numbers = []
+            current_bucket = 1
+            rows_in_current_bucket = base_size + (1 if current_bucket <= remainder else 0)
+            
+            for _ in range(group_size):
+                bucket_numbers.append(current_bucket)
+                rows_in_current_bucket -= 1
+                if rows_in_current_bucket == 0 and current_bucket < bucket_count:
+                    current_bucket += 1
+                    rows_in_current_bucket = base_size + (1 if current_bucket <= remainder else 0)
+            
+            return pd.Series(bucket_numbers, index=sorted_group.index).reindex(group.index)
+
+        if grouped is not None:
+            result = grouped.apply(assign_ntile_buckets, include_groups=False)
+            if isinstance(result.index, pd.MultiIndex):
+                result = result.droplevel(result.index.names[:-1])
+        else:
+            result = assign_ntile_buckets(df)
 
         return result
 

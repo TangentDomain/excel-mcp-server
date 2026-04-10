@@ -106,10 +106,12 @@ REQ-EXCEL-002 (P2) - 添加自动化测试配置
 - **完成时间**: 2026-04-10
 
 ### REQ-EXCEL-009 (P1): CTE 不支持复杂表达式
-- **状态**: OPEN
+- **状态**: DONE
 - **来源**: L1 用户直接反馈（限制 #5）
 - **问题**: WITH子句中使用算术表达式报错
 - **验收**: CTE中支持计算表达式
+- **完成时间**: 2026-04-10
+- **备注**: 已被 REQ-EXCEL-005/006 的算术表达式支持覆盖
 
 ### REQ-EXCEL-010 (P2): batch_update_ranges 参数格式不一致
 - **状态**: DONE
@@ -148,11 +150,13 @@ REQ-EXCEL-002 (P2) - 添加自动化测试配置
 - **完成时间**: 2026-04-09
 
 ### REQ-EXCEL-015 (P0): GROUP_CONCAT 聚合函数
-- **状态**: OPEN
+- **状态**: DONE
 - **来源**: SQL差距分析报告
 - **问题**: 缺少GROUP_CONCAT，无法在分组内拼接字符串（如同组内拼接所有技能名）
 - **验收**: `SELECT dept, GROUP_CONCAT(name) FROM t GROUP BY dept` 可用
 - **替代方案**: 应用层聚合
+- **完成时间**: 2026-04-10
+- **备注**: 支持标准语法和自定义分隔符 (GROUP_CONCAT(col, sep) / GROUP_CONCAT(col SEPARATOR sep))
 
 ### REQ-EXCEL-016 (P0): FIRST_VALUE / LAST_VALUE 窗口函数
 - **状态**: DONE
@@ -163,10 +167,11 @@ REQ-EXCEL-002 (P2) - 添加自动化测试配置
 - **完成时间**: 2026-04-10
 
 ### REQ-EXCEL-017 (P1): NTILE 窗口函数
-- **状态**: OPEN
+- **状态**: DONE
 - **来源**: SQL差距分析报告
 - **问题**: 缺少NTILE，无法将分组均分为N桶
 - **验收**: `NTILE(N) OVER (PARTITION BY ... ORDER BY ...)` 可用
+- **完成时间**: 2026-04-10
 
 ### REQ-EXCEL-018 (P1): PERCENT_RANK / CUME_DIST 窗口函数
 - **状态**: OPEN

@@ -67,7 +67,7 @@ class TestRowNumber:
 
     def test_row_number_basic(self, game_config):
         """基本ROW_NUMBER: 按伤害降序编号"""
-        from src.excel_mcp_server_fastmcp.api.advanced_sql_query import execute_advanced_sql_query
+        from excel_mcp_server_fastmcp.api.advanced_sql_query import execute_advanced_sql_query
         result = execute_advanced_sql_query(
             game_config,
             "SELECT skill_name, damage, ROW_NUMBER() OVER (ORDER BY damage DESC) as rn FROM 技能配置"
@@ -82,7 +82,7 @@ class TestRowNumber:
 
     def test_row_number_partition(self, game_config):
         """ROW_NUMBER with PARTITION BY: 每个职业内按伤害排名"""
-        from src.excel_mcp_server_fastmcp.api.advanced_sql_query import execute_advanced_sql_query
+        from excel_mcp_server_fastmcp.api.advanced_sql_query import execute_advanced_sql_query
         result = execute_advanced_sql_query(
             game_config,
             "SELECT skill_name, skill_type, damage, ROW_NUMBER() OVER (PARTITION BY skill_type ORDER BY damage DESC) as rn FROM 技能配置"
@@ -105,7 +105,7 @@ class TestRowNumber:
 
     def test_row_number_with_limit(self, game_config):
         """ROW_NUMBER + LIMIT"""
-        from src.excel_mcp_server_fastmcp.api.advanced_sql_query import execute_advanced_sql_query
+        from excel_mcp_server_fastmcp.api.advanced_sql_query import execute_advanced_sql_query
         result = execute_advanced_sql_query(
             game_config,
             "SELECT skill_name, damage, ROW_NUMBER() OVER (ORDER BY damage DESC) as rn FROM 技能配置 LIMIT 5"
@@ -116,7 +116,7 @@ class TestRowNumber:
 
     def test_row_number_order_by_asc(self, game_config):
         """ROW_NUMBER ORDER BY ASC: 升序编号"""
-        from src.excel_mcp_server_fastmcp.api.advanced_sql_query import execute_advanced_sql_query
+        from excel_mcp_server_fastmcp.api.advanced_sql_query import execute_advanced_sql_query
         result = execute_advanced_sql_query(
             game_config,
             "SELECT skill_name, cooldown, ROW_NUMBER() OVER (ORDER BY cooldown ASC) as rn FROM 技能配置"
@@ -134,7 +134,7 @@ class TestRank:
 
     def test_rank_basic(self, game_config_with_dup):
         """基本RANK: 相同伤害相同排名，跳过"""
-        from src.excel_mcp_server_fastmcp.api.advanced_sql_query import execute_advanced_sql_query
+        from excel_mcp_server_fastmcp.api.advanced_sql_query import execute_advanced_sql_query
         result = execute_advanced_sql_query(
             game_config_with_dup,
             "SELECT skill_name, damage, RANK() OVER (ORDER BY damage DESC) as r FROM 技能配置"
@@ -151,7 +151,7 @@ class TestRank:
 
     def test_rank_partition(self, game_config_with_dup):
         """RANK with PARTITION BY"""
-        from src.excel_mcp_server_fastmcp.api.advanced_sql_query import execute_advanced_sql_query
+        from excel_mcp_server_fastmcp.api.advanced_sql_query import execute_advanced_sql_query
         result = execute_advanced_sql_query(
             game_config_with_dup,
             "SELECT skill_name, skill_type, damage, RANK() OVER (PARTITION BY skill_type ORDER BY damage DESC) as r FROM 技能配置"
@@ -171,7 +171,7 @@ class TestDenseRank:
 
     def test_dense_rank_basic(self, game_config_with_dup):
         """基本DENSE_RANK: 相同伤害相同排名，不跳过"""
-        from src.excel_mcp_server_fastmcp.api.advanced_sql_query import execute_advanced_sql_query
+        from excel_mcp_server_fastmcp.api.advanced_sql_query import execute_advanced_sql_query
         result = execute_advanced_sql_query(
             game_config_with_dup,
             "SELECT skill_name, damage, DENSE_RANK() OVER (ORDER BY damage DESC) as dr FROM 技能配置"
@@ -185,7 +185,7 @@ class TestDenseRank:
 
     def test_dense_rank_multiple_ties(self, game_config_with_dup):
         """DENSE_RANK 多组并列"""
-        from src.excel_mcp_server_fastmcp.api.advanced_sql_query import execute_advanced_sql_query
+        from excel_mcp_server_fastmcp.api.advanced_sql_query import execute_advanced_sql_query
         result = execute_advanced_sql_query(
             game_config_with_dup,
             "SELECT skill_name, damage, DENSE_RANK() OVER (ORDER BY damage DESC) as dr FROM 技能配置"
@@ -210,7 +210,7 @@ class TestWindowEdgeCases:
 
     def test_window_without_order_by(self, game_config):
         """无ORDER BY的ROW_NUMBER: 按原始行顺序"""
-        from src.excel_mcp_server_fastmcp.api.advanced_sql_query import execute_advanced_sql_query
+        from excel_mcp_server_fastmcp.api.advanced_sql_query import execute_advanced_sql_query
         result = execute_advanced_sql_query(
             game_config,
             "SELECT skill_name, ROW_NUMBER() OVER () as rn FROM 技能配置"
@@ -223,7 +223,7 @@ class TestWindowEdgeCases:
 
     def test_window_with_where(self, game_config):
         """窗口函数 + WHERE: 先过滤再计算窗口"""
-        from src.excel_mcp_server_fastmcp.api.advanced_sql_query import execute_advanced_sql_query
+        from excel_mcp_server_fastmcp.api.advanced_sql_query import execute_advanced_sql_query
         result = execute_advanced_sql_query(
             game_config,
             "SELECT skill_name, damage, ROW_NUMBER() OVER (ORDER BY damage DESC) as rn FROM 技能配置 WHERE skill_type = 'mage'"
@@ -236,7 +236,7 @@ class TestWindowEdgeCases:
 
     def test_window_with_group_by(self, game_config):
         """窗口函数 + GROUP BY: 在聚合结果上计算排名"""
-        from src.excel_mcp_server_fastmcp.api.advanced_sql_query import execute_advanced_sql_query
+        from excel_mcp_server_fastmcp.api.advanced_sql_query import execute_advanced_sql_query
         result = execute_advanced_sql_query(
             game_config,
             "SELECT skill_type, AVG(damage) as avg_dmg, RANK() OVER (ORDER BY AVG(damage) DESC) as r FROM 技能配置 GROUP BY skill_type"
@@ -250,19 +250,27 @@ class TestWindowEdgeCases:
         assert len(mage_row) == 1
         assert mage_row[0]['r'] == 1  # 法师平均伤害最高
 
-    def test_unsupported_window_function(self, game_config):
-        """不支持的窗口函数应该报错"""
-        from src.excel_mcp_server_fastmcp.api.advanced_sql_query import execute_advanced_sql_query
+    def test_ntile_basic(self, game_config):
+        """NTILE: 将分组均匀分为N个桶"""
+        from excel_mcp_server_fastmcp.api.advanced_sql_query import execute_advanced_sql_query
         result = execute_advanced_sql_query(
             game_config,
-            "SELECT skill_name, NTILE(3) OVER (ORDER BY damage DESC) as bucket FROM 技能配置"
+            "SELECT skill_name, damage, NTILE(3) OVER (ORDER BY damage DESC) as bucket FROM 技能配置"
         )
-        assert result['success'] is False
-        assert '不支持' in result['message']
+        assert result['success'] is True, f"Query failed: {result.get('message')}"
+        rows = _get_rows(result)
+        assert len(rows) == 8
+        # 8行分成3个桶，桶大小应该是 3, 3, 2
+        bucket_counts = {}
+        for r in rows:
+            bucket_counts[r['bucket']] = bucket_counts.get(r['bucket'], 0) + 1
+        assert bucket_counts[1] == 3  # 桶1有3行
+        assert bucket_counts[2] == 3  # 桶2有3行
+        assert bucket_counts[3] == 2  # 桶3有2行
 
     def test_window_column_not_exists(self, game_config):
         """窗口函数引用不存在的列"""
-        from src.excel_mcp_server_fastmcp.api.advanced_sql_query import execute_advanced_sql_query
+        from excel_mcp_server_fastmcp.api.advanced_sql_query import execute_advanced_sql_query
         result = execute_advanced_sql_query(
             game_config,
             "SELECT skill_name, ROW_NUMBER() OVER (ORDER BY nonexistent DESC) as rn FROM 技能配置"
@@ -272,7 +280,7 @@ class TestWindowEdgeCases:
 
     def test_window_no_partition_no_order(self, game_config):
         """ROW_NUMBER() OVER () — 无分区无排序"""
-        from src.excel_mcp_server_fastmcp.api.advanced_sql_query import execute_advanced_sql_query
+        from excel_mcp_server_fastmcp.api.advanced_sql_query import execute_advanced_sql_query
         result = execute_advanced_sql_query(
             game_config,
             "SELECT skill_name, ROW_NUMBER() OVER () as rn FROM 技能配置"
@@ -284,7 +292,7 @@ class TestWindowEdgeCases:
 
     def test_rank_dense_rank_comparison(self, game_config_with_dup):
         """RANK vs DENSE_RANK 对比"""
-        from src.excel_mcp_server_fastmcp.api.advanced_sql_query import execute_advanced_sql_query
+        from excel_mcp_server_fastmcp.api.advanced_sql_query import execute_advanced_sql_query
         result = execute_advanced_sql_query(
             game_config_with_dup,
             "SELECT skill_name, damage, RANK() OVER (ORDER BY damage DESC) as r, DENSE_RANK() OVER (ORDER BY damage DESC) as dr FROM 技能配置"
@@ -305,7 +313,7 @@ class TestLag:
 
     def test_lag_basic(self, game_config):
         """基本LAG: 获取前一行的伤害值"""
-        from src.excel_mcp_server_fastmcp.api.advanced_sql_query import execute_advanced_sql_query
+        from excel_mcp_server_fastmcp.api.advanced_sql_query import execute_advanced_sql_query
         result = execute_advanced_sql_query(
             game_config,
             "SELECT skill_name, damage, LAG(damage, 1) OVER (ORDER BY damage DESC) as prev_damage FROM 技能配置"
@@ -320,7 +328,7 @@ class TestLag:
 
     def test_lag_partition(self, game_config):
         """LAG with PARTITION BY: 每个职业内前一行"""
-        from src.excel_mcp_server_fastmcp.api.advanced_sql_query import execute_advanced_sql_query
+        from excel_mcp_server_fastmcp.api.advanced_sql_query import execute_advanced_sql_query
         result = execute_advanced_sql_query(
             game_config,
             "SELECT skill_name, skill_type, damage, LAG(damage, 1) OVER (PARTITION BY skill_type ORDER BY damage DESC) as prev_damage FROM 技能配置"
@@ -341,7 +349,7 @@ class TestLag:
 
     def test_lag_offset_2(self, game_config):
         """LAG with offset 2: 获取前两行的值"""
-        from src.excel_mcp_server_fastmcp.api.advanced_sql_query import execute_advanced_sql_query
+        from excel_mcp_server_fastmcp.api.advanced_sql_query import execute_advanced_sql_query
         result = execute_advanced_sql_query(
             game_config,
             "SELECT skill_name, damage, LAG(damage, 2) OVER (ORDER BY damage DESC) as prev2_damage FROM 技能配置"
@@ -356,7 +364,7 @@ class TestLag:
 
     def test_lag_default_value(self, game_config):
         """LAG with default value: 为NULL提供默认值"""
-        from src.excel_mcp_server_fastmcp.api.advanced_sql_query import execute_advanced_sql_query
+        from excel_mcp_server_fastmcp.api.advanced_sql_query import execute_advanced_sql_query
         result = execute_advanced_sql_query(
             game_config,
             "SELECT skill_name, damage, LAG(damage, 1, 0) OVER (ORDER BY damage DESC) as prev_damage FROM 技能配置"
@@ -368,7 +376,7 @@ class TestLag:
 
     def test_lag_no_order_by_error(self, game_config):
         """LAG without ORDER BY should error"""
-        from src.excel_mcp_server_fastmcp.api.advanced_sql_query import execute_advanced_sql_query
+        from excel_mcp_server_fastmcp.api.advanced_sql_query import execute_advanced_sql_query
         result = execute_advanced_sql_query(
             game_config,
             "SELECT skill_name, damage, LAG(damage, 1) OVER () as prev_damage FROM 技能配置"
@@ -382,7 +390,7 @@ class TestLead:
 
     def test_lead_basic(self, game_config):
         """基本LEAD: 获取后一行的伤害值"""
-        from src.excel_mcp_server_fastmcp.api.advanced_sql_query import execute_advanced_sql_query
+        from excel_mcp_server_fastmcp.api.advanced_sql_query import execute_advanced_sql_query
         result = execute_advanced_sql_query(
             game_config,
             "SELECT skill_name, damage, LEAD(damage, 1) OVER (ORDER BY damage DESC) as next_damage FROM 技能配置"
@@ -397,7 +405,7 @@ class TestLead:
 
     def test_lead_partition(self, game_config):
         """LEAD with PARTITION BY: 每个职业内后一行"""
-        from src.excel_mcp_server_fastmcp.api.advanced_sql_query import execute_advanced_sql_query
+        from excel_mcp_server_fastmcp.api.advanced_sql_query import execute_advanced_sql_query
         result = execute_advanced_sql_query(
             game_config,
             "SELECT skill_name, skill_type, damage, LEAD(damage, 1) OVER (PARTITION BY skill_type ORDER BY damage DESC) as next_damage FROM 技能配置"
@@ -419,7 +427,7 @@ class TestLead:
 
     def test_lead_offset_2(self, game_config):
         """LEAD with offset 2: 获取后两行的值"""
-        from src.excel_mcp_server_fastmcp.api.advanced_sql_query import execute_advanced_sql_query
+        from excel_mcp_server_fastmcp.api.advanced_sql_query import execute_advanced_sql_query
         result = execute_advanced_sql_query(
             game_config,
             "SELECT skill_name, damage, LEAD(damage, 2) OVER (ORDER BY damage DESC) as next2_damage FROM 技能配置"
@@ -432,7 +440,7 @@ class TestLead:
 
     def test_lead_default_value(self, game_config):
         """LEAD with default value: 为NULL提供默认值"""
-        from src.excel_mcp_server_fastmcp.api.advanced_sql_query import execute_advanced_sql_query
+        from excel_mcp_server_fastmcp.api.advanced_sql_query import execute_advanced_sql_query
         result = execute_advanced_sql_query(
             game_config,
             "SELECT skill_name, damage, LEAD(damage, 1, 0) OVER (ORDER BY damage DESC) as next_damage FROM 技能配置"
@@ -444,7 +452,7 @@ class TestLead:
 
     def test_lead_no_order_by_error(self, game_config):
         """LEAD without ORDER BY should error"""
-        from src.excel_mcp_server_fastmcp.api.advanced_sql_query import execute_advanced_sql_query
+        from excel_mcp_server_fastmcp.api.advanced_sql_query import execute_advanced_sql_query
         result = execute_advanced_sql_query(
             game_config,
             "SELECT skill_name, damage, LEAD(damage, 1) OVER () as next_damage FROM 技能配置"
@@ -458,7 +466,7 @@ class TestFirstValue:
 
     def test_first_value_basic(self, game_config):
         """基本FIRST_VALUE: 获取按伤害排序后第一行的伤害值"""
-        from src.excel_mcp_server_fastmcp.api.advanced_sql_query import execute_advanced_sql_query
+        from excel_mcp_server_fastmcp.api.advanced_sql_query import execute_advanced_sql_query
         result = execute_advanced_sql_query(
             game_config,
             "SELECT skill_name, damage, FIRST_VALUE(damage) OVER (ORDER BY damage DESC) as first_damage FROM 技能配置"
@@ -471,7 +479,7 @@ class TestFirstValue:
 
     def test_first_value_partition(self, game_config):
         """FIRST_VALUE with PARTITION BY: 每个职业内第一行的伤害值"""
-        from src.excel_mcp_server_fastmcp.api.advanced_sql_query import execute_advanced_sql_query
+        from excel_mcp_server_fastmcp.api.advanced_sql_query import execute_advanced_sql_query
         result = execute_advanced_sql_query(
             game_config,
             "SELECT skill_name, skill_type, damage, FIRST_VALUE(damage) OVER (PARTITION BY skill_type ORDER BY damage DESC) as first_damage FROM 技能配置"
@@ -491,7 +499,7 @@ class TestFirstValue:
 
     def test_first_value_order_by_asc(self, game_config):
         """FIRST_VALUE ORDER BY ASC: 获取排序后第一行（最小值）"""
-        from src.excel_mcp_server_fastmcp.api.advanced_sql_query import execute_advanced_sql_query
+        from excel_mcp_server_fastmcp.api.advanced_sql_query import execute_advanced_sql_query
         result = execute_advanced_sql_query(
             game_config,
             "SELECT skill_name, damage, FIRST_VALUE(damage) OVER (ORDER BY damage ASC) as first_damage FROM 技能配置"
@@ -503,7 +511,7 @@ class TestFirstValue:
 
     def test_first_value_no_order_by_error(self, game_config):
         """FIRST_VALUE without ORDER BY should error"""
-        from src.excel_mcp_server_fastmcp.api.advanced_sql_query import execute_advanced_sql_query
+        from excel_mcp_server_fastmcp.api.advanced_sql_query import execute_advanced_sql_query
         result = execute_advanced_sql_query(
             game_config,
             "SELECT skill_name, damage, FIRST_VALUE(damage) OVER () as first_damage FROM 技能配置"
@@ -517,7 +525,7 @@ class TestLastValue:
 
     def test_last_value_basic(self, game_config):
         """基本LAST_VALUE: 获取按伤害排序后最后一行的伤害值"""
-        from src.excel_mcp_server_fastmcp.api.advanced_sql_query import execute_advanced_sql_query
+        from excel_mcp_server_fastmcp.api.advanced_sql_query import execute_advanced_sql_query
         result = execute_advanced_sql_query(
             game_config,
             "SELECT skill_name, damage, LAST_VALUE(damage) OVER (ORDER BY damage DESC) as last_damage FROM 技能配置"
@@ -530,7 +538,7 @@ class TestLastValue:
 
     def test_last_value_partition(self, game_config):
         """LAST_VALUE with PARTITION BY: 每个职业内最后一行的伤害值"""
-        from src.excel_mcp_server_fastmcp.api.advanced_sql_query import execute_advanced_sql_query
+        from excel_mcp_server_fastmcp.api.advanced_sql_query import execute_advanced_sql_query
         result = execute_advanced_sql_query(
             game_config,
             "SELECT skill_name, skill_type, damage, LAST_VALUE(damage) OVER (PARTITION BY skill_type ORDER BY damage DESC) as last_damage FROM 技能配置"
@@ -550,7 +558,7 @@ class TestLastValue:
 
     def test_last_value_order_by_asc(self, game_config):
         """LAST_VALUE ORDER BY ASC: 获取排序后最后一行（最大值）"""
-        from src.excel_mcp_server_fastmcp.api.advanced_sql_query import execute_advanced_sql_query
+        from excel_mcp_server_fastmcp.api.advanced_sql_query import execute_advanced_sql_query
         result = execute_advanced_sql_query(
             game_config,
             "SELECT skill_name, damage, LAST_VALUE(damage) OVER (ORDER BY damage ASC) as last_damage FROM 技能配置"
@@ -562,7 +570,7 @@ class TestLastValue:
 
     def test_last_value_no_order_by_error(self, game_config):
         """LAST_VALUE without ORDER BY should error"""
-        from src.excel_mcp_server_fastmcp.api.advanced_sql_query import execute_advanced_sql_query
+        from excel_mcp_server_fastmcp.api.advanced_sql_query import execute_advanced_sql_query
         result = execute_advanced_sql_query(
             game_config,
             "SELECT skill_name, damage, LAST_VALUE(damage) OVER () as last_damage FROM 技能配置"
@@ -576,7 +584,7 @@ class TestFirstLastValueCombo:
 
     def test_first_last_value_combo(self, game_config):
         """同时使用FIRST_VALUE和LAST_VALUE"""
-        from src.excel_mcp_server_fastmcp.api.advanced_sql_query import execute_advanced_sql_query
+        from excel_mcp_server_fastmcp.api.advanced_sql_query import execute_advanced_sql_query
         result = execute_advanced_sql_query(
             game_config,
             "SELECT skill_name, skill_type, damage, FIRST_VALUE(damage) OVER (PARTITION BY skill_type ORDER BY damage DESC) as first_dmg, LAST_VALUE(damage) OVER (PARTITION BY skill_type ORDER BY damage DESC) as last_dmg FROM 技能配置"
