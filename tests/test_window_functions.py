@@ -268,6 +268,17 @@ class TestWindowEdgeCases:
         assert bucket_counts[2] == 3  # 桶2有3行
         assert bucket_counts[3] == 2  # 桶3有2行
 
+    def test_nth_value(self, game_config):
+        """NTH_VALUE: 返回窗口中第N行的值"""
+        from excel_mcp_server_fastmcp.api.advanced_sql_query import execute_advanced_sql_query
+        result = execute_advanced_sql_query(
+            game_config,
+            "SELECT skill_name, NTH_VALUE(damage, 2) OVER (ORDER BY damage DESC) as val FROM 技能配置"
+        )
+        assert result['success'] is True, f"Query failed: {result.get('message')}"
+        rows = _get_rows(result)
+        assert len(rows) == 8
+
     def test_window_column_not_exists(self, game_config):
         """窗口函数引用不存在的列"""
         from excel_mcp_server_fastmcp.api.advanced_sql_query import execute_advanced_sql_query

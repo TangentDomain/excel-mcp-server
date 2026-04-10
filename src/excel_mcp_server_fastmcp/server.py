@@ -559,6 +559,8 @@ mcp = FastMCP(
 定位文本位置？            → excel_search (返回row/column)
 跨文件搜索？              → excel_search_directory
 批量条件修改？            → excel_update_query (SQL UPDATE, 支持dry_run)
+SQL插入数据？            → excel_insert_query (SQL INSERT, 支持dry_run)
+SQL删除数据？            → excel_delete_query (SQL DELETE, 必须WHERE)
 写入指定单元格范围？      → excel_update_range (二维数组写入)
 按ID合并导入配置？        → excel_upsert_row (存在更新/不存在插入)
 批量导入多行数据？        → excel_batch_insert_rows
@@ -578,13 +580,20 @@ mcp = FastMCP(
 合并: UNION(去重), UNION ALL(不去重)
 关联: INNER JOIN, LEFT JOIN, RIGHT JOIN, FULL JOIN, CROSS JOIN（同文件内工作表）
 字符串: UPPER, LOWER, TRIM, LENGTH, CONCAT, REPLACE, SUBSTRING, LEFT, RIGHT
-窗口: ROW_NUMBER, RANK, DENSE_RANK（OVER PARTITION BY ... ORDER BY ...）
+窗口: ROW_NUMBER, RANK, DENSE_RANK, LAG, LEAD, FIRST_VALUE, LAST_VALUE, NTILE, PERCENT_RANK, CUME_DIST, AVG/SUM/COUNT/MIN/MAX OVER
+数据修改: INSERT INTO ... VALUES (...), DELETE FROM ... WHERE ..., UPDATE ... SET ... WHERE ...
 
 ## ❌ SQL不支持
-INSERT, DELETE, 嵌套FROM子查询（FROM子查询中不能再嵌套FROM子查询）, NATURAL JOIN, INTERSECT/EXCEPT, WITH RECURSIVE, LATERAL JOIN
+NATURAL JOIN, WITH RECURSIVE, LATERAL JOIN(请改用子查询或CTE), 跨文件JOIN需使用@'path'语法
+
+## ✅ 跨文件JOIN
+使用@'path'语法引用其他Excel文件的工作表：
+```sql
+SELECT a.*, b.掉落物品 FROM 技能表@'./data/技能配置.xlsx' a JOIN 掉落表@'./data/掉落配置.xlsx' b ON a.id = b.skill_id
+```
 
 ## ✅ FROM子查询
-支持单层FROM子查询：`FROM (SELECT ...) AS alias`。不支持嵌套。
+支持多层嵌套FROM子查询：`FROM (SELECT ...) AS alias`。
 ```sql
 SELECT * FROM (SELECT skill_name, damage FROM 技能配置 WHERE damage > 100) AS 高伤技能
 ```
@@ -2524,6 +2533,90 @@ def excel_update_query(
         return _fail('SQLGlot未安装，无法使用UPDATE功能', meta={"error_code": "DEPENDENCY_MISSING"})
     except Exception as e:
         return _fail(f'UPDATE执行失败: {str(e)}', meta={"error_code": "UPDATE_EXECUTION_FAILED"})
+
+
+@mcp.tool()
+@_track_call
+def excel_insert_query(
+    file_path: str,
+    insert_expression: str,
+    dry_run: bool = False
+) -> Dict[str, Any]:
+    """SQL插入数据。支持单行/多行INSERT。
+
+    示例::
+        INSERT INTO 技能表 (技能名称, 伤害, 冷却) VALUES ('火球术', 300, 6)
+        INSERT INTO Raids (RID, CID, Score) VALUES (6, 105, 7000), (7, 106, 8000)
+
+    Args:
+        file_path: Excel文件路径
+        insert_expression: INSERT语句
+        dry_run: 是否仅预览不实际写入，默认为False
+    """
+
+    if not file_path or not file_path.strip():
+        return _fail('文件路径不能为空', meta={"error_code": "MISSING_FILE_PATH"})
+
+    if not insert_expression or not insert_expression.strip():
+        return _fail('INSERT语句不能为空', meta={"error_code": "MISSING_QUERY"})
+
+    stripped = insert_expression.strip().upper()
+    if not stripped.startswith('INSERT'):
+        return _fail('只支持INSERT语句。查询请使用 excel_query', meta={"error_code": "UNSUPPORTED_SQL"})
+
+    try:
+        from .api.advanced_sql_query import execute_advanced_insert_query
+        return _wrap(execute_advanced_insert_query(
+            file_path=file_path,
+            sql=insert_expression,
+            dry_run=dry_run
+        ))
+    except ImportError:
+        return _fail('SQLGlot未安装，无法使用INSERT功能', meta={"error_code": "DEPENDENCY_MISSING"})
+    except Exception as e:
+        return _fail(f'INSERT执行失败: {str(e)}', meta={"error_code": "INSERT_EXECUTION_FAILED"})
+
+
+@mcp.tool()
+@_track_call
+def excel_delete_query(
+    file_path: str,
+    delete_expression: str,
+    dry_run: bool = False
+) -> Dict[str, Any]:
+    """SQL删除数据。必须指定WHERE条件。
+
+    示例::
+        DELETE FROM Raids WHERE Score < 8000
+        DELETE FROM Raids WHERE _ROW_NUMBER_ IN (3, 5, 7)
+
+    Args:
+        file_path: Excel文件路径
+        delete_expression: DELETE语句
+        dry_run: 是否仅预览不实际删除，默认为False
+    """
+
+    if not file_path or not file_path.strip():
+        return _fail('文件路径不能为空', meta={"error_code": "MISSING_FILE_PATH"})
+
+    if not delete_expression or not delete_expression.strip():
+        return _fail('DELETE语句不能为空', meta={"error_code": "MISSING_QUERY"})
+
+    stripped = delete_expression.strip().upper()
+    if not stripped.startswith('DELETE'):
+        return _fail('只支持DELETE语句。查询请使用 excel_query', meta={"error_code": "UNSUPPORTED_SQL"})
+
+    try:
+        from .api.advanced_sql_query import execute_advanced_delete_query
+        return _wrap(execute_advanced_delete_query(
+            file_path=file_path,
+            sql=delete_expression,
+            dry_run=dry_run
+        ))
+    except ImportError:
+        return _fail('SQLGlot未安装，无法使用DELETE功能', meta={"error_code": "DEPENDENCY_MISSING"})
+    except Exception as e:
+        return _fail(f'DELETE执行失败: {str(e)}', meta={"error_code": "DELETE_EXECUTION_FAILED"})
 
 
 @mcp.tool()

@@ -810,8 +810,8 @@ class ExcelWriter:
                 temp_workbook, temp_file_path = cached_workbook_data
                 logger.debug("使用缓存的工作簿进行计算")
             else:
-                # 创建新的临时工作簿
-                temp_workbook, temp_file_path = self._create_temp_workbook(context_sheet, cache)
+                # 创建新的临时工作簿（传入公式用于判断是否需要加载数据）
+                temp_workbook, temp_file_path = self._create_temp_workbook(context_sheet, cache, formula)
 
             try:
                 # 使用xlcalculator计算公式
@@ -897,27 +897,30 @@ class ExcelWriter:
     def _create_temp_workbook(
         self,
         context_sheet: Optional[str],
-        cache
+        cache,
+        formula: str = None
     ) -> tuple:
         """创建临时工作簿用于计算，检测并保留原始文件格式
 
         Args:
             context_sheet: 上下文工作表名称
             cache: 公式缓存对象
+            formula: 待计算的公式（用于判断是否需要加载原始数据）
 
         Returns:
             tuple: (temp_workbook, temp_file_path) 元组，包含临时工作簿和文件路径
         """
-        # 检测原始文件格式
-        file_format = self._detect_file_format()
+        # 检测公式是否包含单元格引用（字母+数字模式如A1, B2, SUM(A1:A10)）
+        # formula=None 表示直接调用（非evaluate_formula路径），默认需要加载数据
+        has_cell_ref = formula is None or bool(re.search(r'[A-Za-z]+\d+', formula or ''))
 
         # 创建临时工作簿进行计算
         temp_workbook = Workbook()
         temp_sheet = temp_workbook.active
         temp_sheet.title = "Calculation"
 
-        # 从原始工作簿复制数据到临时工作表（用于公式计算的上下文）
-        if self.file_path and os.path.exists(self.file_path):
+        # 只在公式包含单元格引用时才加载原始数据
+        if has_cell_ref and self.file_path and os.path.exists(self.file_path):
             try:
                 original_workbook = load_workbook(self.file_path, data_only=False, read_only=True)
 
@@ -926,25 +929,25 @@ class ExcelWriter:
                 else:
                     source_sheet = original_workbook.active
 
-                for row in source_sheet.iter_rows(
-                    max_row=min(source_sheet.max_row, 1000),
-                    max_col=min(source_sheet.max_column, 100)
+                # 使用values_only批量读取，避免逐cell访问
+                max_rows = min(source_sheet.max_row or 1000, 1000)
+                max_cols = min(source_sheet.max_column or 100, 100)
+                for row_idx, row_data in enumerate(
+                    source_sheet.iter_rows(
+                        max_row=max_rows, max_col=max_cols, values_only=True
+                    ), start=1
                 ):
-                    for cell in row:
-                        if cell.value is not None:
-                            target_cell = temp_sheet.cell(
-                                row=cell.row,
-                                column=cell.column
-                            )
-                            target_cell.value = cell.value
+                    for col_idx, value in enumerate(row_data, start=1):
+                        if value is not None:
+                            temp_sheet.cell(row=row_idx, column=col_idx, value=value)
 
                 original_workbook.close()
             except Exception as e:
                 logger.warning(f"无法加载原始工作簿，使用空工作簿: {e}")
         else:
-            logger.debug("没有文件路径或文件不存在，使用空工作簿进行计算")
+            logger.debug("无文件路径或公式不含单元格引用，使用空工作簿进行计算")
 
-        # 保存到临时文件（始终使用xlsx格式，不需要保留VBA宏）
+        # 保存到临时文件
         temp_file_path = TempFileManager.create_temp_excel_file(suffix='.xlsx')
         temp_workbook.save(temp_file_path)
 
@@ -973,10 +976,10 @@ class ExcelWriter:
 
         # 在临时单元格中设置要计算的公式
         temp_sheet = temp_workbook.active
-        calc_cell = temp_sheet['Z1']  # 使用Z1作为计算单元格
+        calc_cell = temp_sheet['Z1']
         calc_cell.value = f"={formula}"
 
-        # 保存更新后的工作簿
+        # 一次性保存（包含数据和公式）
         temp_workbook.save(temp_file_path)
 
         # 编译模型
