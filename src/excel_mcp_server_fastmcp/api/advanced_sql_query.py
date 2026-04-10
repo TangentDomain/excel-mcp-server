@@ -1992,9 +1992,10 @@ class AdvancedSQLQueryEngine:
         func_type = type(window_expr.this).__name__
 
         # 支持的窗口函数类型
-        supported_funcs = {'RowNumber', 'Rank', 'DenseRank'}
+        supported_funcs = {'RowNumber', 'Rank', 'DenseRank', 'Lag', 'Lead',
+                           'FirstValue', 'LastValue', 'Ntile', 'PercentRank', 'CumeDist'}
         if func_type not in supported_funcs:
-            raise ValueError(f"不支持的窗口函数: {func_type}。💡 支持的窗口函数: ROW_NUMBER, RANK, DENSE_RANK（均需配合 OVER(ORDER BY ...) 使用）")
+            raise ValueError(f"不支持的窗口函数: {func_type}。💡 支持的窗口函数: ROW_NUMBER, RANK, DENSE_RANK, LAG, LEAD, FIRST_VALUE, LAST_VALUE, NTILE, PERCENT_RANK, CUME_DIST")
 
         if select_alias_map is None:
             select_alias_map = {}
@@ -2031,11 +2032,21 @@ class AdvancedSQLQueryEngine:
             'RowNumber': self._compute_row_number,
             'Rank': self._compute_rank,
             'DenseRank': self._compute_dense_rank,
+            'Lag': self._compute_lag,
+            'Lead': self._compute_lead,
+            'FirstValue': self._compute_first_value,
+            'LastValue': self._compute_last_value,
+            'Ntile': self._compute_ntile,
+            'PercentRank': self._compute_percent_rank,
+            'CumeDist': self._compute_cume_dist,
         }
         handler = _window_dispatch.get(func_type)
         if handler:
+            # 需要额外参数的函数传入window_expr
+            if func_type in ('Lag', 'Lead', 'FirstValue', 'LastValue', 'Ntile'):
+                return handler(df, partition_cols, order_cols, ascending, window_expr)
             return handler(df, partition_cols, order_cols, ascending)
-        raise ValueError(f"不支持的窗口函数: {func_type}。💡 支持的窗口函数: ROW_NUMBER, RANK, DENSE_RANK（均需配合 OVER(ORDER BY ...) 使用）")
+        raise ValueError(f"不支持的窗口函数: {func_type}。💡 支持的窗口函数: ROW_NUMBER, RANK, DENSE_RANK, LAG, LEAD, FIRST_VALUE, LAST_VALUE, NTILE, PERCENT_RANK, CUME_DIST")
 
     def _resolve_window_column(self, col_name: str, df_columns: list,
                                 select_alias_map: Dict[str, str]) -> str:
@@ -2162,6 +2173,124 @@ class AdvancedSQLQueryEngine:
         else:
             result = assign_dense_rank(df)
 
+        return result
+
+    def _compute_lag(self, df: pd.DataFrame, partition_cols: list,
+                     order_cols: list, ascending: list, window_expr) -> pd.Series:
+        """LAG: 取分区内前N行的值"""
+        func = window_expr.this
+        col_name = func.this.name if hasattr(func.this, 'name') else str(func.this)
+        offset_expr = func.args.get('offset')
+        offset = int(offset_expr.this) if offset_expr else 1
+
+        sorted_df = df.sort_values(order_cols, ascending=ascending) if order_cols else df
+        if partition_cols:
+            result = sorted_df.groupby(partition_cols, sort=False)[col_name].shift(offset)
+            result = result.reindex(df.index)
+        else:
+            result = sorted_df[col_name].shift(offset).reindex(df.index)
+        return result
+
+    def _compute_lead(self, df: pd.DataFrame, partition_cols: list,
+                      order_cols: list, ascending: list, window_expr) -> pd.Series:
+        """LEAD: 取分区内后N行的值"""
+        func = window_expr.this
+        col_name = func.this.name if hasattr(func.this, 'name') else str(func.this)
+        offset_expr = func.args.get('offset')
+        offset = int(offset_expr.this) if offset_expr else 1
+
+        sorted_df = df.sort_values(order_cols, ascending=ascending) if order_cols else df
+        if partition_cols:
+            result = sorted_df.groupby(partition_cols, sort=False)[col_name].shift(-offset)
+            result = result.reindex(df.index)
+        else:
+            result = sorted_df[col_name].shift(-offset).reindex(df.index)
+        return result
+
+    def _compute_first_value(self, df: pd.DataFrame, partition_cols: list,
+                             order_cols: list, ascending: list, window_expr) -> pd.Series:
+        """FIRST_VALUE: 分区内按排序的第一个值"""
+        func = window_expr.this
+        col_name = func.this.name if hasattr(func.this, 'name') else str(func.this)
+
+        sorted_df = df.sort_values(order_cols, ascending=ascending) if order_cols else df
+        if partition_cols:
+            result = sorted_df.groupby(partition_cols, sort=False)[col_name].transform('first')
+            result = result.reindex(df.index)
+        else:
+            result = pd.Series(sorted_df[col_name].iloc[0], index=df.index)
+        return result
+
+    def _compute_last_value(self, df: pd.DataFrame, partition_cols: list,
+                            order_cols: list, ascending: list, window_expr) -> pd.Series:
+        """LAST_VALUE: 分区内按排序的最后一个值"""
+        func = window_expr.this
+        col_name = func.this.name if hasattr(func.this, 'name') else str(func.this)
+
+        sorted_df = df.sort_values(order_cols, ascending=ascending) if order_cols else df
+        if partition_cols:
+            result = sorted_df.groupby(partition_cols, sort=False)[col_name].transform('last')
+            result = result.reindex(df.index)
+        else:
+            result = pd.Series(sorted_df[col_name].iloc[-1], index=df.index)
+        return result
+
+    def _compute_ntile(self, df: pd.DataFrame, partition_cols: list,
+                       order_cols: list, ascending: list, window_expr) -> pd.Series:
+        """NTILE: 将分区内的行分为N个桶"""
+        func = window_expr.this
+        n_expr = func.this
+        num_buckets = int(n_expr.this) if hasattr(n_expr, 'this') else int(str(n_expr))
+
+        sorted_df = df.sort_values(order_cols, ascending=ascending) if order_cols else df
+        result = pd.Series(0, index=df.index, dtype=int)
+
+        if partition_cols:
+            for _, group in sorted_df.groupby(partition_cols, sort=False):
+                n = len(group)
+                for i, idx in enumerate(group.index):
+                    result[idx] = (i * num_buckets) // n + 1
+        else:
+            n = len(sorted_df)
+            for i, idx in enumerate(sorted_df.index):
+                result[idx] = (i * num_buckets) // n + 1
+        return result
+
+    def _compute_percent_rank(self, df: pd.DataFrame, partition_cols: list,
+                              order_cols: list, ascending: list) -> pd.Series:
+        """PERCENT_RANK: 百分比排名 (rank-1)/(n-1), 结果在0~1之间"""
+        if not order_cols:
+            raise ValueError("PERCENT_RANK() 窗口函数需要 ORDER BY 子句")
+
+        sorted_df = df.sort_values(order_cols, ascending=ascending) if order_cols else df
+        if partition_cols:
+            rank = sorted_df.groupby(partition_cols, sort=False)[order_cols[0]].rank(method='min', ascending=ascending[0])
+            counts = sorted_df.groupby(partition_cols, sort=False)[order_cols[0]].transform('count')
+            result = (rank - 1) / (counts - 1)
+            result = result.reindex(df.index).fillna(0.0)
+        else:
+            rank = sorted_df[order_cols[0]].rank(method='min', ascending=ascending[0])
+            n = len(sorted_df)
+            result = ((rank - 1) / (n - 1) if n > 1 else pd.Series(0.0, index=sorted_df.index))
+            result = result.reindex(df.index)
+        return result
+
+    def _compute_cume_dist(self, df: pd.DataFrame, partition_cols: list,
+                           order_cols: list, ascending: list) -> pd.Series:
+        """CUME_DIST: 累积分布, 值<=当前值的行数/总行数"""
+        if not order_cols:
+            raise ValueError("CUME_DIST() 窗口函数需要 ORDER BY 子句")
+
+        sorted_df = df.sort_values(order_cols, ascending=ascending) if order_cols else df
+        if partition_cols:
+            rank = sorted_df.groupby(partition_cols, sort=False)[order_cols[0]].rank(method='max', ascending=ascending[0])
+            counts = sorted_df.groupby(partition_cols, sort=False)[order_cols[0]].transform('count')
+            result = rank / counts
+            result = result.reindex(df.index)
+        else:
+            rank = sorted_df[order_cols[0]].rank(method='max', ascending=ascending[0])
+            n = len(sorted_df)
+            result = (rank / n).reindex(df.index)
         return result
 
     def _execute_query(
@@ -4110,6 +4239,11 @@ class AdvancedSQLQueryEngine:
                 col_name = self._extract_agg_column(expr.this, func_name.upper())
                 return self._AGG_OPS[func_name](grouped, col_name)
 
+        # GROUP_CONCAT: 分组拼接字符串
+        if func_name == 'groupconcat':
+            col_name = self._extract_agg_column(expr.this, "GROUP_CONCAT")
+            return grouped[col_name].agg(lambda x: ','.join(str(v) for v in x if pd.notna(v)))
+
         raise ValueError(f"不支持的聚合函数: {func_name}")
 
     def _is_expression(self, node) -> bool:
@@ -4695,6 +4829,20 @@ class AdvancedSQLQueryEngine:
             logger.warning(f"写入验证异常: {e}")
             return {'verified': True, 'unverified': []}  # 验证失败不阻塞
 
+    def _precompute_update_window_where(self, df: pd.DataFrame, where_expr,
+                                         window_nodes: list) -> pd.DataFrame:
+        """预处理UPDATE WHERE中的窗口函数，将计算结果存为临时列并替换AST节点"""
+        for i, win_node in enumerate(window_nodes):
+            temp_col = f'_wf_{i}'
+            try:
+                result = self._compute_window_function(win_node, df)
+                df[temp_col] = result
+                # 在WHERE表达式中替换Window节点为临时列引用
+                win_node.replace(exp.Column(this=exp.to_identifier(temp_col)))
+            except Exception as e:
+                raise ValueError(f"UPDATE WHERE中窗口函数计算失败: {e}")
+        return df
+
     def execute_update_query(
         self,
         file_path: str,
@@ -4830,9 +4978,17 @@ class AdvancedSQLQueryEngine:
             else:
                 return self._update_error(f'不支持的SET表达式: {set_item}')
 
-        # 应用WHERE条件筛选
+        # 应用WHERE条件筛选（支持窗口函数预处理）
         where_clause = parsed.args.get('where')
         if where_clause:
+            # 预处理: 检测WHERE中是否有窗口函数，如果有则先计算为临时列
+            where_expr = where_clause.this
+            window_nodes = list(where_expr.find_all(exp.Window))
+            if window_nodes:
+                df = self._precompute_update_window_where(df, where_expr, window_nodes)
+                # 重新解析WHERE（窗口函数已被替换为临时列引用）
+                where_clause = parsed.args.get('where')
+                where_expr = where_clause.this
             condition_str = self._sql_condition_to_pandas(where_clause.this, df)
             if condition_str:
                 try:

@@ -255,7 +255,7 @@ class TestWindowEdgeCases:
         from src.excel_mcp_server_fastmcp.api.advanced_sql_query import execute_advanced_sql_query
         result = execute_advanced_sql_query(
             game_config,
-            "SELECT skill_name, NTILE(3) OVER (ORDER BY damage DESC) as bucket FROM 技能配置"
+            "SELECT skill_name, NTH_VALUE(damage, 2) OVER (ORDER BY damage DESC) as val FROM 技能配置"
         )
         assert result['success'] is False
         assert '不支持' in result['message']
