@@ -458,6 +458,9 @@ class AdvancedSQLQueryEngine:
         if not SQLGLOT_AVAILABLE:
             raise ImportError("SQLGlot未安装,请运行: pip install sqlglot")
 
+        # 当前查询的文件路径(用于同文件JOIN时动态加载其他sheet)
+        self._current_file_path = None
+
     def clear_cache(self):
         """清除DataFrame缓存,释放内存
         
@@ -566,6 +569,9 @@ class AdvancedSQLQueryEngine:
 
             file_mtime = os.path.getmtime(file_path)
             
+            # 保存当前文件路径(用于同文件JOIN时动态加载其他sheet)
+            self._current_file_path = file_path
+
             # 加载Excel数据(带缓存)
             # 重置列名映射(每次查询重新构建)
             self._original_to_clean_cols = {}
@@ -3441,14 +3447,32 @@ class AdvancedSQLQueryEngine:
             self._table_aliases[right_alias] = right_table
             self._table_aliases[right_table] = right_table
 
+            # 检查右表是否存在,如果不存在尝试从同文件加载其他sheet
             if right_table not in worksheets_data:
-                available = list(worksheets_data.keys())
-                raise StructuredSQLError(
-                    "table_not_found",
-                    f"JOIN表 '{right_table}' 不存在.可用表: {available}",
-                    hint="请检查JOIN的表名,或用excel_list_sheets查看可用工作表名.",
-                    context={"table_requested": right_table, "available_tables": available}
-                )
+                # 尝试从同文件加载该sheet
+                if self._current_file_path and hasattr(self, '_load_excel_data'):
+                    try:
+                        # 加载指定sheet的数据
+                        additional_sheets = self._load_excel_data(self._current_file_path, right_table)
+                        if right_table in additional_sheets:
+                            # 将加载的sheet添加到worksheets_data
+                            worksheets_data[right_table] = additional_sheets[right_table]
+                            # 同时更新列名映射
+                            if not hasattr(self, '_additional_loaded_sheets'):
+                                self._additional_loaded_sheets = {}
+                            self._additional_loaded_sheets[right_table] = additional_sheets[right_table]
+                    except Exception:
+                        pass  # 加载失败,继续抛出原错误
+
+                # 再次检查,如果仍不存在则抛出错误
+                if right_table not in worksheets_data:
+                    available = list(worksheets_data.keys())
+                    raise StructuredSQLError(
+                        "table_not_found",
+                        f"JOIN表 '{right_table}' 不存在.可用表: {available}",
+                        hint="请检查JOIN的表名,或用excel_list_sheets查看可用工作表名.",
+                        context={"table_requested": right_table, "available_tables": available}
+                    )
 
             right_df = worksheets_data[right_table].copy()
 
@@ -5002,29 +5026,85 @@ class AdvancedSQLQueryEngine:
             # 其中 Concat 的 expressions=[col, sep]
             # GROUP_CONCAT(col SEPARATOR sep) -> GroupConcat(this=col, separator=sep)
             separator = ','
-            col_name = None
+            target_expr = None
             is_distinct = False
 
             # 检查是否为 DISTINCT
             if isinstance(expr.this, exp.Distinct):
                 is_distinct = True
-                target = expr.this.expressions[0]
+                target_expr = expr.this.expressions[0]
             else:
-                target = expr.this
+                target_expr = expr.this
 
             # 检查是否为 Concat 表达式（MySQL 方言对 GROUP_CONCAT(col, sep) 的解析）
-            if isinstance(target, exp.Concat):
-                concat_exprs = target.expressions
+            if isinstance(target_expr, exp.Concat):
+                concat_exprs = target_expr.expressions
                 if len(concat_exprs) >= 1:
-                    col_name = self._extract_agg_column(concat_exprs[0], "GROUP_CONCAT")
+                    target_expr = concat_exprs[0]
                 if len(concat_exprs) >= 2 and isinstance(concat_exprs[1], exp.Literal):
                     separator = concat_exprs[1].this
             else:
                 # 标准形式：GROUP_CONCAT(col SEPARATOR sep) 或 GROUP_CONCAT(col)
-                col_name = self._extract_agg_column(target, "GROUP_CONCAT")
                 sep_arg = expr.args.get('separator')
                 if sep_arg and isinstance(sep_arg, exp.Literal):
                     separator = sep_arg.this
+
+            # 处理目标表达式:支持简单列名和复杂表达式(CASE WHEN等)
+            # 对于简单列名,直接使用列名;对于复杂表达式,先计算表达式
+            if isinstance(target_expr, exp.Column):
+                # 简单列名
+                col_name = target_expr.name
+            else:
+                # 复杂表达式:先计算表达式,然后在原始df上添加临时列,再重新分组
+                # 注意:这里需要获取原始的df和分组列
+                if df is not None and not df.empty:
+                    # 创建临时列存储表达式结果
+                    temp_col = f"_groupconcat_expr_{id(target_expr)}"
+                    # 计算表达式(使用_apply_select_expressions中的逻辑)
+                    if isinstance(target_expr, exp.Case):
+                        # CASE WHEN 表达式
+                        expr_values = self._evaluate_case_expression(target_expr, df)
+                    elif isinstance(target_expr, exp.Coalesce):
+                        # COALESCE 表达式
+                        expr_values = self._evaluate_coalesce_vectorized(target_expr, df)
+                    elif self._is_mathematical_expression(target_expr):
+                        # 数学表达式
+                        expr_values = self._evaluate_math_expression(target_expr, df)
+                    elif self._is_string_function(target_expr):
+                        # 字符串函数
+                        expr_values = self._evaluate_string_function(target_expr, df)
+                    elif isinstance(target_expr, exp.Literal):
+                        # 字面量
+                        val = self._parse_literal_value(target_expr)
+                        expr_values = pd.Series([val] * len(df), index=df.index)
+                    else:
+                        # 尝试作为列名处理
+                        try:
+                            col_name = self._extract_agg_column(target_expr, "GROUP_CONCAT")
+                            expr_values = df[col_name]
+                        except ValueError:
+                            raise ValueError(f"GROUP_CONCAT 不支持的表达式类型: {type(target_expr)}")
+
+                    # 确保expr_values是Series
+                    if not isinstance(expr_values, pd.Series):
+                        expr_values = pd.Series(expr_values, index=df.index)
+
+                    # 将表达式值添加到df的副本中
+                    df[temp_col] = expr_values
+
+                    # 获取分组列名
+                    if hasattr(grouped, 'names'):
+                        group_cols = list(grouped.names)
+                    elif hasattr(grouped, 'keys'):
+                        group_cols = list(grouped.keys)
+                    else:
+                        raise ValueError("无法获取分组列名")
+
+                    # 重新分组,包含临时列
+                    grouped = df.groupby(group_cols, sort=False, dropna=False)
+                    col_name = temp_col  # 使用临时列名
+                else:
+                    raise ValueError("GROUP_CONCAT 表达式计算需要有效的DataFrame")
 
             # 执行拼接
             if is_distinct:

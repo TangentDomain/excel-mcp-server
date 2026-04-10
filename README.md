@@ -2,7 +2,7 @@
 
 # 🎮 ExcelMCP: 让游戏策划用嘴说话的Excel神器
 
-[![PyPI](https://img.shields.io/pypi/v/excel-mcp-server-fastmcp.svg)](https://pypi.org/project/excel-mcp-server-fastmcp/v1.8.9)
+[![PyPI](https://img.shields.io/pypi/v/excel-mcp-server-fastmcp.svg)](https://pypi.org/project/excel-mcp-server-fastmcp/v1.9.1)
 [![CI](https://github.com/TangentDomain/excel-mcp-server/actions/workflows/ci.yml/badge.svg)](https://github.com/TangentDomain/excel-mcp-server/actions/workflows/ci.yml)
 ![Tests](https://img.shields.io/badge/tests-968-brightgreen.svg)
 ![Tools](https://img.shields.io/badge/tools-52-green.svg)
@@ -16,7 +16,7 @@
 
 ---
 
-## 🚀 最新更新 (v1.8.9)
+## 🚀 最新更新 (v1.9.1)
 
 ### ⚡ 性能大升级
 - **整体性能提升 10.3x**：核心查询路径全面优化，大数据量场景响应速度质的飞跃
