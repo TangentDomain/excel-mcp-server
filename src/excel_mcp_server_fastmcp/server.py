@@ -551,12 +551,11 @@ SQL插入数据？            → excel_insert_query (SQL INSERT, 支持dry_run)
 SQL删除数据？            → excel_delete_query (SQL DELETE, 必须WHERE)
 写入指定单元格范围？      → excel_update_range (二维数组写入)
 按ID合并导入配置？        → excel_upsert_row (存在更新/不存在插入)
-批量导入多行数据？        → excel_batch_insert_rows
+批量导入多行数据？        → excel_insert_query (SQL INSERT, 支持dry_run)
 创建配置表变体？          → excel_copy_sheet (复制工作表)
 按ID对比两表差异？        → excel_compare_sheets (对象级: 新增/删除/修改)
 逐单元格对比差异？        → excel_compare_files (单元格级)
 格式调整？                → excel_format_cells (preset: highlight/warning/success)
-数据修改影响评估？        → excel_assess_data_impact (修改前的安全网)
 ```
 
 ## ✅ SQL已支持功能
@@ -2216,75 +2215,19 @@ def excel_describe_table(
     file_path: str,
     sheet_name: str = None
 ) -> Dict[str, Any]:
-    """
-📋 表结构分析器 - 数据探索的必备第一步
+    """分析Excel工作表结构：列名、数据类型、空值统计、样本数据。
 
-**核心功能**: 快速分析Excel工作表结构，返回列名、数据类型、空值统计等元信息。在进行任何数据操作前，务必先调用此工具了解表结构，避免列名错误和操作失败。
-
-**🎮 游戏开发场景**:
-• **表结构扫描**: 快速了解技能表、装备表、怪物表的字段构成和数据类型
-• **数据质量检查**: 检查关键字段（如ID、名称）是否完整，是否存在空值异常
-• **配置验证**: 确认配置表包含预期字段，字段类型是否正确
-• **开发调试**: 在开发过程中快速检查数据结构是否符合预期
-• **RPG配置**: 检查技能表的skill_id、skill_name、damage、cooldown等字段类型完整性
-• **装备系统**: 验证装备表的稀有度字段是否为枚举类型，属性字段是否为数值类型
-• **数值平衡**: 检查怪物表的血量、攻击、防御等关键数值字段是否存在异常值
-• **任务系统**: 确认任务表的接取条件、完成条件、奖励字段格式正确
-• **经济系统**: 验证物价表的价格字段为数值型，商店折扣字段为百分比格式
-
-**🔍 返回关键信息**:
-• **columns**: 所有列名及对应的数据类型（number/text/date/mixed）
-• **total_rows**: 总行数（包含标题行）
-• **non_null_counts**: 每列的非空值数量，用于数据完整性检查
-• **sample_data**: 每列前3个实际值，直观了解数据内容
-• **header_mode**: single（单行表头）或 dual（双行表头中英映射）
-
-**🔧 参数说明**:
-• **file_path**: Excel文件路径（支持相对路径）
-• **sheet_name**: 工作表名称（可选，不传则分析第一个工作表）
-
-**💡 实用技巧**:
-• **操作前必调**: 任何数据操作前先describe，了解表结构和数据类型
-• **空值检查**: 关注non_null_counts，空值率高的列可能是数据质量问题
-• **双行表头**: 自动识别中文描述+英文字段名，返回完整映射关系
-• **性能友好**: 比get_range读取全部数据更轻量，适合初步了解表结构
-
-**🔍 专业数据分析**:
-• **数据类型验证**: 检查数值字段是否为number，文本字段是否为text，日期字段格式正确
-• **数据完整性**: 计算completeness_rate，关键字段如ID、名称应达到100%完整性
-• **异常值检测**: 检查数值字段的最大值、最小值是否在合理范围内
-• **字段冗余**: 分析是否有重复含义的字段，可以合并删除
-• **数据一致性**: 检查相关文件间的字段命名约定是否一致
-
-**⚡ 性能优化**:
-• **抽样分析**: 默认只读取前3行样本数据，快速了解表结构
-• **延迟加载**: 大文件时使用read_only模式，避免内存溢出
-• **缓存利用**: 重复调用时利用内部缓存，第二次调用速度提升50%
-• **智能识别**: 自动检测双行表头，无需手动指定header_mode
-
-**🎯 最佳实践**:
-• **配置审查**: `describe` → `query` → 验证配置完整性 → 生成质量报告
-• **迁移验证**: 迁移前后各调用一次describe，验证结构一致性
-• **监控指标**: 定期调用describe监控数据质量变化趋势
-• **异常预警**: 设置字段完整性阈值，低于阈值时触发警报
-
-**📊 返回信息**:
-• **columns**: 列信息列表{name、type、sample_values}
-• **table_stats**: 表统计{total_rows、header_mode、dual_header_detected}
-• **data_quality**: 数据质量分析{null_counts、completeness_rates}
-• **file_path**: 源文件路径
-• **success**: 操作是否成功
-• **message**: 状态消息或错误信息
-
-**🔗 配合使用**:
-• **后续查询**: `excel_query`基于此表结构进行数据检索
-• **修改操作**: `excel_update_query`根据类型进行安全修改
-• **版本对比**: `excel_compare_sheets`对比不同版本的结构变化
-• **数据评估**: `excel_assess_data_impact`修改前结合describe评估影响
+    任何数据操作前应先调用此工具了解表结构，避免列名错误。
+    自动识别双行表头（中文描述+英文字段名）。
 
     Args:
         file_path: Excel文件路径
         sheet_name: 工作表名称，默认为None表示第一个工作表
+
+    Returns:
+        columns: 列信息列表 {name, type, sample_values}
+        table_stats: 表统计 {total_rows, header_mode}
+        data_quality: 数据质量 {null_counts, completeness_rates}
     """
     # 文件验证和加载
     if not file_path or not file_path.strip():
