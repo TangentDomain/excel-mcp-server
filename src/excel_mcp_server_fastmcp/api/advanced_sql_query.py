@@ -3165,6 +3165,9 @@ class AdvancedSQLQueryEngine:
                 raise ValueError(f"列 '{qualified or col_name}' 不存在")
         elif isinstance(expr, exp.Literal):
             return self._expression_to_value(expr, df)
+        elif isinstance(expr, exp.Boolean):
+            # SQL布尔字面量(TRUE/FALSE) → int(1/0)，与Excel存储格式一致
+            return int(expr.this)
         elif isinstance(expr, exp.Coalesce):
             # COALESCE在数学表达式中(向量化)
             return self._evaluate_coalesce_vectorized(expr, df)
@@ -3313,6 +3316,9 @@ class AdvancedSQLQueryEngine:
             if anon_name in df.columns:
                 return df[anon_name]
             raise ValueError(f"列 '{full_name}' 不存在。可用列: {list(df.columns)}")
+        elif isinstance(expr, exp.Boolean):
+            # SQL布尔字面量(TRUE/FALSE) → int(1/0)
+            return int(expr.this)
         else:
             raise ValueError(
                 f"不支持的表达式类型: {type(expr).__name__}。"
@@ -4242,6 +4248,10 @@ class AdvancedSQLQueryEngine:
                 suggestion = self._suggest_column_name(col_name, list(df.columns))
                 raise ValueError(f"列 '{col_name}' 不存在.可用列: {list(df.columns)}.{suggestion}")
             return f"`{col_name}`"
+
+        elif isinstance(expr, exp.Boolean):
+            # SQL布尔字面量(TRUE/FALSE) → int(1/0)，与Excel整数存储比较兼容
+            return int(expr.this)
 
         elif isinstance(expr, exp.AggFunc):
             # 聚合函数作为值的处理(HAVING子句中)
@@ -6485,6 +6495,10 @@ class AdvancedSQLQueryEngine:
         """
         if isinstance(expr, exp.Literal):
             return self._parse_literal_value(expr)
+
+        elif isinstance(expr, exp.Boolean):
+            # SQL布尔字面量(TRUE/FALSE) → int(1/0)
+            return int(expr.this)
 
         elif isinstance(expr, exp.Column):
             col_name = expr.name
