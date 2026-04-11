@@ -526,7 +526,7 @@ if _cleaned:
 # 创建FastMCP服务器实例，开启调试模式和详细日志
 mcp = FastMCP(
     name="excel-mcp",
-    instructions=r"""🎮 游戏开发Excel配置表管理专家 — 52个工具
+    instructions=r"""🎮 游戏开发Excel配置表管理专家 — 34个工具
 
 ## 🔥 核心原则：SQL优先
 
@@ -926,6 +926,9 @@ def excel_search_directory(
         file_pattern=None, max_files=max_files))
 
 
+@mcp.tool()
+@_validate_file_path()
+@_track_call
 def excel_get_range(
     file_path: str,
     range: Optional[str] = None,
@@ -1495,40 +1498,7 @@ def excel_import_from_csv(
     return _wrap(ExcelOperations.import_from_csv(csv_path, output_path, sheet_name, encoding, has_header))
 
 
-@mcp.tool()
-@_validate_file_path(['input_path', 'output_path'])
-@_track_call
-def excel_convert_format(
-    input_path: str,
-    output_path: str,
-    target_format: str = "xlsx"
-) -> Dict[str, Any]:
-    """Excel/CSV/JSON格式互转。
 
-    Args:
-        input_path: 输入文件路径
-        output_path: 输出文件路径
-        target_format: 目标格式，默认为"xlsx"
-    """
-    for _p in [input_path, output_path]:
-        _err = _validate_path(_p)
-        if _err:
-            return _err
-
-    return _wrap(ExcelOperations.convert_format(input_path, output_path, target_format))
-
-
-
-@mcp.tool()
-@_validate_file_path()
-@_track_call
-def excel_get_file_info(file_path: str) -> Dict[str, Any]:
-    """获取文件元数据：大小、工作表数、行列范围等。
-
-    Args:
-        file_path: Excel文件路径
-    """
-    return _wrap(ExcelOperations.get_file_info(file_path))
 
 
 @mcp.tool()
@@ -1676,85 +1646,6 @@ def excel_upsert_row(
 
 @mcp.tool()
 @_track_call
-def excel_batch_insert_rows(
-    file_path: str,
-    sheet_name: str,
-    data: List[Dict[str, Any]],
-    header_row: int = 1,
-    streaming: bool = True,
-    insert_position: str = None,
-    condition: str = None
-) -> Dict[str, Any]:
-    """批量插入多行数据。data为字典列表，header_row指定表头行号。
-
-    Args:
-        file_path: Excel文件路径
-        sheet_name: 工作表名称
-        data: 要插入的数据字典列表
-        header_row: 表头行号，默认为1
-        streaming: 是否使用流式写入，默认为True
-        insert_position: 插入位置行号，默认为None
-        condition: 条件表达式，默认为None
-    """
-
-    # 确定插入位置
-    target_row = None
-
-    if condition is not None:
-        # 条件定位：找到第一个匹配条件的行号
-        try:
-            import pandas as pd
-            df = pd.read_excel(file_path, sheet_name=sheet_name, engine='calamine', keep_default_na=False)
-            try:
-                filtered = df.query(condition)
-            except Exception:
-                # 降级：用SQL引擎
-                sql = f"SELECT * FROM {sheet_name} WHERE {condition} LIMIT 1"
-                query_result = _ensure_dict(ExcelOperations.query(file_path, sql))
-                if query_result.get('success', False):
-                    qdata = query_result.get('data', [])
-                    if isinstance(qdata, list) and len(qdata) > 1:
-                        # 匹配第一行获取行号
-                        sql_headers = qdata[0]
-                        sql_row = qdata[1]
-                        if isinstance(sql_row, (list, tuple)):
-                            row_dict = dict(zip(sql_headers, sql_row))
-                            col_names = list(df.columns)
-                            for row_tuple in df.itertuples(index=True, name=None):
-                                idx = row_tuple[0]
-                                row_vals = dict(zip(col_names, row_tuple[1:]))
-                                match = True
-                                for col, val in row_dict.items():
-                                    if col in col_names and str(row_vals.get(col, '')) != str(val):
-                                        match = False
-                                        break
-                                if match:
-                                    target_row = idx + 2  # 1-based + header
-                                    break
-            else:
-                if len(filtered) > 0:
-                    target_row = filtered.index[0] + 2  # 1-based + header
-        except Exception as e:
-            logger.warning(f"条件定位查询失败: {e}，将使用默认追加模式")
-
-    elif insert_position is not None:
-        try:
-            target_row = int(insert_position)
-        except (ValueError, TypeError):
-            return _fail(f"insert_position必须是整数: {insert_position}",
-                         meta={"error_code": "INVALID_INSERT_POSITION"})
-
-    if target_row is not None:
-        # 指定位置插入模式
-        try:
-            result = ExcelOperations.batch_insert_rows_at(file_path, sheet_name, data, target_row, header_row, streaming)
-            return _wrap(result)
-        except Exception as e:
-            return _fail(f"指定位置插入失败: {str(e)}", meta={"error_code": "INSERT_AT_FAILED"})
-
-    return _wrap(ExcelOperations.batch_insert_rows(file_path, sheet_name, data, header_row, streaming))
-
-
 @mcp.tool()
 @_track_call
 def excel_delete_rows(
@@ -2001,23 +1892,6 @@ def excel_set_formula(
         return _fail(f'🔒 安全验证失败: {_formula_err["error"]}', meta={"error_code": "FORMULA_SECURITY_FAILED"})
     return _wrap(ExcelOperations.set_formula(file_path, sheet_name, cell_address, formula))
 
-@mcp.tool()
-@_track_call
-def excel_evaluate_formula(
-    formula: str,
-    context_sheet: Optional[str] = None
-) -> Dict[str, Any]:
-    """临时计算公式结果，不修改文件。
-
-    Args:
-        formula: Excel公式
-        context_sheet: 上下文工作表名称，默认为None
-    """
-    _formula_err = SecurityValidator.validate_formula(formula)
-    if not _formula_err['valid']:
-        return _fail(f'🔒 安全验证失败: {_formula_err["error"]}', meta={"error_code": "FORMULA_SECURITY_FAILED"})
-    return _wrap(ExcelOperations.evaluate_formula(formula, context_sheet))
-
 
 @mcp.tool()
 @_track_call
@@ -2205,40 +2079,6 @@ def excel_delete_query(
         return _fail(f'DELETE执行失败: {str(e)}', meta={"error_code": "DELETE_EXECUTION_FAILED"})
 
 
-@mcp.tool()
-@_track_call
-def _detect_dual_header(rows) -> tuple:
-    """
-    检测双行表头模式
-    
-    Args:
-        rows: 工作表前几行数据
-        
-    Returns:
-        tuple: (is_dual_header, header_row_idx, descriptions)
-    """
-    is_dual_header = False
-    header_row_idx = 0
-    descriptions = None
-    
-    if len(rows) >= 2:
-        second_row = rows[1]
-        if second_row and len(second_row) >= 3:
-            all_valid = all(
-                isinstance(c, str) and c.strip().startswith(tuple('abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ_'))
-                for c in second_row if c is not None
-            )
-            first_row = rows[0]
-            any_chinese = any(
-                isinstance(c, str) and any('\u4e00' <= ch <= '\u9fff' for ch in c)
-                for c in first_row if c is not None
-            )
-            if all_valid and any_chinese:
-                is_dual_header = True
-                header_row_idx = 1
-                descriptions = first_row
-    
-    return is_dual_header, header_row_idx, descriptions
 
 def _collect_column_statistics(ws, data_start, num_cols, col_name_list):
     """
@@ -2568,30 +2408,6 @@ def excel_format_cells(
     return _wrap(result)
 
 
-@mcp.tool()
-@_validate_file_path()
-@_track_call
-def excel_merge_cells(file_path: str, sheet_name: str, range: str) -> Dict[str, Any]:
-    """合并单元格。（建议用 format_cells 的 formatting={"merge": True}）"""
-    return excel_format_cells(file_path, sheet_name, range, formatting={"merge": True})
-
-
-@mcp.tool()
-@_validate_file_path()
-@_track_call
-def excel_unmerge_cells(file_path: str, sheet_name: str, range: str) -> Dict[str, Any]:
-    """取消合并。（建议用 format_cells 的 formatting={"unmerge": True}）"""
-    return excel_format_cells(file_path, sheet_name, range, formatting={"unmerge": True})
-
-
-@mcp.tool()
-@_validate_file_path()
-@_track_call
-def excel_set_borders(file_path: str, sheet_name: str, range: str,
-                      border_style: str = "thin") -> Dict[str, Any]:
-    """设置边框。（建议用 format_cells 的 formatting={"border_style": "thin"}）"""
-    return excel_format_cells(file_path, sheet_name, range, formatting={"border_style": border_style})
-
 
 @mcp.tool()
 @_validate_file_path()
@@ -2641,24 +2457,6 @@ def excel_compare_files(
     return _wrap(ExcelOperations.compare_files(file1_path, file2_path))
 
 
-@mcp.tool()
-@_track_call
-def excel_check_duplicate_ids(
-    file_path: str,
-    sheet_name: str,
-    id_column: Union[int, str] = 1,
-    header_row: int = 1
-) -> Dict[str, Any]:
-    """扫描ID列，返回重复值及所在行号。
-
-    Args:
-        file_path: Excel文件路径
-        sheet_name: 工作表名称
-        id_column: ID列名或列索引，默认为1
-        header_row: 表头行号，默认为1
-    """
-    return _wrap(ExcelOperations.check_duplicate_ids(file_path, sheet_name, id_column, header_row))
-
 
 @mcp.tool()
 @_track_call
@@ -2687,109 +2485,6 @@ def excel_compare_sheets(
     return _wrap(ExcelOperations.compare_sheets(file1_path, sheet1_name, file2_path, sheet2_name, id_column, header_row))
 
 
-@mcp.tool()
-@_track_call
-
-
-@mcp.tool()
-@_track_call
-def excel_merge_multiple_files(source_files: List[str], target_file: str, merge_mode: str = "append") -> Dict[str, Any]:
-    """合并多个文件。merge_mode: append(纵向追加) | sheets(分表合并)。
-
-    Args:
-        source_files: 源文件路径列表
-        target_file: 目标文件路径
-        merge_mode: 合并模式，默认为"append"
-    """
-    # 路径遍历安全验证
-    for _f in source_files:
-        _err = _validate_path(_f)
-        if _err:
-            return _err
-    _err = _validate_path(target_file)
-    if _err:
-        return _err
-    try:
-        from openpyxl import load_workbook, Workbook
-        import os
-        
-        merged_sheets = {}
-        total_rows = 0
-        conflict_count = 0
-        
-        # 确保目标目录存在
-        os.makedirs(os.path.dirname(target_file), exist_ok=True)
-        
-        # 加载目标文件或创建新文件
-        if os.path.exists(target_file):
-            target_wb = load_workbook(target_file)
-        else:
-            target_wb = Workbook()
-            # 删除默认创建的工作表
-            default_sheet = target_wb.active
-            target_wb.remove(default_sheet)
-        
-        for source_file in source_files:
-            if not os.path.exists(source_file):
-                continue
-                
-            try:
-                source_wb = load_workbook(source_file)
-                
-                for sheet_name in source_wb.sheetnames:
-                    source_ws = source_wb[sheet_name]
-                    
-                    if sheet_name in target_wb.sheetnames:
-                        # 工作表已存在，处理冲突
-                        target_ws = target_wb[sheet_name]
-                        
-                        if merge_mode == "overwrite":
-                            # 覆盖模式：清空目标工作表并复制数据
-                            target_ws.delete_rows(1, target_ws.max_row)
-                            for row in source_ws.iter_rows(values_only=True):
-                                target_ws.append(row)
-                        elif merge_mode == "merge":
-                            # 合并模式：追加新行（跳过表头）
-                            start_row = 1 if source_ws.max_row > 1 else 0
-                            for row in source_ws.iter_rows(values_only=True, min_row=start_row+1):
-                                target_ws.append(row)
-                        else:
-                            # 追加模式：直接追加
-                            for row in source_ws.iter_rows(values_only=True):
-                                target_ws.append(row)
-                    else:
-                        # 工作表不存在，直接复制
-                        if sheet_name not in merged_sheets:
-                            merged_sheets[sheet_name] = []
-                        
-                        new_ws = target_wb.create_sheet(title=sheet_name)
-                        for row in source_ws.iter_rows(values_only=True):
-                            new_ws.append(row)
-                    
-                    # 统计数据
-                    if sheet_name not in merged_sheets:
-                        merged_sheets[sheet_name] = []
-                    merged_sheets[sheet_name].append(source_file)
-                    total_rows += source_ws.max_row
-                    
-            except Exception as e:
-                print(f"处理文件{source_file}时出错: {e}")
-                continue
-        
-        # 保存目标文件
-        target_wb.save(target_file)
-        
-        return _ok(f"文件合并完成：处理{len(source_files)}个源文件，生成{len(merged_sheets)}个工作表", data={
-            'source_files_count': len(source_files),
-            'merged_sheets_count': len(merged_sheets),
-            'total_rows': total_rows,
-            'merged_sheets': list(merged_sheets.keys()),
-            'merge_mode': merge_mode,
-            'target_file': target_file
-        })
-        
-    except Exception as e:
-        return _fail("文件合并失败", meta={"error_code": "OPERATION_FAILED"})
 
 
 # ==================== 数据验证工具 ====================
@@ -2859,452 +2554,16 @@ def _parse_validation_values(validation_type: str, parts: list):
 @mcp.tool()
 @_validate_file_path()
 @_track_call
-def excel_set_data_validation(file_path: str, sheet_name: str, range_address: str,
-                            validation_type: str, criteria: str,
-                            input_title: str = "", input_message: str = "") -> Dict[str, Any]:
-    """设置数据验证规则。
-
-    支持的验证类型:
-        - list: 下拉列表验证（criteria 为列表源，如 "A1:A10" 或 "选项1,选项2,选项3"）
-        - whole_number: 整数验证（criteria 格式: "操作符,值1,值2"，如 "between,1,100"）
-        - decimal: 小数验证（同上格式）
-        - date: 日期验证（值格式: YYYY-MM-DD）
-        - text_length: 文本长度验证
-        - custom: 自定义公式验证（criteria 为公式表达式）
-
-    操作符: between/notBetween/equal/notEqual/greaterThan/lessThan/greaterThanOrEqual/lessThanOrEqual
-
-    Args:
-        file_path: Excel文件路径
-        sheet_name: 工作表名称
-        range_address: 单元格范围（如 "A1:C10"）
-        validation_type: 验证类型
-        criteria: 验证条件（见上方说明）
-        input_title: 输入提示标题
-        input_message: 输入提示内容
-    """
-    from openpyxl.worksheet.datavalidation import DataValidation
-
-    wb = None
-    try:
-        # 参数校验
-        for param_name, param_val, hint in [
-            ("sheet_name", sheet_name, '工作表名称，如 "Sheet1"'),
-            ("range_address", range_address, '单元格范围，如 "A1:C10"'),
-            ("validation_type", validation_type, "list/whole_number/decimal/date/text_length/custom"),
-        ]:
-            if not param_val or not param_val.strip():
-                return _fail(
-                    f'缺少必需参数 {param_name}（{hint}）。',
-                    meta={"error_code": "MISSING_REQUIRED_PARAM", "param": param_name})
-
-        supported_types = ['list', 'whole_number', 'decimal', 'date', 'text_length', 'custom']
-        if validation_type not in supported_types:
-            return _fail(f"不支持的验证类型: {validation_type}，支持的类型: {','.join(supported_types)}",
-                        meta={"error_code": "VALIDATION_FAILED"})
-
-        wb, ws = ExcelValidator.get_workbook_and_sheet(file_path, sheet_name)
-        openpyxl_type = _TYPE_MAPPING.get(validation_type, validation_type)
-        dv_kwargs = {'type': openpyxl_type}
-
-        # 根据验证类型构建参数
-        if validation_type == 'list':
-            if not criteria or not criteria.strip():
-                return _fail("列表验证必须提供 criteria（列表源）", meta={"error_code": "VALIDATION_FAILED"})
-            dv_kwargs.update(formula1=criteria, showDropDown=True, allow_blank=True)
-
-        elif validation_type == 'custom':
-            if not criteria or not criteria.strip():
-                return _fail("自定义验证必须提供 criteria（公式表达式）", meta={"error_code": "VALIDATION_FAILED"})
-            dv_kwargs.update(formula1=criteria, allow_blank=True)
-
-        else:  # whole_number / decimal / date / text_length
-            if not criteria or not criteria.strip():
-                return _fail(f"{validation_type} 验证必须提供 criteria（格式: '操作符,值1,值2'）",
-                            meta={"error_code": "VALIDATION_FAILED"})
-            try:
-                parts = [p.strip() for p in criteria.split(',')]
-                if len(parts) < 2:
-                    raise ValueError(f"格式错误，应为 '操作符,值1,值2'")
-                operator, v1, v2 = _parse_validation_values(validation_type, parts)
-                dv_kwargs.update(operator=operator, formula1=v1, allow_blank=True)
-                if v2:
-                    dv_kwargs['formula2'] = v2
-            except ValueError as e:
-                err = str(e)
-                if "值类型转换失败" in err:
-                    return _fail(err, meta={"error_code": "VALIDATION_FAILED"})
-                return _fail(f"验证条件格式错误: {err}", meta={"error_code": "VALIDATION_FAILED"})
-
-        # 创建 DataValidation 对象
-        dv = DataValidation(**dv_kwargs)
-
-        # 错误提示（查表驱动）
-        dv.showErrorMessage = True
-        err_title, err_msg = _VALIDATION_ERROR_MESSAGES.get(validation_type, ('输入错误', '请输入有效值'))
-        dv.errorTitle, dv.error = err_title, err_msg
-
-        # 输入提示
-        if input_title or input_message:
-            dv.showInputMessage = True
-            dv.promptTitle, dv.prompt = input_title, input_message
-
-        # 应用并保存
-        dv.add(range_address)
-        ws.add_data_validation(dv)
-        wb.save(file_path)
-
-        return _ok("数据验证设置成功", data={
-            'validation_type': validation_type,
-            'criteria': criteria,
-            'range_address': range_address,
-            'sheet_name': sheet_name,
-            'input_title': input_title,
-            'input_message': input_message,
-            'validation_count': len(ws.data_validations),
-        })
-
-    except Exception as e:
-        error_msg = str(e)
-        is_dv_error = "DataValidationError" in error_msg or "data validation" in error_msg.lower()
-        code = "VALIDATION_RULE_ERROR" if is_dv_error else "OPERATION_FAILED"
-        return _fail(f"数据验证{'规则错误' if is_dv_error else '设置失败'}: {error_msg}",
-                    meta={"error_code": code})
-    finally:
-        if wb is not None:
-            wb.close()
-
-
 @mcp.tool()
 @_validate_file_path()
 @_track_call
-def excel_clear_validation(file_path: str, sheet_name: str = None, range_address: str = None) -> Dict[str, Any]:
-    """清除数据验证规则。
-
-    Args:
-        file_path: Excel文件路径
-        sheet_name: 工作表名称，默认为None
-        range_address: 单元格范围，默认为None
-    """
-    wb = None
-    try:
-        from openpyxl import load_workbook
-        
-        wb = load_workbook(file_path)
-        cleared_count = 0
-        
-        sheets_to_clear = [sheet_name] if sheet_name else wb.sheetnames
-        
-        for sheet in sheets_to_clear:
-            if sheet not in wb.sheetnames:
-                continue
-                
-            ws = wb[sheet]
-            
-            # 获取当前的数据验证
-            data_validations = ws.data_validations
-            
-            if range_address:
-                # 清除指定范围的验证
-                dv_to_remove = []
-                for dv in list(ws.data_validations.dataValidation):
-                    dv_range = str(dv.sqref) if dv.sqref else ""
-                    if range_address in dv_range or dv_range in range_address:
-                        dv_to_remove.append(dv)
-                
-                for dv in dv_to_remove:
-                    ws.data_validations.dataValidation.remove(dv)
-                    cleared_count += 1
-            else:
-                # 清除整个工作表的验证
-                cleared_count += ws.data_validations.count
-                ws.data_validations.dataValidation.clear()
-        
-        # 保存文件
-        wb.save(file_path)
-        
-        return _ok(f"数据验证清除完成：共清除{cleared_count}个验证规则", data={
-            'cleared_count': cleared_count,
-            'sheets_processed': len(sheets_to_clear),
-            'file_path': file_path,
-            'validation_cleared': True
-        })
-        
-    except Exception as e:
-        return _fail("数据验证清除失败", meta={"error_code": "OPERATION_FAILED"})
-    finally:
-        if wb is not None:
-            wb.close()
-
-
 # ==================== 条件格式工具 ====================
 @mcp.tool()
 @_validate_file_path()
 @_track_call
-def excel_add_conditional_format(file_path: str, sheet_name: str, range_address: str,
-                                format_type: str, criteria: str, format_style: str = "lightRed") -> Dict[str, Any]:
-    """添加条件格式规则。支持高亮/数据条/色阶/图标集。
-
-    Args:
-        file_path: Excel文件路径
-        sheet_name: 工作表名称
-        range_address: 单元格范围
-        format_type: 格式类型，支持 cellValue(单元格值)、formula(公式)、highlight(高亮整个范围)
-        criteria: 条件表达式（highlight类型可忽略或设为任意值）
-        format_style: 格式样式，默认为"lightRed"
-    """
-    try:
-        from openpyxl import load_workbook, styles
-        from openpyxl.formatting.rule import CellIsRule, FormulaRule
-
-        wb, ws = ExcelValidator.get_workbook_and_sheet(file_path, sheet_name)
-        
-        # 创建格式样式
-        style_map = {
-            "lightRed": "FFCCCC",
-            "lightGreen": "CCFFCC", 
-            "lightYellow": "FFFFCC",
-            "lightTurquoise": "CCFFFF"
-        }
-        
-        if format_style not in style_map:
-            return _fail("不支持的格式样式", meta={"error_code": "INVALID_PARAMETER", "hint": f"支持的样式: {list(style_map.keys())}"})
-        
-        fill = styles.PatternFill(start_color=style_map[format_style], 
-                                end_color=style_map[format_style], 
-                                fill_type="solid")
-        
-        # 创建条件格式规则
-        if format_type == "cellValue":
-            rule = CellIsRule(operator="greaterThanOrEqual", formula=[criteria], stopIfTrue=True)
-        elif format_type == "formula":
-            rule = FormulaRule(formula=[criteria], stopIfTrue=True)
-        elif format_type == "highlight":
-            rule = FormulaRule(formula=["TRUE"], stopIfTrue=True)
-        else:
-            return _fail("不支持的格式类型", meta={"error_code": "INVALID_PARAMETER", "hint": "支持的类型: cellValue, formula, highlight"})
-        
-        # 添加格式
-        rule.fill = fill
-        ws.conditional_formatting.add(range_address, rule)
-        
-        # 保存文件
-        wb.save(file_path)
-        
-        return _ok("条件格式添加成功", data={
-            'format_type': format_type,
-            'criteria': criteria,
-            'range_address': range_address,
-            'format_style': format_style,
-            'sheet_name': sheet_name,
-            'rule_applied': True
-        })
-
-    except DataValidationError as e:
-        return _fail(e.message, meta={"error_code": "SHEET_NOT_FOUND", "hint": e.hint, "suggested_fix": e.suggested_fix})
-    except Exception as e:
-        return _fail("条件格式添加失败", meta={"error_code": "OPERATION_FAILED"})
-
-
 @mcp.tool()
-@_validate_file_path()
-@_track_call
-def excel_clear_conditional_format(file_path: str, sheet_name: str = None, range_address: str = None) -> Dict[str, Any]:
-    """清除条件格式。
-
-    Args:
-        file_path: Excel文件路径
-        sheet_name: 工作表名称，默认为None
-        range_address: 单元格范围，默认为None
-    """
-    try:
-        from openpyxl import load_workbook
-        
-        wb = load_workbook(file_path)
-        cleared_count = 0
-        
-        sheets_to_clear = [sheet_name] if sheet_name else wb.sheetnames
-        
-        for sheet in sheets_to_clear:
-            if sheet not in wb.sheetnames:
-                continue
-                
-            ws = wb[sheet]
-            
-            # 获取当前的条件格式
-            conditional_formats = ws.conditional_formatting
-            
-            if range_address:
-                # 清除指定范围的条件格式
-                cf_to_remove = []
-                for cf_key in list(ws.conditional_formatting._cf_rules):
-                    cf_range = str(cf_key)
-                    if range_address in cf_range:
-                        cf_to_remove.append(cf_key)
-                
-                for cf_key in cf_to_remove:
-                    del ws.conditional_formatting._cf_rules[cf_key]
-                    cleared_count += 1
-            else:
-                # 清除整个工作表的条件格式
-                cleared_count += len(ws.conditional_formatting._cf_rules)
-                ws.conditional_formatting._cf_rules.clear()
-                ws.conditional_formatting.max_priority = 0
-        
-        # 保存文件
-        wb.save(file_path)
-        
-        return _ok(f"条件格式清除完成：共清除{cleared_count}个格式规则", data={
-            'cleared_count': cleared_count,
-            'sheets_processed': len(sheets_to_clear),
-            'file_path': file_path,
-            'format_cleared': True
-        })
-        
-    except Exception as e:
-        return _fail("条件格式清除失败", meta={"error_code": "OPERATION_FAILED"})
-
-
-@mcp.tool()
-@_validate_file_path()
-@_track_call
-def excel_write_only_override(
-    file_path: str,
-    sheet_name: str,
-    range_spec: str,
-    data: List[List[Any]],
-    preserve_formulas: bool = False,
-    preserve_col_widths: bool = True
-) -> Dict[str, Any]:
-    """大文件高性能覆盖写入。range_spec: "sheet!A1:D10"。不读取已有内容，直接覆盖。适合批量导入场景。
-
-    Args:
-        file_path: Excel文件路径
-        sheet_name: 工作表名称
-        range_spec: 范围表达式，如"sheet!A1:D10"
-        data: 要写入的数据，二维数组
-        preserve_formulas: 是否保留公式，默认为False
-        preserve_col_widths: 是否保留列宽，默认为True
-    """
-
-    try:
-        # 验证参数
-        if not sheet_name:
-            return _fail("工作表名称不能为空", meta={"error_code": "INVALID_PARAMS"})
-        
-        if not range_spec:
-            return _fail("范围表达式不能为空", meta={"error_code": "INVALID_PARAMS"})
-            
-        if not data:
-            return _fail("数据不能为空", meta={"error_code": "INVALID_PARAMS"})
-            
-        if not isinstance(data, list) or not all(isinstance(row, list) for row in data):
-            return _fail("数据必须是二维数组", meta={"error_code": "INVALID_PARAMS"})
-
-        # 记录操作日志
-        operation_logger.start_session(file_path)
-        operation_logger.log_operation("write_only_override", {
-            "sheet_name": sheet_name,
-            "range": range_spec,
-            "data_rows": len(data),
-            "preserve_formulas": preserve_formulas,
-            "preserve_col_widths": preserve_col_widths
-        })
-
-        # 优先尝试流式写入（高性能模式）
-        try:
-            from excel_mcp_server_fastmcp.core.streaming_writer import StreamingWriter
-            
-            if StreamingWriter.is_available():
-                # 解析范围表达式
-                from excel_mcp_server_fastmcp.utils.parsers import RangeParser
-                range_info = RangeParser.parse_range_expression(f"{sheet_name}!{range_spec}")
-                
-                # 获取起始行列
-                from openpyxl.utils import range_boundaries
-                min_col, min_row, max_col, max_row = range_boundaries(range_info.cell_range)
-                
-                # 执行流式覆盖写入
-                success, message, meta = StreamingWriter.update_range(
-                    file_path, sheet_name, min_row, min_col, data,
-                    preserve_formulas=preserve_formulas,
-                    preserve_col_widths=preserve_col_widths
-                )
-                
-                if success:
-                    # 记录成功结果
-                    operation_logger.log_operation("operation_result", {
-                        "success": True,
-                        "updated_cells": meta.get('updated_cells', 0),
-                        "message": message
-                    })
-                    
-                    return {
-                        'success': True,
-                        'message': message,
-                        'data': meta,
-                        'metadata': {
-                            'file_path': file_path,
-                            'sheet_name': sheet_name,
-                            'range': range_spec,
-                            'streaming_mode': True,
-                            'override_mode': True,
-                            'memory_efficiency': 'high',
-                            **meta
-                        }
-                    }
-                else:
-                    logger.warning(f"流式写入失败，降级到openpyxl: {message}")
-        except Exception as stream_err:
-            logger.warning(f"流式写入异常，降级到openpyxl: {stream_err}")
-
-        # 降级到传统openpyxl模式（作为备用方案）
-        try:
-            from excel_mcp_server_fastmcp.core.excel_writer import ExcelWriter
-            writer = ExcelWriter(file_path)
-            result = writer.update_range(
-                f"{sheet_name}!{range_spec}", 
-                data, 
-                preserve_formulas, 
-                insert_mode=False  # 强制覆盖模式
-            )
-            
-            if result.success:
-                # 记录结果
-                operation_logger.log_operation("operation_result", {
-                    "success": True,
-                    "updated_cells": len(data) * len(data[0]) if data else 0,
-                    "message": f"传统模式覆盖完成"
-                })
-
-                return {
-                    'success': True,
-                    'message': f"传统模式覆盖完成: {result.message}",
-                    'data': _ensure_dict(result),
-                    'metadata': {
-                        'file_path': file_path,
-                        'sheet_name': sheet_name,
-                        'range': range_spec,
-                        'streaming_mode': False,
-                        'override_mode': True,
-                        'memory_efficiency': 'medium',
-                        'updated_cells': len(data) * len(data[0]) if data else 0
-                    }
-                }
-            else:
-                return result
-        except Exception as fallback_err:
-            error_msg = f"覆盖修改失败: {str(fallback_err)}"
-            logger.error(error_msg)
-            return _fail(error_msg, meta={"error_code": "OPERATION_FAILED"})
-
-    except Exception as e:
-        error_msg = f"write_only覆盖修改失败: {str(e)}"
-        logger.error(error_msg)
-        return _fail(error_msg, meta={"error_code": "OPERATION_FAILED"})
-
-
 # ==================== 主程序 ====================
+def main():
     """Entry point for excel-mcp-server-fastmcp.
 
     Args:

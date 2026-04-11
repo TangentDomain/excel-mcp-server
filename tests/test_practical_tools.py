@@ -33,42 +33,6 @@ def workbook(tmp_path):
 class TestBatchOperations:
     """Tests for batch operations."""
 
-    def test_batch_update_ranges(self, workbook):
-        """Batch update multiple ranges in a single file."""
-        from src.excel_mcp_server_fastmcp.server import excel_batch_update_ranges
-
-        updates = [
-            {"range": "B2:B3", "data": [["超级火球术"], ["超级冰冻术"]], "sheet": "技能配置"},
-            {"range": "D2:D3", "data": [[200], [150]], "sheet": "技能配置"},
-        ]
-
-        result = excel_batch_update_ranges(workbook, updates)
-
-        assert result["success"] is True
-        assert result["data"]["success_count"] == 2
-        assert result["data"]["error_count"] == 0
-
-        # Verify persisted values
-        from openpyxl import load_workbook
-        wb2 = load_workbook(workbook)
-        ws = wb2["技能配置"]
-        assert ws["B2"].value == "超级火球术"
-        assert ws["D2"].value == 200
-
-    def test_batch_update_partial_failure(self, workbook):
-        """Failed range should not block others."""
-        from src.excel_mcp_server_fastmcp.server import excel_batch_update_ranges
-
-        updates = [
-            {"range": "B2:B2", "data": [["新名称"]], "sheet": "技能配置"},
-            {"range": "X99:Z99", "data": [["a", "b", "c"]], "sheet": "不存在的表"},
-        ]
-
-        result = excel_batch_update_ranges(workbook, updates)
-        assert result["success"] is True
-        assert result["data"]["success_count"] == 1
-        assert result["data"]["error_count"] == 1
-
     def test_merge_multiple_files_append(self, tmp_path):
         """Merge two files with append mode."""
         from src.excel_mcp_server_fastmcp.server import excel_merge_multiple_files
