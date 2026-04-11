@@ -1529,6 +1529,59 @@ class ExcelOperations:
             logger.error(f"{cls._LOG_PREFIX} {error_msg}")
             return cls._format_error_result(error_msg)
 
+    @staticmethod
+    def _normalize_formatting(formatting: Optional[Dict]) -> Dict:
+        """将LLM友好的扁平格式转换为Writer层需要的嵌套格式。
+
+        扁平格式（API层/LLM输入）:
+            {"bold": True, "alignment": "center", "bg_color": "FF0", "font_size": 14}
+        嵌套格式（Writer层/_apply_cell_format）:
+            {"font": {"bold": True, "size": 14}, "alignment": {"horizontal": "center"}, "fill": {"color": "FF0"}}
+
+        已是嵌套格式的（如preset产生的）直接原样返回，不做二次转换。
+        """
+        if not formatting or not isinstance(formatting, dict):
+            return formatting or {}
+
+        # 检测是否已经是嵌套格式（包含 font/fill/alignment 等嵌套键）
+        nested_keys = {'font', 'fill', 'alignment'}
+        if any(k in formatting and isinstance(formatting.get(k), dict) for k in nested_keys):
+            return formatting  # 已经是嵌套格式，直接返回
+
+        # 扁平 → 嵌套 转换
+        nested: Dict[str, Any] = {}
+        font_attrs: Dict[str, Any] = {}
+        align_attrs: Dict[str, Any] = {}
+
+        flat_to_font = {
+            'bold': 'bold', 'italic': 'italic', 'underline': 'underline',
+            'font_size': 'size', 'font_color': 'color', 'font_name': 'name',
+        }
+        flat_to_align = {
+            'alignment': 'horizontal', 'vertical_alignment': 'vertical',
+            'wrap_text': 'wrap_text', 'text_rotation': 'text_rotation',
+        }
+
+        for key, value in formatting.items():
+            if key in flat_to_font and value is not None:
+                font_attrs[flat_to_font[key]] = value
+            elif key in flat_to_align and value is not None:
+                align_attrs[flat_to_align[key]] = value
+            elif key == 'bg_color' and value is not None:
+                nested['fill'] = {'color': str(value)}
+            elif key == 'number_format' and value is not None:
+                nested['number_format'] = str(value)
+            else:
+                # 未知键直接透传（保持向后兼容）
+                nested[key] = value
+
+        if font_attrs:
+            nested['font'] = font_attrs
+        if align_attrs:
+            nested['alignment'] = align_attrs
+
+        return nested
+
     @classmethod
     def format_cells(
         cls,
@@ -1566,6 +1619,11 @@ class ExcelOperations:
                     'currency': {'number_format': '¥#,##0.00'}
                 }
                 formatting = preset_formats.get(preset, formatting or {})
+
+            # 扁平格式 → 嵌套格式转换（LLM友好API用扁平格式，Writer层需要嵌套格式）
+            # 扁平: {"bold": True, "alignment": "center", "bg_color": "FF0"}
+            # 嵌套: {"font": {"bold": True}, "alignment": {"horizontal": "center"}, "fill": {"color": "FF0"}}
+            formatting = cls._normalize_formatting(formatting)
 
             # 构建完整的range表达式
             if '!' not in range:

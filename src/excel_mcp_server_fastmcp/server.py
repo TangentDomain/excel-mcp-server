@@ -561,7 +561,7 @@ mcp = FastMCP(
 工作表？                    → excel_create_sheet / excel_delete_sheet / excel_rename_sheet / excel_copy_sheet
 行？                        → excel_insert_rows / excel_delete_rows / excel_set_row_height
 列？                        → excel_insert_columns / excel_delete_columns / excel_rename_column / excel_set_column_width
-格式？                      → excel_format_cells（preset: highlight/warning/success）
+样式/合并/边框？            → excel_format_cells（字体+合并+边框+预设样式，一个工具全搞定）
 公式？                      → excel_set_formula（以=开头）
 末行定位？                  → excel_find_last_row（追加数据前必用）
 
@@ -2357,14 +2357,21 @@ def excel_format_cells(
     start_cell: Optional[str] = None,
     end_cell: Optional[str] = None
 ) -> Dict[str, Any]:
-    """设置单元格样式（支持合并操作与字体/边框样式组合使用）。
+    """单元格样式统一入口：字体样式 + 合并/拆分 + 边框，一个工具完成所有外观操作。
+
+    支持的操作类别（可在单次调用中组合使用）：
+      📝 字体: bold, italic, underline, font_size, font_color
+      🎨 单元格: bg_color(背景), alignment(对齐), wrap_text, number_format
+      🔗 结构: merge(True=合并), unmerge(True=取消合并)
+      📦 边框: border_style(thin/thick/double/dotted/dashed)
 
     常用示例:
-      - 加粗: {"bold": True}
-      - 合并+加粗居中: {"merge": True, "bold": True, "alignment": "center"}
-      - 仅合并: {"merge": True}
-      - 边框: {"border_style": "thin"}
-      - 合并+边框+背景色: {"merge": True, "border_style": "thin", "bg_color": "FFFF00"}
+      加粗表头:           {"bold": True}
+      合并+加粗居中:       {"merge": True, "bold": True, "alignment": "center"}
+      仅合并:             {"merge": True}
+      边框:               {"border_style": "thin"}
+      合并+边框+背景色:     {"merge": True, "border_style": "thin", "bg_color": "FFFF00"}
+      预设样式:           preset="header"（等价于 bold + center + bg_color）
 
     Args:
         file_path: Excel文件路径
