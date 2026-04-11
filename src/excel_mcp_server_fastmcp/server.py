@@ -865,30 +865,28 @@ def excel_search(
     file_path: str,
     pattern: str,
     sheet_name: Optional[str] = None,
+    *,
     case_sensitive: bool = False,
     whole_word: bool = False,
-    use_regex: bool = False,
-    include_values: bool = True,
-    include_formulas: bool = False,
+    use_regex: Optional[bool] = None,
     range: Optional[str] = None
 ) -> Dict[str, Any]:
-    """在Excel中搜索匹配pattern的单元格。支持正则、大小写、全词匹配。
+    """在Excel中搜索匹配pattern的单元格。
 
     Args:
         file_path: Excel文件路径
-        pattern: 搜索模式
-        sheet_name: 工作表名称，默认为None
-        case_sensitive: 是否区分大小写，默认为False
-        whole_word: 是否全词匹配，默认为False
-        use_regex: 是否使用正则表达式，默认为False
-        include_values: 是否包含单元格值，默认为True
-        include_formulas: 是否包含公式，默认为False
-        range: 搜索范围，默认为None
-        
-    Returns:
-        Dict[str, Any]: 搜索结果字典，包含匹配的单元格信息，结构为 {"matches": [{"sheet": str, "cell": str, "value": Any, "formula": str}], "success": bool, "total_matches": int}
+        pattern: 搜索模式（文本或正则，use_regex=None时自动检测）
+        sheet_name: 工作表名称，默认搜索全部
+        case_sensitive: 区分大小写，默认False
+        whole_word: 全词匹配，默认False
+        use_regex: None=自动检测(含特殊字符时启用)，True/False=强制
+        range: 限制搜索范围，如 "A1:C10"
     """
-    return _wrap(ExcelOperations.search(file_path, pattern, sheet_name, case_sensitive, whole_word, use_regex, include_values, include_formulas, range))
+    if use_regex is None:
+        use_regex = bool(re.match(r'.*[\[\](){}*+?|^$\\.]', pattern))
+    return _wrap(ExcelOperations.search(
+        file_path, pattern, sheet_name, case_sensitive, whole_word,
+        use_regex, include_values=True, include_formulas=False, range=range))
 
 
 @mcp.tool()
@@ -896,43 +894,38 @@ def excel_search(
 def excel_search_directory(
     directory_path: str,
     pattern: str,
-    case_sensitive: bool = False,
-    whole_word: bool = False,
-    use_regex: bool = False,
-    include_values: bool = True,
-    include_formulas: bool = False,
+    *,
     recursive: bool = True,
     file_extensions: Optional[List[str]] = None,
-    file_pattern: Optional[str] = None,
-    max_files: int = MAX_SEARCH_FILES
+    max_files: int = MAX_SEARCH_FILES,
+    case_sensitive: bool = False,
+    whole_word: bool = False,
+    use_regex: Optional[bool] = None
 ) -> Dict[str, Any]:
-    """在目录下所有Excel文件中搜索内容。支持文件类型过滤和递归搜索。
+    """在目录下所有Excel文件中搜索内容。
 
     Args:
         directory_path: 搜索目录路径
-        pattern: 搜索模式
-        case_sensitive: 是否区分大小写，默认为False
-        whole_word: 是否全词匹配，默认为False
-        use_regex: 是否使用正则表达式，默认为False
-        include_values: 是否包含单元格值，默认为True
-        include_formulas: 是否包含公式，默认为False
-        recursive: 是否递归搜索子目录，默认为True
-        file_extensions: 文件扩展名过滤列表，默认为None
-        file_pattern: 文件名模式匹配，默认为None
-        max_files: 最大搜索文件数，默认为 MAX_SEARCH_FILES
-        
-    Returns:
-        Dict[str, Any]: 目录搜索结果字典，包含所有匹配项，结构为 {"matches": [{"file": str, "sheet": str, "cell": str, "value": Any}], "success": bool, "files_searched": int}
+        pattern: 搜索模式（文本或正则）
+        recursive: 递归子目录，默认True
+        file_extensions: 扩展名过滤，如 [".xlsx", ".xls"]
+        max_files: 最大搜索文件数
+        case_sensitive: 区分大小写，默认False
+        whole_word: 全词匹配，默认False
+        use_regex: None=自动检测，True/False=强制
     """
     _path_err = _validate_path(directory_path)
     if _path_err:
         return _path_err
-    return _wrap(ExcelOperations.search_directory(directory_path, pattern, case_sensitive, whole_word, use_regex, include_values, include_formulas, recursive, file_extensions, file_pattern, max_files))
+    if use_regex is None:
+        use_regex = bool(re.match(r'.*[\[\](){}*+?|^$\\.]', pattern))
+    return _wrap(ExcelOperations.search_directory(
+        directory_path, pattern, case_sensitive, whole_word,
+        use_regex, True, False,
+        recursive=recursive, file_extensions=file_extensions,
+        file_pattern=None, max_files=max_files))
 
 
-@mcp.tool()
-@_validate_file_path()
-@_track_call
 def excel_get_range(
     file_path: str,
     range: Optional[str] = None,
@@ -2568,155 +2561,108 @@ def excel_format_cells(
     start_cell: Optional[str] = None,
     end_cell: Optional[str] = None
 ) -> Dict[str, Any]:
-    """设置单元格样式。formatting字段: bold/italic/underline/font_size/font_color/bg_color/number_format/alignment/wrap_text/border_style。只传需要修改的字段。
-    
+    """设置单元格样式。支持: bold/italic/underline/font_size/font_color/bg_color/
+    number_format/alignment/wrap_text/border_style/merge/unmerge。
+
     Args:
         file_path: Excel文件路径
         sheet_name: 工作表名称
         range: 单元格范围，如 "A1:C10"
-        formatting: 样式配置
-        preset: 预设样式名称
-        start_cell: 起始单元格（可选，与end_cell配合使用）
-        end_cell: 结束单元格（可选，与start_cell配合使用）
+        formatting: 样式配置字典:
+            bold/italic/underline: bool
+            font_size: int | font_color/bg_color: str
+            number_format: str | alignment: left/center/right
+            wrap_text: bool | border_style: thin/thick/double/dotted/dashed
+            merge: bool (合并) | unmerge: bool (取消合并)
+        preset: 预设（bold/italic/highlight/header）
+        start_cell/end_cell: 可选，替代 range 使用
     """
-    
-    # 参数校验：当没有提供formatting和preset参数时，明确告知用户
     if formatting is None and preset is None:
         return _fail(
-            '未提供样式参数：formatting 和 preset 均为空。\n'
-            '请至少提供一种样式配置：\n'
-            '1. 使用 preset: "bold", "italic", "highlight", "header"\n'
-            '2. 使用 formatting: {"bold": true} 或 {"font_size": 12}\n'
-            '示例：excel_format_cells(file, "Sheet1", "A1:C1", preset="bold")',
-            meta={
-                "error_code": "MISSING_FORMATTING_PARAMS",
-                "received_formatting": formatting,
-                "received_preset": preset,
-                "hint": "需要指定样式才能执行格式化操作"
-            }
-        )
-    
-    # 参数校验：sheet_name是必需参数
+            '未提供样式参数。示例: {"bold": True} 或 {"merge": True} 或 {"border_style": "thin"}',
+            meta={"error_code": "MISSING_FORMATTING_PARAMS"})
     if not sheet_name or not sheet_name.strip():
-        return _fail(
-            '缺少必需参数 sheet_name（工作表名称）。请提供有效的工作表名称，如 "Sheet1"。可通过 excel_list_sheets(file) 查看可用工作表。',
-            meta={"error_code": "MISSING_REQUIRED_PARAM", "param": "sheet_name", "hint": "sheet_name 为必需参数"}
-        )
+        return _fail('缺少必需参数 sheet_name',
+                    meta={"error_code": "MISSING_REQUIRED_PARAM", "param": "sheet_name"})
 
-    # 参数兼容性处理：如果提供了start_cell和end_cell，构建range表达式
     if start_cell and end_cell:
         range = f"{start_cell}:{end_cell}"
-    
-    # 确保range包含工作表名
     if '!' not in range:
         range = f"{sheet_name}!{range}"
-    
-    # 调用原始函数
+
+    # 特殊操作：merge / unmerge / border_style
+    if formatting:
+        if formatting.get('merge'):
+            return _wrap(ExcelOperations.merge_cells(file_path, sheet_name, range))
+        if formatting.get('unmerge'):
+            return _wrap(ExcelOperations.unmerge_cells(file_path, sheet_name, range))
+        if 'border_style' in formatting:
+            border = formatting.pop('border_style')
+            result = _ensure_dict(ExcelOperations.format_cells(file_path, sheet_name, range, formatting, preset))
+            try:
+                _wrap(ExcelOperations.set_borders(file_path, sheet_name, range, border))
+            except Exception:
+                pass
+            return _wrap(result)
+
     result = _ensure_dict(ExcelOperations.format_cells(file_path, sheet_name, range, formatting, preset))
-    
-    # 如果成功但data为null（无实际格式更改），添加说明
     if result.get('success') and result.get('data') is None:
-        result['message'] += ' (注意：没有单元格需要格式化，可能是因为指定范围没有内容或样式无变化)'
-    
+        result['message'] += ' (注意：没有单元格需要格式化)'
     return _wrap(result)
 
 
 @mcp.tool()
+@_validate_file_path()
 @_track_call
-def excel_merge_cells(
-    file_path: str,
-    sheet_name: str,
-    range: str
-) -> Dict[str, Any]:
-    """合并指定范围为一个大单元格。
-
-    Args:
-        file_path: Excel文件路径
-        sheet_name: 工作表名称
-        range: 单元格范围
-    """
-    return _wrap(ExcelOperations.merge_cells(file_path, sheet_name, range))
+def excel_merge_cells(file_path: str, sheet_name: str, range: str) -> Dict[str, Any]:
+    """合并单元格。（建议用 format_cells 的 formatting={"merge": True}）"""
+    return excel_format_cells(file_path, sheet_name, range, formatting={"merge": True})
 
 
 @mcp.tool()
+@_validate_file_path()
 @_track_call
-def excel_unmerge_cells(
-    file_path: str,
-    sheet_name: str,
-    range: str
-) -> Dict[str, Any]:
-    """取消合并，恢复为独立单元格。
-
-    Args:
-        file_path: Excel文件路径
-        sheet_name: 工作表名称
-        range: 单元格范围
-    """
-    return _wrap(ExcelOperations.unmerge_cells(file_path, sheet_name, range))
+def excel_unmerge_cells(file_path: str, sheet_name: str, range: str) -> Dict[str, Any]:
+    """取消合并。（建议用 format_cells 的 formatting={"unmerge": True}）"""
+    return excel_format_cells(file_path, sheet_name, range, formatting={"unmerge": True})
 
 
 @mcp.tool()
+@_validate_file_path()
 @_track_call
-def excel_set_borders(
-    file_path: str,
-    sheet_name: str,
-    range: str,
-    border_style: str = "thin"
-) -> Dict[str, Any]:
-    """为范围设置边框。border_style: thin/thick/double/dotted/dashed。
-
-    Args:
-        file_path: Excel文件路径
-        sheet_name: 工作表名称
-        range: 单元格范围
-        border_style: 边框样式，默认为"thin"
-    """
-    return _wrap(ExcelOperations.set_borders(file_path, sheet_name, range, border_style))
+def excel_set_borders(file_path: str, sheet_name: str, range: str,
+                      border_style: str = "thin") -> Dict[str, Any]:
+    """设置边框。（建议用 format_cells 的 formatting={"border_style": "thin"}）"""
+    return excel_format_cells(file_path, sheet_name, range, formatting={"border_style": border_style})
 
 
 @mcp.tool()
+@_validate_file_path()
 @_track_call
-def excel_set_row_height(
-    file_path: str,
-    sheet_name: str,
-    row_index: int,
-    height: float,
-    count: int = 1
-) -> Dict[str, Any]:
-    """设置行高（磅值）。
-
-    Args:
-        file_path: Excel文件路径
-        sheet_name: 工作表名称
-        row_index: 行索引
-        height: 行高（磅值）
-        count: 影响的行数，默认为1
-    """
+def excel_set_row_height(file_path: str, sheet_name: str, row_index: int,
+                          height: float, count: int = 1) -> Dict[str, Any]:
+    """设置行高（磅值）。"""
+    if row_index < 1:
+        return _fail("row_index 必须大于 0", meta={"error_code": "INVALID_PARAMETER"})
+    if height <= 0:
+        return _fail("height 必须大于 0", meta={"error_code": "INVALID_PARAMETER"})
     return _wrap(ExcelOperations.set_row_height(file_path, sheet_name, row_index, height, count))
 
 
 @mcp.tool()
+@_validate_file_path()
 @_track_call
-def excel_set_column_width(
-    file_path: str,
-    sheet_name: str,
-    column_index: int,
-    width: float,
-    count: int = 1
-) -> Dict[str, Any]:
-    """设置列宽（字符单位）。
-
-    Args:
-        file_path: Excel文件路径
-        sheet_name: 工作表名称
-        column_index: 列索引
-        width: 列宽（字符单位）
-        count: 影响的列数，默认为1
-    """
+def excel_set_column_width(file_path: str, sheet_name: str, column_index: int,
+                             width: float, count: int = 1) -> Dict[str, Any]:
+    """设置列宽（字符单位）。"""
+    if column_index < 1:
+        return _fail("column_index 必须大于 0", meta={"error_code": "INVALID_PARAMETER"})
+    if width <= 0:
+        return _fail("width 必须大于 0", meta={"error_code": "INVALID_PARAMETER"})
     return _wrap(ExcelOperations.set_column_width(file_path, sheet_name, column_index, width, count))
 
 
-# ==================== Excel比较功能 ====================
+# ==================== Excel比较功能 ====================能 ====================
 
 @mcp.tool()
 @_validate_file_path(['file1_path', 'file2_path'])
