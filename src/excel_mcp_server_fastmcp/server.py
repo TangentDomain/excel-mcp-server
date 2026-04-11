@@ -556,7 +556,7 @@ mcp = FastMCP(
 ├─ 精确覆盖指定区域？（知道具体A1:C10）────────→ excel_update_range（二维数组覆盖写入）
 │   ⚠️ 默认覆盖模式！insert_mode=True 改为插入
 │
-├─ 按ID增改单行？（幂等：有则改无则插）────────→ excel_upsert_row（key_column+key_value）
+├─ 按ID修改单行？───→ 见下方「upsert_row vs update_query 选择指南」
 │
 ├─ 批量插入新行？───────────────────────────────→ excel_insert_query（SQL INSERT）
 │
@@ -577,6 +577,34 @@ mcp = FastMCP(
 逐单元格对比差异？           → excel_compare_files（单元格级）
 备份恢复？                   → excel_create_backup / excel_restore_backup / excel_list_backups
 ```
+
+## ⚠️ upsert_row vs update_query：按ID改单行该选谁？
+
+这两个工具都能「按ID修改一行」，选择规则：
+
+```
+✅ 选 upsert_row 当：
+   - 你有明确的 key_column（如"技能ID"、"装备名"）
+   - 只改少数几个字段（2-3个）
+   - 需要幂等行为（行不存在时自动插入）
+   - 用 dict 传参更方便：{"伤害": 500, "冷却": 3}
+   ⚠️ 注意：key_column 用 Excel 原始列名（双行表头用第1行中文名，非第2行英文名！）
+
+✅ 选 update_query 当：
+   - 需要同时做计算（SET 血量=血量*2, SET 价格=价格*0.8）
+   - 需要预览效果（dry_run=True）
+   - 改的条件不只是一个ID（WHERE 等级>5 AND 稀有度='传说'）
+   - 已经在用 SQL 做其他操作，保持一致性
+   - ✅ 双行表头友好：SQL引擎自动识别中英文列名
+```
+
+## ⚠️ 双行表头列名注意事项
+
+当 Excel 有双行表头（第1行中文 + 第2行英文）时：
+- **SQL工具**（query/update_query/insert_query/delete_query）：中英文名都 ✅ 能用
+- **describe_table 返回的列名**：是第2行英文名（如 skill_id, equip_name）
+- **upsert_row 的 key_column**：必须用 Excel 原始列名（第1行中文，如 技能ID、装备名）
+- **建议**：先用 describe_table 了解结构后，若要用 upsert_row，用 get_headers 确认原始列名
 
 ## ⚡ SQL vs Direct 选择原则
 ```
