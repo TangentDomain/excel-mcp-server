@@ -13,7 +13,6 @@ import os
 from src.excel_mcp_server_fastmcp.server import (
     excel_compare_files,
     excel_compare_sheets,
-    excel_convert_format,
     excel_export_to_csv,
     excel_import_from_csv,
     excel_search_directory,
@@ -100,37 +99,6 @@ class TestExcelExportImportCSV:
 
 class TestExcelConvertFormat:
     """Test format conversion functionality"""
-
-    def test_convert_xlsx_to_json(self, sample_excel_file, temp_dir):
-        """Test converting Excel to JSON"""
-        output_path = os.path.join(str(temp_dir), "data.json")
-        result = excel_convert_format(sample_excel_file, output_path, "json")
-
-        assert result['success'] is True
-        assert os.path.exists(output_path)
-
-        import json
-        with open(output_path, 'r', encoding='utf-8') as f:
-            data = json.load(f)
-        assert isinstance(data, dict)
-
-    def test_convert_invalid_format(self, sample_excel_file, temp_dir):
-        """Test converting to unsupported format"""
-        output_path = os.path.join(str(temp_dir), "data.pdf")
-        result = excel_convert_format(sample_excel_file, output_path, "pdf")
-
-        assert result['success'] is False
-
-    def test_convert_nonexistent_file(self, temp_dir):
-        """Test converting non-existent file"""
-        output_path = os.path.join(str(temp_dir), "out.json")
-        result = excel_convert_format("/nonexistent.xlsx", output_path, "json")
-
-        assert result['success'] is False
-
-
-class TestExcelSearchDirectory:
-    """Test directory-wide search functionality"""
 
     def test_search_directory_basic(self, temp_dir_with_excel_files):
         """Test basic directory search"""

@@ -127,13 +127,13 @@ class TestRangeExpressionSearch:
             range_search_test_file,
             "@",
             sheet_name="基础数据",
-            range="A1:C6"
+            cell_range="A1:C6"
         )
 
         assert result['success'] is True
         assert len(result['data']) == 6  # B1-B6中都是邮箱
         assert result['meta']['total_matches'] == 6
-        assert result['meta']['range_expression'] == "A1:C6"
+        assert result['meta']['range_expression'] == '基础数据!A1:C6'
 
         # 验证匹配的单元格位置
         cells = [match['cell'] for match in result['data']]
@@ -145,7 +145,7 @@ class TestRangeExpressionSearch:
         result = excel_search(
             range_search_test_file,
             "@",
-            range="基础数据!B1:B5"
+            cell_range="基础数据!B1:B5"
         )
 
         assert result['success'] is True
@@ -160,13 +160,13 @@ class TestRangeExpressionSearch:
             range_search_test_file,
             "@",
             sheet_name="基础数据",
-            range="3:5"
+            cell_range="3:5"
         )
 
         assert result['success'] is True
         assert len(result['data']) == 6  # 第3-5行中的所有邮箱
         assert result['meta']['total_matches'] == 6
-        assert result['meta']['range_expression'] == "3:5"
+        assert result['meta']['range_expression'] == '基础数据!3:5'
 
         # 验证所有匹配都在第3-5行
         for match in result['data']:
@@ -179,7 +179,7 @@ class TestRangeExpressionSearch:
         result = excel_search(
             range_search_test_file,
             "@row",
-            range="基础数据!6:8"
+            cell_range="基础数据!6:8"
         )
 
         assert result['success'] is True
@@ -194,13 +194,13 @@ class TestRangeExpressionSearch:
             range_search_test_file,
             "@",
             sheet_name="基础数据",
-            range="B:B"
+            cell_range="B:B"
         )
 
         assert result['success'] is True
         assert len(result['data']) == 10  # B列中的所有邮箱
         assert result['meta']['total_matches'] == 10
-        assert result['meta']['range_expression'] == "B:B"
+        assert result['meta']['range_expression'] == '基础数据!B:B'
 
         # 验证所有匹配都在B列
         for match in result['data']:
@@ -213,7 +213,7 @@ class TestRangeExpressionSearch:
             range_search_test_file,
             "@col3",
             sheet_name="基础数据",
-            range="B:D"
+            cell_range="B:D"
         )
 
         assert result['success'] is True
@@ -230,7 +230,7 @@ class TestRangeExpressionSearch:
         result = excel_search(
             range_search_test_file,
             "数据",
-            range="基础数据!C:C"
+            cell_range="基础数据!C:C"
         )
 
         assert result['success'] is True
@@ -245,13 +245,13 @@ class TestRangeExpressionSearch:
             range_search_test_file,
             "@",
             sheet_name="基础数据",
-            range="7"
+            cell_range="7"
         )
 
         assert result['success'] is True
         assert len(result['data']) == 2  # 第7行中的2个邮箱 (B7和D7)
         assert result['meta']['total_matches'] == 2
-        assert result['meta']['range_expression'] == "7"
+        assert result['meta']['range_expression'] == '基础数据!7'
 
         # 验证所有匹配都在第7行
         for match in result['data']:
@@ -263,7 +263,7 @@ class TestRangeExpressionSearch:
         result = excel_search(
             range_search_test_file,
             "第10行",
-            range="基础数据!10"
+            cell_range="基础数据!10"
         )
 
         assert result['success'] is True
@@ -278,13 +278,13 @@ class TestRangeExpressionSearch:
             range_search_test_file,
             "数据",
             sheet_name="基础数据",
-            range="C"
+            cell_range="C"
         )
 
         assert result['success'] is True
         assert len(result['data']) == 10  # C列中的所有"数据"
         assert result['meta']['total_matches'] == 10
-        assert result['meta']['range_expression'] == "C"
+        assert result['meta']['range_expression'] == '基础数据!C'
 
         # 验证所有匹配都在C列
         for match in result['data']:
@@ -296,7 +296,7 @@ class TestRangeExpressionSearch:
         result = excel_search(
             range_search_test_file,
             "结果",
-            range="基础数据!E"
+            cell_range="基础数据!E"
         )
 
         assert result['success'] is True
@@ -312,7 +312,7 @@ class TestRangeExpressionSearch:
             range_search_test_file,
             "@",
             sheet_name="基础数据",
-            range="15:20"  # 超出数据行范围
+            cell_range="15:20"  # 超出数据行范围
         )
 
         assert result['success'] is True
@@ -330,7 +330,7 @@ class TestRangeExpressionSearch:
             range_search_test_file,
             "@",
             sheet_name="基础数据",
-            range="INVALID_RANGE"
+            cell_range="INVALID_RANGE"
         )
 
         # 根据实际错误处理，这里可能返回失败或抛出异常
@@ -353,7 +353,7 @@ class TestRangeExpressionSearch:
             range_search_test_file,
             "@",
             sheet_name="基础数据",
-            range="B:B"
+            cell_range="B:B"
         )
         range_search_time = time.time() - start_time
 
@@ -420,7 +420,7 @@ class TestRangeExpressionIntegration:
                 range_search_test_file,
                 case["pattern"],
                 sheet_name="基础数据",
-                range=case["range_expr"]
+                cell_range=case["range_expr"]
             )
 
             # 验证结果
@@ -434,8 +434,8 @@ class TestRangeExpressionIntegration:
 
             assert len(matches) >= case['expected_min'], \
                 f"{case['name']} 匹配数量不足: 期望>={case['expected_min']}, 实际={len(matches)}"
-            assert result['meta']['range_expression'] == case['range_expr'], \
-                f"{case['name']} 范围表达式不匹配"
+            assert result['meta']['range_expression'].endswith(case['range_expr']) or result['meta']['range_expression'] == case['range_expr'], \
+                f"{case['name']} 范围表达式不匹配: {result['meta']['range_expression']}"
 
             results.append({
                 'name': case['name'],

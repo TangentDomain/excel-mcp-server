@@ -556,6 +556,13 @@ SQL删除数据？            → excel_delete_query (SQL DELETE, 必须WHERE)
 按ID对比两表差异？        → excel_compare_sheets (对象级: 新增/删除/修改)
 逐单元格对比差异？        → excel_compare_files (单元格级)
 格式调整？                → excel_format_cells (preset: highlight/warning/success)
+文件操作？                → excel_create_file / excel_create_sheet / excel_delete_sheet / excel_rename_sheet / excel_copy_sheet
+列操作？                  → excel_rename_column / excel_insert_columns / excel_delete_columns
+行操作？                  → excel_insert_rows / excel_delete_rows / excel_set_row_height / excel_set_column_width
+查找末行？                → excel_find_last_row (追加数据前必用)
+写入公式？                → excel_set_formula (以=开头)
+备份恢复？                → excel_create_backup / excel_restore_backup / excel_list_backups
+CSV导入导出？            → excel_export_to_csv / excel_import_from_csv
 ```
 
 ## ✅ SQL已支持功能
@@ -599,8 +606,8 @@ SELECT skill_name, skill_type, ROW_NUMBER() OVER (PARTITION BY skill_type ORDER 
 
 ## ⚠️ 重要原则
 - 双行表头: 第1行中文描述+第2行英文字段名，中英文列名均可查询
-- 1-based索引: 第1行=1, 第1列=1
-- 范围格式: "工作表名!A1:Z100"（必须含工作表名）
+- **统一1-based索引: 第1行=1, 第1列=1（所有工具一致，含insert_rows/delete_rows）**
+- **范围格式(cell_range参数): 优先使用 "工作表名!A1:C10"；不含!时单工作表文件自动推断**
 - 默认覆盖: update_range默认为覆盖模式(insert_mode=False)，保留数据需显式设置insert_mode=True
 
 ## 🎮 游戏配置表示例
@@ -716,7 +723,11 @@ def _fail(message: str, meta: dict = None) -> dict:
 
 def _strip_defaults(obj: Any, depth: int = 0) -> Any:
     """递归移除默认值和空值以减少token消耗。
-    
+
+    ⚠️ LLM注意：以下字段若缺失表示其值为默认值（False/0），并非字段不存在：
+    bold, italic, underline, wrap_text, border_top/bottom/left/right,
+    horizontal_alignment, vertical_alignment, text_rotation, merge_cells
+
     移除规则：
     - None, 空字符串, 空列表, 空字典
     - 常见Excel默认值：False, 0, None（基于字段名判断）
@@ -868,7 +879,7 @@ def excel_search(
     case_sensitive: bool = False,
     whole_word: bool = False,
     use_regex: Optional[bool] = None,
-    range: Optional[str] = None
+    cell_range: Optional[str] = None
 ) -> Dict[str, Any]:
     """在Excel中搜索匹配pattern的单元格。
 
@@ -879,13 +890,18 @@ def excel_search(
         case_sensitive: 区分大小写，默认False
         whole_word: 全词匹配，默认False
         use_regex: None=自动检测(含特殊字符时启用)，True/False=强制
-        range: 限制搜索范围，如 "A1:C10"
+        cell_range: 搜索范围（如 "A1:C10" 或 "Sheet1!A1:C10"，不含!时配合sheet_name使用）
     """
+    # 统一范围格式：如果cell_range不含!但传了sheet_name，自动拼接
+    _range_arg = cell_range
+    if _range_arg and '!' not in _range_arg and sheet_name:
+        _range_arg = f"{sheet_name}!{_range_arg}"
+
     if use_regex is None:
         use_regex = bool(re.match(r'.*[\[\](){}*+?|^$\\.]', pattern))
     return _wrap(ExcelOperations.search(
         file_path, pattern, sheet_name, case_sensitive, whole_word,
-        use_regex, include_values=True, include_formulas=False, range=range))
+        use_regex, include_values=True, include_formulas=False, range=_range_arg))
 
 
 @mcp.tool()
@@ -930,19 +946,19 @@ def excel_search_directory(
 @_track_call
 def excel_get_range(
     file_path: str,
-    range: Optional[str] = None,
+    cell_range: Optional[str] = None,
     include_formatting: bool = False,
     sheet_name: Optional[str] = None,
     start_cell: Optional[str] = None,
     end_cell: Optional[str] = None
 ) -> Dict[str, Any]:
     """读取指定范围的数据。返回{headers, data, shape}。支持include_formatting获取样式。
-    
+
     Args:
         file_path: Excel文件路径
-        range: 单元格范围，如 "Sheet1!A1:C10" 或 "A1:C10"（可选，可与start_cell/end_cell配合使用）
+        cell_range: 单元格范围（如 "A1:C10" 或 "Sheet1!A1:C10"，不含!时配合sheet_name使用）
         include_formatting: 是否包含格式信息
-        sheet_name: 工作表名称（可选，如果range不包含工作表名时可指定）
+        sheet_name: 工作表名称（可选，cell_range不含!时自动拼接）
         start_cell: 起始单元格（可选，与end_cell配合使用）
         end_cell: 结束单元格（可选，与start_cell配合使用）
     """
@@ -950,17 +966,17 @@ def excel_get_range(
     # 参数兼容性处理：如果提供了start_cell和end_cell，构建range表达式（优先执行）
     if start_cell and end_cell:
         if sheet_name:
-            range = f"{sheet_name}!{start_cell}:{end_cell}"
+            cell_range = f"{sheet_name}!{start_cell}:{end_cell}"
         else:
             # 如果没有指定sheet_name，尝试自动推断
-            if range and '!' not in range:
+            if cell_range and '!' not in cell_range:
                 try:
                     from openpyxl import load_workbook
                     wb = load_workbook(file_path, read_only=True)
                     sheet_names = wb.sheetnames
                     wb.close()
                     if len(sheet_names) == 1:
-                        range = f"{sheet_names[0]}!{start_cell}:{end_cell}"
+                        cell_range = f"{sheet_names[0]}!{start_cell}:{end_cell}"
                     else:
                         return _fail(
                             f"需要指定工作表名，文件有多个工作表({', '.join(sheet_names)})。"
@@ -972,7 +988,7 @@ def excel_get_range(
                         "无法自动推断工作表名，请指定sheet_name参数或使用完整范围表达式",
                         meta={"error_code": "VALIDATION_FAILED"}
                     )
-            elif not range:
+            elif not cell_range:
                 # 如果没有range且没有sheet_name，尝试自动推断
                 try:
                     from openpyxl import load_workbook
@@ -980,7 +996,7 @@ def excel_get_range(
                     sheet_names = wb.sheetnames
                     wb.close()
                     if len(sheet_names) == 1:
-                        range = f"{sheet_names[0]}!{start_cell}:{end_cell}"
+                        cell_range = f"{sheet_names[0]}!{start_cell}:{end_cell}"
                     else:
                         return _fail(
                             f"需要指定工作表名，文件有多个工作表({', '.join(sheet_names)})。"
@@ -993,34 +1009,34 @@ def excel_get_range(
                         meta={"error_code": "VALIDATION_FAILED"}
                     )
             else:
-                range = f"{range}!{start_cell}:{end_cell}"  # 这种情况应该不会发生
+                cell_range = f"{cell_range}!{start_cell}:{end_cell}"  # 这种情况应该不会发生
     
     # 如果既没有range也没有start_cell/end_cell，报错
-    if not range:
+    if not cell_range:
         return _fail(
             "必须指定范围参数，可通过以下方式之一：\n"
             "1. 直接提供range参数：'Sheet1!A1:C10'\n"
             "2. 提供 start_cell 和 end_cell 参数\n"
-            "3. 提供 range 参数和 sheet_name 参数",
+            "3. 提供 cell_range 参数和 sheet_name 参数",
             meta={"error_code": "MISSING_RANGE_PARAMETER"}
         )
     
     # 如果range不包含工作表名但指定了sheet_name，添加工作表名
-    if sheet_name and '!' not in range:
-        range = f"{sheet_name}!{range}"
+    if sheet_name and '!' not in cell_range:
+        cell_range = f"{sheet_name}!{cell_range}"
     
     # 参数顺序问题修复：检查range参数是否可能是误传的sheet_name
     # 只有在range不为空且没有通过start_cell/end_cell构建时才执行此检查
-    if range and '!' not in range and not range.startswith(('A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J')) and len(range) <= 10:
-        # range看起来不像有效的单元格范围，可能是用户误将sheet_name传给了range参数
+    if cell_range and '!' not in cell_range and not cell_range.startswith(('A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J')) and len(cell_range) <= 10:
+        # cell_range看起来不像有效的单元格范围，可能是用户误将sheet_name传给了range参数
         return _fail(
-            f"参数顺序可能错误：range参数值 '{range}' 看起来不像有效的单元格范围。\n"
+            f"参数顺序可能错误：cell_range参数值 '{cell_range}' 看起来不像有效的单元格范围。\n"
             f"请检查参数顺序：第二个参数应该是范围表达式（如 'A1:C10' 或 'Sheet1!A1:C10'），\n"
             f"如果要以默认工作表读取，请明确指定: excel_get_range('{file_path}', 'A1:C10')",
             meta={
                 "error_code": "PARAMETER_ORDER_ERROR",
-                "received_range": range,
-                "hint": "range参数应该是单元格范围，不是工作表名"
+                "received_range": cell_range,
+                "hint": "cell_range参数应该是单元格范围，不是工作表名"
             }
         )
     
@@ -1029,14 +1045,14 @@ def excel_get_range(
     try:
         # 验证范围表达式格式
         # 如果没有工作表前缀，尝试自动推断（单工作表文件）
-        if '!' not in range:
+        if '!' not in cell_range:
             try:
                 from openpyxl import load_workbook
                 wb = load_workbook(file_path, read_only=True)
                 sheet_names = wb.sheetnames
                 wb.close()
                 if len(sheet_names) == 1:
-                    range = f"{sheet_names[0]}!{range}"
+                    cell_range = f"{sheet_names[0]}!{cell_range}"
                 else:
                     return _fail(
                         f"范围表达式缺少工作表名，且文件有多个工作表({', '.join(sheet_names)})。"
@@ -1045,11 +1061,11 @@ def excel_get_range(
                     )
             except Exception:
                 return _fail(
-                    f"范围表达式缺少工作表名。正确格式: 'Sheet1!A1:C10'，当前: '{range}'",
+                    f"范围表达式缺少工作表名。正确格式: 'Sheet1!A1:C10'，当前: '{cell_range}'",
                     meta={"error_code": "VALIDATION_FAILED"}
                 )
 
-        range_validation = ExcelValidator.validate_range_expression(range)
+        range_validation = ExcelValidator.validate_range_expression(cell_range)
 
         # 验证操作规模
         scale_validation = ExcelValidator.validate_operation_scale(range_validation['range_info'])
@@ -1064,7 +1080,7 @@ def excel_get_range(
         return _fail(f"范围表达式验证失败: {str(e)}", meta={"error_code": "VALIDATION_FAILED"})
 
     # 调用原始函数
-    result = ExcelOperations.get_range(file_path, range, include_formatting)
+    result = ExcelOperations.get_range(file_path, cell_range, include_formatting)
     result = _ensure_dict(result)
 
     # 如果成功，添加验证信息到结果中
@@ -1112,7 +1128,7 @@ def excel_get_headers(
 @_track_call
 def excel_update_range(
     file_path: str,
-    range: str,
+    cell_range: str,
     data: List[List[Any]],
     preserve_formulas: bool = True,
     insert_mode: bool = False,
@@ -1122,17 +1138,17 @@ def excel_update_range(
     end_cell: Optional[str] = None
 ) -> Dict[str, Any]:
     """写入数据到指定范围。
-    
+
     Args:
         file_path: Excel文件路径
-        range: 单元格范围，如 "Sheet1!A1:C10" 或 "A1:C10"
+        cell_range: 单元格范围（如 "A1:C10" 或 "Sheet1!A1:C10"，不含!时配合sheet_name使用）
         data: 要写入的数据，二维数组格式
         preserve_formulas: 是否保留已有公式不被覆盖，默认True
         insert_mode: 数据写入模式，默认False(覆盖模式)
             - False: 覆盖模式，直接替换目标单元格数据
             - True: 插入模式，在目标位置插入新行，原有数据下移
         streaming: 是否使用流式写入，默认True
-        sheet_name: 工作表名称（可选，如果range不包含工作表名时可指定）
+        sheet_name: 工作表名称（可选，cell_range不含!时自动拼接）
         start_cell: 起始单元格（可选，与end_cell配合使用）
         end_cell: 结束单元格（可选，与start_cell配合使用）
     """
@@ -1140,17 +1156,17 @@ def excel_update_range(
     # 参数兼容性处理：如果提供了start_cell和end_cell，构建range表达式
     if start_cell and end_cell:
         if sheet_name:
-            range = f"{sheet_name}!{start_cell}:{end_cell}"
+            cell_range = f"{sheet_name}!{start_cell}:{end_cell}"
         else:
             # 如果没有指定sheet_name，尝试自动推断
-            if '!' not in range:
+            if '!' not in cell_range:
                 try:
                     from openpyxl import load_workbook
                     wb = load_workbook(file_path, read_only=True)
                     sheet_names = wb.sheetnames
                     wb.close()
                     if len(sheet_names) == 1:
-                        range = f"{sheet_names[0]}!{start_cell}:{end_cell}"
+                        cell_range = f"{sheet_names[0]}!{start_cell}:{end_cell}"
                     else:
                         return _fail(
                             f"需要指定工作表名，文件有多个工作表({', '.join(sheet_names)})。"
@@ -1164,12 +1180,12 @@ def excel_update_range(
                     )
     
     # 如果range不包含工作表名但指定了sheet_name，添加工作表名
-    if sheet_name and '!' not in range:
-        range = f"{sheet_name}!{range}"
+    if sheet_name and '!' not in cell_range:
+        cell_range = f"{sheet_name}!{cell_range}"
 
     try:
         # 验证范围表达式格式
-        range_validation = ExcelValidator.validate_range_expression(range)
+        range_validation = ExcelValidator.validate_range_expression(cell_range)
 
         # 验证操作规模
         scale_validation = ExcelValidator.validate_operation_scale(range_validation['range_info'])
@@ -1183,7 +1199,7 @@ def excel_update_range(
         operation_logger.start_session(file_path)
         operation_logger.log_operation("validation_failed", {
             "operation": "update_range",
-            "range": range,
+            "cell_range": cell_range,
             "error": str(e)
         })
 
@@ -1194,7 +1210,7 @@ def excel_update_range(
 
     # 记录操作日志
     operation_logger.log_operation("update_range", {
-        "range": range,
+        "cell_range": cell_range,
         "validated_range": range_validation['normalized_range'],
         "data_rows": len(data),
         "insert_mode": insert_mode,
@@ -1206,7 +1222,7 @@ def excel_update_range(
         # 扩展流式路径：支持覆盖模式和插入模式
         use_streaming = streaming and not preserve_formulas
         # 插入模式会自动使用流式插入，覆盖模式使用流式覆盖
-        result = ExcelOperations.update_range(file_path, range, data, preserve_formulas, insert_mode, use_streaming)
+        result = ExcelOperations.update_range(file_path, cell_range, data, preserve_formulas, insert_mode, use_streaming)
         result = _ensure_dict(result)
 
         # 记录操作结果
@@ -1378,12 +1394,12 @@ def excel_insert_rows(
     count: int = 1,
     streaming: bool = True
 ) -> Dict[str, Any]:
-    """在指定位置插入空行。row_index从0开始。
+    """在指定位置插入空行。row_index从1开始（第1行前插入传1）。
 
     Args:
         file_path: Excel文件路径
         sheet_name: 工作表名称
-        row_index: 插入位置的行索引（从0开始）
+        row_index: 插入位置的行索引（从1开始，在该行上方插入）
         count: 插入的行数，默认为1
         streaming: 是否使用流式写入，默认为True
     """
@@ -1453,7 +1469,7 @@ def excel_export_to_csv(
     sheet_name: Optional[str] = None,
     encoding: str = "utf-8"
 ) -> Dict[str, Any]:
-    """将工作表导出为CSV。支持指定编码和分隔符。
+    """将工作表导出为CSV文件。
 
     Args:
         file_path: Excel文件路径
@@ -1474,7 +1490,7 @@ def excel_import_from_csv(
     encoding: str = "utf-8",
     has_header: bool = True
 ) -> Dict[str, Any]:
-    """从CSV创建Excel文件。支持编码和分隔符配置。
+    """从CSV文件创建Excel工作表。
 
     Args:
         csv_path: CSV文件路径
@@ -1501,12 +1517,12 @@ def excel_create_sheet(
     sheet_name: str,
     index: Optional[int] = None
 ) -> Dict[str, Any]:
-    """创建新工作表。可指定插入位置index。
+    """创建新工作表。可指定插入位置index（从0开始，0=最前面）。
 
     Args:
         file_path: Excel文件路径
         sheet_name: 新工作表名称
-        index: 插入位置索引，默认为None
+        index: 插入位置索引（从0开始，默认为None表示追加到末尾）
     """
     return _wrap(ExcelOperations.create_sheet(file_path, sheet_name, index))
 
@@ -1579,13 +1595,13 @@ def excel_copy_sheet(
     index: Optional[int] = None,
     streaming: bool = True
 ) -> Dict[str, Any]:
-    """复制工作表（含数据和格式）。可指定目标文件。
+    """复制工作表（含数据和格式）。新工作表在同一文件内创建。
 
     Args:
         file_path: Excel文件路径
         source_name: 源工作表名称
-        new_name: 新工作表名称，默认为None
-        index: 插入位置索引，默认为None
+        new_name: 新工作表名称，默认为None（自动命名为"源名_副本"）
+        index: 插入位置索引（从0开始），默认为None（追加到末尾）
         streaming: 是否使用流式写入，默认为True
     """
     return _wrap(ExcelOperations.copy_sheet(file_path, source_name, new_name, index, streaming))
@@ -1623,14 +1639,14 @@ def excel_upsert_row(
     header_row: int = 1,
     streaming: bool = True
 ) -> Dict[str, Any]:
-    """按key_column+key_value查找行，存在则更新，不存在则插入。update_columns指定要更新的列。
+    """按key_column+key_value查找行，存在则更新，不存在则插入。updates指定要更新的列。
 
     Args:
         file_path: Excel文件路径
         sheet_name: 工作表名称
         key_column: 键列名
         key_value: 键值
-        updates: 要更新的字段字典
+        updates: 要更新的字段字典（如 {"伤害": 200, "冷却": 5}）
         header_row: 表头行号，默认为1
         streaming: 是否使用流式写入，默认为True
     """
@@ -1647,15 +1663,15 @@ def excel_delete_rows(
     streaming: bool = True,
     condition: str = None
 ) -> Dict[str, Any]:
-    """删除行。支持按索引(row_index)或条件(where_column+where_value)删除。
+    """删除行。支持按行索引(row_index，从1开始)或SQL条件(condition)删除。
 
     Args:
         file_path: Excel文件路径
         sheet_name: 工作表名称
-        row_index: 要删除的行索引，默认为None
+        row_index: 要删除的起始行索引（从1开始），默认为None
         count: 删除的行数，默认为1
         streaming: 是否使用流式写入，默认为True
-        condition: SQL条件表达式，默认为None
+        condition: SQL条件表达式（如 "伤害>100" 或 "名称='火球术'"），默认为None
     """
 
     # condition模式：根据SQL条件查找并删除行
@@ -2215,7 +2231,7 @@ def excel_describe_table(
     file_path: str,
     sheet_name: str = None
 ) -> Dict[str, Any]:
-    """分析Excel工作表结构：列名、数据类型、空值统计、样本数据。
+    """分析Excel工作表结构：列名、数据类型、非空统计、样本数据。
 
     任何数据操作前应先调用此工具了解表结构，避免列名错误。
     自动识别双行表头（中文描述+英文字段名）。
@@ -2225,9 +2241,11 @@ def excel_describe_table(
         sheet_name: 工作表名称，默认为None表示第一个工作表
 
     Returns:
-        columns: 列信息列表 {name, type, sample_values}
-        table_stats: 表统计 {total_rows, header_mode}
-        data_quality: 数据质量 {null_counts, completeness_rates}
+        data.sheet_name: 工作表名称
+        data.header_type: 表头类型 ("dual"=双行 / "single"=单行)
+        data.row_count: 数据行数
+        data.column_count: 列数
+        data.columns: 列信息列表 [{name, type, description, non_null, sample_values}]
     """
     # 文件验证和加载
     if not file_path or not file_path.strip():
@@ -2287,7 +2305,7 @@ def excel_describe_table(
 def excel_format_cells(
     file_path: str,
     sheet_name: str,
-    range: str,
+    cell_range: str,
     formatting: Optional[Dict[str, Any]] = None,
     preset: Optional[str] = None,
     start_cell: Optional[str] = None,
@@ -2299,7 +2317,7 @@ def excel_format_cells(
     Args:
         file_path: Excel文件路径
         sheet_name: 工作表名称
-        range: 单元格范围，如 "A1:C10"
+        cell_range: 单元格范围（如 "A1:C10" 或 "Sheet1!A1:C10"，不含!时自动拼接sheet_name）
         formatting: 样式配置字典:
             bold/italic/underline: bool
             font_size: int | font_color/bg_color: str
@@ -2307,7 +2325,7 @@ def excel_format_cells(
             wrap_text: bool | border_style: thin/thick/double/dotted/dashed
             merge: bool (合并) | unmerge: bool (取消合并)
         preset: 预设（bold/italic/highlight/header）
-        start_cell/end_cell: 可选，替代 range 使用
+        start_cell/end_cell: 可选，替代 cell_range 使用
     """
     if formatting is None and preset is None:
         return _fail(
@@ -2318,26 +2336,26 @@ def excel_format_cells(
                     meta={"error_code": "MISSING_REQUIRED_PARAM", "param": "sheet_name"})
 
     if start_cell and end_cell:
-        range = f"{start_cell}:{end_cell}"
-    if '!' not in range:
-        range = f"{sheet_name}!{range}"
+        cell_range = f"{start_cell}:{end_cell}"
+    if '!' not in cell_range:
+        cell_range = f"{sheet_name}!{cell_range}"
 
     # 特殊操作：merge / unmerge / border_style
     if formatting:
         if formatting.get('merge'):
-            return _wrap(ExcelOperations.merge_cells(file_path, sheet_name, range))
+            return _wrap(ExcelOperations.merge_cells(file_path, sheet_name, cell_range))
         if formatting.get('unmerge'):
-            return _wrap(ExcelOperations.unmerge_cells(file_path, sheet_name, range))
+            return _wrap(ExcelOperations.unmerge_cells(file_path, sheet_name, cell_range))
         if 'border_style' in formatting:
             border = formatting.pop('border_style')
-            result = _ensure_dict(ExcelOperations.format_cells(file_path, sheet_name, range, formatting, preset))
+            result = _ensure_dict(ExcelOperations.format_cells(file_path, sheet_name, cell_range, formatting, preset))
             try:
-                _wrap(ExcelOperations.set_borders(file_path, sheet_name, range, border))
+                _wrap(ExcelOperations.set_borders(file_path, sheet_name, cell_range, border))
             except Exception:
                 pass
             return _wrap(result)
 
-    result = _ensure_dict(ExcelOperations.format_cells(file_path, sheet_name, range, formatting, preset))
+    result = _ensure_dict(ExcelOperations.format_cells(file_path, sheet_name, cell_range, formatting, preset))
     if result.get('success') and result.get('data') is None:
         result['message'] += ' (注意：没有单元格需要格式化)'
     return _wrap(result)
@@ -2410,7 +2428,7 @@ def excel_compare_sheets(
         sheet1_name: 第一个工作表名称
         file2_path: 第二个文件路径
         sheet2_name: 第二个工作表名称
-        id_column: ID列名或列索引，默认为1
+        id_column: ID列名（字符串）或列索引（从1开始的整数），默认为1表示第1列
         header_row: 表头行号，默认为1
     """
     for _p in [file1_path, file2_path]:
@@ -2441,7 +2459,7 @@ def main():
     for arg in sys.argv[1:]:
         if arg in ('--stdio', '--sse', '--streamable-http'):
             transport = arg[2:]  # remove '--'
-        elif arg.startswith('----mount-path='):
+        elif arg.startswith('--mount-path='):
             mount_path = arg.split('=', 1)[1]
 
     mcp.run(transport=transport, mount_path=mount_path)

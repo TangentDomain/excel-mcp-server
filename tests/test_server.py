@@ -19,7 +19,6 @@ from src.excel_mcp_server_fastmcp.server import (
     excel_format_cells,
     excel_search,
     excel_find_last_row,
-    excel_evaluate_formula,
     excel_set_formula,
     excel_query
 )
@@ -613,63 +612,6 @@ class TestServerInterfaces:
         assert result['success'] is False
         assert 'message' in result
         assert "工作表不存在" in result['message']
-
-    def test_excel_evaluate_formula_basic_math(self):
-        """Test excel_evaluate_formula with basic mathematical expressions"""
-        # Test simple addition
-        result = excel_evaluate_formula("1+2+3+4+5")
-
-        # Currently the formula evaluation has issues, so we test the interface structure
-        assert 'success' in result
-        assert 'data' in result
-        # The formula calculation may not work yet, but the interface should return proper structure
-        assert isinstance(result['success'], bool)
-
-    def test_excel_evaluate_formula_sum_function(self):
-        """Test excel_evaluate_formula with SUM function"""
-        # Test SUM function with numbers
-        result = excel_evaluate_formula("SUM(1,2,3,4,5)")
-
-        assert 'success' in result
-        assert 'data' in result
-        assert isinstance(result['success'], bool)
-
-    def test_excel_evaluate_formula_average_function(self):
-        """Test excel_evaluate_formula with AVERAGE function"""
-        # Test AVERAGE function with numbers
-        result = excel_evaluate_formula("AVERAGE(10,20,30)")
-
-        assert 'success' in result
-        assert 'data' in result
-        assert isinstance(result['success'], bool)
-
-    def test_excel_evaluate_formula_with_context(self):
-        """Test excel_evaluate_formula with context sheet parameter"""
-        # Test with context sheet
-        result = excel_evaluate_formula("SUM(A1:A10)", "Sheet1")
-
-        assert 'success' in result
-        assert 'data' in result
-        assert isinstance(result['success'], bool)
-
-    def test_excel_evaluate_formula_empty_formula(self):
-        """Test excel_evaluate_formula with empty formula - error handling"""
-        # Test empty formula should return error
-        result = excel_evaluate_formula("")
-
-        assert 'success' in result
-        assert isinstance(result['success'], bool)
-        # Empty formula should fail
-        assert result['success'] is False
-
-    def test_excel_evaluate_formula_complex_expression(self):
-        """Test excel_evaluate_formula with complex mathematical expression"""
-        # Test complex expression with parentheses
-        result = excel_evaluate_formula("(2+3)*4-5")
-
-        assert 'success' in result
-        assert 'data' in result
-        assert isinstance(result['success'], bool)
 
     def test_excel_set_formula_basic(self, sample_excel_file):
         """Test excel_set_formula with basic formula setting"""
