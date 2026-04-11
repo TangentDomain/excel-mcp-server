@@ -541,28 +541,47 @@ mcp = FastMCP(
 
 ## 📊 工具选择决策树
 ```
-数据分析/查询/筛选/聚合？ → excel_query (SQL引擎)
-快速了解单表结构？        → excel_describe_table (列名+类型+样本值+行数)
-批量获取所有表的中英表头？ → excel_get_headers("文件", sheet_name省略)
-定位文本位置？            → excel_search (返回row/column)
-跨文件搜索？              → excel_search_directory
-批量条件修改？            → excel_update_query (SQL UPDATE, 支持dry_run)
-SQL插入数据？            → excel_insert_query (SQL INSERT, 支持dry_run)
-SQL删除数据？            → excel_delete_query (SQL DELETE, 必须WHERE)
-写入指定单元格范围？      → excel_update_range (二维数组写入)
-按ID合并导入配置？        → excel_upsert_row (存在更新/不存在插入)
-批量导入多行数据？        → excel_insert_query (SQL INSERT, 支持dry_run)
-创建配置表变体？          → excel_copy_sheet (复制工作表)
-按ID对比两表差异？        → excel_compare_sheets (对象级: 新增/删除/修改)
-逐单元格对比差异？        → excel_compare_files (单元格级)
-格式调整？                → excel_format_cells (preset: highlight/warning/success)
-文件操作？                → excel_create_file / excel_create_sheet / excel_delete_sheet / excel_rename_sheet / excel_copy_sheet
-列操作？                  → excel_rename_column / excel_insert_columns / excel_delete_columns
-行操作？                  → excel_insert_rows / excel_delete_rows / excel_set_row_height / excel_set_column_width
-查找末行？                → excel_find_last_row (追加数据前必用)
-写入公式？                → excel_set_formula (以=开头)
-备份恢复？                → excel_create_backup / excel_restore_backup / excel_list_backups
-CSV导入导出？            → excel_export_to_csv / excel_import_from_csv
+═══ 读数据 ═══
+读已知单元格？              → excel_get_range（精确读取，如 "Sheet1!A1:C10"）
+需要筛选/聚合/JOIN/排序？   → excel_query（SQL引擎，批量分析首选）
+快速了解表结构？            → excel_describe_table（列名+类型+样本值+行数）
+获取中英表头？              → excel_get_headers（file_path，sheet_name可省略）
+定位文本位置？              → excel_search（返回row/column）
+跨文件搜索？                → excel_search_directory
+
+═══ 写数据 ═══
+写入指定单元格（精确坐标）？ → excel_update_range（二维数组，覆盖模式⚠️）
+按ID增改单行（幂等）？       → excel_upsert_row（存在更新/不存在插入）
+批量条件修改多行？           → excel_update_query（SQL UPDATE，支持dry_run）
+批量插入多行数据？           → excel_insert_query（SQL INSERT，支持dry_run）
+按条件删除行？               → excel_delete_query（SQL DELETE，必须WHERE）
+
+═══ 结构操作 ═══
+文件？                      → excel_create_file / excel_export_to_csv / excel_import_from_csv
+工作表？                    → excel_create_sheet / excel_delete_sheet / excel_rename_sheet / excel_copy_sheet
+行？                        → excel_insert_rows / excel_delete_rows / excel_set_row_height
+列？                        → excel_insert_columns / excel_delete_columns / excel_rename_column / excel_set_column_width
+格式？                      → excel_format_cells（preset: highlight/warning/success）
+公式？                      → excel_set_formula（以=开头）
+末行定位？                  → excel_find_last_row（追加数据前必用）
+
+═══ 对比 & 备份 ═══
+按ID对比两表差异？           → excel_compare_sheets（对象级: 新增/删除/修改）
+逐单元格对比差异？           → excel_compare_files（单元格级）
+备份恢复？                   → excel_create_backup / excel_restore_backup / excel_list_backups
+```
+
+## ⚡ SQL vs Direct 选择原则
+```
+✅ 用 SQL (query/update_query/insert_query/delete_query)：
+   - 需要条件筛选(WHERE)、聚合(GROUP BY)、JOIN、排序(ORDER BY)
+   - 批量操作（影响10行以上）
+   - 需要预览效果(dry_run)
+
+✅ 用 Direct (get_range/update_range/upsert_row)：
+   - 精确坐标操作（知道具体是A1还是C5）
+   - 单行或少量行的精确读写
+   - 需要保持格式/公式的精确区域写入
 ```
 
 ## ✅ SQL已支持功能
@@ -598,38 +617,34 @@ SELECT * FROM (SELECT skill_name, damage FROM 技能配置 WHERE damage > 100) A
 SELECT name FROM 技能配置 WHERE 类型='法师' UNION ALL SELECT name FROM 技能配置 WHERE 类型='战士' ORDER BY name LIMIT 10
 ```
 
-## ✅ 窗口函数 (ROW_NUMBER / RANK / DENSE_RANK)
-在查询结果上计算排名，支持PARTITION BY分区。
-```sql
-SELECT skill_name, skill_type, ROW_NUMBER() OVER (PARTITION BY skill_type ORDER BY damage DESC) as rn FROM 技能配置
-```
-
 ## ⚠️ 重要原则
 - 双行表头: 第1行中文描述+第2行英文字段名，中英文列名均可查询
 - **统一1-based索引: 第1行=1, 第1列=1（所有工具一致，含insert_rows/delete_rows）**
 - **范围格式(cell_range参数): 优先使用 "工作表名!A1:C10"；不含!时单工作表文件自动推断**
-- 默认覆盖: update_range默认为覆盖模式(insert_mode=False)，保留数据需显式设置insert_mode=True
+- **⚠️ update_range默认覆盖模式！保留数据需显式设置insert_mode=True**
 
-## 🎮 游戏配置表示例
-技能统计: SELECT 技能类型, AVG(伤害), COUNT(*) FROM 技能表 GROUP BY 技能类型
-高级筛选: SELECT * FROM 技能表 WHERE 伤害 > (SELECT AVG(伤害) FROM 技能表)
-条件表达式: SELECT 技能名, CASE WHEN 伤害>100 THEN '高' ELSE '低' END AS 等级 FROM 技能表
-CTE: WITH 高伤 AS (SELECT * FROM 技能表 WHERE 伤害>100) SELECT COUNT(*) FROM 高伤
-UNION: SELECT 技能名 FROM 法师技能 UNION ALL SELECT 技能名 FROM 战士技能
-窗口函数: SELECT *, ROW_NUMBER() OVER (PARTITION BY 类型 ORDER BY 伤害 DESC) as 排名 FROM 技能配置
+## 🎮 典型用法示例
+```sql
+-- 聚合统计
+SELECT 技能类型, AVG(伤害), COUNT(*) FROM 技能表 GROUP BY 技能类型
+
+-- 高级筛选+子查询
+SELECT * FROM 技能表 WHERE 伤害 > (SELECT AVG(伤害) FROM 技能表)
+
+-- 跨文件JOIN
+SELECT a.*, b.掉落物品 FROM 技能表@'./data/技能配置.xlsx' a JOIN 掉落表@'./data/掉落配置.xlsx' b ON a.id = b.skill_id
+```
 
 ## 📦 统一返回格式
-所有工具返回统一JSON结构，AI解析时只需检查 `success` 字段：
-- 成功: `{"success": true, "message": "描述", "data": {...}, "meta": {...}}`
-- 失败: `{"success": false, "message": "错误描述+💡修复提示", "meta": {"error_code": "CODE"}}`
-- `data`: 实际数据载荷（查询结果、文件信息等）
-- `meta`: 上下文元数据（行数、列数、执行时间等）
-- `error_code`: 机器可读错误分类（PATH_VALIDATION_FAILED, SQL_EXECUTION_FAILED等）
-- 所有错误均包含💡修复提示，按提示操作即可解决大多数问题
-- SQL查询额外返回 `query_info`（含execution_time_ms、error_type、hint、suggested_fix）
+所有工具返回统一JSON结构：`{success, message, data, meta}`
+- 成功时 `success=true`，`data` 为实际数据
+- 失败时 `success=false`，`meta.error_code` 为机器可读错误码
+- 所有错误均包含💡修复提示
 
-## ⚡ 常用流程
-1. excel_list_sheets → 2. excel_describe_table → 3. excel_query → 4. excel_update_query/excel_update_range → 5. excel_compare_sheets
+## 🔄 常用工作流
+```
+了解结构 → describe_table → 查询分析 → query → 修改数据 → update_query/update_range → 验证结果 → compare_sheets
+```
 """,
     debug=bool(os.environ.get('EXCEL_MCP_DEBUG')),
     log_level="DEBUG" if os.environ.get('EXCEL_MCP_DEBUG') else "WARNING"
@@ -1132,22 +1147,23 @@ def excel_update_range(
     data: List[List[Any]],
     preserve_formulas: bool = True,
     insert_mode: bool = False,
-    streaming: bool = True,
     sheet_name: Optional[str] = None,
     start_cell: Optional[str] = None,
     end_cell: Optional[str] = None
 ) -> Dict[str, Any]:
     """写入数据到指定范围。
 
+    ⚠️ 默认为覆盖模式(insert_mode=False)，会直接替换目标区域数据！
+       如需保留原有数据并插入新行，必须显式设置 insert_mode=True
+
     Args:
         file_path: Excel文件路径
         cell_range: 单元格范围（如 "A1:C10" 或 "Sheet1!A1:C10"，不含!时配合sheet_name使用）
         data: 要写入的数据，二维数组格式
         preserve_formulas: 是否保留已有公式不被覆盖，默认True
-        insert_mode: 数据写入模式，默认False(覆盖模式)
-            - False: 覆盖模式，直接替换目标单元格数据
-            - True: 插入模式，在目标位置插入新行，原有数据下移
-        streaming: 是否使用流式写入，默认True
+        insert_mode: 数据写入模式
+            - False=覆盖模式(默认): 直接替换目标单元格数据 ⚠️
+            - True=插入模式: 在目标位置插入新行，原有数据下移
         sheet_name: 工作表名称（可选，cell_range不含!时自动拼接）
         start_cell: 起始单元格（可选，与end_cell配合使用）
         end_cell: 结束单元格（可选，与start_cell配合使用）
@@ -1220,7 +1236,7 @@ def excel_update_range(
 
     try:
         # 扩展流式路径：支持覆盖模式和插入模式
-        use_streaming = streaming and not preserve_formulas
+        use_streaming = True and not preserve_formulas
         # 插入模式会自动使用流式插入，覆盖模式使用流式覆盖
         result = ExcelOperations.update_range(file_path, cell_range, data, preserve_formulas, insert_mode, use_streaming)
         result = _ensure_dict(result)
@@ -1391,8 +1407,7 @@ def excel_insert_rows(
     file_path: str,
     sheet_name: str,
     row_index: int,
-    count: int = 1,
-    streaming: bool = True
+    count: int = 1
 ) -> Dict[str, Any]:
     """在指定位置插入空行。row_index从1开始（第1行前插入传1）。
 
@@ -1400,10 +1415,8 @@ def excel_insert_rows(
         file_path: Excel文件路径
         sheet_name: 工作表名称
         row_index: 插入位置的行索引（从1开始，在该行上方插入）
-        count: 插入的行数，默认为1
-        streaming: 是否使用流式写入，默认为True
-    """
-    return _wrap(ExcelOperations.insert_rows(file_path, sheet_name, row_index, count, streaming))
+        count: 插入的行数，默认为1    """
+    return _wrap(ExcelOperations.insert_rows(file_path, sheet_name, row_index, count, True))
 
 
 @mcp.tool()
@@ -1412,8 +1425,7 @@ def excel_insert_columns(
     file_path: str,
     sheet_name: str,
     column_index: int,
-    count: int = 1,
-    streaming: bool = True
+    count: int = 1
 ) -> Dict[str, Any]:
     """在指定位置插入空列。column_index从1开始。
 
@@ -1421,10 +1433,8 @@ def excel_insert_columns(
         file_path: Excel文件路径
         sheet_name: 工作表名称
         column_index: 插入位置的列索引（从1开始）
-        count: 插入的列数，默认为1
-        streaming: 是否使用流式写入，默认为True
-    """
-    return _wrap(ExcelOperations.insert_columns(file_path, sheet_name, column_index, count, streaming))
+        count: 插入的列数，默认为1    """
+    return _wrap(ExcelOperations.insert_columns(file_path, sheet_name, column_index, count, True))
 
 
 @mcp.tool()
@@ -1592,8 +1602,7 @@ def excel_copy_sheet(
     file_path: str,
     source_name: str,
     new_name: Optional[str] = None,
-    index: Optional[int] = None,
-    streaming: bool = True
+    index: Optional[int] = None
 ) -> Dict[str, Any]:
     """复制工作表（含数据和格式）。新工作表在同一文件内创建。
 
@@ -1601,10 +1610,8 @@ def excel_copy_sheet(
         file_path: Excel文件路径
         source_name: 源工作表名称
         new_name: 新工作表名称，默认为None（自动命名为"源名_副本"）
-        index: 插入位置索引（从0开始），默认为None（追加到末尾）
-        streaming: 是否使用流式写入，默认为True
-    """
-    return _wrap(ExcelOperations.copy_sheet(file_path, source_name, new_name, index, streaming))
+        index: 插入位置索引（从0开始），默认为None（追加到末尾）    """
+    return _wrap(ExcelOperations.copy_sheet(file_path, source_name, new_name, index, True))
 
 
 @mcp.tool()
@@ -1636,8 +1643,7 @@ def excel_upsert_row(
     key_column: str,
     key_value: Any,
     updates: Dict[str, Any],
-    header_row: int = 1,
-    streaming: bool = True
+    header_row: int = 1
 ) -> Dict[str, Any]:
     """按key_column+key_value查找行，存在则更新，不存在则插入。updates指定要更新的列。
 
@@ -1647,10 +1653,8 @@ def excel_upsert_row(
         key_column: 键列名
         key_value: 键值
         updates: 要更新的字段字典（如 {"伤害": 200, "冷却": 5}）
-        header_row: 表头行号，默认为1
-        streaming: 是否使用流式写入，默认为True
-    """
-    return _wrap(ExcelOperations.upsert_row(file_path, sheet_name, key_column, key_value, updates, header_row, streaming))
+        header_row: 表头行号，默认为1    """
+    return _wrap(ExcelOperations.upsert_row(file_path, sheet_name, key_column, key_value, updates, header_row, True))
 
 
 @mcp.tool()
@@ -1660,7 +1664,6 @@ def excel_delete_rows(
     sheet_name: str,
     row_index: int = None,
     count: int = 1,
-    streaming: bool = True,
     condition: str = None
 ) -> Dict[str, Any]:
     """删除行。支持按行索引(row_index，从1开始)或SQL条件(condition)删除。
@@ -1669,9 +1672,7 @@ def excel_delete_rows(
         file_path: Excel文件路径
         sheet_name: 工作表名称
         row_index: 要删除的起始行索引（从1开始），默认为None
-        count: 删除的行数，默认为1
-        streaming: 是否使用流式写入，默认为True
-        condition: SQL条件表达式（如 "伤害>100" 或 "名称='火球术'"），默认为None
+        count: 删除的行数，默认为1        condition: SQL条件表达式（如 "伤害>100" 或 "名称='火球术'"），默认为None
     """
 
     # condition模式：根据SQL条件查找并删除行
@@ -1751,7 +1752,7 @@ def excel_delete_rows(
                            data={'deleted_rows': 0, 'condition': condition})
 
             # 使用批量删除（一次文件I/O代替N次）- REQ-032 多线程优化
-            result = _ensure_dict(ExcelOperations.batch_delete_rows(file_path, sheet_name, row_numbers, streaming))
+            result = _ensure_dict(ExcelOperations.batch_delete_rows(file_path, sheet_name, row_numbers, True))
             total_deleted = result.get('data', {}).get('deleted_rows', result.get('metadata', {}).get('deleted_rows', 0))
 
             operation_logger.log_operation("operation_result", {
@@ -1790,7 +1791,7 @@ def excel_delete_rows(
     })
 
     try:
-        result = _ensure_dict(ExcelOperations.delete_rows(file_path, sheet_name, row_index, count, streaming))
+        result = _ensure_dict(ExcelOperations.delete_rows(file_path, sheet_name, row_index, count, True))
 
         # 记录操作结果
         operation_logger.log_operation("operation_result", {
@@ -1817,8 +1818,7 @@ def excel_delete_columns(
     file_path: str,
     sheet_name: str,
     column_index: int,
-    count: int = 1,
-    streaming: bool = True
+    count: int = 1
 ) -> Dict[str, Any]:
     """删除指定位置开始的列。column_index从1开始。
 
@@ -1826,9 +1826,7 @@ def excel_delete_columns(
         file_path: Excel文件路径
         sheet_name: 工作表名称
         column_index: 起始列索引（从1开始）
-        count: 删除的列数，默认为1
-        streaming: 是否使用流式写入，默认为True
-    """
+        count: 删除的列数，默认为1    """
     # 开始操作会话
     operation_logger.start_session(file_path)
 
@@ -1840,7 +1838,7 @@ def excel_delete_columns(
     })
 
     try:
-        result = _ensure_dict(ExcelOperations.delete_columns(file_path, sheet_name, column_index, count, streaming))
+        result = _ensure_dict(ExcelOperations.delete_columns(file_path, sheet_name, column_index, count, True))
 
         # 记录操作结果
         operation_logger.log_operation("operation_result", {
@@ -2231,7 +2229,9 @@ def excel_describe_table(
     file_path: str,
     sheet_name: str = None
 ) -> Dict[str, Any]:
-    """分析Excel工作表结构：列名、数据类型、非空统计、样本数据。
+    """分析Excel工作表（sheet）结构：列名、数据类型、非空统计、样本数据。
+
+    ⚠️ 此工具操作的是Excel工作表(sheet)，不是数据库表。名称保留"table"是为了与SQL语法保持一致。
 
     任何数据操作前应先调用此工具了解表结构，避免列名错误。
     自动识别双行表头（中文描述+英文字段名）。
@@ -2397,11 +2397,14 @@ def excel_compare_files(
     file1_path: str,
     file2_path: str
 ) -> Dict[str, Any]:
-    """逐单元格比较两个Excel文件差异。
+    """逐单元格比较两个Excel文件的所有工作表差异（单元格级对比）。
+
+    与 excel_compare_sheets 的区别：本工具逐个单元格比对值，返回每个不同单元格的位置和前后值。
+    适用于：精确找出哪些单元格被修改了。
 
     Args:
-        file1_path: 第一个文件路径
-        file2_path: 第二个文件路径
+        file1_path: 第一个文件路径（基准/旧版本）
+        file2_path: 第二个文件路径（对比/新版本）
     """
     for _p in [file1_path, file2_path]:
         _err = _validate_path(_p)
@@ -2421,12 +2424,15 @@ def excel_compare_sheets(
     id_column: Union[int, str] = 1,
     header_row: int = 1
 ) -> Dict[str, Any]:
-    """比较两个工作表的差异：新增/删除/修改的行和列。
+    """按ID列比较两个工作表的行级差异（对象级对比：新增/删除/修改）。
+
+    与 excel_compare_files 的区别：本工具按ID匹配行，返回行级别的变更摘要（新增/删除/修改了哪些行）。
+    适用于：比较两个版本的配置表，了解数据变动概况。
 
     Args:
-        file1_path: 第一个文件路径
+        file1_path: 第一个文件路径（基准/旧版本）
         sheet1_name: 第一个工作表名称
-        file2_path: 第二个文件路径
+        file2_path: 第二个文件路径（对比/新版本）
         sheet2_name: 第二个工作表名称
         id_column: ID列名（字符串）或列索引（从1开始的整数），默认为1表示第1列
         header_row: 表头行号，默认为1
