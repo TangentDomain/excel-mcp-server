@@ -154,7 +154,6 @@ class TestServerInterfaces:
         assert 'headers' in result
         assert 'header_count' in result
         assert 'sheet_name' in result
-        assert 'header_row' in result
         assert 'message' in result
 
         # Check data content based on sample_excel_file fixture with dual header format
@@ -172,7 +171,7 @@ class TestServerInterfaces:
         assert result['field_names'] == ["name", "age", "department", "salary", "total"]
         assert result['header_count'] == 5
         assert result['sheet_name'] == "Sheet1"
-        assert result['header_row'] == 1
+        assert result['meta']['header_row'] == 1
 
     def test_excel_get_headers_with_max_columns(self, sample_excel_file):
         """Test excel_get_headers with max_columns limit"""
@@ -197,7 +196,7 @@ class TestServerInterfaces:
         assert result['is_dual_header'] is False
         assert result['headers'] == ["name", "age", "department", "salary", "total"]
         assert result['header_count'] >= 4
-        assert result['header_row'] == 2
+        assert result['meta']['header_row'] == 2
 
     def test_excel_get_headers_second_sheet(self, sample_excel_file):
         """Test excel_get_headers on second sheet"""

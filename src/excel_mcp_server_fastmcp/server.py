@@ -48,19 +48,7 @@ from .utils.config import (
     MAX_FILE_SIZE_MB,
     DATA_DENSITY_THRESHOLD,
     LARGE_OPERATION_CELL_THRESHOLD,
-    DATA_QUALITY_MAX_SCORE,
-    DATA_QUALITY_PENALTY_PER_SUGGESTION
 )
-
-# 导入智能配置推荐模块
-try:
-    from .core.smart_config_recommender import SmartConfigurationRecommender
-    SMART_CONFIG_AVAILABLE = True
-    SMART_CONFIG_TOOLS_AVAILABLE = True
-except ImportError:
-    SMART_CONFIG_AVAILABLE = False
-    SMART_CONFIG_TOOLS_AVAILABLE = False
-    logger.warning("智能配置推荐模块未找到，相关功能不可用")
 
 # ==================== 操作日志系统 ====================
 class OperationLogger:
@@ -819,15 +807,6 @@ def _wrap(result, meta: dict = None) -> dict:
     # Token优化：过滤默认值和空值，减少响应体积
     if result.get('success') is True and 'data' in result and isinstance(result['data'], dict):
         result['data'] = _strip_defaults(result['data'])
-        # 向后兼容：将data内的字段展平到顶层（避免破坏已有测试/客户端）
-        for k, v in result['data'].items():
-            if k not in result:
-                result[k] = v
-    # 向后兼容：将meta内的字段也展平到顶层（meta优先级低于data和已有顶层字段）
-    if result.get('success') is True and 'meta' in result and isinstance(result['meta'], dict):
-        for k, v in result['meta'].items():
-            if k not in result:
-                result[k] = v
 
     # 对Operations层返回的错误也附加集中式提示（Operations层无error_code）
     if result.get('success') is False:
@@ -1259,325 +1238,6 @@ def excel_update_range(
 
 @mcp.tool()
 @_track_call
-def excel_assess_data_impact(
-    file_path: str,
-    range: str,
-    operation_type: str = "update",
-    data: Optional[List[List[Any]]] = None,
-    detailed: bool = True
-) -> Dict[str, Any]:
-    """评估修改操作的影响范围。返回受影响行数、关键值变化等，修改前必用。
-
-    Args:
-        file_path: Excel文件路径
-        range: 单元格范围
-        operation_type: 操作类型，默认为"update"
-        data: 要写入的数据，默认为None
-        detailed: 是否返回详细信息，默认为True
-    """
-
-    # 详细模式下先验证范围表达式
-    if detailed:
-        try:
-            range_validation = ExcelValidator.validate_range_expression(range)
-            range_info = range_validation['range_info']
-        except DataValidationError as e:
-            return _fail(f"参数验证失败: {str(e)}", meta={"error_code": "VALIDATION_FAILED"})
-
-    # 获取当前数据
-    current_data_result = ExcelOperations.get_range(file_path, range)
-    current_data_result = _ensure_dict(current_data_result)
-
-    if not current_data_result.get('success'):
-        return _fail(f"无法预览操作: {current_data_result.get('message', '未知错误')}", meta={"error_code": "PREVIEW_FAILED"})
-
-    current_data = current_data_result.get('data', [])
-
-    if not detailed:
-        # 快速预览模式（原preview_operation行为）
-        data_rows = len(current_data)
-        data_cols = len(current_data[0]) if data_rows > 0 else 0
-        total_cells = data_rows * data_cols
-
-        has_data = any(
-            any(cell is not None and str(cell).strip() for cell in row)
-            for row in current_data
-        )
-
-        risk_level = "LOW"
-        if has_data:
-            if total_cells > 100:
-                risk_level = "HIGH"
-            elif total_cells > 20:
-                risk_level = "MEDIUM"
-
-        return _ok("数据影响快速评估完成", data={
-            'operation_type': operation_type,
-            'range': range,
-            'current_data': current_data,
-            'impact_assessment': {
-                'rows_affected': data_rows,
-                'columns_affected': data_cols,
-                'total_cells': total_cells,
-                'has_existing_data': has_data,
-                'risk_level': risk_level
-            },
-            'safety_warning': _generate_safety_warning(operation_type, has_data, risk_level)
-        }, meta={"file_path": file_path, "range": range})
-
-    # 详细评估模式（原assess_data_impact行为）
-    try:
-        # 分析当前数据内容
-        data_analysis = _analyze_current_data(current_data)
-
-        # 计算操作规模
-        scale_info = ExcelValidator.validate_operation_scale(range_info)
-
-        # 评估操作风险
-        risk_assessment = _assess_operation_risk(
-            operation_type,
-            data_analysis,
-            scale_info,
-            data
-        )
-
-        # 生成建议
-        recommendations = _generate_assessment_recommendations(
-            operation_type,
-            data_analysis,
-            risk_assessment,
-            scale_info
-        )
-
-        # 预测结果
-        prediction = _predict_operation_result(
-            operation_type,
-            current_data,
-            data,
-            scale_info
-        )
-
-        return _ok("数据影响详细评估完成", data={
-            'operation_type': operation_type,
-            'range': range,
-            'validation_info': range_validation,
-            'current_data_analysis': data_analysis,
-            'scale_assessment': scale_info,
-            'risk_assessment': risk_assessment,
-            'safety_recommendations': recommendations,
-            'result_prediction': prediction,
-            'impact_summary': {
-                'total_cells': scale_info['total_cells'],
-                'non_empty_cells': data_analysis['non_empty_cell_count'],
-                'data_type_distribution': data_analysis['data_types'],
-                'potential_data_loss': data_analysis['non_empty_cell_count'] if operation_type in ['delete', 'update'] else 0,
-                'overall_risk_level': risk_assessment['overall_risk']
-            }
-        }, meta={"file_path": file_path, "range": range})
-
-    except DataValidationError as e:
-        return _fail(f"参数验证失败: {str(e)}", meta={"error_code": "VALIDATION_FAILED"})
-
-    except Exception as e:
-        return _fail(f"数据影响评估失败: {str(e)}", meta={"error_code": "ASSESSMENT_FAILED"})
-
-
-def _generate_safety_warning(operation_type: str, has_data: bool, risk_level: str) -> str:
-    """生成安全警告"""
-    if risk_level == "HIGH":
-        return f"🔴 高风险警告: {operation_type}操作将影响大量数据，请谨慎操作"
-    elif risk_level == "MEDIUM":
-        return f"🟡 中等风险: {operation_type}操作将影响部分数据，建议先备份"
-    else:
-        return f"✅ 低风险: {operation_type}操作影响较小，可以安全执行"
-
-
-def _analyze_current_data(data: List[List[Any]]) -> Dict[str, Any]:
-    """分析当前数据内容"""
-    if not data:
-        return {
-            'row_count': 0,
-            'column_count': 0,
-            'total_cells': 0,
-            'non_empty_cell_count': 0,
-            'empty_cell_count': 0,
-            'data_types': {},
-            'has_formulas': False,
-            'has_numeric_data': False,
-            'has_text_data': False,
-            'has_dates': False,
-            'completeness_rate': 0.0
-        }
-
-    total_cells = len(data) * max(len(row) for row in data) if data else 0
-    non_empty_cells = 0
-    data_types = {}
-    has_formulas = False
-    has_numeric_data = False
-    has_text_data = False
-    has_dates = False
-
-    for row in data:
-        for cell in row:
-            if cell is not None and str(cell).strip():
-                non_empty_cells += 1
-
-                # 分析数据类型
-                if isinstance(cell, str):
-                    if cell.startswith('='):
-                        has_formulas = True
-                        data_types['formulas'] = data_types.get('formulas', 0) + 1
-                    else:
-                        has_text_data = True
-                        data_types['text'] = data_types.get('text', 0) + 1
-                elif isinstance(cell, (int, float)):
-                    has_numeric_data = True
-                    data_types['numeric'] = data_types.get('numeric', 0) + 1
-                elif isinstance(cell, datetime):
-                    has_dates = True
-                    data_types['dates'] = data_types.get('dates', 0) + 1
-                else:
-                    data_types['other'] = data_types.get('other', 0) + 1
-
-    return {
-        'row_count': len(data),
-        'column_count': max(len(row) for row in data) if data else 0,
-        'total_cells': total_cells,
-        'non_empty_cell_count': non_empty_cells,
-        'empty_cell_count': total_cells - non_empty_cells,
-        'data_types': data_types,
-        'has_formulas': has_formulas,
-        'has_numeric_data': has_numeric_data,
-        'has_text_data': has_text_data,
-        'has_dates': has_dates,
-        'completeness_rate': (non_empty_cells / total_cells * 100) if total_cells > 0 else 0.0
-    }
-
-
-def _assess_operation_risk(
-    operation_type: str,
-    data_analysis: Dict[str, Any],
-    scale_info: Dict[str, Any],
-    new_data: Optional[List[List[Any]]] = None
-) -> Dict[str, Any]:
-    """评估操作风险"""
-    risk_factors = []
-    risk_score = 0
-
-    # 基于操作类型的风险
-    if operation_type == "delete":
-        risk_factors.append("删除操作不可逆")
-        risk_score += 30
-    elif operation_type == "update":
-        if data_analysis['non_empty_cell_count'] > 0:
-            risk_factors.append("将覆盖现有数据")
-            risk_score += 20
-    elif operation_type == "format":
-        risk_factors.append("格式化操作")
-        risk_score += 10
-
-    # 基于数据量的风险
-    if scale_info['total_cells'] > 10000:
-        risk_factors.append("大范围操作")
-        risk_score += 25
-    elif scale_info['total_cells'] > 1000:
-        risk_factors.append("中等范围操作")
-        risk_score += 15
-
-    # 基于数据内容的风险
-    if data_analysis['has_formulas']:
-        risk_factors.append("包含公式数据")
-        risk_score += 15
-
-    if data_analysis['completeness_rate'] > 80:
-        risk_factors.append("高密度数据区域")
-        risk_score += 10
-
-    # 确定整体风险等级
-    if risk_score >= 60:
-        overall_risk = "HIGH"
-    elif risk_score >= 30:
-        overall_risk = "MEDIUM"
-    else:
-        overall_risk = "LOW"
-
-    return {
-        'risk_score': risk_score,
-        'overall_risk': overall_risk,
-        'risk_factors': risk_factors,
-        'requires_backup': overall_risk in ["HIGH", "MEDIUM"],
-        'requires_confirmation': overall_risk == "HIGH"
-    }
-
-
-def _generate_assessment_recommendations(
-    operation_type: str,
-    data_analysis: Dict[str, Any],
-    risk_assessment: Dict[str, Any],
-    scale_info: Dict[str, Any]
-) -> List[str]:
-    """生成详细评估的安全建议"""
-    recommendations = []
-
-    # 基础建议
-    if risk_assessment['requires_backup']:
-        recommendations.append("🔴 强烈建议在操作前创建备份")
-
-    if risk_assessment['requires_confirmation']:
-        recommendations.append("⚠️ 高风险操作，请仔细确认后再执行")
-
-    # 基于数据内容的建议
-    if data_analysis['has_formulas']:
-        recommendations.append("📊 检测到公式数据，建议验证公式的正确性")
-
-    if data_analysis['completeness_rate'] > DATA_DENSITY_THRESHOLD:
-        recommendations.append("💾 数据密度较高，建议先导出重要数据")
-
-    # 基于操作类型的建议
-    if operation_type == "delete":
-        recommendations.append("🗑️ 删除操作不可逆，请确认数据不再需要")
-    elif operation_type == "update":
-        if data_analysis['non_empty_cell_count'] > 0:
-            recommendations.append("✏️ 将覆盖现有数据，建议使用insert_mode=True")
-
-    # 性能建议
-    if scale_info['total_cells'] > LARGE_OPERATION_CELL_THRESHOLD:
-        recommendations.append("⏱️ 大范围操作可能需要较长时间，请耐心等待")
-
-    return recommendations
-
-
-def _predict_operation_result(
-    operation_type: str,
-    current_data: List[List[Any]],
-    new_data: Optional[List[List[Any]]],
-    scale_info: Dict[str, Any]
-) -> Dict[str, Any]:
-    """预测操作结果"""
-    prediction = {
-        'affected_cells': scale_info['total_cells'],
-        'data_overwrite_count': 0,
-        'data_insert_count': 0,
-        'estimated_time': "minimal"
-    }
-
-    if operation_type == "update" and new_data:
-        prediction['data_overwrite_count'] = len([cell for row in current_data for cell in row if cell is not None])
-        prediction['data_insert_count'] = len([cell for row in new_data for cell in row if cell is not None])
-    elif operation_type == "delete":
-        prediction['data_overwrite_count'] = len([cell for row in current_data for cell in row if cell is not None])
-
-    # 估算执行时间
-    if scale_info['total_cells'] > 10000:
-        prediction['estimated_time'] = "long"
-    elif scale_info['total_cells'] > 1000:
-        prediction['estimated_time'] = "medium"
-
-    return prediction
-
-
-@mcp.tool()
-@_track_call
 def excel_get_operation_history(
     file_path: Optional[str] = None,
     limit: int = 20
@@ -1907,30 +1567,6 @@ def excel_convert_format(
 
     return _wrap(ExcelOperations.convert_format(input_path, output_path, target_format))
 
-
-@mcp.tool()
-@_track_call
-def excel_merge_files(
-    input_files: List[str],
-    output_path: str,
-    merge_mode: str = "sheets"
-) -> Dict[str, Any]:
-    """合并多个Excel文件。merge_mode: sheets(每个文件一个表) | append(纵向追加) | columns(横向拼接)。
-
-    Args:
-        input_files: 输入文件路径列表
-        output_path: 输出文件路径
-        merge_mode: 合并模式，默认为"sheets"
-    """
-    for _f in input_files:
-        _err = _validate_path(_f)
-        if _err:
-            return _err
-    _err = _validate_path(output_path)
-    if _err:
-        return _err
-
-    return _wrap(ExcelOperations.merge_files(input_files, output_path, merge_mode))
 
 
 @mcp.tool()
@@ -3163,158 +2799,6 @@ def excel_server_stats() -> Dict[str, Any]:
     return _ok("服务器统计信息", data=stats)
 
 
-# ==================== 用户友好的参数兼容工具 ====================
-@mcp.tool()
-@_track_call
-def excel_get_range_user_friendly(
-    file_path: str,
-    sheet_name: str,
-    start_cell: str,
-    end_cell: str,
-    include_formatting: bool = False
-) -> Dict[str, Any]:
-    """读取指定范围的数据（用户友好版本）。支持单独指定工作表、起始和结束单元格。
-    
-    Args:
-        file_path: Excel文件路径
-        sheet_name: 工作表名称
-        start_cell: 起始单元格，如 "A1"
-        end_cell: 结束单元格，如 "C10"
-        include_formatting: 是否包含格式信息
-    """
-    
-    # 构建范围表达式
-    range_expression = f"{sheet_name}!{start_cell}:{end_cell}"
-
-    try:
-        # 验证工作表存在
-        error_result = _validate_sheet_exists(file_path, sheet_name)
-        if error_result:
-            return error_result
-        
-        # 调用原有的API
-        result = ExcelOperations.get_range(file_path, range_expression, include_formatting)
-        return _wrap(result)
-        
-    except Exception as e:
-        return _wrap(ExcelOperations.get_range(file_path, range_expression, include_formatting))
-
-
-@mcp.tool()
-@_track_call
-def excel_format_cells_user_friendly(
-    file_path: str,
-    sheet_name: str,
-    start_cell: str,
-    end_cell: str,
-    formatting: Optional[Dict[str, Any]] = None,
-    preset: Optional[str] = None
-) -> Dict[str, Any]:
-    """格式化单元格（用户友好版本）。支持单独指定工作表、起始和结束单元格。
-    
-    Args:
-        file_path: Excel文件路径
-        sheet_name: 工作表名称
-        start_cell: 起始单元格，如 "A1"
-        end_cell: 结束单元格，如 "C10"
-        formatting: 样式配置，包含bold/italic/underline等字段
-        preset: 预设样式名称
-    """
-    
-    # 构建范围表达式
-    range_expression = f"{sheet_name}!{start_cell}:{end_cell}"
-
-    try:
-        # 验证工作表存在
-        error_result = _validate_sheet_exists(file_path, sheet_name)
-        if error_result:
-            return error_result
-        
-        # 调用原有的API
-        result = ExcelOperations.format_cells(
-            file_path, sheet_name, f"{start_cell}:{end_cell}", formatting, preset
-        )
-        return _wrap(result)
-        
-    except Exception as e:
-        return _fail(f"格式化失败: {str(e)}")
-
-
-@mcp.tool()
-@_track_call
-def excel_update_range_user_friendly(
-    file_path: str,
-    sheet_name: str,
-    start_cell: str,
-    end_cell: str,
-    data: List[List[Any]],
-    preserve_formulas: bool = True,
-    insert_mode: bool = False,
-    streaming: bool = True
-) -> Dict[str, Any]:
-    """写入数据到指定范围（用户友好版本）。支持单独指定工作表、起始和结束单元格。
-    
-    Args:
-        file_path: Excel文件路径
-        sheet_name: 工作表名称
-        start_cell: 起始单元格，如 "A1"
-        end_cell: 结束单元格，如 "C10"
-        data: 要写入的数据，二维数组格式
-        preserve_formulas: 是否保留已有公式不被覆盖，默认True
-        insert_mode: 数据写入模式，默认False(覆盖模式)
-            - False: 覆盖模式，直接替换目标单元格数据，适合修改现有数据
-            - True: 插入模式，在目标位置插入新行，原有数据下移，适合添加新数据
-        streaming: 是否使用流式写入，默认True
-    """
-    
-    # 构建范围表达式
-    range_expression = f"{sheet_name}!{start_cell}:{end_cell}"
-
-    try:
-        # 验证工作表存在
-        error_result = _validate_sheet_exists(file_path, sheet_name)
-        if error_result:
-            return error_result
-        
-        # 调用原有的API
-        result = ExcelOperations.update_range(
-            file_path, range_expression, data, preserve_formulas, insert_mode, streaming
-        )
-        return _wrap(result)
-        
-    except Exception as e:
-        return _fail(f"数据写入失败: {str(e)}")
-
-
-# ==================== Sheet 验证公共函数 ====================
-def _validate_sheet_exists(file_path: str, sheet_name: str) -> Optional[Dict[str, Any]]:
-    """验证工作表是否存在
-
-    Args:
-        file_path: Excel文件路径
-        sheet_name: 工作表名称
-
-    Returns:
-        如果验证失败，返回错误字典；如果验证通过，返回 None
-    """
-    try:
-        from openpyxl import load_workbook
-        wb = load_workbook(file_path, read_only=True)
-        sheet_names = wb.sheetnames
-        wb.close()
-
-        if sheet_name not in sheet_names:
-            return _fail(
-                f"工作表 '{sheet_name}' 不存在。可用工作表: {', '.join(sheet_names)}",
-                meta={"error_code": "SHEET_NOT_FOUND", "available_sheets": sheet_names}
-            )
-        return None
-    except Exception as e:
-        return _fail(
-            f"验证工作表 '{sheet_name}' 时出错: {str(e)}",
-            meta={"error_code": "SHEET_VALIDATION_ERROR", "sheet_name": sheet_name}
-        )
-
 # ==================== 批量操作工具 ====================
 @mcp.tool()
 @_validate_file_path()
@@ -3535,635 +3019,168 @@ def excel_merge_multiple_files(source_files: List[str], target_file: str, merge_
         return _fail("文件合并失败", meta={"error_code": "OPERATION_FAILED"})
 
 
-# ==================== 图表生成工具 ====================
-@mcp.tool()
-@_validate_file_path()
-@_track_call
-def excel_create_chart(file_path: str, sheet_name: str, chart_type: str, data_range: str, 
-                      title: str = "", chart_name: str = "", position: str = "B15") -> Dict[str, Any]:
-    """在工作表中创建图表。chart_type: line/bar/column/pie/scatter/area等。支持'column'作为'bar'的别名。
-
-    Args:
-        file_path: Excel文件路径
-        sheet_name: 工作表名称
-        chart_type: 图表类型
-        data_range: 数据范围
-        title: 图表标题，默认为空字符串
-        chart_name: 图表名称，默认为空字符串
-        position: 图表位置，默认为"B15"
-    """
-    try:
-        from openpyxl import load_workbook
-        from openpyxl.chart import BarChart, LineChart, PieChart, ScatterChart, Reference
-        from openpyxl.utils import range_boundaries
-
-        wb, ws = ExcelValidator.get_workbook_and_sheet(file_path, sheet_name)
-
-        # 创建图表对象
-        chart_map = {
-            "column": BarChart,
-            "bar": BarChart,
-            "line": LineChart,
-            "pie": PieChart,
-            "scatter": ScatterChart
-        }
-        
-        if chart_type not in chart_map:
-            return _fail("不支持的图表类型", meta={"error_code": "INVALID_PARAMETER", "hint": f"支持的类型: {list(chart_map.keys())}"})
-        
-        chart_class = chart_map[chart_type]
-        chart = chart_class()
-        
-        # 设置图表标题
-        if title:
-            chart.title = title
-        
-        # 设置数据范围
-        min_col, min_row, max_col, max_row = range_boundaries(data_range)
-        
-        data = Reference(ws, min_col=min_col, min_row=min_row, max_col=max_col, max_row=max_row)
-        categories = Reference(ws, min_col=min_col-1 if min_col > 1 else min_col, 
-                              min_row=min_row+1, max_row=max_row)
-        
-        chart.add_data(data, titles_from_data=True)
-        if chart_type != "pie":
-            chart.set_categories(categories)
-        
-        # 设置图表位置
-        if position:
-            chart.anchor = position
-        
-        # 添加图表到工作表
-        ws.add_chart(chart)
-        
-        # 保存文件
-        wb.save(file_path)
-        
-        # 生成图表名称
-        if not chart_name:
-            chart_name = f"图表_{len(ws._charts) + 1}"
-        
-        return _ok("图表创建成功", data={
-            'chart_name': chart_name,
-            'chart_type': chart_type,
-            'data_range': data_range,
-            'sheet_name': sheet_name,
-            'position': position,
-            'title': title,
-            'chart_count': len(ws._charts)
-        })
-
-    except DataValidationError as e:
-        return _fail(e.message, meta={"error_code": "SHEET_NOT_FOUND", "hint": e.hint, "suggested_fix": e.suggested_fix})
-    except Exception as e:
-        return _fail("图表创建失败", meta={"error_code": "OPERATION_FAILED"})
-
-
-@_validate_file_path()
-def excel_create_pivot_table(file_path: str, sheet_name: str, data_range: str, 
-                            rows: List[str], values: List[str], 
-                            columns: Optional[List[str]] = None,
-                            agg_func: str = "sum", 
-                            pivot_sheet_name: str = None) -> Dict[str, Any]:
-    """
-    在Excel中创建数据透视表。支持多种聚合函数，包括'mean'作为'average'的别名。
-    
-    Args:
-        file_path: Excel文件路径
-        sheet_name: 数据所在工作表名称
-        data_range: 数据范围，如 "A1:D100"
-        rows: 行字段列表，如 ["类别", "子类别"]
-        values: 值字段列表，如 ["销售额", "利润"]
-        columns: 列字段列表（可选），如 ["月份"]
-        agg_func: 聚合函数，支持: sum/count/average/mean/max/min/std/var，其中'mean'是'average'的别名
-        pivot_sheet_name: 透视表工作表名称（可选，默认自动生成）
-    
-    Returns:
-        Dict: 透视表创建结果
-    """
-    try:
-        from openpyxl import load_workbook
-        from openpyxl.utils import range_boundaries, get_column_letter
-        import pandas as pd
-        import numpy as np
-
-        wb, ws = ExcelValidator.get_workbook_and_sheet(file_path, sheet_name)
-        
-        # 处理聚合函数别名
-        agg_func_map = {
-            "sum": "sum",
-            "count": "count", 
-            "average": "mean",
-            "mean": "mean",  # 支持'mean'作为'average'的别名
-            "max": "max",
-            "min": "min",
-            "std": "std",
-            "var": "var"
-        }
-        
-        if agg_func not in agg_func_map:
-            return _fail("不支持的聚合函数", meta={"error_code": "INVALID_PARAMETER", 
-                                                   "hint": f"支持的函数: {list(agg_func_map.keys())}"})
-        
-        normalized_agg_func = agg_func_map[agg_func]
-
-        # 解析数据范围
-        min_col, min_row, max_col, max_row = range_boundaries(data_range)
-        
-        # 读取表头和数据到DataFrame
-        headers = []
-        data_rows = []
-        
-        # 读取表头
-        for col in range(min_col, max_col + 1):
-            col_letter = get_column_letter(col)
-            header_cell = ws[f"{col_letter}{min_row}"]
-            headers.append(header_cell.value or f"列{col}")
-        
-        # 读取数据行
-        for row in range(min_row + 1, max_row + 1):
-            row_data = []
-            for col in range(min_col, max_col + 1):
-                col_letter = get_column_letter(col)
-                cell_value = ws[f"{col_letter}{row}"].value
-                row_data.append(cell_value if cell_value is not None else np.nan)
-            data_rows.append(row_data)
-        
-        # 创建DataFrame
-        df = pd.DataFrame(data_rows, columns=headers)
-        
-        # 移除全为NaN的行
-        df = df.dropna(how='all')
-        
-        # 创建透视表
-        index_cols = [col for col in rows if col in df.columns]
-        value_cols = [col for col in values if col in df.columns]
-        
-        if not index_cols or not value_cols:
-            return _fail("行字段或值字段不存在于数据中", meta={"error_code": "INVALID_PARAMETER"})
-        
-        # 创建透视表
-        if columns:
-            column_cols = [col for col in columns if col in df.columns]
-            pivot_df = df.pivot_table(
-                index=index_cols,
-                columns=column_cols,
-                values=value_cols,
-                aggfunc=normalized_agg_func,
-                fill_value=0
-            )
-        else:
-            pivot_df = df.pivot_table(
-                index=index_cols,
-                values=value_cols,
-                aggfunc=normalized_agg_func,
-                fill_value=0
-            )
-        
-        # 确定透视表工作表
-        if pivot_sheet_name:
-            if pivot_sheet_name not in wb.sheetnames:
-                pivot_ws = wb.create_sheet(pivot_sheet_name)
-            else:
-                pivot_ws = wb[pivot_sheet_name]
-                # 清空工作表
-                pivot_ws.delete_rows(1, pivot_ws.max_row)
-        else:
-            pivot_ws = wb.create_sheet(f"透视表_{len(wb.sheetnames) + 1}")
-        
-        # 写入透视表结果
-        row_idx = 1
-        
-        # 写入标题
-        if columns:
-            # 多级列标题的情况
-            header_row = []
-            first_col_headers = pivot_df.columns.get_level_values(0).unique()
-            
-            for i, first_col in enumerate(first_col_headers):
-                # 计算这个列跨多少个第二级列
-                second_cols_for_first = [col[1] for col in pivot_df.columns if col[0] == first_col]
-                col_span = len(second_cols_for_first)
-                
-                if col_span == 1:
-                    header_row.append(str(first_col))
-                else:
-                    # 写入合并的标题
-                    pivot_ws.merge_cells(f"{get_column_letter(min_col + i)}{row_idx}:{get_column_letter(min_col + i + col_span - 1)}{row_idx}")
-                    pivot_ws[f"{get_column_letter(min_col + i)}{row_idx}"] = str(first_col)
-                    header_row.extend([''] * (col_span - 1))
-            
-            # 写入第二级列标题
-            row_idx += 1
-            second_headers = []
-            for col in pivot_df.columns:
-                if len(col) == 2:
-                    second_headers.append(str(col[1]))
-                else:
-                    second_headers.append(str(col))
-            
-            for col_idx, header in enumerate(second_headers):
-                cell_col = min_col + col_idx
-                pivot_ws[f"{get_column_letter(cell_col)}{row_idx}"] = header
-        else:
-            # 单级列标题
-            row_idx += 1
-            for col_idx, header in enumerate(pivot_df.columns):
-                pivot_ws[f"{get_column_letter(min_col + col_idx)}{row_idx}"] = str(header)
-        
-        # 写入行索引和数据
-        row_idx += 1
-        for row_tuple in pivot_df.itertuples(index=True, name=None):
-            index = row_tuple[0]
-            if isinstance(index, tuple):
-                # 多级行索引
-                for i, idx_val in enumerate(index):
-                    pivot_ws[f"{get_column_letter(min_col + i)}{row_idx}"] = str(idx_val)
-            else:
-                # 单级行索引
-                pivot_ws[f"{get_column_letter(min_col)}{row_idx}"] = str(index)
-
-            # 写入数据值
-            values = row_tuple[1:]
-            for col_idx, value in enumerate(values):
-                value_col = min_col + len(pivot_df.columns.get_level_values(0).unique()) + col_idx
-                pivot_ws[f"{get_column_letter(value_col)}{row_idx}"] = float(value) if pd.notna(value) else 0
-
-            row_idx += 1
-        
-        # 添加说明信息
-        info_row = row_idx + 2
-        pivot_ws[f"A{info_row}"] = f"数据源: {sheet_name}!{data_range}"
-        pivot_ws[f"A{info_row + 1}"] = f"聚合函数: {agg_func}"
-        pivot_ws[f"A{info_row + 2}"] = f"创建时间: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}"
-        
-        # 保存文件
-        wb.save(file_path)
-        
-        return _ok("透视表创建成功", data={
-            'pivot_name': f"透视表_{pivot_ws.title}",
-            'sheet_name': pivot_ws.title,
-            'data_range': data_range,
-            'rows': rows,
-            'values': values,
-            'columns': columns or [],
-            'agg_func': agg_func,
-            'row_count': len(pivot_df),
-            'column_count': len(pivot_df.columns),
-            'pivot_rows': len(index_cols),
-            'pivot_cols': len(pivot_df.columns)
-        })
-
-    except DataValidationError as e:
-        return _fail(e.message, meta={"error_code": "SHEET_NOT_FOUND", "hint": e.hint, "suggested_fix": e.suggested_fix})
-    except Exception as e:
-        return _fail("透视表创建失败", meta={"error_code": "OPERATION_FAILED", "error": str(e)})
-
-
-@mcp.tool()
-@_validate_file_path()
-@_track_call
-def excel_list_charts(file_path: str, sheet_name: str = None) -> Dict[str, Any]:
-    """列出工作表中的所有图表信息。
-
-    Args:
-        file_path: Excel文件路径
-        sheet_name: 工作表名称，默认为None表示所有工作表
-    """
-    try:
-        from openpyxl import load_workbook
-        
-        wb = load_workbook(file_path)
-        charts_info = []
-        
-        sheets_to_check = [sheet_name] if sheet_name else wb.sheetnames
-        
-        for sheet in sheets_to_check:
-            if sheet not in wb.sheetnames:
-                continue
-                
-            ws = wb[sheet]
-            
-            for i, chart in enumerate(ws._charts):
-                chart_info = {
-                    'sheet_name': sheet,
-                    'chart_index': i,
-                    'chart_type': getattr(chart, 'type', type(chart).__name__),
-                    'position': str(chart.anchor),
-                    'title': extract_rich_text(chart.title),
-                    'legend': getattr(chart.legend, 'position', None) if chart.legend else None,
-                    'has_data_labels': bool(chart.dLbls) if hasattr(chart, 'dLbls') and chart.dLbls else False
-                }
-                charts_info.append(chart_info)
-        
-        return _ok(f"找到{len(charts_info)}个图表", data={
-            'total_charts': len(charts_info),
-            'charts': charts_info,
-            'sheets_with_charts': len(set([c['sheet_name'] for c in charts_info])),
-            'file_path': file_path
-        })
-        
-    except Exception as e:
-        return _fail("图表列表获取失败", meta={"error_code": "OPERATION_FAILED"})
-
-
 # ==================== 数据验证工具 ====================
+
+# 数据验证错误提示映射
+_VALIDATION_ERROR_MESSAGES = {
+    'list': ('输入错误', '请从下拉列表中选择有效值'),
+    'custom': ('输入错误', '请输入符合要求的值'),
+    'whole_number': ('输入错误', '请输入有效的整数'),
+    'decimal': ('输入错误', '请输入有效的数字'),
+    'date': ('输入错误', '请输入有效的日期（YYYY-MM-DD格式）'),
+    'text_length': ('输入错误', '请输入符合长度要求的文本'),
+}
+
+# 操作符别名映射（snake_case → openpyxl camelCase）
+_OPERATOR_ALIAS = {
+    'between': 'between', 'not_between': 'notBetween',
+    'equal': 'equal', 'not_equal': 'notEqual',
+    'greater_than': 'greaterThan', 'less_than': 'lessThan',
+    'greater_than_or_equal': 'greaterThanOrEqual', 'less_than_or_equal': 'lessThanOrEqual',
+    'notBetween': 'notBetween', 'greaterThan': 'greaterThan',
+    'lessThan': 'lessThan', 'greaterThanOrEqual': 'greaterThanOrEqual',
+    'lessThanOrEqual': 'lessThanOrEqual', 'notEqual': 'notEqual',
+}
+_VALID_OPERATORS = set(_OPERATOR_ALIAS.values())
+
+# 验证类型到 openpyxl 类型的映射
+_TYPE_MAPPING = {
+    'whole_number': 'whole',
+    'text_length': 'textLength',
+}
+
+
+def _parse_validation_values(validation_type: str, parts: list):
+    """解析并转换验证条件的值。返回 (operator, value1, value2) 或抛出 ValueError。"""
+    operator_raw = parts[0]
+    value1 = parts[1]
+    value2 = parts[2] if len(parts) > 2 else None
+
+    operator = _OPERATOR_ALIAS.get(operator_raw)
+    if not operator or operator not in _VALID_OPERATORS:
+        raise ValueError(f"不支持的操作符: {operator_raw}")
+
+    # 值类型转换
+    converters = {
+        'whole_number': lambda v: str(int(float(v))),
+        'decimal': lambda v: str(float(v)),
+        'text_length': lambda v: str(int(float(v))),
+        'date': lambda v: __import__('datetime').datetime.strptime(v, '%Y-%m-%d').strftime('%Y-%m-%d'),
+    }
+    conv = converters.get(validation_type)
+    if conv:
+        try:
+            value1 = conv(value1)
+            if value2:
+                value2 = conv(value2)
+        except (ValueError, TypeError) as e:
+            raise ValueError(f"值类型转换失败: {e}")
+
+    # between/notBetween 必须有两个值
+    if operator in ('between', 'notBetween') and not value2:
+        raise ValueError(f"操作符 '{operator}' 需要两个值")
+
+    return operator, value1, value2
+
+
 @mcp.tool()
 @_validate_file_path()
 @_track_call
 def excel_set_data_validation(file_path: str, sheet_name: str, range_address: str,
-                            validation_type: str, criteria: str, input_title: str = "",
-                            input_message: str = "") -> Dict[str, Any]:
+                            validation_type: str, criteria: str,
+                            input_title: str = "", input_message: str = "") -> Dict[str, Any]:
     """设置数据验证规则。
 
     支持的验证类型:
-        - list: 下拉列表验证
-        - whole_number: 整数验证
-        - decimal: 小数验证
-        - date: 日期验证
+        - list: 下拉列表验证（criteria 为列表源，如 "A1:A10" 或 "选项1,选项2,选项3"）
+        - whole_number: 整数验证（criteria 格式: "操作符,值1,值2"，如 "between,1,100"）
+        - decimal: 小数验证（同上格式）
+        - date: 日期验证（值格式: YYYY-MM-DD）
         - text_length: 文本长度验证
-        - custom: 自定义公式验证
+        - custom: 自定义公式验证（criteria 为公式表达式）
 
-    验证规则创建逻辑:
-        1. 类型映射（代码 3820-3831行）: 将用户输入的验证类型映射到 openpyxl 要求的格式
-           - 验证类型检查（3820-3824行）：验证类型必须是 ['list', 'whole_number', 'decimal', 'date', 'text_length', 'custom'] 之一
-           - 类型映射（3826-3831行）:
-             - 'whole_number' → 'whole'
-             - 'text_length' → 'textLength'
-             - 其他类型（list/decimal/date/custom）保持不变
-
-        2. 根据验证类型构建验证参数（代码 3833-3920行）:
-           - list（代码 3838-3845行）: 使用 formula1 指定列表源，showDropDown=True, allow_blank=True
-           - custom（代码 3846-3852行）: 使用 formula1 指定自定义公式，allow_blank=True
-           - whole_number/decimal/date/text_length（代码 3853-3918行）: 解析操作符和值
-             * 格式: "操作符,值1,值2"
-             * 操作符: between/notBetween/equal/notEqual/greaterThan/lessThan/greaterThanOrEqual/lessThanOrEqual
-             * 部分操作符需要两个值（between/notBetween），部分只需一个值（equal/greaterThan等）
-             * 值转换逻辑:
-               - whole_number: 值转换为整数（int(float(value))），自动截断小数部分
-               - decimal: 值转换为浮点数（float(value)）
-               - date: 值必须为 YYYY-MM-DD 格式，使用 datetime.strptime 验证并标准化
-               - text_length: 值转换为整数（int(float(value))）
-
-        3. 创建 DataValidation 对象并应用（代码 3922-3983行）:
-           - 创建 DataValidation 对象（3922行）
-           - 设置错误提示（代码 3924-3940行）: 根据验证类型设置不同的 errorTitle 和 error 消息
-           - 设置输入提示（代码 3942-3946行）: 使用 input_title 和 input_message
-           - 添加到指定单元格范围（代码 3948-3950行）: dv.add(range_address), ws.add_data_validation(dv)
-           - 保存工作簿（代码 3953-3983行）: wb.save(file_path)（包含异常处理和返回结果）
+    操作符: between/notBetween/equal/notEqual/greaterThan/lessThan/greaterThanOrEqual/lessThanOrEqual
 
     Args:
         file_path: Excel文件路径
         sheet_name: 工作表名称
-        range_address: 单元格范围
+        range_address: 单元格范围（如 "A1:C10"）
         validation_type: 验证类型
-        criteria: 验证条件
-            - list: 列表源（如 "A1:A10" 或 "选项1,选项2,选项3"）
-            - whole_number/decimal/date/text_length: 格式为 "操作符,值1,值2"
-              操作符: between/notBetween/equal/notEqual/greaterThan/lessThan/greaterThanOrEqual/lessThanOrEqual
-              示例: "between,1,100" 或 "greaterThan,0"
-            - custom: 自定义公式（如 "=AND(A1>0,A1<100)"）
-        input_title: 输入提示标题，默认为空字符串
-        input_message: 输入提示内容，默认为空字符串
-
-    Returns:
-        Dict[str, Any]: 包含验证设置结果的字典：
-            - success: 操作是否成功（bool）
-            - message: 操作结果消息（str）
-            - data: 验证详情（dict），包含以下字段：
-                - validation_type: 验证类型（str）
-                - criteria: 验证条件（str）
-                - range_address: 单元格范围（str）
-                - sheet_name: 工作表名称（str）
-                - input_title: 输入提示标题（str）
-                - input_message: 输入提示内容（str）
-                - validation_count: 当前工作表中的验证规则总数（int）
+        criteria: 验证条件（见上方说明）
+        input_title: 输入提示标题
+        input_message: 输入提示内容
     """
+    from openpyxl.worksheet.datavalidation import DataValidation
+
     wb = None
     try:
-        # 参数校验：sheet_name是必需参数
-        if not sheet_name or not sheet_name.strip():
-            return _fail(
-                '缺少必需参数 sheet_name（工作表名称）。请提供有效的工作表名称，如 "Sheet1"。可通过 excel_list_sheets(file) 查看可用工作表。',
-                meta={"error_code": "MISSING_REQUIRED_PARAM", "param": "sheet_name", "hint": "sheet_name 为必需参数"}
-            )
-        if not range_address or not range_address.strip():
-            return _fail(
-                '缺少必需参数 range_address（单元格范围）。请提供有效的范围，如 "A1:C10"。',
-                meta={"error_code": "MISSING_REQUIRED_PARAM", "param": "range_address", "hint": "range_address 为必需参数"}
-            )
-        if not validation_type or not validation_type.strip():
-            return _fail(
-                '缺少必需参数 validation_type（验证类型）。支持的类型: list, whole_number, decimal, date, text_length, custom',
-                meta={"error_code": "MISSING_REQUIRED_PARAM", "param": "validation_type", "hint": "validation_type 为必需参数"}
-            )
+        # 参数校验
+        for param_name, param_val, hint in [
+            ("sheet_name", sheet_name, '工作表名称，如 "Sheet1"'),
+            ("range_address", range_address, '单元格范围，如 "A1:C10"'),
+            ("validation_type", validation_type, "list/whole_number/decimal/date/text_length/custom"),
+        ]:
+            if not param_val or not param_val.strip():
+                return _fail(
+                    f'缺少必需参数 {param_name}（{hint}）。',
+                    meta={"error_code": "MISSING_REQUIRED_PARAM", "param": param_name})
 
-        from openpyxl import load_workbook
-        from openpyxl.worksheet.datavalidation import DataValidation
-
-        logger.info(f"[DATA_VALIDATION] 开始设置数据验证 - file_path={file_path}, sheet_name={sheet_name}, range_address={range_address}, validation_type={validation_type}, criteria={criteria}, input_title={input_title}, input_message={input_message}")
-
-        wb, ws = ExcelValidator.get_workbook_and_sheet(file_path, sheet_name)
-        logger.info(f"[DATA_VALIDATION] 成功获取工作簿和工作表 - current_validations_count={len(ws.data_validations)}")
-
-        # 验证类型映射和检查
         supported_types = ['list', 'whole_number', 'decimal', 'date', 'text_length', 'custom']
         if validation_type not in supported_types:
             return _fail(f"不支持的验证类型: {validation_type}，支持的类型: {','.join(supported_types)}",
                         meta={"error_code": "VALIDATION_FAILED"})
 
-        # 映射验证类型到 openpyxl 要求的格式
-        type_mapping = {
-            'whole_number': 'whole',
-            'text_length': 'textLength',
-        }
-        openpyxl_type = type_mapping.get(validation_type, validation_type)
-        logger.info(f"[DATA_VALIDATION] 验证类型映射 - validation_type={validation_type} -> openpyxl_type={openpyxl_type}")
-
-        # 步骤1: 创建数据验证对象基础参数
+        wb, ws = ExcelValidator.get_workbook_and_sheet(file_path, sheet_name)
+        openpyxl_type = _TYPE_MAPPING.get(validation_type, validation_type)
         dv_kwargs = {'type': openpyxl_type}
-        logger.debug(f"[DATA_VALIDATION] 初始化 dv_kwargs - type={openpyxl_type}")
 
-        # 步骤2: 根据验证类型构建特定参数
-        try:
-            if validation_type == 'list':
-                # 列表类型：formula1 为列表源
-                logger.info(f"[DATA_VALIDATION] 处理 list 类型 - criteria={criteria}")
-                if not criteria or not criteria.strip():
-                    logger.error(f"[DATA_VALIDATION] list 类型失败 - criteria 为空")
-                    return _fail("列表验证类型必须提供 criteria 参数（列表源）",
-                                meta={"error_code": "VALIDATION_FAILED"})
-                dv_kwargs['formula1'] = criteria
-                dv_kwargs['showDropDown'] = True
-                dv_kwargs['allow_blank'] = True
-                logger.info(f"[DATA_VALIDATION] list 类型参数设置完成 - formula1={criteria}, showDropDown=True, allow_blank=True")
-            elif validation_type == 'custom':
-                # 自定义公式：formula1 为公式表达式
-                logger.info(f"[DATA_VALIDATION] 处理 custom 类型 - criteria={criteria}")
-                if not criteria or not criteria.strip():
-                    logger.error(f"[DATA_VALIDATION] custom 类型失败 - criteria 为空")
-                    return _fail("自定义验证类型必须提供 criteria 参数（公式表达式）",
-                                meta={"error_code": "VALIDATION_FAILED"})
-                dv_kwargs['formula1'] = criteria
-                dv_kwargs['allow_blank'] = True
-                logger.info(f"[DATA_VALIDATION] custom 类型参数设置完成 - formula1={criteria}, allow_blank=True")
-            elif validation_type in ['whole_number', 'decimal', 'date', 'text_length']:
-                # 数值/日期/长度类型：需要解析操作符和值
-                logger.info(f"[DATA_VALIDATION] 处理 {validation_type} 类型 - criteria={criteria}")
-                if not criteria or not criteria.strip():
-                    logger.error(f"[DATA_VALIDATION] {validation_type} 类型失败 - criteria 为空")
-                    return _fail(f"{validation_type} 验证类型必须提供 criteria 参数（格式: '操作符,值1,值2'）",
-                                meta={"error_code": "VALIDATION_FAILED"})
+        # 根据验证类型构建参数
+        if validation_type == 'list':
+            if not criteria or not criteria.strip():
+                return _fail("列表验证必须提供 criteria（列表源）", meta={"error_code": "VALIDATION_FAILED"})
+            dv_kwargs.update(formula1=criteria, showDropDown=True, allow_blank=True)
 
+        elif validation_type == 'custom':
+            if not criteria or not criteria.strip():
+                return _fail("自定义验证必须提供 criteria（公式表达式）", meta={"error_code": "VALIDATION_FAILED"})
+            dv_kwargs.update(formula1=criteria, allow_blank=True)
+
+        else:  # whole_number / decimal / date / text_length
+            if not criteria or not criteria.strip():
+                return _fail(f"{validation_type} 验证必须提供 criteria（格式: '操作符,值1,值2'）",
+                            meta={"error_code": "VALIDATION_FAILED"})
+            try:
                 parts = [p.strip() for p in criteria.split(',')]
-                logger.debug(f"[DATA_VALIDATION] 解析 criteria 结果 - parts_count={len(parts)}, parts={parts}")
                 if len(parts) < 2:
-                    logger.error(f"[DATA_VALIDATION] criteria 格式错误 - parts_count={len(parts)} < 2")
-                    return _fail(f"验证条件格式错误，应为 '操作符,值1,值2'，当前为: {criteria}",
-                                meta={"error_code": "VALIDATION_FAILED"})
+                    raise ValueError(f"格式错误，应为 '操作符,值1,值2'")
+                operator, v1, v2 = _parse_validation_values(validation_type, parts)
+                dv_kwargs.update(operator=operator, formula1=v1, allow_blank=True)
+                if v2:
+                    dv_kwargs['formula2'] = v2
+            except ValueError as e:
+                err = str(e)
+                if "值类型转换失败" in err:
+                    return _fail(err, meta={"error_code": "VALIDATION_FAILED"})
+                return _fail(f"验证条件格式错误: {err}", meta={"error_code": "VALIDATION_FAILED"})
 
-                operator = parts[0]
-                value1 = parts[1]
-                value2 = parts[2] if len(parts) > 2 else None
-                logger.debug(f"[DATA_VALIDATION] 解析操作符和值 - operator={operator}, value1={value1}, value2={value2}")
-
-                # 操作符名映射：支持 snake_case 和 camelCase
-                operator_alias = {
-                    'between': 'between', 'not_between': 'notBetween',
-                    'equal': 'equal', 'not_equal': 'notEqual',
-                    'greater_than': 'greaterThan', 'less_than': 'lessThan',
-                    'greater_than_or_equal': 'greaterThanOrEqual', 'less_than_or_equal': 'lessThanOrEqual',
-                    'notBetween': 'notBetween', 'greaterThan': 'greaterThan',
-                    'lessThan': 'lessThan', 'greaterThanOrEqual': 'greaterThanOrEqual',
-                    'lessThanOrEqual': 'lessThanOrEqual', 'notEqual': 'notEqual',
-                }
-                operator = operator_alias.get(operator)
-                if not operator:
-                    logger.error(f"[DATA_VALIDATION] 不支持的操作符 - operator={parts[0]}")
-                    return _fail(f"不支持的操作符: {parts[0]}，支持的操作符: {','.join(sorted(set(operator_alias.values())))}",
-                                meta={"error_code": "VALIDATION_FAILED"})
-                valid_operators = list(set(operator_alias.values()))
-                if operator not in valid_operators:
-                    logger.error(f"[DATA_VALIDATION] 不支持的操作符 - operator={operator}")
-                    return _fail(f"不支持的操作符: {operator}，支持的操作符: {','.join(valid_operators)}",
-                                meta={"error_code": "VALIDATION_FAILED"})
-                logger.debug(f"[DATA_VALIDATION] 操作符验证通过 - operator={operator}")
-
-                # 根据验证类型进行值转换和验证
-                try:
-                    if validation_type == 'whole_number':
-                        logger.debug(f"[DATA_VALIDATION] 整数转换 - value1={value1}, value2={value2}")
-                        # 整数验证：值必须是整数，自动截断小数部分
-                        value1 = str(int(float(value1)))
-                        if value2:
-                            value2 = str(int(float(value2)))
-                        logger.debug(f"[DATA_VALIDATION] 整数转换完成 - value1={value1}, value2={value2}")
-                    elif validation_type == 'decimal':
-                        logger.debug(f"[DATA_VALIDATION] 小数转换 - value1={value1}, value2={value2}")
-                        # 小数验证：值可以是小数或整数
-                        value1 = str(float(value1))
-                        if value2:
-                            value2 = str(float(value2))
-                        logger.debug(f"[DATA_VALIDATION] 小数转换完成 - value1={value1}, value2={value2}")
-                    elif validation_type == 'date':
-                        # 日期验证：验证并标准化日期格式
-                        logger.debug(f"[DATA_VALIDATION] 日期验证和转换 - value1={value1}, value2={value2}")
-                        from datetime import datetime
-                        try:
-                            # 验证并标准化为 YYYY-MM-DD 格式
-                            parsed_date1 = datetime.strptime(value1, '%Y-%m-%d')
-                            value1 = parsed_date1.strftime('%Y-%m-%d')
-                            if value2:
-                                parsed_date2 = datetime.strptime(value2, '%Y-%m-%d')
-                                value2 = parsed_date2.strftime('%Y-%m-%d')
-                            logger.debug(f"[DATA_VALIDATION] 日期转换完成 - value1={value1}, value2={value2}")
-                        except ValueError:
-                            logger.error(f"[DATA_VALIDATION] 日期格式错误 - value1={value1}, value2={value2}")
-                            return _fail(f"日期格式错误，应为 YYYY-MM-DD 格式，当前: {value1}{',' + value2 if value2 else ''}",
-                                        meta={"error_code": "VALIDATION_FAILED"})
-                    elif validation_type == 'text_length':
-                        logger.debug(f"[DATA_VALIDATION] 文本长度转换 - value1={value1}, value2={value2}")
-                        # 文本长度验证：值必须是整数
-                        value1 = str(int(float(value1)))
-                        if value2:
-                            value2 = str(int(float(value2)))
-                        logger.debug(f"[DATA_VALIDATION] 文本长度转换完成 - value1={value1}, value2={value2}")
-                except ValueError as e:
-                    logger.error(f"[DATA_VALIDATION] 值类型转换失败 - validation_type={validation_type}, error={str(e)}")
-                    return _fail(f"值类型转换失败: {str(e)}，验证类型: {validation_type}",
-                                meta={"error_code": "VALIDATION_FAILED"})
-
-                dv_kwargs['operator'] = operator
-                dv_kwargs['formula1'] = value1
-                if value2:
-                    dv_kwargs['formula2'] = value2
-                dv_kwargs['allow_blank'] = True
-                logger.info(f"[DATA_VALIDATION] {validation_type} 类型参数设置完成 - operator={operator}, formula1={value1}, formula2={value2}, allow_blank=True")
-
-                # 检查是否需要两个值
-                if operator in ['between', 'notBetween'] and not value2:
-                    logger.error(f"[DATA_VALIDATION] 操作符需要两个值但未提供 - operator={operator}")
-                    return _fail(f"操作符 '{operator}' 需要两个值，请提供 '操作符,值1,值2' 格式",
-                                meta={"error_code": "VALIDATION_FAILED"})
-        except Exception as e:
-            logger.error(f"[DATA_VALIDATION] 验证条件解析异常 - error={str(e)}, error_type={type(e).__name__}")
-            return _fail(f"验证条件解析失败: {str(e)}", meta={"error_code": "VALIDATION_FAILED"})
-
-        logger.info(f"[DATA_VALIDATION] 创建 DataValidation 对象 - dv_kwargs={dv_kwargs}")
+        # 创建 DataValidation 对象
         dv = DataValidation(**dv_kwargs)
-        logger.info(f"[DATA_VALIDATION] DataValidation 对象创建成功 - type={dv.type}, operator={getattr(dv, 'operator', 'N/A')}, formula1={dv.formula1}, formula2={getattr(dv, 'formula2', 'N/A')}")
 
-        # 设置错误提示
+        # 错误提示（查表驱动）
         dv.showErrorMessage = True
-        if validation_type in ['list', 'custom']:
-            dv.errorTitle = '输入错误'
-            dv.error = '请从下拉列表中选择有效值' if validation_type == 'list' else '请输入符合要求的值'
-        elif validation_type == 'whole_number':
-            dv.errorTitle = '输入错误'
-            dv.error = '请输入有效的整数'
-        elif validation_type == 'decimal':
-            dv.errorTitle = '输入错误'
-            dv.error = '请输入有效的数字'
-        elif validation_type == 'date':
-            dv.errorTitle = '输入错误'
-            dv.error = '请输入有效的日期（YYYY-MM-DD格式）'
-        elif validation_type == 'text_length':
-            dv.errorTitle = '输入错误'
-            dv.error = '请输入符合长度要求的文本'
-        logger.debug(f"[DATA_VALIDATION] 错误提示设置完成 - errorTitle={dv.errorTitle}, error={dv.error}")
+        err_title, err_msg = _VALIDATION_ERROR_MESSAGES.get(validation_type, ('输入错误', '请输入有效值'))
+        dv.errorTitle, dv.error = err_title, err_msg
 
-        # 设置输入提示
+        # 输入提示
         if input_title or input_message:
             dv.showInputMessage = True
-            dv.promptTitle = input_title
-            dv.prompt = input_message
-            logger.debug(f"[DATA_VALIDATION] 输入提示设置完成 - showInputMessage=True, promptTitle={input_title}, prompt={input_message}")
+            dv.promptTitle, dv.prompt = input_title, input_message
 
-        # 添加应用到指定范围
-        logger.info(f"[DATA_VALIDATION] 应用验证到范围 - range_address={range_address}")
+        # 应用并保存
         dv.add(range_address)
-        logger.debug(f"[DATA_VALIDATION] dv.add 完成 - sqref={dv.sqref if hasattr(dv, 'sqref') else 'N/A'}")
         ws.add_data_validation(dv)
-        logger.info(f"[DATA_VALIDATION] 验证已添加到工作表 - validations_count_before_save={len(ws.data_validations)}")
+        wb.save(file_path)
 
-        # 保存文件
-        try:
-            logger.info(f"[DATA_VALIDATION] 开始保存文件 - file_path={file_path}")
-            wb.save(file_path)
-            logger.info(f"[DATA_VALIDATION] 文件保存成功 - file_path={file_path}")
-        except Exception as save_error:
-            logger.error(f"[DATA_VALIDATION] 文件保存失败 - file_path={file_path}, error={str(save_error)}, error_type={type(save_error).__name__}")
-            return _fail(f"数据验证设置成功但保存文件失败: {str(save_error)}", 
-                        meta={"error_code": "SAVE_FAILED", "validation_data": {
-                            'validation_type': validation_type,
-                            'criteria': criteria,
-                            'range_address': range_address,
-                            'sheet_name': sheet_name,
-                            'input_title': input_title,
-                            'input_message': input_message
-                        }})
-
-        logger.info(f"[DATA_VALIDATION] 数据验证设置成功 - validation_count={len(ws.data_validations)}")
         return _ok("数据验证设置成功", data={
             'validation_type': validation_type,
             'criteria': criteria,
@@ -4171,21 +3188,15 @@ def excel_set_data_validation(file_path: str, sheet_name: str, range_address: st
             'sheet_name': sheet_name,
             'input_title': input_title,
             'input_message': input_message,
-            'validation_count': len(ws.data_validations)
+            'validation_count': len(ws.data_validations),
         })
 
     except Exception as e:
-        # 捕获所有异常，包括DataValidationError
         error_msg = str(e)
-        error_type = type(e).__name__
-        logger.error(f"[DATA_VALIDATION] 全局异常捕获 - error_type={error_type}, error_msg={error_msg}")
-        if "DataValidationError" in error_msg or "data validation" in error_msg.lower():
-            logger.error(f"[DATA_VALIDATION] 识别为数据验证规则错误 - error_code=VALIDATION_RULE_ERROR")
-            return _fail(f"数据验证规则错误: {error_msg}", 
-                        meta={"error_code": "VALIDATION_RULE_ERROR", "suggested_fix": "检查验证条件和参数格式"})
-        else:
-            logger.error(f"[DATA_VALIDATION] 识别为一般操作失败 - error_code=OPERATION_FAILED")
-            return _fail(f"数据验证设置失败: {error_msg}", meta={"error_code": "OPERATION_FAILED"})
+        is_dv_error = "DataValidationError" in error_msg or "data validation" in error_msg.lower()
+        code = "VALIDATION_RULE_ERROR" if is_dv_error else "OPERATION_FAILED"
+        return _fail(f"数据验证{'规则错误' if is_dv_error else '设置失败'}: {error_msg}",
+                    meta={"error_code": code})
     finally:
         if wb is not None:
             wb.close()
@@ -4521,300 +3532,20 @@ def excel_write_only_override(
 
 
 # ==================== 主程序 ====================
-# ==================== 智能配置推荐工具 ====================
+    """Entry point for excel-mcp-server-fastmcp.
 
-if SMART_CONFIG_AVAILABLE:
-    # 智能配置推荐工具
-    @mcp.tool()
-    def recommend_excel_config(
-        file_path: str,
-        game_type: Optional[str] = None,
-        optimization_level: str = "balanced"
-    ) -> str:
-        """
-        智能推荐Excel配置结构
-        
-        Args:
-            file_path: Excel文件路径
-            game_type: 游戏类型 (rpg/strategy/action/puzzle/simulation)，如不指定自动检测
-            optimization_level: 优化级别 (basic/balanced/aggressive)
-        
-        Returns:
-            智能配置推荐结果JSON字符串
-        """
-        try:
-            # 创建智能推荐器实例
-            recommender = SmartConfigurationRecommender()
-            
-            # 读取Excel数据
-            excel_data = ExcelOperations.read_excel_file(file_path)
-            
-            # 进行智能配置推荐
-            recommendations = recommender.recommend_configurations(excel_data)
-            
-            # 根据优化级别调整建议详细程度
-            if optimization_level == "basic":
-                # 只保留核心建议
-                result = {
-                    "game_type": recommendations["game_type"],
-                    "core_recommendations": recommendations["config_recommendations"][:3],
-                    "critical_validation_rules": [r for r in recommendations["validation_rules"] if r["priority"] == "high"]
-                }
-            elif optimization_level == "aggressive":
-                # 添加详细的优化建议
-                result = {
-                    "game_type": recommendations["game_type"],
-                    "full_analysis": recommendations["analysis"],
-                    "all_recommendations": recommendations["config_recommendations"],
-                    "all_validation_rules": recommendations["validation_rules"],
-                    "optimization_tips": recommendations["optimization_tips"],
-                    "summary": _generate_summary(recommendations)
-                }
-            else:
-                # balanced 默认模式
-                result = {
-                    "game_type": recommendations["game_type"],
-                    "analysis_summary": _generate_summary(recommendations),
-                    "key_recommendations": recommendations["config_recommendations"][:5],
-                    "important_validation_rules": recommendations["validation_rules"][:10]
-                }
-            
-            return _ok("智能配置推荐完成", result)
-            
-        except Exception as e:
-            error_msg = f"配置推荐失败: {str(e)}"
-            logger.error(error_msg)
-            return _fail(error_msg, meta={"error_code": "SMART_CONFIG_FAILED"})
-    
-    @mcp.tool()
-    def analyze_game_patterns(
-        file_path: str,
-        target_sheet: Optional[str] = None
-    ) -> str:
-        """
-        分析游戏模式和数据结构
-        
-        Args:
-            file_path: Excel文件路径
-            target_sheet: 指定分析特定工作表，如不分析所有工作表
-        
-        Returns:
-            游戏模式分析结果JSON字符串
-        """
-        try:
-            # 创建分析器
-            analyzer = ConfigurationAnalyzer()
-            
-            # 读取Excel数据
-            excel_data = ExcelOperations.read_excel_file(file_path)
-            
-            # 分析数据结构
-            analysis = analyzer.analyze_excel_structure(excel_data)
-            
-            # 检测游戏类型
-            game_type = analyzer.detector.detect_game_type(excel_data)
-            
-            result = {
-                "detected_game_type": game_type,
-                "analysis_scope": target_sheet if target_sheet else "all_sheets",
-                "data_patterns": analysis.get("data_patterns", {}),
-                "structure_analysis": analysis.get("sheet_structure", {}),
-                "optimization_suggestions": analysis.get("optimization_suggestions", []),
-                "data_quality_score": _calculate_data_quality_score(analysis)
-            }
-            
-            return _ok("游戏模式分析完成", result)
-            
-        except Exception as e:
-            error_msg = f"游戏模式分析失败: {str(e)}"
-            logger.error(error_msg)
-            return _fail(error_msg, meta={"error_code": "ANALYSIS_FAILED"})
-    
-    @mcp.tool()
-    def generate_validation_rules(
-        file_path: str,
-        rule_categories: Optional[List[str]] = None
-    ) -> str:
-        """
-        基于游戏配置生成验证规则
-        
-        Args:
-            file_path: Excel文件路径
-            rule_categories: 规则类别列表，如不生成全部类别
-        
-        Returns:
-            验证规则JSON字符串
-        """
-        try:
-            # 创建推荐器
-            recommender = SmartConfigurationRecommender()
-            
-            # 读取Excel数据
-            excel_data = ExcelOperations.read_excel_file(file_path)
-            
-            # 获取推荐
-            recommendations = recommender.recommend_configurations(excel_data)
-            
-            # 筛选规则类别
-            if rule_categories:
-                filtered_rules = []
-                for rule in recommendations["validation_rules"]:
-                    if rule["sheet"] in rule_categories:
-                        filtered_rules.append(rule)
-                rules = filtered_rules
-            else:
-                rules = recommendations["validation_rules"]
-            
-            result = {
-                "validation_rules": rules,
-                "rule_categories": list(set(rule["sheet"] for rule in rules)),
-                "priority_breakdown": _categorize_by_priority(rules),
-                "rule_summary": f"生成了{len(rules)}个验证规则"
-            }
-            
-            return _ok("验证规则生成完成", result)
-            
-        except Exception as e:
-            error_msg = f"验证规则生成失败: {str(e)}"
-            logger.error(error_msg)
-            return _fail(error_msg, meta={"error_code": "VALIDATION_FAILED"})
-    
-    @mcp.tool()
-    def optimize_data_structure(
-        file_path: str,
-        optimization_type: str = "compression"
-    ) -> str:
-        """
-        优化Excel数据结构
-        
-        Args:
-            file_path: Excel文件路径
-            optimization_type: 优化类型 (compression/restructuring/indexing)
-        
-        Returns:
-            优化建议JSON字符串
-        """
-        try:
-            # 创建分析器
-            analyzer = ConfigurationAnalyzer()
-            
-            # 读取Excel数据
-            excel_data = ExcelOperations.read_excel_file(file_path)
-            analysis = analyzer.analyze_excel_structure(excel_data)
-            
-            # 生成优化建议
-            optimization_suggestions = []
-            
-            if optimization_type == "compression":
-                # 数据压缩优化
-                for sheet_name, patterns in analysis.get("data_patterns", {}).items():
-                    for col_name, pattern in patterns.items():
-                        if pattern.get("uniqueness_ratio", 0) < 0.1:
-                            optimization_suggestions.append({
-                                "type": "enum_conversion",
-                                "sheet": sheet_name,
-                                "column": col_name,
-                                "description": f"建议将{col_name}转换为枚举类型，节省存储空间",
-                                "estimated_savings": f"{(1 - pattern.get('uniqueness_ratio', 0)) * 100:.1f}%"
-                            })
-            
-            elif optimization_type == "restructuring":
-                # 结构重构优化
-                for sheet_name, sheet_info in analysis.get("sheet_structure", {}).items():
-                    if sheet_info["rows"] > 1000:
-                        optimization_suggestions.append({
-                            "type": "normalization",
-                            "sheet": sheet_name,
-                            "description": f"{sheet_name}表数据量较大，建议考虑表结构规范化",
-                            "current_rows": sheet_info["rows"],
-                            "recommendation": "拆分为多个关联表"
-                        })
-            
-            elif optimization_type == "indexing":
-                # 索引优化
-                for sheet_name, sheet_info in analysis.get("sheet_structure", {}).items():
-                    headers = sheet_info.get("headers", [])
-                    for i, header in enumerate(headers):
-                        if any(keyword in header.lower() for keyword in ["id", "name", "key", "code"]):
-                            optimization_suggestions.append({
-                                "type": "index_recommendation",
-                                "sheet": sheet_name,
-                                "column": header,
-                                "description": f"建议为{sheet_name}表的{header}列添加索引，提升查询性能",
-                                "query_type": "primary_key" if "id" in header.lower() else "search_key"
-                            })
-            
-            result = {
-                "optimization_type": optimization_type,
-                "original_structure": analysis,
-                "optimization_suggestions": optimization_suggestions,
-                "expected_improvements": _estimate_improvements(optimization_suggestions)
-            }
-            
-            return _ok("数据结构优化分析完成", result)
-            
-        except Exception as e:
-            error_msg = f"数据结构优化失败: {str(e)}"
-            logger.error(error_msg)
-            return _fail(error_msg, meta={"error_code": "OPTIMIZATION_FAILED"})
-    
-    # 辅助函数
-    def _generate_summary(recommendations: Dict[str, Any]) -> str:
-        """生成推荐摘要"""
-        game_type = recommendations["game_type"]
-        key_recs = recommendations["config_recommendations"][:3]
-        
-        summary = f"检测到游戏类型: {game_type}\\n"
-        summary += f"核心推荐: {len(key_recs)}条\\n"
-        summary += "主要建议: "
-        summary += "; ".join([rec["suggestion"] for rec in key_recs])
-        
-        return summary
-    
-    def _calculate_data_quality_score(analysis: Dict[str, Any]) -> float:
-        """计算数据质量评分
-        
-        Args:
-            analysis (Dict[str, Any]): 数据分析结果
-            
-        Returns:
-            float: 数据质量评分（0-100）
-        """
-        score = DATA_QUALITY_MAX_SCORE
-        
-        # 根据优化建议扣分
-        suggestions = analysis.get("optimization_suggestions", [])
-        score -= len(suggestions) * DATA_QUALITY_PENALTY_PER_SUGGESTION
-        
-        # 确保评分在0-100之间
-        return max(0, min(DATA_QUALITY_MAX_SCORE, score))
-    
-    def _categorize_by_priority(rules: List[Dict[str, Any]]) -> Dict[str, int]:
-        """按优先级分类规则"""
-        priority_count = {"high": 0, "medium": 0, "low": 0}
-        for rule in rules:
-            priority = rule.get("priority", "medium")
-            priority_count[priority] += 1
-        return priority_count
-    
-    def _estimate_improvements(suggestions: List[Dict[str, Any]]) -> Dict[str, Any]:
-        """预估优化效果"""
-        improvements = {
-            "performance_gain": "预估查询速度提升20-30%",
-            "storage_reduction": "预估存储节省10-25%",
-            "maintainability": "预估维护难度降低40%"
-        }
-        
-        if len(suggestions) > 5:
-            improvements["significant_improvement"] = "大规模优化，效果显著"
-        elif len(suggestions) > 2:
-            improvements["moderate_improvement"] = "中等规模优化，效果明显"
-        else:
-            improvements["minor_improvement"] = "小幅优化，略有改善"
-        
-        return improvements
+    Args:
+        --stdio: 标准输入输出模式（默认），本地使用，uvx/claude/cursor
+        --sse: Server-Sent Events远程模式
+        --streamable-http: Streamable HTTP远程模式，推荐用于团队共享
+        --mount-path=<path>: HTTP模式挂载路径
+        --version, -v: 显示版本号
 
-
+    支持三种传输模式：
+    - stdio（默认）：本地使用，uvx/claude/cursor
+    - sse：Server-Sent Events远程模式
+    - streamable-http：Streamable HTTP远程模式，推荐用于团队共享
+    """
 def main():
     """Entry point for excel-mcp-server-fastmcp.
 
@@ -4830,7 +3561,6 @@ def main():
     - sse：Server-Sent Events远程模式
     - streamable-http：Streamable HTTP远程模式，推荐用于团队共享
     """
-    import sys
     if len(sys.argv) > 1 and sys.argv[1] in ('--version', '-v'):
         from excel_mcp_server_fastmcp import __version__
         logger.info(f"excel-mcp-server-fastmcp {__version__}")
@@ -4841,7 +3571,7 @@ def main():
     for arg in sys.argv[1:]:
         if arg in ('--stdio', '--sse', '--streamable-http'):
             transport = arg[2:]  # remove '--'
-        elif arg.startswith('--mount-path='):
+        elif arg.startswith('----mount-path='):
             mount_path = arg.split('=', 1)[1]
 
     mcp.run(transport=transport, mount_path=mount_path)

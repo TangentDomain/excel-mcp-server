@@ -12,15 +12,10 @@ from datetime import datetime
 
 from src.excel_mcp_server_fastmcp.server import (
     OperationLogger,
-    excel_assess_data_impact,
     excel_create_backup,
     excel_restore_backup,
     excel_list_backups,
     excel_get_operation_history,
-    _analyze_current_data,
-    _assess_operation_risk,
-    _generate_assessment_recommendations,
-    _predict_operation_result
 )
 from src.excel_mcp_server_fastmcp.utils.validators import ExcelValidator, DataValidationError
 from src.excel_mcp_server_fastmcp.api.excel_operations import ExcelOperations
@@ -141,145 +136,6 @@ class TestEnhancedRangeValidation:
         with pytest.raises(DataValidationError):
             ExcelValidator.validate_operation_scale(range_info)
 
-class TestDataAnalysis:
-    """测试数据分析功能"""
-
-    def test_analyze_empty_data(self):
-        """测试分析空数据"""
-        result = _analyze_current_data([])
-
-        assert result['row_count'] == 0
-        assert result['column_count'] == 0
-        assert result['non_empty_cell_count'] == 0
-        assert result['completeness_rate'] == 0.0
-
-    def test_analyze_numeric_data(self):
-        """测试分析数值数据"""
-        data = [
-            [1, 2, 3],
-            [4, 5, 6],
-            [7, 8, 9]
-        ]
-
-        result = _analyze_current_data(data)
-
-        assert result['row_count'] == 3
-        assert result['column_count'] == 3
-        assert result['non_empty_cell_count'] == 9
-        assert result['has_numeric_data'] is True
-        assert result['has_text_data'] is False
-        assert result['completeness_rate'] == 100.0
-        assert result['data_types']['numeric'] == 9
-
-    def test_analyze_mixed_data(self):
-        """测试分析混合类型数据"""
-        data = [
-            [1, "Text", "=SUM(A1)"],
-            [None, "", "Another Text"],
-            [3.14, "中文", 42]
-        ]
-
-        result = _analyze_current_data(data)
-
-        assert result['row_count'] == 3
-        assert result['column_count'] == 3
-        assert result['non_empty_cell_count'] == 7  # 1, Text, =SUM, Another Text, 3.14, 中文, 42
-        assert result['has_numeric_data'] is True
-        assert result['has_text_data'] is True
-        assert result['has_formulas'] is True
-        assert result['data_types']['numeric'] == 3  # 1, 3.14, 42
-        assert result['data_types']['text'] == 3  # Text, Another Text, 中文
-        assert result['data_types']['formulas'] == 1  # =SUM
-
-    def test_analyze_data_completeness(self):
-        """测试数据完整性分析"""
-        # 部分填充的数据
-        data = [
-            [1, None, 3],
-            [None, 5, None],
-            [7, None, 9]
-        ]
-
-        result = _analyze_current_data(data)
-
-        assert result['total_cells'] == 9
-        assert result['non_empty_cell_count'] == 5
-        assert result['empty_cell_count'] == 4
-        assert result['completeness_rate'] == (5/9) * 100
-
-class TestRiskAssessment:
-    """测试风险评估功能"""
-
-    def test_assess_low_risk_operation(self):
-        """测试低风险操作评估"""
-        data_analysis = {
-            'non_empty_cell_count': 0,
-            'has_formulas': False,
-            'completeness_rate': 0.0
-        }
-        scale_info = {'total_cells': 10}
-
-        result = _assess_operation_risk("update", data_analysis, scale_info)
-
-        assert result['overall_risk'] == "LOW"
-        assert result['risk_score'] < 30
-        assert result['requires_backup'] is False
-        assert result['requires_confirmation'] is False
-
-    def test_assess_high_risk_operation(self):
-        """测试高风险操作评估"""
-        data_analysis = {
-            'non_empty_cell_count': 100,
-            'has_formulas': True,
-            'completeness_rate': 90.0
-        }
-        scale_info = {'total_cells': 15000}
-
-        result = _assess_operation_risk("delete", data_analysis, scale_info)
-
-        assert result['overall_risk'] == "HIGH"
-        assert result['risk_score'] >= 60
-        assert result['requires_backup'] is True
-        assert result['requires_confirmation'] is True
-        assert "删除操作不可逆" in result['risk_factors']
-        assert "包含公式数据" in result['risk_factors']
-
-    def test_safety_recommendations_generation(self):
-        """测试安全建议生成"""
-        data_analysis = {
-            'has_formulas': True,
-            'completeness_rate': 85.0,
-            'non_empty_cell_count': 50
-        }
-        risk_assessment = {
-            'requires_backup': True,
-            'requires_confirmation': True,
-            'overall_risk': "HIGH"
-        }
-        scale_info = {'total_cells': 5000}
-
-        recommendations = _generate_assessment_recommendations(
-            "update", data_analysis, risk_assessment, scale_info
-        )
-
-        assert len(recommendations) > 0
-        assert any("建议在操作前创建备份" in rec for rec in recommendations)
-        assert any("高风险操作" in rec for rec in recommendations)
-        assert any("公式数据" in rec for rec in recommendations)
-
-    def test_operation_result_prediction(self):
-        """测试操作结果预测"""
-        current_data = [[1, 2], [3, 4]]
-        new_data = [[5, 6], [7, 8]]
-        scale_info = {'total_cells': 4}
-
-        result = _predict_operation_result("update", current_data, new_data, scale_info)
-
-        assert result['affected_cells'] == 4
-        assert result['data_overwrite_count'] == 4
-        assert result['data_insert_count'] == 4
-        assert result['estimated_time'] == "minimal"
-
 class TestBackupSystem:
     """测试备份系统功能"""
 
@@ -335,114 +191,6 @@ class TestBackupSystem:
         assert result['data'].get('total_backups', 0) == 0
         assert result['data'].get('backups', []) == []
 
-class TestIntegrationSecurityWorkflow:
-    """测试完整的安全工作流程集成"""
-
-    def setup_method(self):
-        """每个测试方法前的设置"""
-        self.temp_dir = tempfile.mkdtemp()
-        self.test_file = os.path.join(self.temp_dir, "security_test.xlsx")
-
-    def teardown_method(self):
-        """每个测试方法后的清理"""
-        import shutil
-        shutil.rmtree(self.temp_dir, ignore_errors=True)
-
-    @patch('src.excel_mcp_server_fastmcp.server.ExcelOperations.get_range')
-    def test_complete_safe_update_workflow(self, mock_get_range):
-        """测试完整的安全更新工作流程"""
-        # 模拟现有数据
-        mock_get_range.return_value = {
-            'success': True,
-            'data': [[1, 2, 3], [4, 5, 6]]
-        }
-
-        # 1. 数据影响评估
-        assessment_result = excel_assess_data_impact(
-            self.test_file,
-            "Sheet1!A1:C3",
-            "update",
-            [[7, 8, 9], [10, 11, 12]]
-        )
-
-        assert assessment_result['success'] is True
-        assert 'risk_assessment' in assessment_result['data']
-        assert 'safety_recommendations' in assessment_result['data']
-
-        # 2. 快速预览模式（detailed=False）
-        preview_result = excel_assess_data_impact(
-            self.test_file,
-            "Sheet1!A1:C3",
-            "update",
-            None,
-            detailed=False
-        )
-
-        assert preview_result['success'] is True
-        assert 'impact_assessment' in preview_result['data']
-        assert 'safety_warning' in preview_result['data']
-        assert preview_result['data']['impact_assessment']['rows_affected'] == 2
-        assert preview_result['data']['impact_assessment']['columns_affected'] == 3
-
-        # 3. 验证风险评估一致性
-        risk_level = assessment_result['data']['risk_assessment']['overall_risk']
-        assert risk_level in ["LOW", "MEDIUM", "HIGH"]
-
-    def test_validation_prevents_dangerous_operations(self):
-        """测试验证机制阻止危险操作"""
-        # 测试无效范围格式 - 应该返回错误而不是抛出异常
-        result = excel_assess_data_impact(
-            self.test_file,
-            "invalid_range",  # 无效格式
-            "update"
-        )
-        assert result['success'] is False
-        assert result['meta']['error_code'] == 'VALIDATION_FAILED'
-
-        # 测试范围验证 - 这个会抛出异常
-        with pytest.raises(DataValidationError):
-            ExcelValidator.validate_range_expression("A1:C10")  # 缺少工作表名
-
-    @patch('src.excel_mcp_server_fastmcp.server.ExcelOperations.get_range')
-    def test_high_risk_operation_detection(self, mock_get_range):
-        """测试高风险操作检测"""
-        # 模拟大量数据
-        large_data = [[f"cell_{i}_{j}" for j in range(100)] for i in range(100)]
-        mock_get_range.return_value = {
-            'success': True,
-            'data': large_data
-        }
-
-        # 大范围操作应该被识别为高风险
-        assessment_result = excel_assess_data_impact(
-            self.test_file,
-            "Sheet1!A1:CV100",  # 100x100 = 10000 cells
-            "delete"
-        )
-
-        assert assessment_result['success'] is True
-        assert assessment_result['data']['risk_assessment']['overall_risk'] in ["HIGH", "MEDIUM"]
-        assert assessment_result['data']['risk_assessment']['requires_backup'] is True
-
-    def test_operation_history_tracking(self):
-        """测试操作历史跟踪"""
-        # 创建临时文件用于测试
-        with open(self.test_file, 'w') as f:
-            f.write("test")
-
-        # 获取操作历史
-        history_result = excel_get_operation_history(self.test_file, 10)
-
-        assert history_result['success'] is True
-        assert 'operations' in history_result['data']
-        assert 'statistics' in history_result['data']
-
-        # 验证统计信息结构
-        stats = history_result['data']['statistics']
-        assert 'total_operations' in stats
-        assert 'operation_types' in stats
-        assert 'success_rate' in stats
-
 class TestSecurityPerformance:
     """测试安全功能的性能"""
 
@@ -472,25 +220,6 @@ class TestSecurityPerformance:
 
         # 验证性能要求（所有验证应在1秒内完成）
         assert (end_time - start_time) < 1.0
-
-    def test_data_analysis_performance(self):
-        """测试数据分析的性能"""
-        import time
-
-        # 创建大型数据集
-        large_data = [[f"data_{i}_{j}" for j in range(50)] for i in range(100)]
-
-        start_time = time.time()
-        result = _analyze_current_data(large_data)
-        end_time = time.time()
-
-        # 验证分析结果正确性
-        assert result['row_count'] == 100
-        assert result['column_count'] == 50
-        assert result['non_empty_cell_count'] == 5000
-
-        # 验证性能要求（大型数据分析应在0.5秒内完成）
-        assert (end_time - start_time) < 0.5
 
 if __name__ == "__main__":
     pytest.main([__file__, "-v"])

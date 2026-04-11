@@ -65,3 +65,36 @@ dev = [
     "flake8>=7.0.0,<8.0.0",
     "mypy>=1.10.0,<2.0.0",
 ]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+python_files = ["test_*.py"]
+python_classes = ["Test*"]
+python_functions = ["test_*"]
+addopts = [
+    "-v",
+    "--tb=short",
+    "--strict-markers",
+    "--color=yes",
+    "--maxfail=10",
+    "--durations=10",
+]
+markers = [
+    "slow: 标记测试为慢速测试",
+    "integration: 标记集成测试",
+    "security: 标记安全功能测试",
+    "unit: 标记单元测试",
+    "performance: 标记性能测试",
+    "api: 标记API测试",
+    "core: 标记核心模块测试",
+    "utils: 标记工具模块测试",
+    "xdist_group: pytest-xdist 并行分组",
+    "timeout: 超时限制",
+]
+norecursedirs = [
+    ".git", ".tox", "dist", "build", "*.egg",
+    ".venv", "venv", "env", "__pycache__", ".pytest_cache", "htmlcov",
+]
+timeout = 600
+timeout_method = "thread"
+minversion = "6.0"

@@ -29,20 +29,6 @@ def workbook(tmp_path):
                      ])
     return path
 
-@pytest.fixture
-def chart_workbook(tmp_path):
-    """Create a test workbook with chart data."""
-    path = str(tmp_path / "chart_test.xlsx")
-    wb = Workbook()
-    ws = wb.active
-    ws.title = "角色属性"
-    ws.append(["角色名", "等级", "生命值", "魔法值", "攻击力", "防御力"])
-    ws.append(["战士", 10, 1200, 100, 85, 60])
-    ws.append(["法师", 10, 800, 300, 70, 40])
-    ws.append(["牧师", 10, 900, 250, 55, 45])
-    os.makedirs(os.path.dirname(path), exist_ok=True)
-    wb.save(path)
-    return path
 
 class TestBatchOperations:
     """Tests for batch operations."""
@@ -105,39 +91,6 @@ class TestBatchOperations:
         assert "技能表" in wb.sheetnames
         assert "装备表" in wb.sheetnames
 
-class TestChartOperations:
-    """Tests for chart creation and listing."""
-
-    def test_create_column_chart(self, chart_workbook):
-        """Create a column chart on a sheet."""
-        from src.excel_mcp_server_fastmcp.server import excel_create_chart
-
-        result = excel_create_chart(
-            chart_workbook, "角色属性", "column", "B1:F4",
-            title="角色属性对比图", position="H2"
-        )
-        assert result["success"] is True
-        assert result["data"]["chart_type"] == "column"
-
-    def test_create_pie_chart(self, chart_workbook):
-        """Create a pie chart."""
-        from src.excel_mcp_server_fastmcp.server import excel_create_chart
-
-        result = excel_create_chart(
-            chart_workbook, "角色属性", "pie", "B1:B4", title="角色占比"
-        )
-        assert result["success"] is True
-        assert result["data"]["chart_type"] == "pie"
-
-    def test_invalid_chart_type(self, chart_workbook):
-        """Reject unsupported chart types."""
-        from src.excel_mcp_server_fastmcp.server import excel_create_chart
-
-        result = excel_create_chart(
-            chart_workbook, "角色属性", "radar", "A1:C5"
-        )
-        assert result["success"] is False
-        assert "不支持的图表类型" in result["message"]
 
 class TestDataValidation:
     """Tests for data validation set / clear."""

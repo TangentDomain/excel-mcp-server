@@ -12,6 +12,19 @@ from pathlib import Path
 from openpyxl import Workbook
 from openpyxl.styles import Font, PatternFill, Alignment
 
+# 注册自定义标记（消除 PytestUnknownMarkWarning）
+def pytest_configure(config):
+    config.addinivalue_line("markers", "slow: 标记测试为慢速测试")
+    config.addinivalue_line("markers", "integration: 标记集成测试")
+    config.addinivalue_line("markers", "security: 标记安全功能测试")
+    config.addinivalue_line("markers", "unit: 标记单元测试")
+    config.addinivalue_line("markers", "performance: 标记性能测试")
+    config.addinivalue_line("markers", "api: 标记API测试")
+    config.addinivalue_line("markers", "core: 标记核心模块测试")
+    config.addinivalue_line("markers", "utils: 标记工具模块测试")
+    config.addinivalue_line("markers", "xdist_group: pytest-xdist 并行分组")
+    config.addinivalue_line("markers", "timeout: 超时限制")
+
 # Set up logging to suppress warnings
 logging.getLogger('openpyxl').setLevel(logging.ERROR)
 
