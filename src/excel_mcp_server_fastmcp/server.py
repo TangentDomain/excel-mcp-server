@@ -543,19 +543,26 @@ mcp = FastMCP(
 ```
 ═══ 读数据 ═══
 读已知单元格？              → excel_get_range（精确读取，如 "Sheet1!A1:C10"）
-需要筛选/聚合/JOIN/排序？   → excel_query（SQL引擎，批量分析首选）
+需筛选/聚合/JOIN/排序？     → excel_query（SQL引擎，批量分析首选）
 快速了解表结构？            → excel_describe_table（列名+类型+样本值+行数）
 获取中英表头？              → excel_get_headers（file_path，sheet_name可省略）
 定位文本位置？              → excel_search（返回row/column）
 跨文件搜索？                → excel_search_directory
 
-═══ 写数据 ═══
-写入指定单元格（精确坐标）？ → excel_update_range（二维数组，覆盖模式⚠️）
-按ID增改单行（幂等）？       → excel_upsert_row（存在更新/不存在插入）
-批量条件修改多行？           → excel_update_query（SQL UPDATE，支持dry_run）
-批量插入多行数据？           → excel_insert_query（SQL INSERT，支持dry_run）
-按条件删除行？               → excel_delete_query（SQL DELETE，必须WHERE，支持dry_run）
-按行号删除行？               → excel_delete_rows（row_index从1开始，指定count）
+═══ 写数据（重要！选对工具） ═══
+┌─ 批量修改多行？（改10行以上/按条件改）────────→ excel_update_query（SQL UPDATE）
+│   例: UPDATE 怪物表 SET 血量=血量*2 WHERE 等级>5
+│
+├─ 精确覆盖指定区域？（知道具体A1:C10）────────→ excel_update_range（二维数组覆盖写入）
+│   ⚠️ 默认覆盖模式！insert_mode=True 改为插入
+│
+├─ 按ID增改单行？（幂等：有则改无则插）────────→ excel_upsert_row（key_column+key_value）
+│
+├─ 批量插入新行？───────────────────────────────→ excel_insert_query（SQL INSERT）
+│
+└─ 按条件删行？────────────────────────────────→ excel_delete_query（SQL DELETE，必须WHERE）
+    按行号删行？────────────────────────────────→ excel_delete_rows（row_index从1开始）
+
 ═══ 结构操作 ═══
 文件？                      → excel_create_file / excel_export_to_csv / excel_import_from_csv
 工作表？                    → excel_create_sheet / excel_delete_sheet / excel_rename_sheet / excel_copy_sheet
@@ -689,6 +696,7 @@ _ERROR_HINTS = {
     'MISSING_FILE_PATH': '请提供文件路径参数。例如：excel_query("配置表.xlsx", "SELECT * FROM 技能表")',
     'MISSING_QUERY': '请提供SQL查询语句。例如：excel_query("配置表.xlsx", "SELECT * FROM 技能表 WHERE 伤害 > 100")',
     'INVALID_FORMAT': '请检查参数值是否在允许范围内。查看工具描述了解支持的选项。',
+    'PARAMETER_ORDER_ERROR': '参数顺序或类型错误。cell_range应该是单元格范围（如A1:E10），不是工作表名。正确示例: excel_get_range("文件.xlsx", "Sheet1!A1:E10")',
     'VALIDATION_FAILED': '请检查参数格式是否正确。常见原因：范围表达式格式错误（应为"工作表名!A1:Z100"）、参数类型不匹配。',
     'OPERATION_FAILED': '写入操作失败，文件可能被锁定或磁盘空间不足。请关闭其他正在使用该文件的程序后重试。',
     'PREVIEW_FAILED': '无法预览操作影响。请先用excel_get_range查看当前数据，再重新尝试操作。',
@@ -961,97 +969,34 @@ def excel_search_directory(
 @_track_call
 def excel_get_range(
     file_path: str,
-    cell_range: Optional[str] = None,
+    cell_range: str,
     include_formatting: bool = False,
-    sheet_name: Optional[str] = None,
-    start_cell: Optional[str] = None,
-    end_cell: Optional[str] = None
+    sheet_name: Optional[str] = None
 ) -> Dict[str, Any]:
     """读取指定范围的数据。返回{headers, data, shape}。支持include_formatting获取样式。
 
     Args:
         file_path: Excel文件路径
         cell_range: 单元格范围（如 "A1:C10" 或 "Sheet1!A1:C10"，不含!时配合sheet_name使用）
-        include_formatting: 是否包含格式信息
-        sheet_name: 工作表名称（可选，cell_range不含!时自动拼接）
-        start_cell: 起始单元格（可选，与end_cell配合使用）
-        end_cell: 结束单元格（可选，与start_cell配合使用）
+        include_formatting: 是否包含格式信息，默认False
+        sheet_name: 工作表名称（可选，cell_range不含!时自动拼接为 "sheet_name!cell_range"）
     """
     
-    # 参数兼容性处理：如果提供了start_cell和end_cell，构建range表达式（优先执行）
-    if start_cell and end_cell:
-        if sheet_name:
-            cell_range = f"{sheet_name}!{start_cell}:{end_cell}"
-        else:
-            # 如果没有指定sheet_name，尝试自动推断
-            if cell_range and '!' not in cell_range:
-                try:
-                    from openpyxl import load_workbook
-                    wb = load_workbook(file_path, read_only=True)
-                    sheet_names = wb.sheetnames
-                    wb.close()
-                    if len(sheet_names) == 1:
-                        cell_range = f"{sheet_names[0]}!{start_cell}:{end_cell}"
-                    else:
-                        return _fail(
-                            f"需要指定工作表名，文件有多个工作表({', '.join(sheet_names)})。"
-                            f"请使用sheet_name参数或格式: '工作表名!A1:C10'",
-                            meta={"error_code": "VALIDATION_FAILED", "available_sheets": sheet_names}
-                        )
-                except Exception:
-                    return _fail(
-                        "无法自动推断工作表名，请指定sheet_name参数或使用完整范围表达式",
-                        meta={"error_code": "VALIDATION_FAILED"}
-                    )
-            elif not cell_range:
-                # 如果没有range且没有sheet_name，尝试自动推断
-                try:
-                    from openpyxl import load_workbook
-                    wb = load_workbook(file_path, read_only=True)
-                    sheet_names = wb.sheetnames
-                    wb.close()
-                    if len(sheet_names) == 1:
-                        cell_range = f"{sheet_names[0]}!{start_cell}:{end_cell}"
-                    else:
-                        return _fail(
-                            f"需要指定工作表名，文件有多个工作表({', '.join(sheet_names)})。"
-                            f"请使用sheet_name参数或格式: '工作表名!A1:C10'",
-                            meta={"error_code": "VALIDATION_FAILED", "available_sheets": sheet_names}
-                        )
-                except Exception:
-                    return _fail(
-                        "无法自动推断工作表名，请指定sheet_name参数或使用完整范围表达式",
-                        meta={"error_code": "VALIDATION_FAILED"}
-                    )
-            else:
-                cell_range = f"{cell_range}!{start_cell}:{end_cell}"  # 这种情况应该不会发生
-    
-    # 如果既没有range也没有start_cell/end_cell，报错
-    if not cell_range:
-        return _fail(
-            "必须指定范围参数，可通过以下方式之一：\n"
-            "1. 直接提供range参数：'Sheet1!A1:C10'\n"
-            "2. 提供 start_cell 和 end_cell 参数\n"
-            "3. 提供 cell_range 参数和 sheet_name 参数",
-            meta={"error_code": "MISSING_RANGE_PARAMETER"}
-        )
-    
-    # 如果range不包含工作表名但指定了sheet_name，添加工作表名
+    # 如果range不包含工作表名但指定了sheet_name，添加工作表名前缀
     if sheet_name and '!' not in cell_range:
         cell_range = f"{sheet_name}!{cell_range}"
     
-    # 参数顺序问题修复：检查range参数是否可能是误传的sheet_name
-    # 只有在range不为空且没有通过start_cell/end_cell构建时才执行此检查
+    # 参数顺序问题检测：cell_range看起来像误传的sheet_name
     if cell_range and '!' not in cell_range and not cell_range.startswith(('A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J')) and len(cell_range) <= 10:
-        # cell_range看起来不像有效的单元格范围，可能是用户误将sheet_name传给了range参数
         return _fail(
             f"参数顺序可能错误：cell_range参数值 '{cell_range}' 看起来不像有效的单元格范围。\n"
             f"请检查参数顺序：第二个参数应该是范围表达式（如 'A1:C10' 或 'Sheet1!A1:C10'），\n"
-            f"如果要以默认工作表读取，请明确指定: excel_get_range('{file_path}', 'A1:C10')",
+            f"如果要以默认工作表读取，请明确指定: excel_get_range('{file_path}', 'A1:C10')\n"
+            f"💡 正确示例: excel_get_range('文件.xlsx', 'Sheet1!A1:E10') 或 excel_get_range('文件.xlsx', 'A1:E10', sheet_name='Sheet1')",
             meta={
                 "error_code": "PARAMETER_ORDER_ERROR",
                 "received_range": cell_range,
-                "hint": "cell_range参数应该是单元格范围，不是工作表名"
+                "hint": "cell_range参数应该是单元格范围（如A1:E10），不是工作表名"
             }
         )
     
@@ -1147,11 +1092,9 @@ def excel_update_range(
     data: List[List[Any]],
     preserve_formulas: bool = True,
     insert_mode: bool = False,
-    sheet_name: Optional[str] = None,
-    start_cell: Optional[str] = None,
-    end_cell: Optional[str] = None
+    sheet_name: Optional[str] = None
 ) -> Dict[str, Any]:
-    """写入数据到指定范围。
+    """写入数据到指定范围（精确坐标覆盖/插入）。
 
     ⚠️ 默认为覆盖模式(insert_mode=False)，会直接替换目标区域数据！
        如需保留原有数据并插入新行，必须显式设置 insert_mode=True
@@ -1159,43 +1102,13 @@ def excel_update_range(
     Args:
         file_path: Excel文件路径
         cell_range: 单元格范围（如 "A1:C10" 或 "Sheet1!A1:C10"，不含!时配合sheet_name使用）
-        data: 要写入的数据，二维数组格式
+        data: 要写入的数据，二维数组格式 [[row1], [row2], ...]
         preserve_formulas: 是否保留已有公式不被覆盖，默认True
-        insert_mode: 数据写入模式
-            - False=覆盖模式(默认): 直接替换目标单元格数据 ⚠️
-            - True=插入模式: 在目标位置插入新行，原有数据下移
-        sheet_name: 工作表名称（可选，cell_range不含!时自动拼接）
-        start_cell: 起始单元格（可选，与end_cell配合使用）
-        end_cell: 结束单元格（可选，与start_cell配合使用）
+        insert_mode: False=覆盖模式(默认，直接替换) | True=插入模式(原有数据下移)
+        sheet_name: 工作表名称（可选，cell_range不含!时自动拼接为 "sheet_name!cell_range"）
     """
     
-    # 参数兼容性处理：如果提供了start_cell和end_cell，构建range表达式
-    if start_cell and end_cell:
-        if sheet_name:
-            cell_range = f"{sheet_name}!{start_cell}:{end_cell}"
-        else:
-            # 如果没有指定sheet_name，尝试自动推断
-            if '!' not in cell_range:
-                try:
-                    from openpyxl import load_workbook
-                    wb = load_workbook(file_path, read_only=True)
-                    sheet_names = wb.sheetnames
-                    wb.close()
-                    if len(sheet_names) == 1:
-                        cell_range = f"{sheet_names[0]}!{start_cell}:{end_cell}"
-                    else:
-                        return _fail(
-                            f"需要指定工作表名，文件有多个工作表({', '.join(sheet_names)})。"
-                            f"请使用sheet_name参数或格式: '工作表名!A1:C10'",
-                            meta={"error_code": "VALIDATION_FAILED", "available_sheets": sheet_names}
-                        )
-                except Exception:
-                    return _fail(
-                        "无法自动推断工作表名，请指定sheet_name参数或使用完整范围表达式",
-                        meta={"error_code": "VALIDATION_FAILED"}
-                    )
-    
-    # 如果range不包含工作表名但指定了sheet_name，添加工作表名
+    # 如果range不包含工作表名但指定了sheet_name，添加工作表名前缀
     if sheet_name and '!' not in cell_range:
         cell_range = f"{sheet_name}!{cell_range}"
 
