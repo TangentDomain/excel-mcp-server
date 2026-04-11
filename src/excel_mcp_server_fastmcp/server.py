@@ -1230,12 +1230,6 @@ def excel_update_range(
 
 
 
-
-
-@mcp.tool()
-@_track_call
-
-
 @mcp.tool()
 @_track_call
 def excel_create_backup(
@@ -1644,8 +1638,6 @@ def excel_upsert_row(
     return _wrap(ExcelOperations.upsert_row(file_path, sheet_name, key_column, key_value, updates, header_row, streaming))
 
 
-@mcp.tool()
-@_track_call
 @mcp.tool()
 @_track_call
 def excel_delete_rows(
@@ -2435,7 +2427,7 @@ def excel_set_column_width(file_path: str, sheet_name: str, column_index: int,
     return _wrap(ExcelOperations.set_column_width(file_path, sheet_name, column_index, width, count))
 
 
-# ==================== Excel比较功能 ====================能 ====================
+# ==================== Excel比较功能 ====================
 
 @mcp.tool()
 @_validate_file_path(['file1_path', 'file2_path'])
@@ -2485,83 +2477,6 @@ def excel_compare_sheets(
     return _wrap(ExcelOperations.compare_sheets(file1_path, sheet1_name, file2_path, sheet2_name, id_column, header_row))
 
 
-
-
-# ==================== 数据验证工具 ====================
-
-# 数据验证错误提示映射
-_VALIDATION_ERROR_MESSAGES = {
-    'list': ('输入错误', '请从下拉列表中选择有效值'),
-    'custom': ('输入错误', '请输入符合要求的值'),
-    'whole_number': ('输入错误', '请输入有效的整数'),
-    'decimal': ('输入错误', '请输入有效的数字'),
-    'date': ('输入错误', '请输入有效的日期（YYYY-MM-DD格式）'),
-    'text_length': ('输入错误', '请输入符合长度要求的文本'),
-}
-
-# 操作符别名映射（snake_case → openpyxl camelCase）
-_OPERATOR_ALIAS = {
-    'between': 'between', 'not_between': 'notBetween',
-    'equal': 'equal', 'not_equal': 'notEqual',
-    'greater_than': 'greaterThan', 'less_than': 'lessThan',
-    'greater_than_or_equal': 'greaterThanOrEqual', 'less_than_or_equal': 'lessThanOrEqual',
-    'notBetween': 'notBetween', 'greaterThan': 'greaterThan',
-    'lessThan': 'lessThan', 'greaterThanOrEqual': 'greaterThanOrEqual',
-    'lessThanOrEqual': 'lessThanOrEqual', 'notEqual': 'notEqual',
-}
-_VALID_OPERATORS = set(_OPERATOR_ALIAS.values())
-
-# 验证类型到 openpyxl 类型的映射
-_TYPE_MAPPING = {
-    'whole_number': 'whole',
-    'text_length': 'textLength',
-}
-
-
-def _parse_validation_values(validation_type: str, parts: list):
-    """解析并转换验证条件的值。返回 (operator, value1, value2) 或抛出 ValueError。"""
-    operator_raw = parts[0]
-    value1 = parts[1]
-    value2 = parts[2] if len(parts) > 2 else None
-
-    operator = _OPERATOR_ALIAS.get(operator_raw)
-    if not operator or operator not in _VALID_OPERATORS:
-        raise ValueError(f"不支持的操作符: {operator_raw}")
-
-    # 值类型转换
-    converters = {
-        'whole_number': lambda v: str(int(float(v))),
-        'decimal': lambda v: str(float(v)),
-        'text_length': lambda v: str(int(float(v))),
-        'date': lambda v: __import__('datetime').datetime.strptime(v, '%Y-%m-%d').strftime('%Y-%m-%d'),
-    }
-    conv = converters.get(validation_type)
-    if conv:
-        try:
-            value1 = conv(value1)
-            if value2:
-                value2 = conv(value2)
-        except (ValueError, TypeError) as e:
-            raise ValueError(f"值类型转换失败: {e}")
-
-    # between/notBetween 必须有两个值
-    if operator in ('between', 'notBetween') and not value2:
-        raise ValueError(f"操作符 '{operator}' 需要两个值")
-
-    return operator, value1, value2
-
-
-@mcp.tool()
-@_validate_file_path()
-@_track_call
-@mcp.tool()
-@_validate_file_path()
-@_track_call
-# ==================== 条件格式工具 ====================
-@mcp.tool()
-@_validate_file_path()
-@_track_call
-@mcp.tool()
 # ==================== 主程序 ====================
 def main():
     """Entry point for excel-mcp-server-fastmcp.
@@ -2572,26 +2487,6 @@ def main():
         --streamable-http: Streamable HTTP远程模式，推荐用于团队共享
         --mount-path=<path>: HTTP模式挂载路径
         --version, -v: 显示版本号
-
-    支持三种传输模式：
-    - stdio（默认）：本地使用，uvx/claude/cursor
-    - sse：Server-Sent Events远程模式
-    - streamable-http：Streamable HTTP远程模式，推荐用于团队共享
-    """
-def main():
-    """Entry point for excel-mcp-server-fastmcp.
-
-    Args:
-        --stdio: 标准输入输出模式（默认），本地使用，uvx/claude/cursor
-        --sse: Server-Sent Events远程模式
-        --streamable-http: Streamable HTTP远程模式，推荐用于团队共享
-        --mount-path=<path>: HTTP模式挂载路径
-        --version, -v: 显示版本号
-
-    支持三种传输模式：
-    - stdio（默认）：本地使用，uvx/claude/cursor
-    - sse：Server-Sent Events远程模式
-    - streamable-http：Streamable HTTP远程模式，推荐用于团队共享
     """
     if len(sys.argv) > 1 and sys.argv[1] in ('--version', '-v'):
         from excel_mcp_server_fastmcp import __version__
