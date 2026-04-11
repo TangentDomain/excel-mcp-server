@@ -603,8 +603,8 @@ mcp = FastMCP(
 当 Excel 有双行表头（第1行中文 + 第2行英文）时：
 - **SQL工具**（query/update_query/insert_query/delete_query）：中英文名都 ✅ 能用
 - **describe_table 返回的列名**：是第2行英文名（如 skill_id, equip_name）
-- **upsert_row 的 key_column**：必须用 Excel 原始列名（第1行中文，如 技能ID、装备名）
-- **建议**：先用 describe_table 了解结构后，若要用 upsert_row，用 get_headers 确认原始列名
+- **upsert_row 的 key_column**：✅ 中英文名都能用（自动检测双行表头，自动兼容）
+- **建议**：直接用 describe_table 返回的英文名即可，无需额外确认原始列名
 
 ## ⚡ SQL vs Direct 选择原则
 ```

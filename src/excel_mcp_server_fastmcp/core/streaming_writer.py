@@ -234,6 +234,22 @@ class StreamingWriter:
                     for col_idx, cell_val in enumerate(rows[header_row - 1], 1):
                         if cell_val is not None:
                             col_map[str(cell_val).strip()] = col_idx
+                    # 双行表头自动检测：下一行全是英文字段名时也注册到col_map
+                    _next_idx = header_row  # 0-based index of next row
+                    if _next_idx < len(rows):
+                        _next_row_vals = rows[_next_idx]
+                        _next_strs = [v for v in _next_row_vals if v is not None]
+                        _is_english_row = (
+                            len(_next_strs) >= 2
+                            and all(isinstance(v, str) and v.strip() and v.strip()[0].isalpha() and v.strip()[0].isascii()
+                                   for v in _next_strs)
+                        )
+                        if _is_english_row:
+                            for col_idx, val in enumerate(_next_row_vals, 1):
+                                if val is not None:
+                                    name = str(val).strip()
+                                    if name and name not in col_map:
+                                        col_map[name] = col_idx
                     target_rows = list(rows)  # 深拷贝
 
             if sheet_name not in all_sheets_data:

@@ -907,12 +907,31 @@ class ExcelManager:
             if header_row < 1 or header_row > sheet.max_row:
                 raise DataValidationError(f"表头行号 {header_row} 超出范围（1-{sheet.max_row}）")
 
-            # 构建列名→列索引映射
+            # 构建列名→列索引映射（支持双行表头：同时注册中英文列名）
             col_map = {}
             for col in range(1, sheet.max_column + 1):
                 cell_val = sheet.cell(row=header_row, column=col).value
                 if cell_val is not None:
                     col_map[str(cell_val).strip()] = col
+
+            # 双行表头自动检测：如果下一行全是英文字段名，也注册到col_map
+            # 这样LLM用describe_table返回的英文名也能匹配到
+            _next_row = header_row + 1
+            if _next_row <= sheet.max_row:
+                _next_vals = [sheet.cell(row=_next_row, column=c).value for c in range(1, sheet.max_column + 1)]
+                _next_strs = [v for v in _next_vals if v is not None]
+                _is_english_row = (
+                    len(_next_strs) >= 2
+                    and all(isinstance(v, str) and v.strip() and v.strip()[0].isalpha() and v.strip()[0].isascii()
+                           for v in _next_strs)
+                )
+                if _is_english_row:
+                    for col in range(1, min(sheet.max_column + 1, len(_next_vals) + 1)):
+                        val = _next_vals[col - 1]
+                        if val is not None:
+                            name = str(val).strip()
+                            if name and name not in col_map:  # 不覆盖已有映射
+                                col_map[name] = col
 
             if key_column not in col_map:
                 actual = list(col_map.keys())[:10]
