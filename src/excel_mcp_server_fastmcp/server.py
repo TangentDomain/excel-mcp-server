@@ -2222,6 +2222,52 @@ def _prepare_describe_result(sheet_name, is_dual_header, columns, row_count, fil
     }, meta={"file_path": file_path, "sheet": sheet_name})
 
 
+def _detect_dual_header(rows: list) -> tuple:
+    """检测双行表头模式（第1行中文描述 + 第2行英文字段名）。
+    
+    Args:
+        rows: 工作表前几行数据（values_only=True的列表）
+    
+    Returns:
+        tuple: (is_dual_header, header_row_idx, descriptions)
+    """
+    if len(rows) < 2:
+        return False, 0, []
+    
+    first_row = [_cell_str(c) for c in rows[0]]
+    second_row = [_cell_str(c) for c in rows[1]]
+    
+    # 第二行是否全是有效英文字段名
+    second_row_strs = [v for v in second_row if v is not None]
+    all_valid_names = (
+        len(second_row_strs) >= 2
+        and all(isinstance(v, str) and v.strip() and v.strip()[0].isalpha() and v.strip()[0].isascii()
+               for v in second_row_strs)
+    )
+    
+    # 第一行是否有中文
+    first_row_strs = [v for v in first_row if v is not None]
+    any_chinese = any(
+        isinstance(v, str) and any('\u4e00' <= ch <= '\u9fff' for ch in v)
+        for v in first_row_strs
+    )
+    
+    is_dual_header = all_valid_names and any_chinese
+    header_row_idx = 1 if is_dual_header else 0  # 双行时数据从第3行开始(idx=2)，表头用第2行(idx=1)
+    descriptions = first_row if is_dual_header else []
+    
+    return is_dual_header, header_row_idx, descriptions
+
+
+def _cell_str(c):
+    """统一单元格值转字符串"""
+    if c is None:
+        return None
+    if hasattr(c, 'value'):
+        return c.value
+    return str(c)
+
+
 @mcp.tool()
 @_validate_file_path()
 @_track_call
@@ -2311,21 +2357,27 @@ def excel_format_cells(
     start_cell: Optional[str] = None,
     end_cell: Optional[str] = None
 ) -> Dict[str, Any]:
-    """设置单元格样式。支持: bold/italic/underline/font_size/font_color/bg_color/
-    number_format/alignment/wrap_text/border_style/merge/unmerge。
+    """设置单元格样式（支持合并操作与字体/边框样式组合使用）。
+
+    常用示例:
+      - 加粗: {"bold": True}
+      - 合并+加粗居中: {"merge": True, "bold": True, "alignment": "center"}
+      - 仅合并: {"merge": True}
+      - 边框: {"border_style": "thin"}
+      - 合并+边框+背景色: {"merge": True, "border_style": "thin", "bg_color": "FFFF00"}
 
     Args:
         file_path: Excel文件路径
         sheet_name: 工作表名称
         cell_range: 单元格范围（如 "A1:C10" 或 "Sheet1!A1:C10"，不含!时自动拼接sheet_name）
-        formatting: 样式配置字典:
+        formatting: 样式配置字典（可同时指定多项，按 merge/unmerge → format → border 顺序执行）:
             bold/italic/underline: bool
             font_size: int | font_color/bg_color: str
             number_format: str | alignment: left/center/right
             wrap_text: bool | border_style: thin/thick/double/dotted/dashed
-            merge: bool (合并) | unmerge: bool (取消合并)
-        preset: 预设（bold/italic/highlight/header）
-        start_cell/end_cell: 可选，替代 cell_range 使用
+            merge: bool (合并单元格) | unmerge: bool (取消合并)
+        preset: 预设样式名（bold/italic/highlight/header）
+        start_cell/end_cell: 可选，替代 cell_range 使用（如 start_cell="A1", end_cell="E1"）
     """
     if formatting is None and preset is None:
         return _fail(
@@ -2340,25 +2392,55 @@ def excel_format_cells(
     if '!' not in cell_range:
         cell_range = f"{sheet_name}!{cell_range}"
 
-    # 特殊操作：merge / unmerge / border_style
-    if formatting:
-        if formatting.get('merge'):
-            return _wrap(ExcelOperations.merge_cells(file_path, sheet_name, cell_range))
-        if formatting.get('unmerge'):
-            return _wrap(ExcelOperations.unmerge_cells(file_path, sheet_name, cell_range))
-        if 'border_style' in formatting:
-            border = formatting.pop('border_style')
-            result = _ensure_dict(ExcelOperations.format_cells(file_path, sheet_name, cell_range, formatting, preset))
-            try:
-                _wrap(ExcelOperations.set_borders(file_path, sheet_name, cell_range, border))
-            except Exception:
-                pass
-            return _wrap(result)
+    # 提取特殊操作（从formatting中pop，避免传给底层format_cells引起混淆）
+    _do_merge = formatting.pop('merge', None) if formatting else None
+    _do_unmerge = formatting.pop('unmerge', None) if formatting else None
+    _border_style = formatting.pop('border_style', None) if formatting else None
 
-    result = _ensure_dict(ExcelOperations.format_cells(file_path, sheet_name, cell_range, formatting, preset))
-    if result.get('success') and result.get('data') is None:
-        result['message'] += ' (注意：没有单元格需要格式化)'
-    return _wrap(result)
+    # 如果提取后formatting为空且没有preset且无特殊操作，报错
+    if not formatting and not preset and _do_merge is None and _do_unmerge is None and _border_style is None:
+        return _fail(
+            '未提供样式参数。示例: {"bold": True} 或 {"merge": True} 或 {"border_style": "thin"}',
+            meta={"error_code": "MISSING_FORMATTING_PARAMS"})
+
+    _ops_result: list[tuple[str, bool, str]] = []
+
+    # Step 1: 合并/取消合并（结构操作先执行）
+    if _do_merge:
+        r = _ensure_dict(ExcelOperations.merge_cells(file_path, sheet_name, cell_range))
+        _ops_result.append(('merge', r.get('success', False), r.get('message', '')))
+    elif _do_unmerge:
+        r = _ensure_dict(ExcelOperations.unmerge_cells(file_path, sheet_name, cell_range))
+        _ops_result.append(('unmerge', r.get('success', False), r.get('message', '')))
+
+    # Step 2: 字体/单元格样式（仅当有剩余格式参数或preset时）
+    if formatting or preset:
+        r = _ensure_dict(ExcelOperations.format_cells(file_path, sheet_name, cell_range, formatting, preset))
+        ok = r.get('success', False)
+        _ops_result.append(('format', ok, r.get('message', '')))
+        if ok and r.get('data') is None:
+            r['message'] += ' (注意：没有单元格需要格式化)'
+
+    # Step 3: 边框
+    if _border_style:
+        try:
+            r = _ensure_dict(ExcelOperations.set_borders(file_path, sheet_name, cell_range, _border_style))
+            _ops_result.append(('border', r.get('success', False), r.get('message', '')))
+        except Exception as e:
+            _ops_result.append(('border', False, str(e)))
+
+    # 汇总结果
+    _ops_ok = [name for name, ok, _ in _ops_result if ok]
+    _ops_fail = [name for name, ok, _ in _ops_result if not ok]
+
+    if _ops_fail and not _ops_ok:
+        return _fail(f"格式化操作全部失败: {', '.join(_ops_fail)}",
+                     meta={"error_code": "FORMAT_FAILED", "operations": _ops_result})
+
+    _msg = f"已完成格式化: {', '.join(_ops_ok)}"
+    if _ops_fail:
+        _msg += f" | 部分失败: {', '.join(_ops_fail)}"
+    return _ok(_msg, data={'operations': [(n, o) for n, o, _ in _ops_result]})
 
 
 
