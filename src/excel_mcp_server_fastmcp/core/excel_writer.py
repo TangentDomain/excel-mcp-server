@@ -803,31 +803,38 @@ class ExcelWriter:
                     }
                 )
 
-            # 缓存未命中，尝试获取缓存的工作簿
-            cached_workbook_data = cache.get_cached_workbook(self.file_path)
-
-            if cached_workbook_data:
-                temp_workbook, temp_file_path = cached_workbook_data
-                logger.debug("使用缓存的工作簿进行计算")
+            # 缓存未命中
+            # 快速路径：先判断是否纯算术公式（无单元格引用）
+            # 纯算术公式直接用 Python 计算，完全跳过临时工作簿创建和磁盘I/O
+            if not re.search(r'[A-Za-z]+\d+', formula):
+                logger.debug(f"检测到纯算术公式，使用快速计算（跳过工作簿创建）: {formula}")
+                calculated_value = self._fast_calculate(formula)
             else:
-                # 创建新的临时工作簿（传入公式用于判断是否需要加载数据）
-                temp_workbook, temp_file_path = self._create_temp_workbook(context_sheet, cache, formula)
+                # 含单元格引用的公式需要工作簿上下文
+                cached_workbook_data = cache.get_cached_workbook(self.file_path)
 
-            try:
-                # 使用xlcalculator计算公式
-                calculated_value = self._calculate_with_xlcalculator(
-                    temp_file_path, formula, temp_workbook
-                )
+                if cached_workbook_data:
+                    temp_workbook, temp_file_path = cached_workbook_data
+                    logger.debug("使用缓存的工作簿进行计算")
+                else:
+                    # 创建新的临时工作簿（传入公式用于判断是否需要加载数据）
+                    temp_workbook, temp_file_path = self._create_temp_workbook(context_sheet, cache, formula)
 
-            except ImportError:
-                return OperationResult(
-                    success=False,
-                    error="需要安装xlcalculator库来支持公式计算: pip install xlcalculator"
-                )
-            except Exception as calc_error:
-                # 如果xlcalculator失败，尝试基础的手动解析
-                logger.warning(f"xlcalculator计算失败，尝试基础解析: {calc_error}")
-                calculated_value = self._fallback_calculation(temp_file_path, formula)
+                try:
+                    # 使用xlcalculator计算公式
+                    calculated_value = self._calculate_with_xlcalculator(
+                        temp_file_path, formula, temp_workbook
+                    )
+
+                except ImportError:
+                    return OperationResult(
+                        success=False,
+                        error="需要安装xlcalculator库来支持公式计算: pip install xlcalculator"
+                    )
+                except Exception as calc_error:
+                    # 如果xlcalculator失败，尝试基础的手动解析
+                    logger.warning(f"xlcalculator计算失败，尝试基础解析: {calc_error}")
+                    calculated_value = self._fallback_calculation(temp_file_path, formula)
 
             # 缓存计算结果
             cache.put(self.file_path, formula, calculated_value, context_sheet)
@@ -990,6 +997,110 @@ class ExcelWriter:
         # 计算Z1位置的公式
         calculated_value = evaluator.evaluate('Calculation!Z1')
         return calculated_value
+
+    def _fast_calculate(self, formula: str) -> any:
+        """快速计算纯算术公式（无单元格引用），使用 Python 内置 eval。
+
+        支持: SUM, AVG, MIN, MAX, COUNT, ABS, ROUND, INT, MOD, POWER, SQRT,
+              IF, AND, OR, NOT, CONCATENATE, LEFT, RIGHT, MID, LEN, UPPER, LOWER,
+              TRIM, TEXT, DATE, TODAY, NOW 等常用函数，以及 + - * / ^ () 运算。
+
+        Args:
+            formula: Excel 公式（不含等号）
+
+        Returns:
+            计算结果
+        """
+        import math
+        from datetime import datetime, date
+
+        # Excel 函数名 → Python 映射
+        safe_names = {
+            # 数学函数
+            'SUM': lambda *args: sum(args) if args else 0,
+            'AVG': lambda *args: sum(args) / len(args) if args else 0,
+            'MIN': min,
+            'MAX': max,
+            'COUNT': lambda *args: sum(1 for a in args if a is not None),
+            'ABS': abs,
+            'ROUND': round,
+            'INT': int,
+            'MOD': lambda a, b: a % b,
+            'POWER': pow,
+            'SQRT': math.sqrt,
+            'FLOOR': math.floor,
+            'CEILING': math.ceil,
+            'LN': math.log,
+            'LOG': math.log10,
+            'LOG10': math.log10,
+            'EXP': math.exp,
+            'PI': math.pi,
+            'E': math.e,
+            'SIN': math.sin,
+            'COS': math.cos,
+            'TAN': math.tan,
+            'DEGREES': math.degrees,
+            'RADIANS': math.radians,
+            # 逻辑函数
+            'IF': lambda cond, t, f: t if cond else f,
+            'AND': lambda *args: all(args),
+            'OR': lambda *args: any(args),
+            'NOT': lambda x: not x,
+            'TRUE': True,
+            'FALSE': False,
+            'NA': None,
+            # 文本函数
+            'CONCATENATE': lambda *args: ''.join(str(a) for a in args),
+            'LEFT': lambda s, n=1: str(s)[:int(n)],
+            'RIGHT': lambda s, n=1: str(s)[-int(n):] if int(n) > 0 else '',
+            'MID': lambda s, start, length: str(s)[int(start)-1:int(start)-1+int(length)],
+            'LEN': lambda s: len(str(s)),
+            'UPPER': lambda s: str(s).upper(),
+            'LOWER': lambda s: str(s).lower(),
+            'TRIM': lambda s: str(s).strip(),
+            'TEXT': lambda v, fmt=None: str(v),
+            'VALUE': lambda v: float(v) if '.' in str(v) else int(v),
+            # 日期函数
+            'TODAY': date.today(),
+            'NOW': datetime.now(),
+            'DATE': lambda y, m, d: date(int(y), int(m), int(d)),
+            'YEAR': lambda d: d.year if hasattr(d, 'year') else 0,
+            'MONTH': lambda d: d.month if hasattr(d, 'month') else 0,
+            'DAY': lambda d: d.day if hasattr(d, 'day') else 0,
+            # 统计
+            'MEDIAN': lambda *args: sorted(args)[len(args)//2] if args else 0,
+            'MODE': lambda *args: max(set(args), key=args.count) if args else 0,
+        }
+
+        try:
+            # 将 Excel 风格公式转为 Python 表达式
+            py_expr = formula
+
+            # 处理 Excel 比较运算符（Python 已支持）
+            # 处理 & 连接符 → +
+            py_expr = re.sub(r'&', '+', py_expr)
+
+            # 处理 != (Excel 用 <>)
+            py_expr = re.sub(r'<>', '!=', py_expr)
+
+            result = eval(py_expr, {"__builtins__": {}}, safe_names)
+            return result
+        except Exception as e:
+            logger.warning(f"快速计算失败，回退到 xlcalculator: {e}")
+            # 回退：创建临时工作簿用 xlcalculator 计算
+            temp_workbook = Workbook()
+            temp_sheet = temp_workbook.active
+            temp_sheet.title = "Calculation"
+            temp_file_path = TempFileManager.create_temp_excel_file(suffix='.xlsx')
+            calc_cell = temp_sheet['Z1']
+            calc_cell.value = f"={formula}"
+            temp_workbook.save(temp_file_path)
+
+            from xlcalculator import ModelCompiler, Evaluator
+            compiler = ModelCompiler()
+            model = compiler.read_and_parse_archive(temp_file_path)
+            evaluator = Evaluator(model)
+            return evaluator.evaluate('Calculation!Z1')
 
     def _fallback_calculation(self, temp_file_path: str, formula: str) -> any:
         """备用计算方法
