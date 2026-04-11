@@ -15,7 +15,6 @@ from src.excel_mcp_server_fastmcp.server import (
     excel_create_backup,
     excel_restore_backup,
     excel_list_backups,
-    excel_get_operation_history,
 )
 from src.excel_mcp_server_fastmcp.utils.validators import ExcelValidator, DataValidationError
 from src.excel_mcp_server_fastmcp.api.excel_operations import ExcelOperations
