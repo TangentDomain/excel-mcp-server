@@ -2183,6 +2183,45 @@ def excel_describe_table(
         wb.close()
 
 
+def _check_merge_data_loss(file_path: str, sheet_name: str, cell_range: str) -> Optional[str]:
+    """检查合并操作是否会导致数据丢失。返回警告信息或None。
+    
+    Excel合并单元格时，只有左上角单元格保留数据，其余单元格的值会丢失。
+    此函数在合并前检测目标范围内是否有非空的非左上角单元格，如有则返回警告。
+    """
+    try:
+        from openpyxl import load_workbook
+        wb = load_workbook(file_path, read_only=True, data_only=True)
+        ws = wb[sheet_name]
+        
+        # 解析范围
+        if '!' in cell_range:
+            range_part = cell_range.split('!')[1]
+        else:
+            range_part = cell_range
+        
+        # 获取范围内所有非空单元格（排除第一个/左上角）
+        non_empty_cells = []
+        first_cell = True
+        for row in ws[range_part]:
+            for cell in row:
+                if first_cell:
+                    first_cell = False  # 跳过左上角
+                    continue
+                if cell.value is not None:
+                    non_empty_cells.append(f"{cell.coordinate}={cell.value!r}")
+        wb.close()
+        
+        if non_empty_cells:
+            sample = non_empty_cells[:3]
+            more = f" 等{len(non_empty_cells)}个" if len(non_empty_cells) > 3 else ""
+            return (f"⚠️ 合并将清除以下单元格的数据: {', '.join(sample)}{more}。"
+                    f"Excel合并后只有左上角单元格保留值。如需保留数据请先备份或改用加粗+背景色代替合并。")
+        return None
+    except Exception:
+        return None  # 检查失败不阻塞合并操作
+
+
 @mcp.tool()
 @_track_call
 def excel_format_cells(
@@ -2209,6 +2248,9 @@ def excel_format_cells(
       边框:               {"border_style": "thin"}
       合并+边框+背景色:     {"merge": True, "border_style": "thin", "bg_color": "FFFF00"}
       预设样式:           preset="header"（等价于 bold + center + bg_color）
+
+    ⚠️ 合并警告：merge=True 会清除合并区域内非左上角单元格的值！Excel合并后只有左上角单元格保留数据。
+       例如合并 A1:E1 后，B1~E1 的值会丢失。如需保留数据，请先复制到其他位置或改用加粗+背景色代替合并。
 
     Args:
         file_path: Excel文件路径
@@ -2248,9 +2290,12 @@ def excel_format_cells(
             meta={"error_code": "MISSING_FORMATTING_PARAMS"})
 
     _ops_result: list[tuple[str, bool, str]] = []
+    _merge_warning: Optional[str] = None
 
     # Step 1: 合并/取消合并（结构操作先执行）
     if _do_merge:
+        # 检查合并是否会导致数据丢失
+        _merge_warning = _check_merge_data_loss(file_path, sheet_name, cell_range)
         r = _ensure_dict(ExcelOperations.merge_cells(file_path, sheet_name, cell_range))
         _ops_result.append(('merge', r.get('success', False), r.get('message', '')))
     elif _do_unmerge:
@@ -2284,6 +2329,8 @@ def excel_format_cells(
     _msg = f"已完成格式化: {', '.join(_ops_ok)}"
     if _ops_fail:
         _msg += f" | 部分失败: {', '.join(_ops_fail)}"
+    if _merge_warning:
+        _msg += f" | {_merge_warning}"
     return _ok(_msg, data={'operations': [(n, o) for n, o, _ in _ops_result]})
 
 
