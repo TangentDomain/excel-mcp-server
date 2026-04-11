@@ -554,8 +554,8 @@ mcp = FastMCP(
 按ID增改单行（幂等）？       → excel_upsert_row（存在更新/不存在插入）
 批量条件修改多行？           → excel_update_query（SQL UPDATE，支持dry_run）
 批量插入多行数据？           → excel_insert_query（SQL INSERT，支持dry_run）
-按条件删除行？               → excel_delete_query（SQL DELETE，必须WHERE）
-
+按条件删除行？               → excel_delete_query（SQL DELETE，必须WHERE，支持dry_run）
+按行号删除行？               → excel_delete_rows（row_index从1开始，指定count）
 ═══ 结构操作 ═══
 文件？                      → excel_create_file / excel_export_to_csv / excel_import_from_csv
 工作表？                    → excel_create_sheet / excel_delete_sheet / excel_rename_sheet / excel_copy_sheet
@@ -1662,123 +1662,19 @@ def excel_upsert_row(
 def excel_delete_rows(
     file_path: str,
     sheet_name: str,
-    row_index: int = None,
-    count: int = 1,
-    condition: str = None
+    row_index: int,
+    count: int = 1
 ) -> Dict[str, Any]:
-    """删除行。支持按行索引(row_index，从1开始)或SQL条件(condition)删除。
+    """按行号删除行。row_index从1开始（第1行前删除传1）。
+
+    ⚠️ 按条件删除请用 excel_delete_query（SQL DELETE FROM ... WHERE ...）
 
     Args:
         file_path: Excel文件路径
         sheet_name: 工作表名称
-        row_index: 要删除的起始行索引（从1开始），默认为None
-        count: 删除的行数，默认为1        condition: SQL条件表达式（如 "伤害>100" 或 "名称='火球术'"），默认为None
+        row_index: 要删除的起始行索引（从1开始，在该行位置删除）
+        count: 删除的行数，默认为1
     """
-
-    # condition模式：根据SQL条件查找并删除行
-    if condition is not None:
-        operation_logger.start_session(file_path)
-        operation_logger.log_operation("delete_rows_by_condition", {
-            "sheet_name": sheet_name,
-            "condition": condition
-        })
-        try:
-            # 使用pandas加载工作表数据，找出符合条件的行号
-            import pandas as pd
-            from python_calamine import CalamineWorkbook
-
-            cal_wb = CalamineWorkbook.from_path(file_path)
-            cal_ws = cal_wb.get_sheet_by_name(sheet_name)
-            if cal_ws is None:
-                return _fail(f"工作表 '{sheet_name}' 不存在",
-                             meta={"error_code": "SHEET_NOT_FOUND"})
-
-            # 读取全部数据
-            df = pd.read_excel(file_path, sheet_name=sheet_name, engine='calamine', keep_default_na=False)
-            # 找出表头行（第一行数据行），实际数据从第2行开始
-            # condition中的列名对应表头，行号 = 数据行index + 2（1-based表头 + 1-based offset）
-            header_row = 1  # 默认表头在第1行
-
-            # REQ-046: 尝试将可转换的列转为数值类型，避免字符串比较导致条件匹配失败
-            for col in df.columns:
-                try:
-                    df[col] = pd.to_numeric(df[col], errors='ignore')
-                except Exception:
-                    pass
-
-            # 使用pandas query执行条件筛选
-            try:
-                # pandas的query需要特殊处理中文列名
-                filtered = df.query(condition)
-            except Exception:
-                # 降级：用SQL引擎执行
-                sql = f"SELECT * FROM {sheet_name} WHERE {condition}"
-                query_result = _ensure_dict(ExcelOperations.query(file_path, sql))
-                if not query_result.get('success', False):
-                    return _fail(f"条件查询失败: {query_result.get('message', '未知错误')}",
-                                 meta={"error_code": "CONDITION_QUERY_FAILED"})
-                # 从SQL结果中提取行号（通过比对原始数据）
-                qdata = query_result.get('data', [])
-                if not isinstance(qdata, list) or len(qdata) <= 1:
-                    return _ok(f"条件 '{condition}' 未匹配到任何行",
-                               data={'deleted_rows': 0, 'condition': condition})
-                # SQL结果的行需要和原始df匹配来获取行号
-                sql_headers = qdata[0]
-                sql_rows = qdata[1:]
-                row_numbers = []
-                for sql_row in sql_rows:
-                    if not isinstance(sql_row, (list, tuple)):
-                        continue
-                    row_dict = dict(zip(sql_headers, sql_row))
-                    # 在df中找到匹配的行
-                    col_names = list(df.columns)
-                    for row_tuple in df.itertuples(index=True, name=None):
-                        idx = row_tuple[0]
-                        row_vals = dict(zip(col_names, row_tuple[1:]))
-                        match = True
-                        for col, val in row_dict.items():
-                            if col in col_names and str(row_vals.get(col, '')) != str(val):
-                                match = False
-                                break
-                        if match:
-                            row_numbers.append(idx + header_row + 1)  # 1-based, +1 for header
-                            break
-            else:
-                # pandas query成功，获取行号
-                row_numbers = [idx + header_row + 1 for idx in filtered.index]
-
-            if not row_numbers:
-                return _ok(f"条件 '{condition}' 未匹配到任何行",
-                           data={'deleted_rows': 0, 'condition': condition})
-
-            # 使用批量删除（一次文件I/O代替N次）- REQ-032 多线程优化
-            result = _ensure_dict(ExcelOperations.batch_delete_rows(file_path, sheet_name, row_numbers, True))
-            total_deleted = result.get('data', {}).get('deleted_rows', result.get('metadata', {}).get('deleted_rows', 0))
-
-            operation_logger.log_operation("operation_result", {
-                "success": result.get('success', False),
-                "deleted_rows": total_deleted,
-                "message": f"按条件批量删除完成"
-            })
-
-            if result.get('success', False):
-                return _ok(f"按条件 '{condition}' 删除了 {total_deleted} 行",
-                           data={'deleted_rows': total_deleted, 'condition': condition})
-            else:
-                return _fail(f"按条件删除失败: {result.get('message', '')}",
-                             meta={"error_code": "BATCH_DELETE_FAILED"})
-
-        except Exception as e:
-            operation_logger.log_operation("operation_error", {
-                "error": str(e),
-                "message": f"条件删除失败: {str(e)}"
-            })
-            return _fail(f"条件删除失败: {str(e)}", meta={"error_code": "CONDITION_DELETE_FAILED"})
-
-    # 行号模式：按row_index和count删除
-    if row_index is None:
-        return _fail("删除行需要指定 row_index 或 condition 参数",
-                     meta={"error_code": "MISSING_ROW_INDEX"})
 
     # 开始操作会话
     operation_logger.start_session(file_path)
