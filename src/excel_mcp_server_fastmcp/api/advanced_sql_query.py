@@ -2985,6 +2985,10 @@ class AdvancedSQLQueryEngine:
                     # 字符串函数: UPPER, LOWER, TRIM, LENGTH, CONCAT, REPLACE, SUBSTRING, LEFT, RIGHT
                     result_data[alias_name] = self._evaluate_string_function(original_expr, df)
 
+                elif self._is_scalar_num_function(original_expr):
+                    # 标量数值函数: ROUND(value, decimals)
+                    result_data[alias_name] = self._evaluate_scalar_num_function(original_expr, df)
+
                 elif isinstance(original_expr, exp.Window):
                     # 窗口函数: ROW_NUMBER, RANK, DENSE_RANK(已由_apply_window_functions预计算)
                     if alias_name in df.columns:
@@ -3126,6 +3130,7 @@ class AdvancedSQLQueryEngine:
         exp.Concat, exp.Replace, exp.Substring, exp.Left, exp.Right,
         exp.Add, exp.Sub, exp.Mul, exp.Div, exp.Mod,
         exp.Nullif, exp.All, exp.Any, exp.Anonymous,
+        exp.Round,  # 标量数值函数
     })
 
     # HAVING空结果建议分发表:(stat_func, op_str, label)
@@ -3202,6 +3207,9 @@ class AdvancedSQLQueryEngine:
                 right = right if isinstance(right, pd.Series) else pd.Series([right] * len(df), index=df.index)
                 return left.where(left != right, other=None)
             return None if left == right else left
+        elif self._is_scalar_num_function(expr):
+            # 标量数值函数嵌入数学表达式(如 ROUND(price,2) * 1.1)
+            return self._evaluate_scalar_num_function(expr, df)
         else:
             raise ValueError(f"不支持的数学运算: {expr}。💡 WHERE子句暂不支持算术运算，建议用子查询替代")
 
@@ -3217,6 +3225,16 @@ class AdvancedSQLQueryEngine:
         exp.Trim: 'strip',
         exp.Length: 'len',
     }
+
+    # 标量数值函数分发表:ROUND等一元/二元数值操作(isinstance需要tuple,不能用frozenset)
+    _SCALAR_NUM_FUNCS = (
+        exp.Round,   # ROUND(value, decimals) -- 四舍五入
+        # 预留: exp.Abs, exp.Floor, exp.Ceil, exp.Power
+    )
+
+    def _is_scalar_num_function(self, expr) -> bool:
+        """检查是否为标量数值函数(ROUND, ABS, FLOOR等)"""
+        return isinstance(expr, self._SCALAR_NUM_FUNCS)
 
     def _evaluate_string_function(self, expr, df) -> pd.Series:
         """计算字符串函数,返回pd.Series"""
@@ -3301,6 +3319,54 @@ class AdvancedSQLQueryEngine:
             return val[-n:] if n > 0 else ''
         return val
 
+    def _evaluate_scalar_num_function(self, expr, df) -> pd.Series:
+        """计算标量数值函数,返回pd.Series(向量化)
+
+        支持: ROUND(value, decimals)
+        sqlglot Round 结构: this=值表达式, args['decimals']=小数位数(可选Literal)
+        """
+        func_type = type(expr)
+
+        # 提取参数
+        val_series = self._expr_to_series(expr.this, df)
+        decimals_arg = expr.args.get('decimals')
+        decimals = int(self._literal_value(decimals_arg)) if decimals_arg is not None else 0
+
+        if func_type == exp.Round:
+            # pd.Series.round() 向量化四舍五入
+            try:
+                numeric_series = pd.to_numeric(val_series, errors='coerce')
+                return numeric_series.round(decimals)
+            except Exception:
+                # 回退: 逐行处理
+                def _round_val(v):
+                    try:
+                        return round(float(v), decimals)
+                    except (TypeError, ValueError):
+                        return None
+                return val_series.apply(_round_val)
+
+        raise ValueError(f"不支持的标量数值函数: {func_type.__name__}")
+
+    def _evaluate_scalar_num_function_for_row(self, expr, row: pd.Series) -> Any:
+        """逐行评估标量数值函数"""
+        func_type = type(expr)
+
+        val = self._get_row_value(expr.this, row)
+        if val is None:
+            return None
+
+        decimals_arg = expr.args.get('decimals')
+        decimals = int(self._literal_value(decimals_arg)) if decimals_arg is not None else 0
+
+        if func_type == exp.Round:
+            try:
+                return round(float(val), decimals)
+            except (TypeError, ValueError):
+                return None
+
+        return None
+
     def _expr_to_series(self, expr, df) -> pd.Series:
         """将表达式转换为pd.Series(支持列引用,字面量,数学表达式,字符串函数)"""
         if isinstance(expr, exp.Column):
@@ -3322,6 +3388,8 @@ class AdvancedSQLQueryEngine:
             return self._evaluate_coalesce_vectorized(expr, df)
         elif self._is_string_function(expr):
             return self._evaluate_string_function(expr, df)
+        elif self._is_scalar_num_function(expr):
+            return self._evaluate_scalar_num_function(expr, df)
         elif isinstance(expr, exp.Case):
             return self._evaluate_case_expression(expr, df)
         elif isinstance(expr, exp.Anonymous):
@@ -3336,7 +3404,22 @@ class AdvancedSQLQueryEngine:
                 return df[full_name]
             if anon_name in df.columns:
                 return df[anon_name]
-            raise ValueError(f"列 '{full_name}' 不存在。可用列: {list(df.columns)}")
+
+            # 中文函数名映射提示
+            _CN_FUNC_MAP = {
+                '长度': 'LENGTH', 'LEN': 'LENGTH',
+                'UPPER': 'UPPER', 'LOWER': 'LOWER',
+                'TRIM': 'TRIM', '截取': 'SUBSTRING',
+                '四舍五入': 'ROUND', '舍入': 'ROUND',
+                '拼接': 'CONCAT', '替换': 'REPLACE',
+            }
+            cn_hint = ''
+            for cn_name, en_name in _CN_FUNC_MAP.items():
+                if cn_name in anon_name or cn_name in full_name:
+                    cn_hint = f"💡 如需调用{en_name}函数,请使用英文函数名: {en_name}(...)"
+                    break
+
+            raise ValueError(f"列 '{full_name}' 不存在。可用列: {list(df.columns)}{cn_hint}")
         elif isinstance(expr, exp.Boolean):
             # SQL布尔字面量(TRUE/FALSE) → int(1/0)
             return int(expr.this)
@@ -3494,10 +3577,21 @@ class AdvancedSQLQueryEngine:
                 # 再次检查,如果仍不存在则抛出错误
                 if right_table not in worksheets_data:
                     available = list(worksheets_data.keys())
+
+                    # 跨文件语法提示: 检测是否误用了Excel原生 ! 语法
+                    cross_file_hint = ""
+                    if '!' in right_table or right_table.endswith(('.xlsx', '.xls')):
+                        cross_file_hint = (
+                            "\n💡 跨文件JOIN请使用 @'path' 语法,例如:"
+                            "\n   FROM 表A@'/path/to/file1.xlsx' a "
+                            "JOIN 表B@'/path/to/file2.xlsx' b ON a.id = b.id"
+                            "\n   (不支持Excel原生的 'file.xlsx'!Sheet 语法)"
+                        )
+
                     raise StructuredSQLError(
                         "table_not_found",
-                        f"JOIN表 '{right_table}' 不存在.可用表: {available}",
-                        hint="请检查JOIN的表名,或用excel_list_sheets查看可用工作表名.",
+                        f"JOIN表 '{right_table}' 不存在.可用表: {available}.{cross_file_hint}",
+                        hint="请检查JOIN的表名,跨文件引用请用 表名@'文件路径' 语法.",
                         context={"table_requested": right_table, "available_tables": available}
                     )
 
@@ -4606,6 +4700,9 @@ class AdvancedSQLQueryEngine:
         elif self._is_string_function(expr):
             return self._evaluate_string_function_for_row(expr, row)
 
+        elif self._is_scalar_num_function(expr):
+            return self._evaluate_scalar_num_function_for_row(expr, row)
+
         elif isinstance(expr, exp.Anonymous):
             # 含括号的列名(如"刷新时间(小时)")被sqlglot解析为Anonymous
             anon_name = expr.this
@@ -4615,6 +4712,19 @@ class AdvancedSQLQueryEngine:
             else:
                 full_name = anon_name
             val = row.get(full_name) if full_name in row.index else row.get(anon_name)
+
+            # 中文函数名映射提示
+            _CN_FUNC_MAP = {
+                '长度': 'LENGTH', 'LEN': 'LENGTH',
+                'UPPER': 'UPPER', 'LOWER': 'LOWER',
+                'TRIM': 'TRIM', '截取': 'SUBSTRING',
+                '四舍五入': 'ROUND', '舍入': 'ROUND',
+                '拼接': 'CONCAT', '替换': 'REPLACE',
+            }
+            if val is None:
+                for cn_name, en_name in _CN_FUNC_MAP.items():
+                    if cn_name in anon_name or cn_name in full_name:
+                        return f"💡 如需调用{en_name}函数,请使用英文函数名: {en_name}(...)"
             return val
 
         else:
@@ -4959,6 +5069,10 @@ class AdvancedSQLQueryEngine:
 
     def _evaluate_math_for_row(self, expr: exp.Expression, row: pd.Series) -> Any:
         """逐行评估数学表达式,复用类级别分发表"""
+        # 标量数值函数: ROUND, ABS, FLOOR等
+        if self._is_scalar_num_function(expr):
+            return self._evaluate_scalar_num_function_for_row(expr, row)
+
         op_type = type(expr)
         if op_type not in self._MATH_BINARY_OPS:
             return None
@@ -5400,6 +5514,8 @@ class AdvancedSQLQueryEngine:
         try:
             if self._is_string_function(expr):
                 df[temp_col] = self._evaluate_string_function(expr, df)
+            elif self._is_scalar_num_function(expr):
+                df[temp_col] = self._evaluate_scalar_num_function(expr, df)
             elif isinstance(expr, exp.Case):
                 df[temp_col] = self._evaluate_case_expression(expr, df)
             elif isinstance(expr, exp.Coalesce):
@@ -6606,6 +6722,16 @@ class AdvancedSQLQueryEngine:
                 return result
             except (ValueError, TypeError):
                 return ''
+
+        elif isinstance(expr, exp.Round):
+            # UPDATE SET ROUND(column, decimals)
+            inner = self._evaluate_update_expression(expr.this, df, row_idx)
+            decimals_arg = expr.args.get('decimals')
+            decimals = int(self._literal_value(decimals_arg)) if decimals_arg is not None else 0
+            try:
+                return round(float(inner), decimals)
+            except (ValueError, TypeError):
+                return inner
 
         else:
             # 未知表达式类型,尝试递归
