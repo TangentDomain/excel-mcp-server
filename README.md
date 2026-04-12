@@ -53,7 +53,7 @@
 
 ---
 
-[📖 完整更新日志](docs/CHANGELOG.md) | [🎯 版本规划](docs/ROADMAP.md)
+[📖 完整更新日志](docs/CHANGELOG.md) | [🎯 贡献指南](docs/CONTRIBUTING.md)
 
 ---
 
@@ -67,7 +67,7 @@
 
 ## 🚀 快速开始(1分钟)
 
-> 💡 **🔥 急用命令？** → [📋 30秒快速参考](docs/QUICK_REFERENCE.md)
+> 💡 **🔥 急用命令？** → [📋 30秒快速参考](docs/tutorials/QUICK_REFERENCE.md)
 
 ### 🔥 一键安装，即刻使用！
 
@@ -316,11 +316,11 @@ UPDATE 数据表 SET 值 = 100 WHERE _ROW_NUMBER_ BETWEEN 10 AND 50
 ## 📚 文档资源
 
 ### 📖 快速上手
-- [📋 快速参考指南](docs/QUICK_REFERENCE.md) - 30秒找到你需要命令（新！）
-- [互动式教程](docs/INTERACTIVE_TUTORIAL.md) - 分模块游戏配置实战教程（新！）
-- [基础教程](docs/README-gaming.md) - 游戏开发入门指南
-- [性能优化](docs/README-performance.md) - 大文件处理技巧
-- [SQL 参考](docs/README-sql.md) - 高级查询语法
+- [📋 快速参考指南](docs/tutorials/QUICK_REFERENCE.md) - 30秒找到你需要命令（新！）
+- [互动式教程](docs/tutorials/INTERACTIVE_TUTORIAL.md) - 分模块游戏配置实战教程（新！）
+- [基础教程](docs/api/README-gaming.md) - 游戏开发入门指南
+- [性能优化](docs/api/README-performance.md) - 大文件处理技巧
+- [SQL 参考](docs/api/README-sql.md) - 高级查询语法
 
 ### 🎮 示例代码
 - [游戏开发示例](examples/README.md) - 完整技能系统、装备管理案例

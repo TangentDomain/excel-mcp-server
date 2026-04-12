@@ -32,7 +32,7 @@
 
 ---
 
-[📖 Complete Changelog](docs/CHANGELOG.md) | [🎯 Roadmap](docs/ROADMAP.md)
+[📖 Complete Changelog](docs/CHANGELOG.md) | [🎯 Contributing](docs/CONTRIBUTING.md)
 
 ---
 
@@ -47,7 +47,7 @@
 ## 🚀 Quick Start (2 minutes)
 
 > 💡 **😱 First time?** → Watch [🎮 3-min Video Tutorial](VIDEO_TUTORIALS.en.md) first  
-> 💡 **🔥 In a hurry?** → [📋 30-sec Quick Reference](docs/QUICK_REFERENCE.md)
+> 💡 **🔥 In a hurry?** → [📋 30-sec Quick Reference](docs/tutorials/QUICK_REFERENCE.md)
 
 ### 🔥 One-click setup, start instantly!
 
@@ -300,11 +300,11 @@ When you receive replies like this, configuration is successful:
 ## 📚 Documentation Resources
 
 ### 📖 Quick Start Guides
-- [📋 Quick Reference Guide](docs/QUICK_REFERENCE.md) - Find what you need in 30 seconds (New!)
-- [Interactive Tutorial](docs/INTERACTIVE_TUTORIAL.md) - Modular game configuration tutorials (New!)
-- [Basic Tutorial](docs/README-gaming.md) - Game development getting started
-- [Performance Optimization](docs/README-performance.md) - Large file handling techniques
-- [SQL Reference](docs/README-sql.md) - Advanced query syntax
+- [📋 Quick Reference Guide](docs/tutorials/QUICK_REFERENCE.md) - Find what you need in 30 seconds (New!)
+- [Interactive Tutorial](docs/tutorials/INTERACTIVE_TUTORIAL.md) - Modular game configuration tutorials (New!)
+- [Basic Tutorial](docs/api/README-gaming.md) - Game development getting started
+- [Performance Optimization](docs/api/README-performance.md) - Large file handling techniques
+- [SQL Reference](docs/api/README-sql.md) - Advanced query syntax
 
 ### 🎮 Example Code
 - [Game Development Examples](examples/README.md) - Complete skill systems, equipment management cases
