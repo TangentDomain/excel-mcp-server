@@ -18,7 +18,7 @@ from typing import List, Any, Optional
 from openpyxl import load_workbook, Workbook
 from openpyxl.utils import range_boundaries
 from openpyxl.utils.cell import coordinate_from_string
-from openpyxl.styles import Font, PatternFill, Border, Alignment, Side
+from openpyxl.styles import Font, PatternFill, GradientFill, Border, Alignment, Side
 
 from ..models.types import RangeInfo, ModifiedCell, OperationResult, RangeType
 from ..utils.validators import ExcelValidator
@@ -1625,11 +1625,15 @@ class ExcelWriter:
                     fill_type='solid'
                 )
             elif _fill_type == 'gradient':
+                from openpyxl.styles.colors import Color as Clr
+                from openpyxl.styles.fills import Stop
+                _colors = fill_config.get('colors', ['FFFFFF', 'D9D9D9'])
+                _n = len(_colors)
                 cell.fill = GradientFill(
                     type=fill_config.get('gradient_type', 'linear'),
                     degree=fill_config.get('degree', 0),
-                    stop=[PatternFill(start_color=c, end_color=c, fill_type='solid')
-                          for c in fill_config.get('colors', ['FFFFFF', 'D9D9D9'])]
+                    stop=[Stop(color=Clr(c), position=i/(_n-1) if _n > 1 else 0)
+                          for i, c in enumerate(_colors)]
                 )
             elif _fill_type == 'pattern':
                 cell.fill = PatternFill(
@@ -1671,8 +1675,8 @@ class ExcelWriter:
                 top=_make_side(border_config.get('top')),
                 bottom=_make_side(border_config.get('bottom')),
                 diagonal=_make_side(border_config.get('diagonal')),
-                diagonalDirection=border_config.get('diagonal_direction'),
-                outline=border_config.get('outline'),
+                diagonal_direction=border_config.get('diagonal_direction'),
+                outline=border_config.get('outline', True),
                 start=border_config.get('start'),
                 end=border_config.get('end'),
             )
