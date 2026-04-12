@@ -654,6 +654,10 @@ class AdvancedSQLQueryEngine:
                 # 解决用户写 SELECT "Player Name" 但内部列名已变为 Player_Name 的问题
                 sql = self._preprocess_quoted_identifiers(sql)
 
+                # 预处理: 将 || 字符串拼接操作符转为 CONCAT()
+                # 因为 MySQL 方言将 || 解析为逻辑 OR，需要提前转换
+                sql = self._preprocess_dpipe_to_concat(sql)
+
                 parsed_sql = sqlglot.parse_one(sql, dialect="mysql")
 
                 # 保存解析后的SQL,用于错误提示中的窗口函数别名检测
@@ -1125,6 +1129,93 @@ class AdvancedSQLQueryEngine:
         # pandas groupby 默认跳过 NaN 行,不需要手动处理
 
         return df
+
+    def _preprocess_dpipe_to_concat(self, sql: str) -> str:
+        """
+        预处理SQL中的 || 字符串拼接操作符
+
+        注意: 此方法保留作为扩展点,当前不做实际转换。
+        MySQL 方言将 || 解析为逻辑 OR,实际的 || → 拼接转换
+        在 _process_select_expression 中通过 _is_likely_dpipe_concatenation() 启发式检测实现。
+
+        如需启用预处理转换(替代启发式检测),可在此方法中实现 || → CONCAT() 的正则替换。
+
+        Args:
+            sql: 原始SQL查询语句
+
+        Returns:
+            str: 原始SQL语句(未修改)
+        """
+        # 当前不进行预处理转换,由 _process_select_expression 中的运行时检测处理
+        return sql
+
+    def _is_likely_dpipe_concatenation(self, or_expr) -> bool:
+        """
+        启发式判断 MySQL 方言解析的 exp.Or 是否原本是 || 字符串拼接(DPipe)
+
+        判断依据:
+        - 两边都不是布尔比较表达式(=, !=, >, <, IN, LIKE, BETWEEN, IS 等)
+        - 至少有一边是列引用、字面量字符串、CAST 或字符串函数
+        - 不包含 AND/OR 嵌套(真正的逻辑OR通常有嵌套布尔条件)
+
+        Args:
+            or_expr: sqlglot 的 exp.Or 表达式节点
+
+        Returns:
+            bool: True 表示这可能是字符串拼接, False 表示是真正的逻辑 OR
+        """
+        from sqlglot import exp as sg_exp
+
+        left = or_expr.this
+        right = or_expr.expression
+
+        # 如果任一边是布尔比较/逻辑运算,则认为是真正的 OR
+        bool_types = (
+            sg_exp.EQ, sg_exp.NEQ, sg_exp.GT, sg_exp.GTE, sg_exp.LT, sg_exp.LTE,
+            sg_exp.In, sg_exp.Like, sg_exp.ILike, sg_exp.Between,
+            sg_exp.Is, sg_exp.Null, sg_exp.Not,
+            sg_exp.And, sg_exp.Or,  # 嵌套逻辑运算
+            sg_exp.Exists, sg_exp.Any, sg_exp.All,
+            sg_exp.Boolean,  # TRUE/FALSE 字面量
+        )
+
+        def _contains_bool_type(expr):
+            """检查表达式中是否包含布尔类型节点"""
+            if isinstance(expr, bool_types):
+                return True
+            # 递归检查子节点
+            for child in expr.iter_expressions():
+                if _contains_bool_type(child):
+                    return True
+            return False
+
+        # 如果两边都是非布尔表达式,很可能是拼接
+        if _contains_bool_type(left) or _contains_bool_type(right):
+            return False
+
+        # 检查两边是否都是"值类"表达式(列引用、字面量、函数调用等)
+        value_types = (
+            sg_exp.Column, sg_exp.Literal, sg_exp.Cast,
+            sg_exp.Upper, sg_exp.Lower, sg_exp.Trim, sg_exp.Length,
+            sg_exp.Concat, sg_exp.Replace, sg_exp.Substring,
+            sg_exp.Anonymous,
+            sg_exp.Add, sg_exp.Sub, sg_exp.Mul, sg_exp.Div,  # 算术表达式也是值
+            sg_exp.Coalesce, sg_exp.Nullif, sg_exp.Round,
+            sg_exp.Case,
+        )
+
+        def _is_value_expr(expr):
+            """检查是否为值类型表达式"""
+            if isinstance(expr, value_types):
+                return True
+            # 嵌套的算术/函数也视为值
+            for child in expr.iter_expressions():
+                if isinstance(child, value_types):
+                    return True
+            return False
+
+        # 两边都应该是值表达式
+        return _is_value_expr(left) and _is_value_expr(right)
 
     def _preprocess_quoted_identifiers(self, sql: str) -> str:
         """
@@ -3159,6 +3250,22 @@ class AdvancedSQLQueryEngine:
                             f"\n🔧 可用列: {list(df.columns)}"
                         )
 
+                elif isinstance(original_expr, exp.Cast):
+                    # CAST 表达式(向量化)
+                    result_data[alias_name] = self._evaluate_cast_expression(original_expr, df)
+
+                elif isinstance(original_expr, exp.Or):
+                    # MySQL 方言将 || 解析为 OR,启发式检测是否为字符串拼接
+                    if self._is_likely_dpipe_concatenation(original_expr):
+                        left = self._expr_to_series(original_expr.this, df).astype(str)
+                        right = self._expr_to_series(original_expr.expression, df).astype(str)
+                        result_data[alias_name] = left + right
+                    else:
+                        raise ValueError(
+                            f"不支持的表达式: {original_expr}。"
+                            f"\n💡 MySQL方言中 || 表示逻辑OR,如需字符串拼接请使用 CONCAT() 函数。"
+                        )
+
                 else:
                     # 其他表达式,尝试作为列处理
                     if hasattr(original_expr, 'name') and original_expr.name in df.columns:
@@ -3252,6 +3359,7 @@ class AdvancedSQLQueryEngine:
         exp.Add, exp.Sub, exp.Mul, exp.Div, exp.Mod,
         exp.Nullif, exp.All, exp.Any, exp.Anonymous,
         exp.Round,  # 标量数值函数
+        exp.Cast,   # 类型转换函数 (SQL标准)
     })
 
     # HAVING空结果建议分发表:(stat_func, op_str, label)
@@ -3363,6 +3471,14 @@ class AdvancedSQLQueryEngine:
             else:
                 # 单列单行
                 return pd.to_numeric(subquery_df.iloc[0, 0], errors='coerce')
+        elif isinstance(expr, exp.Cast):
+            # CAST 嵌入数学表达式 (如 CAST(col AS FLOAT) * 100)
+            return self._evaluate_cast_expression(expr, df)
+        elif isinstance(expr, exp.DPipe):
+            # || 字符串拼接嵌入表达式
+            left = self._evaluate_math_expression(expr.this, df).astype(str)
+            right = self._evaluate_math_expression(expr.expression, df).astype(str)
+            return left + right
         else:
             raise ValueError(f"不支持的数学运算: {expr}。💡 WHERE子句暂不支持算术运算，建议用子查询替代")
 
@@ -3671,6 +3787,11 @@ class AdvancedSQLQueryEngine:
             return pd.Series([val] * len(df), index=df.index)
         elif isinstance(expr, (exp.Add, exp.Sub, exp.Mul, exp.Div)):
             return self._evaluate_math_expression(expr, df)
+        elif isinstance(expr, exp.DPipe):
+            # || 字符串拼接操作符 (SQL标准/PostgreSQL风格)
+            left = self._expr_to_series(expr.this, df).astype(str)
+            right = self._expr_to_series(expr.expression, df).astype(str)
+            return left + right
         elif isinstance(expr, exp.Coalesce):
             return self._evaluate_coalesce_vectorized(expr, df)
         elif self._is_string_function(expr):
@@ -3707,13 +3828,31 @@ class AdvancedSQLQueryEngine:
                     break
 
             raise ValueError(f"列 '{full_name}' 不存在。可用列: {list(df.columns)}{cn_hint}")
+        elif isinstance(expr, exp.Cast):
+            # CAST(expr AS type) — SQL 标准类型转换
+            return self._evaluate_cast_expression(expr, df)
         elif isinstance(expr, exp.Boolean):
             # SQL布尔字面量(TRUE/FALSE) → int(1/0)
             return int(expr.this)
+
+        elif isinstance(expr, exp.Or):
+            # MySQL 方言将 || 解析为 OR,但用户可能意图是字符串拼接
+            # 启发式检测: 如果两边都是非布尔表达式(列引用/字面量/CAST/函数),
+            # 则将其视为字符串拼接(DPipe)而非逻辑OR
+            if self._is_likely_dpipe_concatenation(expr):
+                left = self._expr_to_series(expr.this, df).astype(str)
+                right = self._expr_to_series(expr.expression, df).astype(str)
+                return left + right
+            raise ValueError(
+                f"不支持的表达式: {expr}。"
+                f"\n💡 MySQL方言中 || 表示逻辑OR,如需字符串拼接请使用 CONCAT() 函数。"
+                f"\n🔧 示例: SELECT CONCAT(name, '_v1') FROM table"
+            )
+
         else:
             raise ValueError(
                 f"不支持的表达式类型: {type(expr).__name__}。"
-                f"\n💡 建议: 检查SQL语法，常用表达式支持: 列引用、字面量、算术运算(+,-,*,/)、字符串函数(UPPER/LOWER/CONCAT)、CASE WHEN。"
+                f"\n💡 建议: 检查SQL语法，常用表达式支持: 列引用、字面量、算术运算(+,-,*,/)、字符串函数(UPPER/LOWER/CONCAT)、CASE WHEN、CAST。"
                 f"\n🔧 如需复杂计算，可用子查询替代: SELECT * FROM (SELECT ..., (A+B) as total FROM table) WHERE total > 100"
             )
 
@@ -4699,10 +4838,15 @@ class AdvancedSQLQueryEngine:
             except Exception as e:
                 raise ValueError(f"标量子查询执行失败: {e}")
 
+        elif isinstance(expr, exp.Cast):
+            # WHERE/HAVING 中的 CAST: 递归求内部值,类型转换由 pandas 在比较时自动处理
+            inner_expr = expr.this
+            return self._expression_to_value(inner_expr, df)
+
         else:
             raise ValueError(
                 f"不支持的表达式类型: {type(expr).__name__}。"
-                f"\n💡 WHERE子句支持: 比较运算(=,!=,>,<,>=,<=)、逻辑运算(AND,OR,NOT)、LIKE、IN、BETWEEN、IS NULL。"
+                f"\n💡 WHERE子句支持: 比较运算(=,!=,>,<,>=,<=)、逻辑运算(AND,OR,NOT)、LIKE、IN、BETWEEN、IS NULL、CAST。"
                 f"\n🔧 不支持算术运算(如 A+B>10)，建议用子查询: SELECT * FROM (SELECT ..., (A+B) as t FROM tbl) WHERE t>10"
             )
 
@@ -5019,6 +5163,12 @@ class AdvancedSQLQueryEngine:
 
         elif self._is_scalar_num_function(expr):
             return self._evaluate_scalar_num_function_for_row(expr, row)
+
+        elif isinstance(expr, exp.Cast):
+            # CAST(expr AS type) — 逐行模式
+            # 需要传入 df 参数,这里用 row.to_frame().T 构造临时 DataFrame
+            tmp_df = row.to_frame().T
+            return self._evaluate_cast_expression(expr, tmp_df, row=row)[0]
 
         elif isinstance(expr, exp.Anonymous):
             # 含括号的列名(如"刷新时间(小时)")被sqlglot解析为Anonymous
@@ -5358,6 +5508,80 @@ class AdvancedSQLQueryEngine:
             return result
         except Exception as e:
             raise ValueError(f"子查询执行失败: {e}")
+
+    def _evaluate_cast_expression(self, cast_expr: exp.Cast, df, row=None) -> Any:
+        """
+        评估 CAST(expr AS type) 表达式 — SQL 标准类型转换
+
+        支持的目标类型:
+        - INT / INTEGER → 整数
+        - FLOAT / DECIMAL / REAL / DOUBLE → 浮点数
+        - VARCHAR / TEXT / STRING / CHAR → 字符串
+        - BOOLEAN / BOOL → 布尔值 (0/1)
+        """
+        # 1. 获取内部表达式并递归求值
+        inner = cast_expr.this
+
+        if row is not None:
+            # 单行模式: 用于 WHERE 逐行过滤
+            inner_val = self._evaluate_condition_for_row(inner, row) if hasattr(inner, 'key') or isinstance(inner, exp.Binary) else self._literal_value(inner)
+            if isinstance(inner, exp.Column):
+                col_name = inner.name
+                if col_name in row.index:
+                    inner_val = row[col_name]
+                else:
+                    raise ValueError(f"CAST: 列 '{col_name}' 不存在.可用列: {list(row.index)}")
+        else:
+            # 向量化模式: 用于 SELECT 列计算
+            if isinstance(inner, exp.Column):
+                col_name = inner.name
+                if col_name in df.columns:
+                    inner_val = df[col_name]
+                else:
+                    raise ValueError(f"CAST: 列 '{col_name}' 不存在.可用列: {list(df.columns)}")
+            elif isinstance(inner, exp.Literal):
+                inner_val = self._parse_literal_value(inner)
+            else:
+                # 嵌套表达式: 递归求值
+                inner_val = self._process_select_expression(inner, df)
+
+        # 2. 获取目标类型
+        target_type = cast_expr.args.get('to')
+        if target_type is None:
+            return inner_val  # 无目标类型则原样返回
+
+        type_name = str(target_type.this).upper() if hasattr(target_type, 'this') else str(target_type).upper()
+
+        # 3. 执行类型转换
+        import numpy as np
+
+        if type_name in ('INT', 'INTEGER'):
+            if isinstance(inner_val, pd.Series):
+                return pd.to_numeric(inner_val, errors='coerce').astype('Int64')
+            return int(float(inner_val)) if inner_val is not None else None
+
+        elif type_name in ('FLOAT', 'DECIMAL', 'REAL', 'DOUBLE', 'NUMBER'):
+            if isinstance(inner_val, pd.Series):
+                return pd.to_numeric(inner_val, errors='coerce')
+            return float(inner_val) if inner_val is not None else None
+
+        elif type_name in ('VARCHAR', 'TEXT', 'STRING', 'CHAR', 'NVARCHAR'):
+            if isinstance(inner_val, pd.Series):
+                return inner_val.astype(str).replace('nan', '').replace('<NA>', '')
+            return str(inner_val) if inner_val is not None else ''
+
+        elif type_name in ('BOOLEAN', 'BOOL'):
+            if isinstance(inner_val, pd.Series):
+                return inner_val.astype(bool).astype(int)
+            if inner_val is None:
+                return 0
+            return 1 if bool(inner_val) else 0
+
+        else:
+            # 未知类型: 尝试转为字符串(最安全的默认行为)
+            if isinstance(inner_val, pd.Series):
+                return inner_val.astype(str)
+            return str(inner_val) if inner_val is not None else None
 
     def _evaluate_case_expression(self, case_expr: exp.Case, df, row=None) -> Any:
         """
@@ -5899,6 +6123,14 @@ class AdvancedSQLQueryEngine:
                 df[temp_col] = self._evaluate_coalesce_vectorized(expr, df)
             elif self._is_mathematical_expression(expr):
                 df[temp_col] = self._evaluate_math_expression(expr, df)
+            elif isinstance(expr, exp.Cast):
+                # CAST 表达式用于 ORDER BY 临时列
+                df[temp_col] = self._evaluate_cast_expression(expr, df)
+            elif isinstance(expr, exp.DPipe):
+                # || 拼接用于 ORDER BY 临时列
+                left = self._expr_to_series(expr.this, df).astype(str)
+                right = self._expr_to_series(expr.expression, df).astype(str)
+                df[temp_col] = left + right
             elif isinstance(expr, exp.Anonymous):
                 # 含括号的列名(如"刷新时间(小时)")
                 anon_name = expr.this
