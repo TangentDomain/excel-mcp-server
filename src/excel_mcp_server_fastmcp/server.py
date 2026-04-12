@@ -808,12 +808,12 @@ def _strip_defaults(obj: Any, depth: int = 0) -> Any:
     
     cleaned = {}
     for k, v in obj.items():
-        # 单元格value字段：保留None（空单元格有语义意义）
+        # 单元格value字段：保留None和空字符串（空单元格有语义意义，calamine返回''而openpyxl返回None）
         if k in cell_semantic_fields and _is_cell_info:
-            cleaned[k] = v  # 保留原值（包括None），让JSON序列化为null
+            cleaned[k] = v  # 保留原值（包括None和''），让JSON序列化为null
             continue
         
-        # 移除空值
+        # 移除空值（CellInfo的value已由上面处理）
         if v is None or v == '':
             continue
         
@@ -1011,7 +1011,9 @@ def excel_get_range(
     include_formatting: bool = False,
     sheet_name: Optional[str] = None
 ) -> Dict[str, Any]:
-    """读取指定范围的数据。返回{headers, data, shape}。支持include_formatting获取样式。
+    """读取指定范围的数据。返回二维CellInfo数组[[{coordinate,value},...],...]。
+    每个单元格返回 {coordinate: "A1", value: ...}，空单元格value为null。
+    支持include_formatting获取样式信息（额外返回font/fill等字段）。
 
     Args:
         file_path: Excel文件路径

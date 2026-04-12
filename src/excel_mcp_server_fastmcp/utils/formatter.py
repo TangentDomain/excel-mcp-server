@@ -49,10 +49,15 @@ def _strip_defaults(obj: Any) -> Any:
         return obj if obj.strip() != "" else None
     elif isinstance(obj, dict):
         cleaned = {}
+        # CellInfo语义检测：coordinate+value结构中，value=None/''代表空单元格
+        _is_cell_info = 'coordinate' in obj
         for key, value in obj.items():
             if key in ['data', 'matches', 'differences', 'results', 'row_differences', 'headers']:
                 # 重要字段即使为空也要保留
                 cleaned[key] = _strip_defaults(value)
+            elif key == 'value' and _is_cell_info:
+                # 单元格value：保留None和空字符串（空单元格有语义意义）
+                cleaned[key] = value
             else:
                 # 普通字段过滤掉空值
                 stripped_value = _strip_defaults(value)
@@ -416,7 +421,13 @@ def _deep_clean_nulls(obj: Any) -> Any:
     """
     if isinstance(obj, dict):
         cleaned = {}
+        # CellInfo语义检测：coordinate+value结构中，value=None代表空单元格，必须保留
+        _is_cell_info = 'coordinate' in obj
         for key, value in obj.items():
+            # 单元格value字段：保留None和空字符串（空单元格有语义意义，calamine返回''而openpyxl返回None）
+            if key == 'value' and _is_cell_info and (value is None or value == ''):
+                cleaned[key] = value  # 保留原值（包括None和''）
+                continue
             if value is not None:
                 cleaned_value = _deep_clean_nulls(value)
                 # 保留重要字段，即使为空
