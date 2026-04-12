@@ -4468,9 +4468,11 @@ class AdvancedSQLQueryEngine:
             return None
 
         # IS NULL (sqlglot解析为 exp.Is)
+        # 注意: Excel中空单元格被openpyxl/calamine读为空字符串(非NaN),
+        # 因keep_default_na=False保留原始语义.所以IS NULL需同时匹配NaN和空字符串.
         elif isinstance(condition, exp.Is):
             left = self._expression_to_column_reference(condition.this, df)
-            return f"{left}.isna()"
+            return f"({left}.isna()) | ({left} == '')"
 
         # BETWEEN x AND y
         elif isinstance(condition, exp.Between):
