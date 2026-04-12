@@ -2102,6 +2102,10 @@ class AdvancedSQLQueryEngine:
                         order_cols.append(col)
                         ascending.append(not desc)
                     if order_cols:
+                        # [FIX] 确保排序列为数值类型，避免 object 列混合类型导致 sort_values 崩溃
+                        for oc in order_cols:
+                            if oc in df.columns and df[oc].dtype == object:
+                                df[oc] = pd.to_numeric(df[oc], errors='coerce')
                         df = df.sort_values(order_cols, ascending=ascending, kind='mergesort')
                 break  # 只按第一个窗口函数排序
 
@@ -2159,6 +2163,14 @@ class AdvancedSQLQueryEngine:
             if col not in df.columns:
                 suggestion = self._suggest_column_name(col, list(df.columns))
                 raise ValueError(f"窗口函数中列 '{col}' 不存在.可用列: {list(df.columns)}.{suggestion}")
+
+        # [FIX] 确保排序列为数值类型，避免 object 列混合 int/str 导致 sort_values 崩溃
+        # 场景: 部分列INSERT产生空字符串值，查询管道将列转为object dtype
+        if order_cols:
+            df = df.copy()
+            for oc in order_cols:
+                if oc in df.columns and df[oc].dtype == object:
+                    df[oc] = pd.to_numeric(df[oc], errors='coerce')
 
         # 窗口函数分发表
         _window_dispatch = {
@@ -2265,7 +2277,7 @@ class AdvancedSQLQueryEngine:
             # 无PARTITION BY: 全表作为一个分区
             result = compute_count_in_group(df)
 
-        return result.astype(int)
+        return result.astype('Int64')
 
     def _compute_row_number(self, df: pd.DataFrame, partition_cols: list,
                             order_cols: list, ascending: list) -> pd.Series:
@@ -2284,7 +2296,7 @@ class AdvancedSQLQueryEngine:
         else:
             result = pd.Series(range(1, len(sorted_df) + 1), index=sorted_df.index, dtype=int)
 
-        return result.reindex(df.index).astype(int)
+        return result.reindex(df.index).astype('Int64')
 
     def _compute_rank(self, df: pd.DataFrame, partition_cols: list,
                       order_cols: list, ascending: list) -> pd.Series:
@@ -2297,7 +2309,7 @@ class AdvancedSQLQueryEngine:
             result = sorted_df.groupby(partition_cols, sort=False)[order_cols[0]].rank(method='min', ascending=ascending[0])
         else:
             result = sorted_df[order_cols[0]].rank(method='min', ascending=ascending[0])
-        return result.reindex(df.index).astype(int)
+        return result.reindex(df.index).astype('Int64')
 
     def _compute_dense_rank(self, df: pd.DataFrame, partition_cols: list,
                             order_cols: list, ascending: list) -> pd.Series:
@@ -2310,7 +2322,7 @@ class AdvancedSQLQueryEngine:
             result = sorted_df.groupby(partition_cols, sort=False)[order_cols[0]].rank(method='dense', ascending=ascending[0])
         else:
             result = sorted_df[order_cols[0]].rank(method='dense', ascending=ascending[0])
-        return result.reindex(df.index).astype(int)
+        return result.reindex(df.index).astype('Int64')
 
     def _compute_percent_rank(self, df: pd.DataFrame, partition_cols: list,
                               order_cols: list, ascending: list) -> pd.Series:
