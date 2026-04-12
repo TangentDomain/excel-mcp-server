@@ -53,7 +53,7 @@
 
 ---
 
-[📖 完整更新日志](CHANGELOG.md) | [🎯 版本规划](docs/ROADMAP.md)
+[📖 完整更新日志](docs/CHANGELOG.md) | [🎯 版本规划](docs/ROADMAP.md)
 
 ---
 
@@ -386,7 +386,7 @@ GitHub Issues → 使用 Bug 报告模板
 - 🐛 **报告 Bug**:使用 [Issue 模板](https://github.com/TangentDomain/excel-mcp-server/issues/new)
 - 💡 **功能建议**:欢迎提出游戏开发新需求
 - 📚 **改进文档**:让其他开发者更容易上手
-- 💻 **提交代码**:查看 [贡献指南](CONTRIBUTING.md)
+- 💻 **提交代码**:查看 [贡献指南](docs/CONTRIBUTING.md)
 
 ---
 

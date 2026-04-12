@@ -32,7 +32,7 @@
 
 ---
 
-[📖 Complete Changelog](CHANGELOG.md) | [🎯 Roadmap](docs/ROADMAP.md)
+[📖 Complete Changelog](docs/CHANGELOG.md) | [🎯 Roadmap](docs/ROADMAP.md)
 
 ---
 
@@ -479,7 +479,7 @@ If this tool helps you, please light up ⭐ Star
 - 🐛 **Report Bugs**: Use [Issue Template](https://github.com/TangentDomain/excel-mcp-server/issues/new)
 - 💡 **Feature Suggestions**: Welcome new game development needs
 - 📚 **Improve Documentation**: Help other developers get started faster
-- 💻 **Submit Code**: See [Contribution Guide](CONTRIBUTING.md)
+- 💻 **Submit Code**: See [Contribution Guide](docs/CONTRIBUTING.md)
 
 ---
 
