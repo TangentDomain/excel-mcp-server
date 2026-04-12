@@ -2241,9 +2241,7 @@ def excel_format_cells(
     sheet_name: str,
     cell_range: str,
     formatting: Optional[Dict[str, Any]] = None,
-    preset: Optional[str] = None,
-    start_cell: Optional[str] = None,
-    end_cell: Optional[str] = None
+    preset: Optional[str] = None
 ) -> Dict[str, Any]:
     """单元格样式统一入口：字体样式 + 合并/拆分 + 边框，一个工具完成所有外观操作。
 
@@ -2275,7 +2273,6 @@ def excel_format_cells(
             wrap_text: bool | border_style: thin/thick/double/dotted/dashed
             merge: bool (合并单元格) | unmerge: bool (取消合并)
         preset: 预设样式名（bold/italic/highlight/header）
-        start_cell/end_cell: 可选，替代 cell_range 使用（如 start_cell="A1", end_cell="E1"）
     """
     if formatting is None and preset is None:
         return _fail(
@@ -2285,8 +2282,6 @@ def excel_format_cells(
         return _fail('缺少必需参数 sheet_name',
                     meta={"error_code": "MISSING_REQUIRED_PARAM", "param": "sheet_name"})
 
-    if start_cell and end_cell:
-        cell_range = f"{start_cell}:{end_cell}"
     if '!' not in cell_range:
         cell_range = f"{sheet_name}!{cell_range}"
 
