@@ -7333,8 +7333,8 @@ class AdvancedSQLQueryEngine:
             # 整数值直接返回int
             if f == int(f):
                 return int(f)
-            # 自适应舍入:极小值保留更多小数位
-            if abs(f) < 0.01 and f != 0:
+            # 自适应舍入:较小值保留更多小数位(游戏配置常见概率/掉落率/加成比)
+            if abs(f) < 0.1 and f != 0:
                 return round(f, 10)
             return round(f, 2)
         if isinstance(val, float):
@@ -7342,8 +7342,8 @@ class AdvancedSQLQueryEngine:
                 return None
             if val == int(val):
                 return int(val)
-            # 自适应舍入:极小值保留更多小数位
-            if abs(val) < 0.01 and val != 0:
+            # 自适应舍入:较小值保留更多小数位
+            if abs(val) < 0.1 and val != 0:
                 return round(val, 10)
             return round(val, 2)
         return val
