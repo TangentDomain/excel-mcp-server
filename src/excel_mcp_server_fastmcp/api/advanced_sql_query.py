@@ -1297,11 +1297,7 @@ class AdvancedSQLQueryEngine:
             col_type = df[col].dtype
 
             if col_type == 'object':
-                # 字符串列:仅当低基数(唯一值/总行数 < 0.3)时转为 category
-                # 高基数字符串列转 category 反而增加内存开销
-                num_unique = df[col].nunique()
-                if num_unique > 0 and num_unique / len(df) < 0.3:
-                    df[col] = df[col].astype('category')
+                pass  # 保持 object 类型,避免 category 导致 UPDATE 写入新值时报错
             elif col_type in ['int64', 'int32']:
                 # 整数列降级
                 col_min = df[col].min()

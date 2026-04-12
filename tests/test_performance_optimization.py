@@ -126,18 +126,17 @@ class TestDtypeOptimization:
         assert df_opt['values'].dtype == 'float32'
 
     def test_optimize_dtypes_category_conversion(self):
-        """验证低基数字符串列转为 category"""
+        """验证字符串列保持 object 类型（不再转 category 以兼容 UPDATE 写入）"""
         engine = AdvancedSQLQueryEngine()
 
-        # 100行，只有5个唯一值 → 基数比 = 5/100 = 0.05 < 0.3
+        # 100行，只有5个唯一值
         df = pd.DataFrame({
             'cat_col': [f"cat_{i % 5}" for i in range(100)],
         })
-        # 确保列为 object 类型（兼容不同 pandas 版本）
         df['cat_col'] = df['cat_col'].astype('object')
 
         df_opt = engine._optimize_dtypes(df)
-        assert df_opt['cat_col'].dtype.name == 'category'
+        assert df_opt['cat_col'].dtype == 'object'  # 不再转 category
 
     def test_optimize_dtypes_high_cardinality_unchanged(self):
         """验证高基数字符串列不转为 category"""
