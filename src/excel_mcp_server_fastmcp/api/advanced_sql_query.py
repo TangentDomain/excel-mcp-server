@@ -4569,6 +4569,10 @@ class AdvancedSQLQueryEngine:
         elif isinstance(expr, exp.Literal):
             return self._parse_literal_value(expr)
 
+        elif isinstance(expr, exp.Boolean):
+            # SQL布尔字面量(TRUE/FALSE) → int(1/0)，与Excel存储格式一致
+            return int(expr.this)
+
         elif isinstance(expr, exp.Coalesce):
             return self._evaluate_coalesce_for_row(expr, row)
 
