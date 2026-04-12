@@ -87,6 +87,12 @@ try:
 except ImportError:
     StreamingWriter = None
 
+# 表头分析器（统一双表头检测）
+try:
+    from .header_analyzer import HeaderAnalyzer
+except ImportError:
+    HeaderAnalyzer = None
+
 # 配置常量
 from ..utils.config import (
     MAX_CACHE_SIZE,
@@ -950,40 +956,45 @@ class AdvancedSQLQueryEngine:
             else:
                 sheets_to_load = all_sheet_names
 
-            # 批量检测所有sheet的双行表头(calamine读取前两行,毫秒级)
+            # 使用 HeaderAnalyzer 统一检测所有sheet的双行表头（毫秒级）
             header_info = {}  # {sheet: (is_dual_header, first_row_values, second_row_values)}
             for sheet in sheets_to_load:
                 try:
-                    cal_ws = cal_wb.get_sheet_by_name(sheet)
-                    # 跳过空工作表(无数据行)
-                    if cal_ws.height == 0:
-                        header_info[sheet] = (False, None, None)
-                        continue
-                    rows_iter = cal_ws.iter_rows()
-                    first_row = next(rows_iter, None)
-                    second_row = next(rows_iter, None)
-
-                    is_dual_header = False
-                    if first_row and second_row:
-                        second_row_values = [str(v).strip() if v is not None else '' for v in second_row]
-                        first_row_values = [str(v).strip() if v is not None else '' for v in first_row]
-
-                        non_empty_second = [v for v in second_row_values if v]
-                        non_empty_first = [v for v in first_row_values if v]
-
-                        if len(non_empty_second) >= 2:
-                            second_all_field = all(
-                                re.match(r'^[a-zA-Z_][a-zA-Z0-9_.#]*$', v)
-                                for v in non_empty_second
-                            )
-                            first_all_field = all(
-                                re.match(r'^[a-zA-Z_][a-zA-Z0-9_#]*$', v)
-                                for v in non_empty_first
-                            ) if non_empty_first else False
-                            if second_all_field and not first_all_field:
-                                is_dual_header = True
-
-                    header_info[sheet] = (is_dual_header, first_row_values, second_row_values)
+                    if HeaderAnalyzer is not None:
+                        # 用统一的 HeaderAnalyzer 检测
+                        info = HeaderAnalyzer.analyze(file_path, sheet)
+                        header_info[sheet] = (
+                            info.is_dual,
+                            info.raw_first_row,
+                            info.raw_second_row
+                        )
+                    else:
+                        # fallback：手动检测
+                        cal_ws = cal_wb.get_sheet_by_name(sheet)
+                        if cal_ws.height == 0:
+                            header_info[sheet] = (False, None, None)
+                            continue
+                        rows_iter = cal_ws.iter_rows()
+                        first_row = list(next(rows_iter, []))
+                        second_row = list(next(rows_iter, []))
+                        is_dual_header = False
+                        if first_row and second_row:
+                            second_row_values = [str(v).strip() if v is not None else '' for v in second_row]
+                            first_row_values = [str(v).strip() if v is not None else '' for v in first_row]
+                            non_empty_second = [v for v in second_row_values if v]
+                            non_empty_first = [v for v in first_row_values if v]
+                            if len(non_empty_second) >= 2:
+                                second_all_field = all(
+                                    re.match(r'^[a-zA-Z_][a-zA-Z0-9_.#]*$', v)
+                                    for v in non_empty_second
+                                )
+                                first_all_field = all(
+                                    re.match(r'^[a-zA-Z_][a-zA-Z0-9_#]*$', v)
+                                    for v in non_empty_first
+                                ) if non_empty_first else False
+                                if second_all_field and not first_all_field:
+                                    is_dual_header = True
+                        header_info[sheet] = (is_dual_header, first_row_values, second_row_values)
                 except Exception:
                     header_info[sheet] = (False, None, None)
 
@@ -6090,6 +6101,24 @@ class AdvancedSQLQueryEngine:
 
         df = worksheets_data[matched_sheet]
         col_names = specified_cols if specified_cols else list(df.columns)
+
+        # 双表头列名解析：将中文描述映射为英文字段名
+        if specified_cols:
+            try:
+                from .header_analyzer import HeaderAnalyzer
+                info = HeaderAnalyzer.analyze(file_path, matched_sheet)
+                if info.is_dual and info.column_map:
+                    _resolved_cols = []
+                    for col in col_names:
+                        if col in df.columns:
+                            _resolved_cols.append(col)
+                        elif col in info.column_map:
+                            _resolved_cols.append(info.column_map[col])
+                        else:
+                            _resolved_cols.append(col)  # 保留原值，后续验证会报错
+                    col_names = _resolved_cols
+            except Exception:
+                pass
 
         # 验证列名
         for col in col_names:

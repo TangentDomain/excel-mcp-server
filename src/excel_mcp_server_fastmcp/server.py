@@ -2157,15 +2157,22 @@ def excel_describe_table(
 
     try:
 
-        # 读取前几行来判断表头类型
-        rows = list(ws.iter_rows(max_row=4, values_only=True))
+        # 使用 HeaderAnalyzer 统一检测双表头
+        from src.excel_mcp_server_fastmcp.api.header_analyzer import HeaderAnalyzer
+        HeaderAnalyzer.invalidate(file_path)  # 确保读取最新数据（read_only 模式下可能需要）
+        info = HeaderAnalyzer.analyze(file_path, sheet_name)
+        
+        is_dual_header = info.is_dual
+        header_row_idx = 1 if is_dual_header else 0  # 0-based index into rows list
+        descriptions = info.descriptions
+        
+        # 从 openpyxl 重新读取数据（HeaderAnalyzer 用 calamine，这里需要 openpyxl 取类型信息）
+        rows = list(ws.iter_rows(max_row=4 if info.is_dual else 3, values_only=True))
         if not rows:
             return _fail('工作表为空', meta={"error_code": "EMPTY_SHEET"})
-
-        # 检测双行表头（提取为独立函数）
-        is_dual_header, header_row_idx, descriptions = _detect_dual_header(rows)
-        headers = rows[header_row_idx]
-        data_start = header_row_idx + 1
+        
+        headers = rows[header_row_idx] if header_row_idx < len(rows) else rows[0]
+        data_start = info.data_start_row
 
         # 准备列名列表
         num_cols = len(headers)

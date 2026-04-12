@@ -32,6 +32,7 @@ from ..utils.exceptions import (
     ExcelFileNotFoundError,
     ExcelMCPError
 )
+from .header_analyzer import HeaderAnalyzer
 
 logger = logging.getLogger(__name__)
 
@@ -1316,16 +1317,26 @@ class ExcelOperations:
         Args:
             file_path: Excel文件路径
             sheet_name: 工作表名称
-            old_header: 当前列名
+            old_header: 当前列名（支持中文/英文）
             new_header: 新列名
-            header_row: 表头所在行号（默认1）
+            header_row: 表头所在行号（默认1=自动检测）
 
         Returns:
             Dict: 标准化的操作结果
         """
         try:
+            # 自动检测双表头：确定实际表头行
+            _effective_header_row = header_row
+            if header_row == 1:
+                try:
+                    info = HeaderAnalyzer.analyze(file_path, sheet_name)
+                    if info.is_dual:
+                        _effective_header_row = 2  # 双表头时重命名第2行（英文字段名）
+                except Exception:
+                    pass
+
             manager = ExcelManager(file_path)
-            result = manager.rename_column(sheet_name, old_header, new_header, header_row)
+            result = manager.rename_column(sheet_name, old_header, new_header, _effective_header_row)
             return format_operation_result(result)
         except Exception as e:
             error_msg = f"重命名列失败: {str(e)}"
@@ -2015,6 +2026,7 @@ class ExcelOperations:
             logger.info(f"{cls._LOG_PREFIX} 开始查找最后一行: {sheet_name}")
 
         try:
+            # 自动检测双表头：列名解析需要支持中英文
             reader = ExcelReader(file_path)
 
             # 获取工作簿和工作表
@@ -2046,23 +2058,35 @@ class ExcelOperations:
                             last_row = row_num
                 search_info = "整个工作表"
             else:
-                # 转换列参数为列索引
+                # 转换列参数为列索引（支持双表头：中文名/英文名都能匹配）
                 if isinstance(column, str):
-                    # REQ-044: 先在表头行中搜索列名，找不到再按列字母解释（与check_duplicate_ids一致）
                     col_index = None
+
+                    # 优先用 HeaderAnalyzer 解析（支持双表头中英文）
                     try:
-                        max_col = sheet.max_column or 1000
-                        for row in sheet.iter_rows(min_row=1, max_row=1, max_col=max_col, values_only=False):
-                            for idx, cell in enumerate(row, start=1):
-                                if cell.value is not None and str(cell.value).strip() == column.strip():
-                                    col_index = idx
-                                    break
-                            if col_index is not None:
-                                break
+                        info = HeaderAnalyzer.analyze(file_path, sheet_name)
+                        col_index = info.resolve_column(column)
+                        if col_index is not None:
+                            col_index += 1  # 转为 1-based
                     except Exception:
                         pass
+
+                    # 回退：手动搜索第1行
                     if col_index is None:
-                        # 回退：按列字母解释（如 'A'→1, 'B'→2）
+                        try:
+                            max_col = sheet.max_column or 1000
+                            for row in sheet.iter_rows(min_row=1, max_row=1, max_col=max_col, values_only=False):
+                                for idx, cell in enumerate(row, start=1):
+                                    if cell.value is not None and str(cell.value).strip() == column.strip():
+                                        col_index = idx
+                                        break
+                                if col_index is not None:
+                                    break
+                        except Exception:
+                            pass
+
+                    if col_index is None:
+                        # 最后回退：按列字母解释（如 'A'→1, 'B'→2）
                         try:
                             col_index = column_index_from_string(column.upper())
                         except ValueError:
@@ -2157,6 +2181,18 @@ class ExcelOperations:
                     'duplicates': []
                 }
 
+            # 自动检测双表头：确定实际表头行和数据起始行
+            _effective_header_row = header_row
+            _data_start_row = header_row + 1  # 默认数据从表头下一行开始
+            if header_row == 1:
+                try:
+                    info = HeaderAnalyzer.analyze(file_path, sheet_name)
+                    if info.is_dual:
+                        _effective_header_row = 2  # 双表头时用第2行（英文字段名）
+                        _data_start_row = info.data_start_row  # 数据从第3行开始
+                except Exception:
+                    pass
+
             # 加载工作簿
             try:
                 wb = load_workbook(file_path, read_only=True)
@@ -2195,20 +2231,31 @@ class ExcelOperations:
 
             ws = wb[sheet_name]
 
-            # 处理列索引
+            # 处理列索引（支持双表头：中文名/英文名都能匹配）
             if isinstance(id_column, str):
-                # 先尝试在表头行中搜索列名，找不到再按列字母解释
                 col_idx = None
+
+                # 优先用 HeaderAnalyzer 解析（支持双表头中英文）
                 try:
-                    for row in ws.iter_rows(min_row=header_row, max_row=header_row, max_col=ws.max_column or 1000):
-                        for idx, cell in enumerate(row, start=1):
-                            if cell.value is not None and str(cell.value).strip() == id_column.strip():
-                                col_idx = idx
-                                break
-                        if col_idx is not None:
-                            break
+                    info = HeaderAnalyzer.analyze(file_path, sheet_name)
+                    resolved = info.resolve_column(id_column)
+                    if resolved is not None:
+                        col_idx = resolved + 1  # 转为 1-based
                 except Exception:
                     pass
+
+                # 回退：手动搜索 header_row 行
+                if col_idx is None:
+                    try:
+                        for row in ws.iter_rows(min_row=header_row, max_row=header_row, max_col=ws.max_column or 1000):
+                            for idx, cell in enumerate(row, start=1):
+                                if cell.value is not None and str(cell.value).strip() == id_column.strip():
+                                    col_idx = idx
+                                    break
+                            if col_idx is not None:
+                                break
+                    except Exception:
+                        pass
                 if col_idx is None:
                     # 回退：按列字母解释（如 'A'→1, 'B'→2）
                     try:
@@ -2255,8 +2302,8 @@ class ExcelOperations:
             total_ids = 0
 
             for row_idx, row_data in enumerate(
-                ws.iter_rows(min_row=header_row + 1, min_col=col_idx, max_col=col_idx, values_only=True),
-                start=header_row + 1
+                ws.iter_rows(min_row=_data_start_row, min_col=col_idx, max_col=col_idx, values_only=True),
+                start=_data_start_row
             ):
                 cell_value = row_data[0] if row_data else None
                 if cell_value is not None:
@@ -2316,18 +2363,45 @@ class ExcelOperations:
         Args:
             file_path: Excel文件路径
             sheet_name: 工作表名称
-            key_column: 用于匹配的列名
+            key_column: 用于匹配的列名（支持中文/英文）
             key_value: 用于匹配的值
-            updates: 要写入的列值字典
-            header_row: 表头所在行号（默认1）
+            updates: 要写入的列值字典（key 支持中文/英文）
+            header_row: 表头所在行号（默认1=自动检测）
             streaming: 是否使用流式写入（默认True）
 
         Returns:
             Dict: 标准化的操作结果
         """
         try:
+            # 自动检测双表头 + 中文key解析
+            _effective_header_row = header_row
+            _resolved_key = key_column
+            _resolved_updates = updates.copy() if updates else {}
+            
+            if header_row == 1:
+                try:
+                    info = HeaderAnalyzer.analyze(file_path, sheet_name)
+                    if info.is_dual:
+                        _effective_header_row = 2
+                        # 解析中文 key → 英文列名
+                        _resolved_col = info.resolve_column(key_column)
+                        if _resolved_col is not None:
+                            # 用英文名替换（取 column_names 中对应索引的值）
+                            _resolved_key = info.column_names[_resolved_col]
+                        # 解析 updates 中的中文 key
+                        _new_updates = {}
+                        for k, v in _resolved_updates.items():
+                            _rc = info.resolve_column(k)
+                            if _rc is not None and k != info.column_names[_rc]:
+                                _new_updates[info.column_names[_rc]] = v
+                            else:
+                                _new_updates[k] = v
+                        _resolved_updates = _new_updates
+                except Exception:
+                    pass
+
             manager = ExcelManager(file_path)
-            result = manager.upsert_row(sheet_name, key_column, key_value, updates, header_row, streaming)
+            result = manager.upsert_row(sheet_name, _resolved_key, key_value, _resolved_updates, _effective_header_row, streaming)
             return format_operation_result(result)
         except Exception as e:
             error_msg = f"Upsert行失败: {str(e)}"
@@ -2350,7 +2424,7 @@ class ExcelOperations:
             file_path: Excel文件路径
             sheet_name: 工作表名称
             data: 行数据列表，每行为{列名: 值}字典
-            header_row: 表头所在行号（默认1）
+            header_row: 表头所在行号（默认1=自动检测）
             streaming: 是否使用流式写入（默认True）
 
         Returns:
@@ -2359,10 +2433,21 @@ class ExcelOperations:
         📌 双行表头支持（v1.9.3+）：
             自动检测第1行中文描述 + 第2行英文字段名的双行表头模式。
             data 字典中无论用中文还是英文列名作为 key 都能正确匹配。
+            header_row 默认为 1（自动检测），显式传入时可覆盖。
         """
         try:
+            # 自动检测双表头：batch_insert_rows 的 streaming_writer 已内置双表头检测
+            # 这里保持 header_row=1 让它自行处理；仅做记录和缓存预热
+            _effective_header_row = header_row
+            if header_row == 1:
+                try:
+                    info = HeaderAnalyzer.analyze(file_path, sheet_name)
+                    # 不修改 header_row！streaming_writer 内部会正确检测 [row1, row2]
+                except Exception:
+                    pass
+
             manager = ExcelManager(file_path)
-            result = manager.batch_insert_rows(sheet_name, data, header_row, streaming)
+            result = manager.batch_insert_rows(sheet_name, data, _effective_header_row, streaming)
             return format_operation_result(result)
         except Exception as e:
             error_msg = f"批量插入行失败: {str(e)}"
@@ -2400,6 +2485,16 @@ class ExcelOperations:
             if count == 0:
                 return {'success': False, 'message': '没有数据需要插入', 'data': None}
 
+            # 自动检测双表头：确定实际表头行
+            _effective_header_row = header_row
+            if header_row == 1:
+                try:
+                    info = HeaderAnalyzer.analyze(file_path, sheet_name)
+                    if info.is_dual:
+                        _effective_header_row = 2
+                except Exception:
+                    pass
+
             # 步骤1：在目标位置插入空行
             insert_result = cls.insert_rows(file_path, sheet_name, target_row, count, streaming)
             if not insert_result.get('success', False):
@@ -2407,12 +2502,12 @@ class ExcelOperations:
 
             # 步骤2：获取表头列名
             reader = ExcelReader(file_path)
-            range_expr = f"{sheet_name}!A{header_row}"
+            range_expr = f"{sheet_name}!A{_effective_header_row}"
             header_result = reader.get_range(range_expr)
             reader.close()
 
             if not header_result.success or not header_result.data:
-                return {'success': False, 'message': f'无法读取表头: 第{header_row}行', 'data': None}
+                return {'success': False, 'message': f'无法读取表头: 第{_effective_header_row}行', 'data': None}
 
             headers = header_result.data[0] if header_result.data else []
             # 从CellInfo对象中提取value（get_range可能返回CellInfo而非原始值）
