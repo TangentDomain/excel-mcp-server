@@ -801,8 +801,18 @@ def _strip_defaults(obj: Any, depth: int = 0) -> Any:
         'descriptions', 'data', 'columns', 'rows'
     }
     
+    # 单元格语义字段：即使为None也必须保留（LLM需要区分「空单元格」和「字段缺失」）
+    # 当dict同时包含coordinate时，说明这是CellInfo结构，value=None代表空单元格
+    cell_semantic_fields = {'value'}
+    _is_cell_info = 'coordinate' in obj
+    
     cleaned = {}
     for k, v in obj.items():
+        # 单元格value字段：保留None（空单元格有语义意义）
+        if k in cell_semantic_fields and _is_cell_info:
+            cleaned[k] = v  # 保留原值（包括None），让JSON序列化为null
+            continue
+        
         # 移除空值
         if v is None or v == '':
             continue
