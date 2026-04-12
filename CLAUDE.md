@@ -64,12 +64,12 @@ tests = [
 passed = 0
 for name, sql in tests:
     is_update = sql.strip().upper().startswith('UPDATE')
-    
+
     if is_update:
         result = execute_advanced_update_query(file_path, sql)
     else:
         result = execute_advanced_sql_query(file_path, sql)
-    
+
     if result['success']:
         print(f"✅ {name}")
         passed += 1
@@ -204,6 +204,69 @@ git commit -m "feat: add new feature"
 - 分发表定义：使用 `tuple` 而非 `frozenset`
 - 向量化优先：使用 `pd.Series` 向量操作
 - 异常回退：提供逐行处理的 fallback
+
+## 🎯 SQL 核心原则
+
+**只支持 SQL 标准支持的功能，SQL 都不支持的就不用支持了**
+
+### 为什么？
+
+1. **与主流数据库保持一致** - MySQL, PostgreSQL, SQL Server, Oracle 都遵循 SQL 标准
+2. **避免自创特殊行为** - 不实现 SQL 标准之外的特殊逻辑
+3. **降低维护成本** - 符合标准的行为更容易维护和文档化
+4. **用户可预期** - 用户已有的SQL知识可以直接应用
+
+### 应用规范
+
+**功能开发**:
+- ✅ **支持**: 符合 SQL 标准的功能（如窗口函数、JOIN、聚合）
+- ❌ **不支持**: SQL 标准明确不支持的功能（如 WHERE 引用窗口函数别名）
+- 💡 **错误提示**: 对不支持的功能返回友好错误提示，说明原因和解决方案
+
+**测试用例设计**:
+- ✅ **测试用例必须符合 SQL 标准**: 不测试 SQL 不支持的写法
+- ❌ **不测试边缘 bug**: SQL 标准限制不是 bug
+- ✅ **可以测试错误提示质量**: 标记为 `expected_error: True`
+
+### 典型 SQL 标准限制
+
+**WHERE 子句限制**:
+- ❌ **不能引用**: 窗口函数别名（如 `RANK() OVER(...)`）、SELECT 子句别名
+- ✅ **可以引用**: 原始列名、字面量
+
+**原因**: SQL 执行顺序为 `FROM → WHERE → 窗口函数 → SELECT`
+
+**SQL 执行顺序**:
+```
+1. FROM     → 确定数据源
+2. JOIN     → 表关联
+3. WHERE    → 筛选行
+4. GROUP BY → 分组
+5. HAVING   → 分组筛选
+6. 窗口函数 → 计算窗口函数
+7. SELECT   → 选择列
+8. ORDER BY → 排序
+9. LIMIT    → 限制结果
+```
+
+### 例子
+
+**✅ 正确的测试**:
+```sql
+-- 符合 SQL 标准
+SELECT * FROM (SELECT *, RANK() as 排名 FROM 表) t WHERE 排名 <= 3
+```
+
+**❌ 错误的测试（不要这样设计）**:
+```sql
+-- SQL 标准不支持，不要期望通过
+SELECT *, RANK() as 排名 FROM 表 WHERE 排名 <= 3
+```
+
+---
+
+**记录日期**: 2026-04-13
+**Why**: 测试场景4 `WHERE 窗口函数别名` 失败，用户强调"只支持sql支持的，sql都不支持的就不用支持了"
 
 ## 🔄 版本更新
 

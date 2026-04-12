@@ -634,6 +634,9 @@ class AdvancedSQLQueryEngine:
 
                 parsed_sql = sqlglot.parse_one(sql, dialect="mysql")
 
+                # 保存解析后的SQL,用于错误提示中的窗口函数别名检测
+                self._parsed_sql = parsed_sql
+
                 # 验证SQL支持范围
                 validation_result = self._validate_sql_support(parsed_sql)
                 if not validation_result['valid']:
@@ -1410,14 +1413,24 @@ class AdvancedSQLQueryEngine:
 
         # 保护AS别名(避免中文别名被误替换为英文列名)
         # 例如: SELECT level AS 等级 → 不应把"等级"替换为"level"
+        alias_mapping = {}  # 记录别名到保护名的映射
+
         def protect_as_alias(match):
             """保护AS别名不被替换"""
-            string_literals.append(match.group(1))  # 只保存别名部分
-            return f'AS __PROTECTED_ALIAS_{len(string_literals) - 1}__'
+            alias_name = match.group(1)
+            alias_mapping[alias_name] = f'__PROTECTED_ALIAS_{len(string_literals)}__'
+            string_literals.append(alias_name)  # 保存别名部分用于恢复
+            return f'AS {alias_mapping[alias_name]}'
 
-        protected_sql = re.sub(r'\bAS\s+([^\s,]+)', protect_as_alias, protected_sql, flags=re.IGNORECASE)
+        protected_sql = re.sub(r'\bAS\s+([^\s,)(]+)', protect_as_alias, protected_sql, flags=re.IGNORECASE)
 
-        # 替换中文列名(此时AS别名已被保护)
+        # 保护 ORDER BY/GROUP BY/HAVING 中的别名引用
+        # 简化方案: 在全局SQL中替换所有别名引用为保护名(中文→英文替换之前)
+        for alias_name, protected_name in alias_mapping.items():
+            # 使用单词边界确保只替换完整的别名
+            protected_sql = re.sub(rf'\b{re.escape(alias_name)}\b', protected_name, protected_sql, flags=re.IGNORECASE)
+
+        # 替换中文列名(此时AS别名及其引用已被保护)
         for cn_name in sorted_names:
             en_name = cn_to_en[cn_name]
             protected_sql = re.sub(re.escape(cn_name), en_name, protected_sql)
@@ -1749,6 +1762,27 @@ class AdvancedSQLQueryEngine:
 
         return ""
 
+    def _check_window_alias_hint(self, col_name: str) -> str:
+        """
+        检查列名是否是窗口函数别名,如果是则返回友好的错误提示.
+
+        WHERE子句无法引用窗口函数结果(SQL标准执行顺序限制).
+        """
+        if not hasattr(self, '_parsed_sql'):
+            return ""
+
+        # 检查SELECT表达式中的窗口函数别名
+        for select_expr in self._parsed_sql.expressions:
+            if isinstance(select_expr, exp.Alias):
+                alias_name = select_expr.alias
+                original_expr = select_expr.this
+                # 检查是否是窗口函数且别名匹配
+                if isinstance(original_expr, exp.Window) and alias_name == col_name:
+                    return (f"\n💡 提示: '{col_name}' 是窗口函数别名,WHERE 子句无法引用窗口函数结果(SQL标准限制).\n"
+                           f"   解决方案: 使用子查询包装 — SELECT * FROM (SELECT ..., RANK() as {col_name} FROM ...) t WHERE {col_name} <= 3\n"
+                           f"   原因: SQL执行顺序为 FROM → WHERE → GROUP BY → HAVING → 窗口函数 → SELECT → ORDER BY")
+        return ""
+
     def _apply_union_order_by(self, df, order_clause=None) -> pd.DataFrame:
         """
         对 UNION 合并后的 DataFrame 应用 ORDER BY 排序
@@ -1831,6 +1865,27 @@ class AdvancedSQLQueryEngine:
                 return selects
             return []
 
+        # 处理CTE(WITH子句) - UNION可能包含CTE定义
+        # 兼容sqlglot不同版本:arg key可能是'with'或'with_'
+        _with_key = 'with' if parsed_sql.args.get('with') else 'with_'
+        with_clause = parsed_sql.args.get(_with_key)
+        effective_data = worksheets_data
+
+        if with_clause:
+            # 复制worksheets_data避免修改原始数据,逐步添加CTE结果
+            cte_data = dict(worksheets_data)
+            for cte_expr in with_clause.expressions:
+                cte_name = cte_expr.alias
+                cte_query = cte_expr.this  # inner Select
+                try:
+                    # 每个CTE在已有的cte_data上执行(支持CTE引用前面的CTE)
+                    cte_result = self._execute_query(cte_query, cte_data, limit=None)
+                    cte_data[cte_name] = cte_result
+                except Exception as e:
+                    raise ValueError(f"CTE '{cte_name}' 执行失败: {e}")
+            # 使用包含CTE的数据
+            effective_data = cte_data
+
         selects = _extract_selects(parsed_sql)
         if not selects:
             raise ValueError("UNION 查询中未找到有效的 SELECT 语句")
@@ -1838,8 +1893,8 @@ class AdvancedSQLQueryEngine:
         # 执行每个 SELECT 并收集结果
         result_dfs = []
         for i, select_sql in enumerate(selects):
-            # 确保每个 SELECT 有自己的表别名上下文
-            df = self._execute_query(select_sql, worksheets_data, limit=None)
+            # 使用包含CTE的effective_data
+            df = self._execute_query(select_sql, effective_data, limit=None)
             result_dfs.append(df)
 
         # 合并所有结果(列名对齐)
@@ -2334,12 +2389,21 @@ class AdvancedSQLQueryEngine:
                 else:
                     s = series.reindex(sorted_df.index)
                     result = s.cumsum() / pd.Series(range(1, len(s)+1), index=s.index)
+            elif func_type in ('Stddev', 'Std', 'Variance', 'Var'):
+                # 累计标准差/方差:计算整个分区的std/var并填充到每行
+                # 注意:这是简化的实现,不是数学上严格的累计std/var
+                if sorted_group:
+                    result = sorted_group.transform('std' if 'Std' in func_type else 'var').reindex(df.index)
+                else:
+                    result = series.agg('std' if 'Std' in func_type else 'var')
+                    result = pd.Series([result] * len(df), index=df.index)
             else:
                 raise ValueError(f"不支持的窗口聚合函数: {func_type}")
             result = result.reindex(df.index)
         else:
             # 无ORDER BY: 分区整体聚合
-            agg_map = {'Avg': 'mean', 'Sum': 'sum', 'Count': 'count', 'Min': 'min', 'Max': 'max'}
+            agg_map = {'Avg': 'mean', 'Sum': 'sum', 'Count': 'count', 'Min': 'min', 'Max': 'max',
+                       'Stddev': 'std', 'Std': 'std', 'Variance': 'var', 'Var': 'var'}
             agg_func = agg_map[func_type]
             if grouped is not None:
                 result = grouped.transform(agg_func)
@@ -2701,6 +2765,9 @@ class AdvancedSQLQueryEngine:
         Returns:
             pd.DataFrame: 查询结果
         """
+        # 保存worksheets_data为实例变量,供子查询执行使用
+        self._worksheets_data = worksheets_data
+
         # 处理CTE (WITH ... AS ...)
         # 兼容sqlglot不同版本:arg key可能是'with'或'with_'
         _with_key = 'with' if parsed_sql.args.get('with') else 'with_'
@@ -2816,8 +2883,10 @@ class AdvancedSQLQueryEngine:
 
         if parsed_sql.args.get('group') or has_aggregate:
             # ORDER BY(聚合查询:在GROUP BY之后)
+            # 提取SELECT别名,支持ORDER BY引用聚合结果列的别名
+            select_aliases = self._extract_select_aliases(parsed_sql)
             if parsed_sql.args.get('order'):
-                base_df = self._apply_order_by(parsed_sql, base_df)
+                base_df = self._apply_order_by(parsed_sql, base_df, select_aliases=select_aliases)
         else:
             # 非聚合查询:提取SELECT别名,然后ORDER BY(支持引用别名和原始列),最后SELECT
             select_aliases = self._extract_select_aliases(parsed_sql)
@@ -2850,9 +2919,24 @@ class AdvancedSQLQueryEngine:
         """从SQL子句中提取整数值(LIMIT/OFFSET等)"""
         if clause is None:
             return None
-        if hasattr(clause, 'expression'):
-            return int(clause.expression.this)
-        return int(clause.this)
+
+        # 提取值
+        if hasattr(clause, 'expression') and clause.expression is not None:
+            value = clause.expression.this
+        else:
+            value = clause.this
+
+        # 转换为整数
+        try:
+            int_value = int(value)
+            # LIMIT/OFFSET 不支持负数
+            if int_value < 0:
+                raise ValueError(f"LIMIT/OFFSET 不支持负数: {int_value}")
+            return int_value
+        except (ValueError, TypeError) as e:
+            if "负数" in str(e):
+                raise
+            raise ValueError(f"无法提取整数值: {value}")
 
     def _check_has_aggregate_function(self, parsed_sql: exp.Expression) -> bool:
         """检查SQL查询是否包含聚合函数"""
@@ -3210,13 +3294,41 @@ class AdvancedSQLQueryEngine:
         elif self._is_scalar_num_function(expr):
             # 标量数值函数嵌入数学表达式(如 ROUND(price,2) * 1.1)
             return self._evaluate_scalar_num_function(expr, df)
+        elif isinstance(expr, exp.Window):
+            # 窗口函数参与算术表达式(如 Price - LAG(Price) OVER ...)
+            # 需要即时计算窗口函数并返回结果Series
+            temp_col = f'_window_math_{id(expr)}'
+            if temp_col not in df.columns:
+                # 计算窗口函数并存储到临时列
+                df[temp_col] = self._compute_window_function(expr, df)
+            return pd.to_numeric(df[temp_col], errors='coerce')
+        elif isinstance(expr, (exp.Select, exp.Subquery)):
+            # 标量子查询参与算术运算(如 Price > (SELECT AVG(Price) FROM ...) 或 Price / (SELECT AVG(Price) FROM ...))
+            # 执行子查询并获取标量结果
+            if not hasattr(self, '_worksheets_data'):
+                raise ValueError("子查询执行失败: 缺少工作表数据上下文")
+
+            # 执行子查询
+            subquery_df = self._execute_subquery(expr, self._worksheets_data)
+
+            # 子查询应该返回单个值(标量子查询)
+            if subquery_df.empty:
+                return None
+            if len(subquery_df) > 1:
+                raise ValueError(f"子查询返回了多行数据,无法作为标量值使用。返回行数: {len(subquery_df)}")
+            if len(subquery_df.columns) > 1:
+                # 多列时取第一列
+                return pd.to_numeric(subquery_df.iloc[0, 0], errors='coerce')
+            else:
+                # 单列单行
+                return pd.to_numeric(subquery_df.iloc[0, 0], errors='coerce')
         else:
             raise ValueError(f"不支持的数学运算: {expr}。💡 WHERE子句暂不支持算术运算，建议用子查询替代")
 
     def _is_string_function(self, expr) -> bool:
         """检查是否为字符串函数"""
         return isinstance(expr, (exp.Upper, exp.Lower, exp.Trim, exp.Length,
-                                exp.Concat, exp.Replace, exp.Substring, exp.Left, exp.Right))
+                                exp.Concat, exp.ConcatWs, exp.Replace, exp.Substring, exp.Left, exp.Right))
 
     # 简单字符串函数分发表:一元操作,统一模式 val_series.astype(str).str.<op>()
     _SIMPLE_STR_OPS = {
@@ -3259,6 +3371,20 @@ class AdvancedSQLQueryEngine:
                 for p in parts[1:]:
                     result = result + p
                 return result
+            return pd.Series([''] * len(df), index=df.index)
+
+        if func_name == 'concatws':
+            # CONCAT_WS(separator, str1, str2, ...) -- 第一个参数是分隔符
+            if len(expr.expressions) >= 2:
+                # 第一个表达式是分隔符
+                separator = self._expr_to_series(expr.expressions[0], df).astype(str).iloc[0]
+                # 其余表达式是要拼接的字符串
+                parts = [self._expr_to_series(arg, df).astype(str) for arg in expr.expressions[1:]]
+                if parts:
+                    result = parts[0]
+                    for p in parts[1:]:
+                        result = result + separator + p
+                    return result
             return pd.Series([''] * len(df), index=df.index)
 
         if func_name == 'replace':
@@ -3307,6 +3433,13 @@ class AdvancedSQLQueryEngine:
         if func_name == 'concat':
             parts = [str(self._get_row_value(arg, row) or '') for arg in expr.expressions]
             return ''.join(parts)
+        if func_name == 'concatws':
+            # CONCAT_WS(separator, str1, str2, ...)
+            if len(expr.expressions) >= 2:
+                separator = str(self._get_row_value(expr.expressions[0], row) or '')
+                parts = [str(self._get_row_value(arg, row) or '') for arg in expr.expressions[1:]]
+                return separator.join(parts)
+            return ''
         if func_name == 'replace':
             old_val = self._get_arg(expr, 'expression', '', str)
             new_val = self._get_arg(expr, 'replacement', '', str)
@@ -4282,6 +4415,13 @@ class AdvancedSQLQueryEngine:
         if op_type in self._PANDAS_OPS:
             left = self._expression_to_column_reference(condition.left, df)
             right = self._expression_to_value(condition.right, df)
+
+            # SQL标准: 任何与NULL的比较都返回UNKNOWN(在WHERE中视为FALSE)
+            # 例如: WHERE column = NULL  应该返回空结果
+            if right is None:
+                # 返回一个总是为False的表达式
+                return "False"
+
             return f"{left} {self._PANDAS_OPS[op_type]} {right}"
 
         elif isinstance(condition, exp.And):
@@ -4417,8 +4557,14 @@ class AdvancedSQLQueryEngine:
                 # 5. 最后尝试原始列名
                 if col_name in df.columns:
                     return f"`{col_name}`"
-            
+
             suggestion = self._suggest_column_name(col_name, list(df.columns))
+
+            # 检测是否是窗口函数别名被WHERE引用(SQL标准限制)
+            window_hint = self._check_window_alias_hint(col_name)
+            if window_hint:
+                raise ValueError(f"列 '{qualified or col_name}' 不存在.{window_hint}")
+
             raise ValueError(f"列 '{qualified or col_name}' 不存在.可用列: {list(df.columns)}.{suggestion}")
 
         elif isinstance(expr, exp.Literal):
@@ -4470,6 +4616,10 @@ class AdvancedSQLQueryEngine:
                 return f"'{parsed}'"
             return parsed
 
+        elif isinstance(expr, exp.Null):
+            # SQL NULL 字面量 - 返回Python None
+            return None
+
         elif isinstance(expr, exp.Column):
             col_name = expr.name
             if col_name not in df.columns:
@@ -4488,7 +4638,7 @@ class AdvancedSQLQueryEngine:
 
         elif isinstance(expr, exp.Subquery):
             """标量子查询: WHERE col > (SELECT AVG(...) FROM ...)
-            
+
             子查询结果应返回单行单列的标量值.
             修复: 直接从 DataFrame 提取标量值,不再假设有标题行.
             """
@@ -4525,6 +4675,11 @@ class AdvancedSQLQueryEngine:
                 right_expr = condition.right
                 if isinstance(right_expr, (exp.All, exp.Any)):
                     return self._evaluate_all_any_comparison(condition, row)
+
+                # SQL标准: 任何与NULL的比较都返回UNKNOWN(在WHERE中视为FALSE)
+                if isinstance(right_expr, exp.Null):
+                    return False
+
                 left_val = self._get_row_value(condition.left, row)
                 right_val = self._get_row_value(condition.right, row)
                 try:
@@ -4765,34 +4920,38 @@ class AdvancedSQLQueryEngine:
         if isinstance(expr, exp.Column):
             col_name = expr.name
             table_part = expr.table if hasattr(expr, 'table') and expr.table else None
-            
+
             # 支持表别名限定符 (a.column)
             if table_part:
                 # 优先尝试表别名格式: table_part.column
                 qualified_col = f"{table_part}.{col_name}"
                 if qualified_col in row.index:
                     return row.get(qualified_col)
-                
+
                 # 尝试pandas merge后的格式: table_part_column
                 pandas_suffix_col = f"{table_part}_{col_name}"
                 if pandas_suffix_col in row.index:
                     return row.get(pandas_suffix_col)
-                
+
                 # 尝试JOIN映射中的列名
                 if hasattr(self, '_join_column_mapping') and table_part in self._join_column_mapping:
                     mapped_col = self._join_column_mapping[table_part].get(col_name)
                     if mapped_col and mapped_col in row.index:
                         return row.get(mapped_col)
-                
+
                 # 尝试表别名解析后的格式
                 if hasattr(self, '_table_aliases') and table_part in self._table_aliases:
                     resolved_table = self._table_aliases[table_part]
                     resolved_col = f"{resolved_table}_{col_name}"
                     if resolved_col in row.index:
                         return row.get(resolved_col)
-            
+
             # 最后尝试原始列名
             return row.get(col_name)
+
+        elif isinstance(expr, exp.Null):
+            # SQL NULL 字面量
+            return None
 
         elif isinstance(expr, exp.Literal):
             return self._parse_literal_value(expr)
@@ -4839,6 +4998,21 @@ class AdvancedSQLQueryEngine:
                     if cn_name in anon_name or cn_name in full_name:
                         return f"💡 如需调用{en_name}函数,请使用英文函数名: {en_name}(...)"
             return val
+
+        elif isinstance(expr, exp.Window):
+            # 窗口函数参与逐行评估(如 WHERE 条件中的 LAG/LEAD)
+            # 尝试从预计算的窗口函数列中获取值
+            temp_col = f'_window_math_{id(expr)}'
+            if temp_col in row.index:
+                val = row[temp_col]
+                return float(val) if val is not None else None
+            # 尝试通过窗口函数的文本表示查找
+            window_str = str(expr).strip()
+            for col in row.index:
+                if col.startswith('_window_') or col == window_str:
+                    val = row[col]
+                    return float(val) if val is not None else None
+            return None
 
         else:
             return None
@@ -5186,6 +5360,22 @@ class AdvancedSQLQueryEngine:
         if self._is_scalar_num_function(expr):
             return self._evaluate_scalar_num_function_for_row(expr, row)
 
+        # 窗口函数参与算术表达式(逐行评估时需要从已计算的列中取值)
+        if isinstance(expr, exp.Window):
+            # 窗口函数应该已在预计算阶段处理,从df中查找对应列
+            # 生成临时列名并尝试从row中获取
+            temp_col = f'_window_math_{id(expr)}'
+            if temp_col in row.index:
+                val = row[temp_col]
+                return float(val) if val is not None else None
+            # 尝试通过窗口函数的文本表示查找
+            window_str = str(expr).strip()
+            for col in row.index:
+                if col.startswith('_window_') or col in [window_str]:
+                    val = row[col]
+                    return float(val) if val is not None else None
+            return None
+
         op_type = type(expr)
         if op_type not in self._MATH_BINARY_OPS:
             return None
@@ -5294,6 +5484,10 @@ class AdvancedSQLQueryEngine:
         'avg': lambda g, col: g[col].agg(lambda x: pd.to_numeric(x, errors='coerce').mean()),
         'max': lambda g, col: g[col].agg(lambda x: pd.to_numeric(x, errors='coerce').max()),
         'min': lambda g, col: g[col].agg(lambda x: pd.to_numeric(x, errors='coerce').min()),
+        'stddev': lambda g, col: g[col].agg(lambda x: pd.to_numeric(x, errors='coerce').std(ddof=1)),
+        'std': lambda g, col: g[col].agg(lambda x: pd.to_numeric(x, errors='coerce').std(ddof=1)),
+        'variance': lambda g, col: g[col].agg(lambda x: pd.to_numeric(x, errors='coerce').var(ddof=1)),
+        'var': lambda g, col: g[col].agg(lambda x: pd.to_numeric(x, errors='coerce').var(ddof=1)),
     }
 
     def _apply_aggregation_function(self, expr: exp.Expression, grouped, df) -> pd.Series:
@@ -5440,43 +5634,62 @@ class AdvancedSQLQueryEngine:
         """计算表达式,返回临时列名"""
         if isinstance(expr_node, exp.Column):
             return expr_node.name
-        
+
         # 处理字面量(数字)
         if isinstance(expr_node, exp.Literal):
             temp_col = f"_temp_literal_{id(expr_node)}"
             df[temp_col] = float(expr_node.this) if expr_node.this is not None else 0
             return temp_col
-        
+
         # 生成临时列名
         temp_col = f"_temp_expr_{id(expr_node)}"
-        
+
+        # 处理字符串函数（LENGTH, UPPER, LOWER, CONCAT等）
+        if self._is_string_function(expr_node):
+            if temp_col not in df.columns:
+                df[temp_col] = self._evaluate_string_function(expr_node, df)
+            return temp_col
+
+        # 处理标量数值函数（ROUND, ABS, CEIL, FLOOR等）
+        if self._is_scalar_num_function(expr_node):
+            if temp_col not in df.columns:
+                df[temp_col] = self._evaluate_scalar_num_function(expr_node, df)
+            return temp_col
+
         # 处理加法表达式
         if isinstance(expr_node, exp.Add):
             left_col = self._evaluate_expression(expr_node.this, df)
             right_col = self._evaluate_expression(expr_node.expression, df)
             df[temp_col] = pd.to_numeric(df[left_col], errors='coerce') + pd.to_numeric(df[right_col], errors='coerce')
-        
+
         # 处理减法表达式
         elif isinstance(expr_node, exp.Sub):
             left_col = self._evaluate_expression(expr_node.this, df)
             right_col = self._evaluate_expression(expr_node.expression, df)
             df[temp_col] = pd.to_numeric(df[left_col], errors='coerce') - pd.to_numeric(df[right_col], errors='coerce')
-        
+
         # 处理乘法表达式
         elif isinstance(expr_node, exp.Mul):
             left_col = self._evaluate_expression(expr_node.this, df)
             right_col = self._evaluate_expression(expr_node.expression, df)
             df[temp_col] = pd.to_numeric(df[left_col], errors='coerce') * pd.to_numeric(df[right_col], errors='coerce')
-        
+
         # 处理除法表达式
         elif isinstance(expr_node, exp.Div):
             left_col = self._evaluate_expression(expr_node.this, df)
             right_col = self._evaluate_expression(expr_node.expression, df)
             df[temp_col] = pd.to_numeric(df[left_col], errors='coerce') / pd.to_numeric(df[right_col], errors='coerce')
-        
+
+        # 处理 CASE WHEN 表达式
+        elif isinstance(expr_node, exp.Case):
+            # 复用已有的 CASE WHEN 向量化求值方法
+            if temp_col not in df.columns:
+                df[temp_col] = self._evaluate_case_expression(expr_node, df)
+            return temp_col
+
         else:
             raise ValueError(f"不支持的表达式类型: {type(expr_node)}")
-        
+
         return temp_col
 
     def _apply_having_clause(self, parsed_sql: exp.Expression, df) -> pd.DataFrame:
@@ -6540,26 +6753,31 @@ class AdvancedSQLQueryEngine:
             return {'success': True, 'message': '没有匹配WHERE条件的行,无需删除',
                     'affected_rows': 0, 'execution_time_ms': round(elapsed, 1)}
 
-        row_numbers = filtered_df['_ROW_NUMBER_'].tolist()
+        # DataFrame行号转Excel行号
+        # 单行表头: DataFrame第1行 = Excel第2行 (+1)
+        # 双行表头: DataFrame第1行 = Excel第3行 (+2)
+        df_row_numbers = filtered_df['_ROW_NUMBER_'].tolist()
+        header_offset = 2 if matched_sheet in self._header_descriptions and self._header_descriptions[matched_sheet] else 1
+        excel_row_numbers = [r + header_offset for r in df_row_numbers]
 
         if dry_run:
             elapsed = (time.time() - start_time) * 1000
             return {'success': True,
-                    'message': f'[预览] 将删除 {len(row_numbers)} 行',
-                    'affected_rows': len(row_numbers), 'dry_run': True,
+                    'message': f'[预览] 将删除 {len(excel_row_numbers)} 行',
+                    'affected_rows': len(excel_row_numbers), 'dry_run': True,
                     'execution_time_ms': round(elapsed, 1)}
 
         # 写入Excel
         try:
             from .excel_operations import ExcelOperations
             result = ExcelOperations.batch_delete_rows(
-                file_path, matched_sheet, row_numbers, streaming=True
+                file_path, matched_sheet, excel_row_numbers, streaming=True
             )
             elapsed = (time.time() - start_time) * 1000
             if result.get('success'):
                 return {'success': True,
-                        'message': f'成功删除 {len(row_numbers)} 行',
-                        'affected_rows': len(row_numbers),
+                        'message': f'成功删除 {len(excel_row_numbers)} 行',
+                        'affected_rows': len(excel_row_numbers),
                         'execution_time_ms': round(elapsed, 1)}
             else:
                 return {'success': False,
