@@ -482,6 +482,28 @@ class AdvancedSQLQueryEngine:
         self._df_cache.clear()
         self._query_result_cache.clear()
 
+    def _find_column_name(self, col_name: str, df: pd.DataFrame) -> Optional[str]:
+        """大小写不敏感的列名查找（符合SQL标准：未引用标识符大小写不敏感）
+        
+        SQL标准规定未引用的标识符(identifier)是不区分大小写的。
+        例如 SELECT rate FROM ... 应能匹配列名 'Rate'、'RATE'、'rate' 等。
+        
+        Args:
+            col_name: 用户SQL中使用的列名
+            df: 目标DataFrame
+            
+        Returns:
+            实际存在的列名(保持原始大小写)，如果找不到则返回None
+        """
+        if col_name in df.columns:
+            return col_name
+        # 大小写不敏感匹配
+        col_lower = col_name.lower()
+        for c in df.columns:
+            if c.lower() == col_lower:
+                return c
+        return None
+
     def _get_query_cache_key(self, sql: str, file_path: str, sheet_name: Optional[str] = None) -> str:
         """生成查询缓存键"""
         import hashlib
@@ -3029,15 +3051,17 @@ class AdvancedSQLQueryEngine:
                                 column_name                     # 无表前缀的原始列名
                             ]
                             
-                            # 去重并检查存在的列
+                            # 去重并检查存在的列(大小写不敏感)
                             for possible_col in possible_columns:
-                                if possible_col in df.columns:
-                                    result_data[alias_name] = df[possible_col]
+                                actual = self._find_column_name(possible_col, df)
+                                if actual:
+                                    result_data[alias_name] = df[actual]
                                     break
                             else:
-                                # 所有可能的映射都失败,尝试直接使用列名
-                                if column_name in df.columns:
-                                    result_data[alias_name] = df[column_name]
+                                # 所有可能的映射都失败,尝试直接使用列名(大小写不敏感)
+                                actual_col = self._find_column_name(column_name, df)
+                                if actual_col:
+                                    result_data[alias_name] = df[actual_col]
                                 else:
                                     suggestion = self._suggest_column_name(column_name, list(df.columns))
                                     raise StructuredSQLError(
@@ -3046,8 +3070,9 @@ class AdvancedSQLQueryEngine:
                                         hint="请检查列名拼写,或用excel_get_headers查看所有可用列名.",
                                         context={"column_requested": qualified or column_name, "available_columns": list(df.columns)}
                                     )
-                    elif column_name in df.columns:
-                        result_data[alias_name] = df[column_name]
+                    actual_col = self._find_column_name(column_name, df)
+                    if actual_col:
+                        result_data[alias_name] = df[actual_col]
                     else:
                         suggestion = self._suggest_column_name(column_name, list(df.columns))
                         raise StructuredSQLError(
@@ -3260,7 +3285,7 @@ class AdvancedSQLQueryEngine:
             right = self._evaluate_math_expression(expr.right, df)
             return self._MATH_BINARY_OPS[op_type](left, right)
         elif isinstance(expr, exp.Column):
-            # 处理列引用，支持表限定符（如 t.column_name）
+            # 处理列引用，支持表限定符（如 t.column_name）+ 大小写不敏感
             col_name = expr.name
             table_part = expr.table if hasattr(expr, 'table') and expr.table else None
             qualified = f"{table_part}.{col_name}" if table_part else None
@@ -3268,11 +3293,15 @@ class AdvancedSQLQueryEngine:
             # 先尝试直接使用qualified列名
             if qualified and qualified in df.columns:
                 return df[qualified]
-            # 如果qualified不存在，尝试简单列名
-            elif col_name in df.columns:
-                return df[col_name]
-            else:
-                raise ValueError(f"列 '{qualified or col_name}' 不存在")
+            # 大小写不敏感列名查找
+            actual_col = self._find_column_name(col_name, df)
+            if actual_col:
+                return df[actual_col]
+            elif qualified:
+                actual_qualified = self._find_column_name(qualified, df)
+                if actual_qualified:
+                    return df[actual_qualified]
+            raise ValueError(f"列 '{qualified or col_name}' 不存在")
         elif isinstance(expr, exp.Literal):
             return self._expression_to_value(expr, df)
         elif isinstance(expr, exp.Boolean):
@@ -4485,7 +4514,7 @@ class AdvancedSQLQueryEngine:
             raise ValueError(f"不支持的条件类型: {type(condition)}")
 
     def _expression_to_column_reference(self, expr: exp.Expression, df) -> str:
-        """将表达式转换为列引用(支持表限定符 a.column)"""
+        """将表达式转换为列引用(支持表限定符 a.column, 大小写不敏感)"""
         if isinstance(expr, exp.Column):
             col_name = expr.name
             # 处理表限定符 (a.column_name -> 查找 "a.column_name" 或 "column_name")
@@ -4494,8 +4523,10 @@ class AdvancedSQLQueryEngine:
 
             if qualified and qualified in df.columns:
                 return f"`{qualified}`"
-            if col_name in df.columns:
-                return f"`{col_name}`"
+            # 大小写不敏感列名查找
+            actual_col = self._find_column_name(col_name, df)
+            if actual_col:
+                return f"`{actual_col}`"
             
             # JOIN别名映射支持
             if table_part:
@@ -5798,7 +5829,7 @@ class AdvancedSQLQueryEngine:
         return aliases
 
     def _resolve_order_column(self, col_name: str, df, select_aliases=None) -> Optional[str]:
-        """解析ORDER BY列名:先查SELECT别名对应的基础列,再查原始列名
+        """解析ORDER BY列名:先查SELECT别名对应的基础列,再查原始列名(大小写不敏感)
 
         Args:
             col_name: ORDER BY中引用的列名
@@ -5808,21 +5839,27 @@ class AdvancedSQLQueryEngine:
         Returns:
             解析后的实际列名,找不到返回None
         """
-        # 1. 如果列名直接在DataFrame中,直接返回
-        if col_name in df.columns:
-            return col_name
+        # 1. 大小写不敏感查找
+        actual_col = self._find_column_name(col_name, df)
+        if actual_col:
+            return actual_col
 
-        # 2. 如果有SELECT别名映射,检查别名对应的基础列
-        if select_aliases and col_name in select_aliases:
-            expr = select_aliases[col_name]
-            if isinstance(expr, exp.Column) and expr.name in df.columns:
-                return expr.name
-            # 别名对应的是计算表达式,临时计算后用于排序
-            temp_col = self._compute_temp_column(expr, df, f"__order_temp_{col_name}")
-            if temp_col is None:
-                return None
-            df.rename(columns={temp_col: col_name}, inplace=True)
-            return col_name
+        # 2. 如果有SELECT别名映射(大小写不敏感),检查别名对应的基础列
+        if select_aliases:
+            # 别名也做大小写不敏感匹配
+            alias_lower = col_name.lower()
+            for alias_name, expr in select_aliases.items():
+                if alias_name.lower() == alias_lower:
+                    if isinstance(expr, exp.Column):
+                        actual_expr_col = self._find_column_name(expr.name, df)
+                        if actual_expr_col:
+                            return actual_expr_col
+                    # 别名对应的是计算表达式,临时计算后用于排序
+                    temp_col = self._compute_temp_column(expr, df, f"__order_temp_{col_name}")
+                    if temp_col is None:
+                        return None
+                    df.rename(columns={temp_col: col_name}, inplace=True)
+                    return col_name
 
         # 3. 列名不存在
         return None
@@ -6418,15 +6455,19 @@ class AdvancedSQLQueryEngine:
             # sqlglot Update SET items: EQ expression (col = value)
             if isinstance(set_item, exp.EQ):
                 col_name = set_item.left.name
-                # 中文列名替换
+                # 中文列名替换 + 大小写不敏感
                 if col_name in cn_map:
                     col_name = cn_map[col_name]
                 if col_name == '_ROW_NUMBER_':
                     return self._update_error('_ROW_NUMBER_ 是虚拟列，不允许修改')
-                if col_name not in df.columns:
+                # 大小写不敏感列名查找
+                actual_col = self._find_column_name(col_name, df)
+                if not actual_col:
                     suggestion = self._suggest_column_name(col_name, list(df.columns))
                     return self._update_error(
                         f"列 '{col_name}' 不存在.可用列: {list(df.columns)}.{suggestion}")
+                # 使用实际列名(保持原始大小写)
+                col_name = actual_col
                 set_operations.append((col_name, set_item.right))
             else:
                 return self._update_error(f'不支持的SET表达式: {set_item}')
