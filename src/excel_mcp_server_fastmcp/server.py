@@ -542,40 +542,46 @@ mcp = FastMCP(
 ## 📊 工具选择决策树
 ```
 ═══ 读数据 ═══
-读已知单元格？              → excel_get_range（精确读取，如 "Sheet1!A1:C10"）
-需筛选/聚合/JOIN/排序？     → excel_query（SQL引擎，批量分析首选）
-快速了解表结构？            → excel_describe_table（列名+类型+样本值+行数）
-获取中英表头？              → excel_get_headers（file_path，sheet_name可省略）
-定位文本位置？              → excel_search（返回row/column）
-跨文件搜索？                → excel_search_directory
+🔥 首选：所有数据查询/分析任务 → excel_query（SQL引擎，批量分析首选）
+│   ✅ 复杂条件筛选 → WHERE, LIKE, IN, BETWEEN, 子查询
+│   ✅ 聚合统计 → COUNT, SUM, AVG, MAX, MIN, GROUP BY, HAVING
+│   ✅ 多表关联 → 5种JOIN类型，支持跨文件查询
+│   ✅ 窗口函数 → ROW_NUMBER, RANK, DENSE_RANK
+│   ✅ 字符串函数 → UPPER, LOWER, TRIM, LENGTH, CONCAT, REPLACE, SUBSTRING
+│
+├─ 📍 已知精确坐标（如A1:C10）────────────→ excel_get_range
+│
+├─ 📊 快速了解表结构（列名+类型+样本值）───→ excel_describe_table
+│
+├─ 📋 只需表头信息（中文+英文）───────────→ excel_get_headers（更轻量）
+│
+├─ 🔍 定位文本位置───────────────────────→ excel_search（返回row/column）
+│
+└─ 🌐 跨文件搜索─────────────────────────→ excel_search_directory
 
 ═══ 写数据（重要！选对工具） ═══
-┌─ 批量修改多行？（改10行以上/按条件改）────────→ excel_update_query（SQL UPDATE）
+┌─ 🔥 批量修改多行？（改10行以上/按条件改）──→ excel_update_query（SQL UPDATE）
 │   例: UPDATE 怪物表 SET 血量=血量*2 WHERE 等级>5
+│   ✅ 需要计算表达式 → SET 血量=血量*2
+│   ✅ 需要预览变更 → dry_run=True
+│   ✅ 条件复杂 → WHERE 等级>5 AND 稀有度='传说'
 │
-├─ 🔴 精确覆盖指定区域？（知道具体A1:C10）──────→ excel_update_range（二维数组写入）
+├─ 📍 精确坐标写入（知道具体A1:C10）───────→ excel_update_range
 │   ⚠️⚠️⚠️ 默认覆盖模式！insert_mode=True 才是插入！
 │   🟢 安全追加数据？→ 先 find_last_row → 再 update_range(..., insert_mode=True)
 │   🔴 直接覆盖数据？→ update_range(..., insert_mode=False) 【默认，危险】
 │
-├─ 按ID改单行？（知道 key_column + key_value）──→ 二选一：
-│   │
-│   ├─👍 首选 upsert_row：只改2-3个字段、dict传参方便、幂等安全
-│   │   例: upsert_row(file, sheet, "ID", 3, {"血量": 900, "攻击力": 70})
-│   │   ✅ 优点：不会误改其他行、行不存在自动插入、参数自文档化
-│   │   ⚠️ 注意：双行表头也兼容（中英文名都能用）
-│   │
-│   └─👍 选 update_query 当：需要计算(SET 血量=血量*2)、需要dry_run预览、
-│       条件复杂(WHERE 等级>5 AND 稀有度='传说')、已在用SQL保持一致
-│       例: UPDATE 怪物表 SET 血量=900 WHERE ID=3
-│       ✅ 优点：支持计算表达式、dry_run预览、双行表头友好
+├─ 👍 按ID改单行（知道 key_column + key_value）→ excel_upsert_row
+│   例: upsert_row(file, sheet, "ID", 3, {"血量": 900, "攻击力": 70})
+│   ✅ 优点：不会误改其他行、行不存在自动插入、参数自文档化
+│   ✅ 只改2-3个字段、dict传参方便、幂等安全
 │
-├─ 批量插入新行？───────────────────────────────→ excel_insert_query（SQL INSERT）
+├─ ➕ 批量插入新行────────────────────────→ excel_insert_query（SQL INSERT）
 │   例: INSERT INTO 怪物表 (ID,名称,血量) VALUES (6,'Boss',9999)
 │
-└─ 删行？
-    按条件删？────────────────────────────────→ excel_delete_query（SQL DELETE，必须WHERE）
-    按行号删？────────────────────────────────→ excel_delete_rows（row_index从1开始）
+└─ 🗑️ 删行？
+    按条件删？────────────────────────────→ excel_delete_query（SQL DELETE，必须WHERE）
+    按行号删？────────────────────────────→ excel_delete_rows（row_index从1开始）
 
 ═══ 结构操作 ═══
 文件？                      → excel_create_file / excel_export_to_csv / excel_import_from_csv
@@ -1022,7 +1028,18 @@ def excel_get_range(
     include_formatting: bool = False,
     sheet_name: Optional[str] = None
 ) -> Dict[str, Any]:
-    """读取指定范围的数据。返回二维CellInfo数组[[{coordinate,value},...],...]。
+    """📍 **精确读取**：已知单元格坐标时使用（如A1:C10）。
+
+    💡 **使用场景**：
+    • 已知精确坐标 → excel_get_range（精确读取，如 "Sheet1!A1:C10"）
+    • 需要单元格格式信息 → include_formatting=True
+
+    ⚠️ **不推荐用于**：
+    • 需要筛选/聚合/JOIN/排序 → 使用 excel_query（SQL引擎）
+    • 快速了解表结构 → 使用 excel_describe_table（列名+类型+样本值）
+    • 只需表头信息 → 使用 excel_get_headers
+
+    返回二维CellInfo数组[[{coordinate,value},...],...]。
     每个单元格返回 {coordinate: "A1", value: ...}，空单元格value为null。
     支持include_formatting获取样式信息（额外返回font/fill等字段）。
 
@@ -1121,7 +1138,19 @@ def excel_get_headers(
     header_row: int = 1,
     max_columns: Optional[int] = None
 ) -> Dict[str, Any]:
-    """提取工作表表头信息。支持双行表头（中文描述+英文字段名）。不传sheet_name获取所有表的表头。
+    """📋 **表头信息**：轻量级获取列名（中文+英文）。
+
+    💡 **使用场景**：
+    • 只需表头信息 → excel_get_headers（更轻量）
+    • 需要双行表头（中文+英文）→ 自动识别
+    • 获取所有表的表头 → 不传sheet_name参数
+
+    ⚠️ **不推荐用于**：
+    • 需要数据类型/样本值 → 使用 excel_describe_table（完整分析）
+    • 需要筛选/聚合 → 使用 excel_query（SQL引擎）
+
+    提取工作表表头信息。支持双行表头（中文描述+英文字段名）。
+    不传sheet_name获取所有表的表头。
 
     Args:
         file_path: Excel文件路径
@@ -1145,9 +1174,18 @@ def excel_update_range(
     insert_mode: bool = False,
     sheet_name: Optional[str] = None
 ) -> Dict[str, Any]:
-    """写入数据到指定范围（精确坐标覆盖/插入）。
+    """📍 **精确坐标写入**：知道具体单元格范围时使用。
 
-    ⚠️ 默认为覆盖模式(insert_mode=False)，会直接替换目标区域数据！
+    💡 **使用场景**：
+    • 🔴 精确覆盖指定区域（知道具体A1:C10）→ excel_update_range
+    • 🟢 安全追加数据 → 先 find_last_row → 再 update_range(..., insert_mode=True)
+    • 🔴 直接覆盖数据 → update_range(..., insert_mode=False)【默认，危险】
+
+    ⚠️ **不推荐用于**：
+    • 批量修改多行（改10行以上/按条件改）→ 使用 excel_update_query（SQL UPDATE）
+    • 按ID改单行（知道 key_column + key_value）→ 使用 excel_upsert_row
+
+    ⚠️ **重要**：默认为覆盖模式(insert_mode=False)，会直接替换目标区域数据！
        如需保留原有数据并插入新行，必须显式设置 insert_mode=True
 
     Args:
@@ -1652,7 +1690,20 @@ def excel_upsert_row(
     updates: Dict[str, Any],
     header_row: int = 1
 ) -> Dict[str, Any]:
-    """按key_column+key_value查找行，存在则更新，不存在则插入。updates指定要更新的列。
+    """👍 **按ID更新单行首选**：知道key_column+key_value时使用。
+
+    💡 **使用场景**：
+    • 按ID改单行（知道 key_column + key_value）→ excel_upsert_row
+    • 只改2-3个字段、dict传参方便 → 更安全
+    • 需要幂等操作（行不存在自动插入）
+
+    ⚠️ **不推荐用于**：
+    • 批量修改多行 → 使用 excel_update_query（SQL UPDATE）
+    • 精确覆盖指定区域 → 使用 excel_update_range
+
+    ✅ **优点**：不会误改其他行、行不存在自动插入、参数自文档化、双行表头兼容
+
+    按key_column+key_value查找行，存在则更新，不存在则插入。
 
     Args:
         file_path: Excel文件路径
@@ -1660,7 +1711,8 @@ def excel_upsert_row(
         key_column: 键列名
         key_value: 键值
         updates: 要更新的字段字典（如 {"伤害": 200, "冷却": 5}）
-        header_row: 表头行号，默认为1    """
+        header_row: 表头行号，默认为1
+    """
     return _wrap(ExcelOperations.upsert_row(file_path, sheet_name, key_column, key_value, updates, header_row, True))
 
 
@@ -1809,8 +1861,21 @@ def excel_query(
     include_headers: bool = True,
     output_format: str = "table"
 ) -> Dict[str, Any]:
-    """SQL查询引擎。支持WHERE/JOIN/GROUP BY/ORDER BY/LIMIT/子查询。
-query_expression: SELECT * FROM 技能表 WHERE 伤害>100 | GROUP BY | JOIN ON
+    """🔥 **首选工具**：所有数据查询/分析任务，优先使用此工具。
+
+    💡 **使用场景**：
+    • 需要筛选/聚合/JOIN/排序 → excel_query（SQL引擎，批量分析首选）
+    • 复杂条件筛选 → WHERE, LIKE, IN, BETWEEN, 子查询
+    • 聚合统计 → COUNT, SUM, AVG, MAX, MIN, GROUP BY, HAVING
+    • 多表关联 → 5种JOIN类型，支持跨文件查询
+    • 窗口函数 → ROW_NUMBER, RANK, DENSE_RANK
+    • 字符串函数 → UPPER, LOWER, TRIM, LENGTH, CONCAT, REPLACE, SUBSTRING
+
+    ⚠️ **不推荐用于**：
+    • 已知精确坐标（如A1:C10）→ 使用 excel_get_range
+    • 只需表头信息 → 使用 excel_get_headers 或 excel_describe_table
+
+    query_expression: SELECT * FROM 技能表 WHERE 伤害>100 | GROUP BY | JOIN ON
 
     Args:
         file_path: Excel文件路径
@@ -1860,7 +1925,19 @@ def excel_update_query(
     update_expression: str,
     dry_run: bool = False
 ) -> Dict[str, Any]:
-    """SQL批量修改。dry_run=True预览变更不实际写入。
+    """🔥 **批量修改首选**：按条件批量修改多行数据。
+
+    💡 **使用场景**：
+    • 批量修改多行（改10行以上/按条件改）→ excel_update_query（SQL UPDATE）
+    • 需要计算表达式 → SET 血量=血量*2
+    • 需要预览变更 → dry_run=True
+    • 条件复杂 → WHERE 等级>5 AND 稀有度='传说'
+
+    ⚠️ **不推荐用于**：
+    • 🔴 精确覆盖指定区域（知道具体A1:C10）→ 使用 excel_update_range
+    • 按ID改单行（只改2-3个字段）→ 使用 excel_upsert_row（更安全）
+
+    SQL批量修改。dry_run=True预览变更不实际写入。
 
     示例::
         UPDATE 技能表 SET 伤害=200 WHERE 等级>=5
@@ -2178,10 +2255,19 @@ def excel_describe_table(
     file_path: str,
     sheet_name: str = None
 ) -> Dict[str, Any]:
-    """分析Excel工作表（sheet）结构：列名、数据类型、非空统计、样本数据。
+    """📊 **表结构分析**：快速了解表的列名、类型、样本值。
 
-    ⚠️ 此工具操作的是Excel工作表(sheet)，不是数据库表。名称保留"table"是为了与SQL语法保持一致。
+    💡 **使用场景**：
+    • 快速了解表结构 → excel_describe_table（列名+类型+样本值+行数）
+    • 数据操作前了解表结构 → 避免列名错误
+    • 需要数据类型和非空统计 → 自动推断类型、非空比例
 
+    ⚠️ **不推荐用于**：
+    • 只需表头信息 → 使用 excel_get_headers（更轻量）
+    • 已知精确坐标读取数据 → 使用 excel_get_range
+    • 需要筛选/聚合 → 使用 excel_query（SQL引擎）
+
+    分析Excel工作表(sheet)结构：列名、数据类型、非空统计、样本数据。
     任何数据操作前应先调用此工具了解表结构，避免列名错误。
     自动识别双行表头（中文描述+英文字段名）。
 

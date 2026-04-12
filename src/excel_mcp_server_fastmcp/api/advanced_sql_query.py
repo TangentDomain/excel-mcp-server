@@ -3226,10 +3226,14 @@ class AdvancedSQLQueryEngine:
         exp.Length: 'len',
     }
 
-    # 标量数值函数分发表:ROUND等一元/二元数值操作(isinstance需要tuple,不能用frozenset)
+    # 标量数值函数分发表:ROUND, ABS, CEIL, FLOOR, SQRT, POWER 等(isinstance需要tuple,不能用frozenset)
     _SCALAR_NUM_FUNCS = (
         exp.Round,   # ROUND(value, decimals) -- 四舍五入
-        # 预留: exp.Abs, exp.Floor, exp.Ceil, exp.Power
+        exp.Abs,     # ABS(value) -- 绝对值
+        exp.Ceil,    # CEIL(value) -- 向上取整
+        exp.Floor,   # FLOOR(value) -- 向下取整
+        exp.Sqrt,    # SQRT(value) -- 平方根
+        exp.Pow,     # POWER(base, exp) -- 幂运算
     )
 
     def _is_scalar_num_function(self, expr) -> bool:
@@ -3322,23 +3326,22 @@ class AdvancedSQLQueryEngine:
     def _evaluate_scalar_num_function(self, expr, df) -> pd.Series:
         """计算标量数值函数,返回pd.Series(向量化)
 
-        支持: ROUND(value, decimals)
-        sqlglot Round 结构: this=值表达式, args['decimals']=小数位数(可选Literal)
+        支持: ROUND, ABS, CEIL, FLOOR, SQRT, POWER
         """
         func_type = type(expr)
+        import numpy as np
 
-        # 提取参数
+        # 提取基础参数
         val_series = self._expr_to_series(expr.this, df)
-        decimals_arg = expr.args.get('decimals')
-        decimals = int(self._literal_value(decimals_arg)) if decimals_arg is not None else 0
 
         if func_type == exp.Round:
-            # pd.Series.round() 向量化四舍五入
+            # ROUND(value, decimals)
+            decimals_arg = expr.args.get('decimals')
+            decimals = int(self._literal_value(decimals_arg)) if decimals_arg is not None else 0
             try:
                 numeric_series = pd.to_numeric(val_series, errors='coerce')
                 return numeric_series.round(decimals)
             except Exception:
-                # 回退: 逐行处理
                 def _round_val(v):
                     try:
                         return round(float(v), decimals)
@@ -3346,24 +3349,134 @@ class AdvancedSQLQueryEngine:
                         return None
                 return val_series.apply(_round_val)
 
+        elif func_type == exp.Abs:
+            # ABS(value) - 绝对值
+            try:
+                numeric_series = pd.to_numeric(val_series, errors='coerce')
+                return numeric_series.abs()
+            except Exception:
+                return val_series.apply(lambda v: abs(float(v)) if pd.notna(v) and v != '' else None)
+
+        elif func_type == exp.Ceil:
+            # CEIL(value) - 向上取整
+            try:
+                numeric_series = pd.to_numeric(val_series, errors='coerce')
+                return np.ceil(numeric_series)
+            except Exception:
+                return val_series.apply(lambda v: np.ceil(float(v)) if pd.notna(v) and v != '' else None)
+
+        elif func_type == exp.Floor:
+            # FLOOR(value) - 向下取整
+            try:
+                numeric_series = pd.to_numeric(val_series, errors='coerce')
+                return np.floor(numeric_series)
+            except Exception:
+                return val_series.apply(lambda v: np.floor(float(v)) if pd.notna(v) and v != '' else None)
+
+        elif func_type == exp.Sqrt:
+            # SQRT(value) - 平方根
+            try:
+                numeric_series = pd.to_numeric(val_series, errors='coerce')
+                return np.sqrt(numeric_series)
+            except Exception:
+                def _sqrt_val(v):
+                    try:
+                        return np.sqrt(float(v))
+                    except (TypeError, ValueError):
+                        return None
+                return val_series.apply(_sqrt_val)
+
+        elif func_type == exp.Pow:
+            # POWER(base, exp) - 幂运算
+            # sqlglot Pow 结构: this=base, args['exp']=exponent
+            exp_arg = expr.args.get('exp')
+            exponent = self._literal_value(exp_arg)
+
+            try:
+                # 转换为数值
+                numeric_series = pd.to_numeric(val_series, errors='coerce')
+                if isinstance(exponent, (int, float)):
+                    return np.power(numeric_series, exponent)
+                else:
+                    # 指数也是表达式的情况
+                    exp_series = self._expr_to_series(exp_arg, df)
+                    exp_numeric = pd.to_numeric(exp_series, errors='coerce')
+                    return np.power(numeric_series, exp_numeric)
+            except Exception:
+                def _pow_val(v):
+                    try:
+                        if isinstance(exponent, (int, float)):
+                            return np.power(float(v), exponent)
+                        return None
+                    except (TypeError, ValueError):
+                        return None
+                return val_series.apply(_pow_val)
+
         raise ValueError(f"不支持的标量数值函数: {func_type.__name__}")
 
     def _evaluate_scalar_num_function_for_row(self, expr, row: pd.Series) -> Any:
-        """逐行评估标量数值函数"""
+        """逐行评估标量数值函数
+
+        支持: ROUND, ABS, CEIL, FLOOR, SQRT, POWER
+        """
         func_type = type(expr)
+        import numpy as np
 
         val = self._get_row_value(expr.this, row)
         if val is None:
             return None
 
-        decimals_arg = expr.args.get('decimals')
-        decimals = int(self._literal_value(decimals_arg)) if decimals_arg is not None else 0
+        try:
+            val_float = float(val)
+        except (TypeError, ValueError):
+            return None
 
         if func_type == exp.Round:
+            # ROUND(value, decimals)
+            decimals_arg = expr.args.get('decimals')
+            decimals = int(self._literal_value(decimals_arg)) if decimals_arg is not None else 0
             try:
-                return round(float(val), decimals)
+                return round(val_float, decimals)
             except (TypeError, ValueError):
                 return None
+
+        elif func_type == exp.Abs:
+            # ABS(value)
+            return abs(val_float)
+
+        elif func_type == exp.Ceil:
+            # CEIL(value)
+            return np.ceil(val_float)
+
+        elif func_type == exp.Floor:
+            # FLOOR(value)
+            return np.floor(val_float)
+
+        elif func_type == exp.Sqrt:
+            # SQRT(value)
+            try:
+                return np.sqrt(val_float)
+            except (TypeError, ValueError):
+                return None
+
+        elif func_type == exp.Pow:
+            # POWER(base, exp)
+            exp_arg = expr.args.get('exp')
+            exponent = self._literal_value(exp_arg)
+
+            if isinstance(exponent, (int, float)):
+                try:
+                    return np.power(val_float, exponent)
+                except (TypeError, ValueError):
+                    return None
+            # 如果指数也是表达式，需要递归求值
+            exp_val = self._get_row_value(exp_arg, row)
+            if exp_val is not None:
+                try:
+                    return np.power(val_float, float(exp_val))
+                except (TypeError, ValueError):
+                    return None
+            return None
 
         return None
 
