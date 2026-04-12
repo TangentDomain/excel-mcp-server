@@ -5461,6 +5461,43 @@ class AdvancedSQLQueryEngine:
             return self._is_aggregate_function(expr.this)
         return False
 
+    def _is_aggregate_only_query(self, parsed_sql: exp.Expression) -> bool:
+        """检查是否为无GROUP BY的纯聚合查询(如 SELECT COUNT(*) FROM t WHERE ...)
+        
+        SQL标准要求此类查询即使无匹配行也应返回1行默认值(COUNT→0, 其他→NULL)
+        """
+        if not isinstance(parsed_sql, exp.Select):
+            return False
+        # 有GROUP BY时由groupby逻辑处理空结果，不在此处干预
+        if parsed_sql.args.get('group') is not None:
+            return False
+        # 检查SELECT中是否包含聚合函数
+        for expr in parsed_sql.expressions:
+            if self._is_aggregate_function(expr):
+                return True
+        return False
+
+    def _get_aggregate_default_value(self, parsed_sql: exp.Expression, col_name: str):
+        """获取聚合函数在空结果集时的默认值
+        
+        SQL标准: COUNT → 0, SUM/AVG/MAX/MIN → NULL
+        """
+        for expr in parsed_sql.expressions:
+            alias_name = None
+            actual_expr = expr
+            if isinstance(expr, exp.Alias):
+                alias_name = expr.alias
+                actual_expr = expr.this
+            if self._is_aggregate_function(actual_expr):
+                # 检查此聚合函数对应的别名是否匹配当前列
+                func_name = type(actual_expr).__name__.lower()
+                if alias_name == col_name or (alias_name is None and func_name.upper() == col_name.upper()):
+                    if func_name == 'count':
+                        return 0
+                    return None  # SUM/AVG/MAX/MIN等返回NULL
+        # 无法确定具体聚合函数时的保守默认值
+        return None
+
     def _execute_subquery(
         self,
         subquery_expr,
@@ -6364,6 +6401,13 @@ class AdvancedSQLQueryEngine:
         if not result_df.empty:
             for row in result_df.itertuples(index=False, name=None):
                 data.append([self._serialize_value(val) for val in row])
+        elif self._is_aggregate_only_query(parsed_sql):
+            # SQL标准: 无GROUP BY的纯聚合查询(COUNT/SUM/AVG等)在无匹配行时应返回1行默认值
+            # COUNT(*) → 0, 其他聚合函数 → NULL
+            default_row = []
+            for col in result_df.columns:
+                default_row.append(self._get_aggregate_default_value(parsed_sql, col))
+            data.append(default_row)
 
         # 大结果自动截断:保护AI上下文窗口(MAX_RESULT_ROWS=500)
         truncated = False
@@ -7271,7 +7315,13 @@ class AdvancedSQLQueryEngine:
                 lock_fd.close()
 
     def _serialize_value(self, val: Any) -> Any:
-        """智能序列化值:数值保持数值类型,None/NaN转None,numpy->Python原生"""
+        """智能序列化值:数值保持数值类型,None/NaN转None,numpy->Python原生
+        
+        浮点数舍入策略:
+        - 整数值(如 25.0) → int(25)
+        - 常规值(>= 0.01 或 <= -0.01) → 保留2位小数
+        - 极小值(< 0.01 且 > 0) → 保留有效精度(最多10位小数),避免 0.000001 被截断为 0
+        """
         if val is None or (isinstance(val, float) and np.isnan(val)):
             return None
         if isinstance(val, (np.integer,)):
@@ -7280,11 +7330,22 @@ class AdvancedSQLQueryEngine:
             f = float(val)
             if np.isnan(f):
                 return None
-            return int(f) if f == int(f) else round(f, 2)
+            # 整数值直接返回int
+            if f == int(f):
+                return int(f)
+            # 自适应舍入:极小值保留更多小数位
+            if abs(f) < 0.01 and f != 0:
+                return round(f, 10)
+            return round(f, 2)
         if isinstance(val, float):
             if np.isnan(val):
                 return None
-            return int(val) if val == int(val) else round(val, 2)
+            if val == int(val):
+                return int(val)
+            # 自适应舍入:极小值保留更多小数位
+            if abs(val) < 0.01 and val != 0:
+                return round(val, 10)
+            return round(val, 2)
         return val
 
     def _serialize_update_value(self, val: Any) -> Any:
