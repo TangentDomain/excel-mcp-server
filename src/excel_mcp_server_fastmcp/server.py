@@ -1491,6 +1491,35 @@ def excel_create_sheet(
 
 
 @mcp.tool()
+@_validate_file_path()
+@_track_call
+def excel_create_chart(
+    file_path: str,
+    sheet_name: str,
+    chart_type: str,
+    data_range: str,
+    title: str = "",
+    chart_name: str = "",
+    position: str = "B15"
+) -> Dict[str, Any]:
+    """在工作表中创建图表。chart_type: line/bar/column/pie/scatter/area等。支持'column'作为'bar'的别名。
+
+    Args:
+        file_path: Excel文件路径
+        sheet_name: 工作表名称
+        chart_type: 图表类型
+        data_range: 数据范围
+        title: 图表标题，默认为空字符串
+        chart_name: 图表名称，默认为空字符串
+        position: 图表位置，默认为"B15"
+    """
+    return _wrap(ExcelOperations.create_chart(
+        file_path, sheet_name, chart_type, data_range,
+        title=title, chart_name=chart_name, position=position
+    ))
+
+
+@mcp.tool()
 @_track_call
 def excel_delete_sheet(
     file_path: str,

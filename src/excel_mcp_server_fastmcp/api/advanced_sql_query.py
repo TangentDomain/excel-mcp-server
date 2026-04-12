@@ -1412,7 +1412,16 @@ class AdvancedSQLQueryEngine:
 
         protected_sql = re.sub(r"'[^']*'", protect_string, protected_sql)
 
-        # 替换中文列名
+        # 保护AS别名(避免中文别名被误替换为英文列名)
+        # 例如: SELECT level AS 等级 → 不应把"等级"替换为"level"
+        def protect_as_alias(match):
+            """保护AS别名不被替换"""
+            string_literals.append(match.group(1))  # 只保存别名部分
+            return f'AS __PROTECTED_ALIAS_{len(string_literals) - 1}__'
+
+        protected_sql = re.sub(r'\bAS\s+([^\s,]+)', protect_as_alias, protected_sql, flags=re.IGNORECASE)
+
+        # 替换中文列名(此时AS别名已被保护)
         for cn_name in sorted_names:
             en_name = cn_to_en[cn_name]
             protected_sql = re.sub(re.escape(cn_name), en_name, protected_sql)
@@ -1420,6 +1429,11 @@ class AdvancedSQLQueryEngine:
         # 恢复字符串字面量
         for i, s in enumerate(string_literals):
             protected_sql = protected_sql.replace(f'__PROTECTED_STR_{i}__', s)
+
+        # 恢复AS别名(在字符串恢复之后,避免冲突)
+        for i, s in enumerate(string_literals):
+            if f'__PROTECTED_ALIAS_{i}__' in protected_sql:
+                protected_sql = protected_sql.replace(f'__PROTECTED_ALIAS_{i}__', s)
 
         return protected_sql
 
@@ -4795,10 +4809,45 @@ class AdvancedSQLQueryEngine:
                     if col not in ordered_columns:
                         ordered_columns.append(col)
 
-        # 确保所有GROUP BY列都在结果中(修复多列GROUP BY逻辑)
-        # 如果SELECT中不包含某些GROUP BY列,需要确保它们被包含
+        # 构建完整的别名→原始列名反向映射(覆盖所有表达式类型)
+        # 用于GROUP BY列去重判断:避免 SELECT col AS 别名 时重复添加原始列
+        _alias_to_orig_map: Dict[str, str] = {}
+        _orig_to_alias_map: Dict[str, str] = {}
+        for i, select_expr in enumerate(parsed_sql.expressions):
+            alias_name, original_expr = self._extract_select_alias(select_expr, i)
+            # 从原始表达式中提取底层列名
+            orig_col_name = None
+            if hasattr(original_expr, 'name') and original_expr.name:
+                orig_col_name = original_expr.name
+            elif isinstance(original_expr, exp.Column) and hasattr(original_expr, 'this'):
+                ref = original_expr.this
+                if hasattr(ref, 'name') and ref.name:
+                    orig_col_name = ref.name
+            elif isinstance(original_expr, (exp.AggFunc,)):
+                # 聚合函数:提取内部列引用
+                for col_ref in original_expr.find_all(exp.Column):
+                    if hasattr(col_ref, 'name') and col_ref.name:
+                        orig_col_name = col_ref.name
+                        break
+            if orig_col_name and alias_name != orig_col_name:
+                _alias_to_orig_map[alias_name] = orig_col_name
+                _orig_to_alias_map[orig_col_name] = alias_name
+
+        def _is_group_col_represented(col: str) -> bool:
+            """检查GROUP BY列是否已被SELECT中的某列(含别名)表示"""
+            if col in result_data:
+                return True
+            # 检查是否有别名映射到这个原始列名
+            if col in _orig_to_alias_map:
+                return True
+            # 遍历所有映射关系
+            for alias, orig in _alias_to_orig_map.items():
+                if orig == col and alias in result_data:
+                    return True
+            return False
+
         for col in group_by_columns:
-            if col not in result_data:
+            if not _is_group_col_represented(col):
                 # 为缺失的GROUP BY列添加到结果
                 result_data[col] = grouped[col].first().reset_index(drop=True)
                 # 如果不在有序列列表中,添加到末尾

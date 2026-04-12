@@ -2547,3 +2547,128 @@ class ExcelOperations:
             logger.error(f"{cls._LOG_PREFIX} {error_msg}")
             return cls._format_error_result(error_msg)
 
+    @classmethod
+    def create_chart(cls, file_path: str, sheet_name: str, chart_type: str,
+                     data_range: str, title: str = "",
+                     chart_name: str = "", position: str = "B15") -> Dict[str, Any]:
+        """在工作表中创建图表。
+
+        Args:
+            file_path: Excel文件路径
+            sheet_name: 工作表名称
+            chart_type: 图表类型 (line/bar/column/pie/scatter/area等)
+            data_range: 数据范围 (如 "Sheet1!A1:B10")
+            title: 图表标题
+            chart_name: 图表名称
+            position: 图表位置(单元格引用, 如 "B15")
+        """
+        import openpyxl
+        from openpyxl.chart import BarChart, LineChart, PieChart, ScatterChart, AreaChart, Reference
+        from openpyxl.chart.label import DataLabelList
+
+        # 图表类型映射
+        type_map = {
+            'bar': BarChart,
+            'column': BarChart,  # openpyxl中column也是BarChart(不同方向)
+            'line': LineChart,
+            'pie': PieChart,
+            'scatter': ScatterChart,
+            'area': AreaChart,
+        }
+
+        chart_type_lower = chart_type.lower().strip()
+        if chart_type_lower not in type_map:
+            return cls._format_error_result(
+                f"不支持的图表类型: {chart_type}。支持的类型: {', '.join(type_map.keys())}")
+
+        try:
+            wb = openpyxl.load_workbook(file_path)
+            if sheet_name not in wb.sheetnames:
+                wb.close()
+                return cls._format_error_result(f"工作表 '{sheet_name}' 不存在")
+
+            ws = wb[sheet_name]
+
+            # 解析数据范围
+            if '!' in data_range:
+                range_sheet, range_ref = data_range.split('!', 1)
+                if range_sheet != sheet_name:
+                    wb.close()
+                    return cls._format_error_result(f"数据范围的工作表 '{range_sheet}' 与目标工作表 '{sheet_name}' 不匹配")
+            else:
+                range_ref = data_range
+
+            # 解析数据范围边界 (兼容 openpyxl 3.1+: ws[range] 返回 tuple 而非 CellRange)
+            from openpyxl.utils import range_boundaries
+            try:
+                min_col, min_row, max_col, max_row = range_boundaries(range_ref)
+                if max_col < min_col or max_row < min_row:
+                    wb.close()
+                    return cls._format_error_result(f"无效的数据范围: {data_range}")
+            except Exception:
+                wb.close()
+                return cls._format_error_result(f"无效的数据范围: {data_range}")
+
+            # 验证数据区域有内容 (至少2行2列: 表头+数据, 类别+数值)
+            if max_row <= min_row or max_col <= min_col:
+                wb.close()
+                return cls._format_error_result("数据范围为空或只有一行/一列，无法创建图表")
+
+            # 创建图表
+            ChartClass = type_map[chart_type_lower]
+            chart = ChartClass()
+
+            # 设置标题
+            if title:
+                chart.title = title
+            elif chart_name:
+                chart.title = chart_name
+
+            # 设置数据源（第一列作为类别，后续列作为数据系列）
+            categories = Reference(ws, min_col=min_col, min_row=min_row + 1, max_row=max_row)
+            chart.set_categories(categories)
+
+            # 添加数据系列（跳过第一列作为标签）
+            for col_idx in range(min_col + 1, max_col + 1):
+                values = Reference(ws, min_col=col_idx, min_row=min_row, max_row=max_row)
+                chart.add_data(values, titles_from_data=True)
+
+            # 设置图表样式
+            chart.style = 10
+            chart.shape = 4
+
+            # column 类型改为垂直方向
+            if chart_type_lower == 'column':
+                chart.type = "col"
+
+            # 解析位置
+            try:
+                pos_cell = ws[position]
+                chart.anchor = position
+            except Exception:
+                # 如果位置无效，使用默认位置
+                chart.anchor = "B15"
+
+            # 添加图表到工作表
+            ws.add_chart(chart, chart_name or None)
+
+            # 保存文件
+            wb.save(file_path)
+            wb.close()
+
+            return {
+                'success': True,
+                'message': f"图表创建成功",
+                'data': {
+                    'chart_type': chart_type,
+                    'chart_title': title or chart_name or '',
+                    'data_range': data_range,
+                    'position': position,
+                    'sheet_name': sheet_name
+                }
+            }
+        except Exception as e:
+            error_msg = f"图表创建失败: {str(e)}"
+            logger.error(f"{cls._LOG_PREFIX} {error_msg}")
+            return cls._format_error_result(error_msg)
+
