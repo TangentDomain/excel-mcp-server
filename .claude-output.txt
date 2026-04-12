@@ -1,7 +1,0 @@
-**Step 9: Final output** — No code changes, but REQ-036 (edge case testing) was actively worked on. This is an END case because the project has open requirements being worked on.
-
-⚠️ 上下文膨胀预警：docs/NOW.md已达25行(>20)、docs/RULES.md已达207行(>200)，建议CEO手动清理
-
-===END===
-📊 第259轮 | REQ-036 边缘案例测试T256-T275 | 17 PASS / 0 FAIL / 3 INFO | 6a7591d
-反思：20个边缘案例全部通过，API稳定性持续向好。测试编写时因参数名不熟导致多轮修正，应先查schema再写测试。

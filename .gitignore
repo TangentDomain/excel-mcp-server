@@ -139,3 +139,97 @@ runs/latest
 .claude-verify.md
 .claude-progress.md
 .env
+
+# === v1.9.4 补充：AI 编程残留 + 临时文件 ===
+
+# Claude Code 临时文件（全部）
+.claude-*.md
+.claude-*.log
+.claude-*.txt
+.claude-sessions.json
+.claude-tasks.md.tmp
+.claude-analysis-req*.md
+.claude-code-*.txt
+.claude-output*.log
+.claude-output*.txt
+.claude/
+.claude/
+
+# AI 迭代状态文件（round/step/progress/iterate）
+.current-*.txt
+.current-*.md
+.round-number
+.round-report.md
+.iterate-start
+.step-*.done
+.step-*-done
+.progress-*.json
+.version-info.txt
+.k3-report-*.md
+.get-error-locations.md
+.code-self-review.md
+BEFORE_COMMIT
+
+# 一次性测试/修复脚本（根目录散落）
+test_req*.py
+test_*.py
+fix_*.py
+verify_*.py
+debug_*.py
+direct_test*.py
+execute_*.py
+run_*.py
+run_*test*.sh
+simple_test.py
+quick_test.py
+analyze_*.py
+temp_*.py
+check_docstring.py
+scan_docstring.py
+final_test_report.py
+test_fixes.py
+test_runner.py
+test_wrapper.py
+test_same_file_join.py
+test_group_concat_complex.py
+
+# 临时报告/输出文件
+report.md
+report.txt
+final-report.md
+round*_results.md
+test-report-*.md
+TEST_EXECUTION_REPORT.md
+TEST_*.md
+FIX_SUMMARY.md
+exception-report.txt
+missing_docstring_report.txt
+mcp_validation_results.json
+PROGRESS.json
+COMPETITOR-ANALYSIS.md
+FEEDBACK.md
+SQL功能缺口分析报告.md
+REQUIREMENTS-ARCHIVED.md
+REQUIREMENTS.md.backup
+.cron-prompt.md.backup.*
+SUBAGENT_REPORT.md
+API_ISSUES_REPORT.md
+FIX_API_ISSUES.patch
+
+# 备份文件
+*.backup
+*_backup.py
+
+# 大日志/锁文件
+pytestdebug.log
+uv.lock
+
+# Excel 测试数据（根目录散落）
+complex_test.xlsx
+test_data.xlsx
+test_issues.xlsx
+test_range.xlsx
+
+# 版本标记文件
+VERSION
+CURRENT_VERSION
