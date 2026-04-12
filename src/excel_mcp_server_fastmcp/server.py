@@ -592,17 +592,19 @@ mcp = FastMCP(
 备份恢复？                   → excel_create_backup / excel_restore_backup / excel_list_backups
 ```
 
-## ⚠️ upsert_row vs update_query：快速参考
+## 🔥 LLM 防错自查清单（调用前速查）
 
-> 📌 **详细选择逻辑已内联到上方决策树「按ID改单行」分支中，请优先查看决策树。**
-> 以下为精简版速查：
+> 选完工具后、调用前，花3秒检查这5项，避免90%的错误：
 
-| 场景 | 首选工具 | 原因 |
-|------|---------|------|
-| 改2-3个字段、dict传参 | `upsert_row` | 幂等安全、参数自文档化 |
-| 需要计算(SET x=x*2) | `update_query` | SQL支持表达式计算 |
-| 需要预览效果 | `update_query(dry_run=True)` | 支持预览不写入 |
-| 条件复杂(多AND/OR) | `update_query` | WHERE更灵活 |
+| # | 自查问题 | 常见错误 | 正确做法 |
+|---|---------|---------|---------|
+| 1 | 我要追加还是覆盖？ | 用 update_range 追加数据却忘了 insert_mode=True | 追加→`insert_mode=True`+先`find_last_row`；覆盖→默认即可 |
+| 2 | 我改的是一行还是批量？ | 改单行却用了 update_query（大材小用） | 单行2-3字段→`upsert_row`；需计算/预览/复杂条件→`update_query` |
+| 3 | 范围含工作表名吗？ | 多表文件中 cell_range="A1:C10" 报错 | 优先用 `"Sheet名!A1:C10"` 格式 |
+| 4 | SQL语句类型对吗？ | 把 SELECT 传给 update_query 或 UPDATE 传给 query | 查询→query / 改→update_query / 增→insert_query / 删→delete_query |
+| 5 | 写入后验证了吗？ | 写完就结束，没确认实际效果 | 安全链路：写入 → query验证 → 有备份可恢复 |
+
+**错误信号速认**：返回值含 `覆盖模式` → 你可能忘了 insert_mode=True；含 `💡` → 按提示修复即可
 
 ## ⚠️ 双行表头列名注意事项
 
