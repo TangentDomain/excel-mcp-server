@@ -1046,6 +1046,11 @@ class ExcelManager:
 
         Returns:
             OperationResult: 操作结果
+
+        📌 双行表头支持（v1.9.3+）：
+            自动检测第1行中文描述 + 第2行英文字段名的双行表头模式。
+            data 字典中无论用中文还是英文列名作为 key 都能正确匹配。
+            例如双行表头时：{"skill_name": "火球术"} 和 {"技能名称": "火球术"} 均可。
         """
         try:
             if not sheet_name or not sheet_name.strip():

@@ -1534,11 +1534,28 @@ class ExcelOperations:
         """将LLM友好的扁平格式转换为Writer层需要的嵌套格式。
 
         扁平格式（API层/LLM输入）:
-            {"bold": True, "alignment": "center", "bg_color": "FF0", "font_size": 14}
+            {"bold": True, "alignment": "center", "bg_color": "FF0", "font_size": 14,
+             "underline": "double", "strikethrough": True,
+             "gradient_colors": ["4472C4", "ED7D31"],
+             "border": {"top": "medium", "color": "000000"},
+             "text_rotation": 45, "indent": 2}
         嵌套格式（Writer层/_apply_cell_format）:
-            {"font": {"bold": True, "size": 14}, "alignment": {"horizontal": "center"}, "fill": {"color": "FF0"}}
+            {"font": {"bold": True, "size": 14, "underline": "double"},
+             "alignment": {"horizontal": "center", "text_rotation": 45},
+             "fill": {"type": "gradient", "colors": ["4472C4", "ED7D31"]},
+             "border": {"top": {"style": "medium"}, "color": "000000"}}
 
         已是嵌套格式的（如preset产生的）直接原样返回，不做二次转换。
+
+        支持的扁平字段映射（v1.9.3+ 完整列表）：
+            字体: bold, italic, underline(single/double/singleAccounting/doubleAccounting),
+                  strikethrough, font_size(size), font_color(color), font_name(name)
+            填充: bg_color → fill.color, fill_type(solid/gradient/pattern),
+                  gradient_colors(list), gradient_type(linear/radial/path)
+            对齐: alignment(horizontal), vertical_alignment(vertical),
+                  wrap_text, text_rotation(-90~90), indent, shrink_to_fit
+            边框: border(dict) — 支持 {left/right/top/bottom/diagonal: style|dict, color}
+            数字: number_format
         """
         if not formatting or not isinstance(formatting, dict):
             return formatting or {}
@@ -1556,10 +1573,12 @@ class ExcelOperations:
         flat_to_font = {
             'bold': 'bold', 'italic': 'italic', 'underline': 'underline',
             'font_size': 'size', 'font_color': 'color', 'font_name': 'name',
+            'strikethrough': 'strikethrough',
         }
         flat_to_align = {
             'alignment': 'horizontal', 'vertical_alignment': 'vertical',
             'wrap_text': 'wrap_text', 'text_rotation': 'text_rotation',
+            'indent': 'indent', 'shrink_to_fit': 'shrink_to_fit',
         }
 
         for key, value in formatting.items():
@@ -1571,6 +1590,26 @@ class ExcelOperations:
                 nested['fill'] = {'color': str(value)}
             elif key == 'number_format' and value is not None:
                 nested['number_format'] = str(value)
+            elif key == 'fill_type' and value is not None:
+                # 渐变/图案填充类型，与 bg_color 合并到 fill
+                if 'fill' not in nested:
+                    nested['fill'] = {}
+                nested['fill']['type'] = str(value)
+            elif key == 'gradient_colors' and value is not None:
+                if 'fill' not in nested:
+                    nested['fill'] = {}
+                nested['fill']['type'] = 'gradient'
+                nested['fill']['colors'] = list(value) if isinstance(value, (list, tuple)) else [str(value)]
+            elif key == 'gradient_type' and value is not None:
+                if 'fill' not in nested:
+                    nested['fill'] = {}
+                nested['fill']['gradient_type'] = str(value)
+            elif key == 'border' and value is not None:
+                # 行内边框配置：支持简写字符串或详细字典
+                if isinstance(value, str):
+                    nested['border'] = {'style': value}
+                else:
+                    nested['border'] = value
             else:
                 # 未知键直接透传（保持向后兼容）
                 nested[key] = value
@@ -2316,6 +2355,10 @@ class ExcelOperations:
 
         Returns:
             Dict: 标准化的操作结果
+
+        📌 双行表头支持（v1.9.3+）：
+            自动检测第1行中文描述 + 第2行英文字段名的双行表头模式。
+            data 字典中无论用中文还是英文列名作为 key 都能正确匹配。
         """
         try:
             manager = ExcelManager(file_path)

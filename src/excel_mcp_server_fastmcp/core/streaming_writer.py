@@ -64,6 +64,18 @@ class StreamingWriter:
 
         Returns:
             (success, message, metadata)
+
+        📌 双行表头支持（v1.9.3+）：
+            自动检测第1行中文描述 + 第2行英文字段名的双行表头模式。
+            检测到后，中英文列名同时注册到 col_map，因此 data 字典中无论用
+            中文（如 "技能名称"）还是英文（如 "skill_name"）作为 key 都能正确匹配。
+
+            单行表头：data 用 {"技能名称": "火球术", "伤害": 300}
+            双行表头：data 用 {"skill_name": "火球术", "damage": 300}  ✅ 也支持
+                       data 用 {"技能名称": "火球术", "伤害值": 300}   ✅ 同样支持
+
+        ⚠️ 注意：header_row 应指向中文字段描述所在行（通常是第1行），
+             英文字段名在 header_row+1 行。如果表头只有一行则走单行模式。
         """
         if not _HAS_CALAMINE:
             return False, "calamine未安装，无法使用流式写入", {}
@@ -80,11 +92,42 @@ class StreamingWriter:
                 all_sheets_data[sn] = rows
 
                 if sn == sheet_name and rows:
-                    # 提取表头映射
+                    # 提取表头映射（支持双行表头）
                     if header_row <= len(rows):
-                        for col_idx, cell_val in enumerate(rows[header_row - 1], 1):
-                            if cell_val is not None:
-                                col_map[str(cell_val).strip()] = col_idx
+                        # 检测双行表头：第1行中文描述 + 第2行英文字段名
+                        _is_dual = False
+                        if header_row < len(rows):
+                            _row1 = [str(v).strip() if v is not None else '' for v in rows[header_row - 1]]
+                            _row2 = [str(v).strip() if v is not None else '' for v in rows[header_row]]
+                            # 第2行全是有效英文/字母开头？
+                            _r2_valid = all(
+                                v and v[0].isalpha() and v[0].isascii()
+                                for v in _row2 if v
+                            )
+                            # 第1行有中文？
+                            _r1_cn = any(
+                                any('\u4e00' <= ch <= '\u9fff' for ch in v)
+                                for v in _row1 if v
+                            )
+                            _is_dual = _r2_valid and _r1_cn and len([v for v in _row2 if v]) >= 2
+
+                        if _is_dual:
+                            # 双行模式：同时注册中文名和英文名
+                            _desc_row = rows[header_row - 1]
+                            _name_row = rows[header_row]
+                            for col_idx in range(max(len(_desc_row), len(_name_row))):
+                                _cidx = col_idx + 1
+                                _desc_val = _desc_row[col_idx] if col_idx < len(_desc_row) else None
+                                _name_val = _name_row[col_idx] if col_idx < len(_name_row) else None
+                                if _name_val is not None:
+                                    col_map[str(_name_val).strip()] = _cidx
+                                if _desc_val is not None:
+                                    col_map[str(_desc_val).strip()] = _cidx
+                        else:
+                            # 单行模式（原有逻辑）
+                            for col_idx, cell_val in enumerate(rows[header_row - 1], 1):
+                                if cell_val is not None:
+                                    col_map[str(cell_val).strip()] = col_idx
                     target_sheet_data = rows
 
             if sheet_name not in all_sheets_data:

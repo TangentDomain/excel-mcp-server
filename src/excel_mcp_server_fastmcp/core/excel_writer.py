@@ -1563,11 +1563,33 @@ class ExcelWriter:
             return len(values) / sum(1.0 / v for v in values)
 
     def _apply_cell_format(self, cell, formatting: dict):
-        """应用单元格格式
+        """应用单元格格式（v1.9.3+ 增强版）
 
         Args:
             cell: openpyxl单元格对象
-            formatting: 格式配置字典，包含 font, fill, alignment, number_format 等键
+            formatting: 格式配置字典，支持以下键：
+
+                font: {
+                    name(str), size(int), bold(bool), italic(bool),
+                    color(str/RGB), underline('single'|'double'|'singleAccounting'|'doubleAccounting'),
+                    strikethrough(bool)
+                }
+                fill: {
+                    type('solid'|'gradient'|'pattern'),
+                    color(str),           # solid 模式的填充色
+                    colors(list[str]),    # gradient 模式的渐变色数组
+                    gradient_type, patternType, fgColor, bgColor
+                }
+                alignment: {
+                    horizontal, vertical,
+                    wrap_text(bool), text_rotation(int, -90~90),
+                    indent(int), shrink_to_fit(bool)
+                }
+                number_format: str
+                border: {
+                    left/right/top/bottom/diagonal: str|dict(style, color),
+                    color(str), diagonalDirection, outline, start, end
+                }
 
         Returns:
             None
@@ -1575,34 +1597,85 @@ class ExcelWriter:
         # 字体格式
         if 'font' in formatting:
             font_config = formatting['font']
+            # 处理 underline 值：支持 'single'/'double'/'singleAccounting'/'doubleAccounting'/True/False
+            _underline = font_config.get('underline', None)
+            if _underline is True:
+                _underline = 'single'
+            elif _underline is False:
+                _underline = 'none'
+
             cell.font = Font(
                 name=font_config.get('name', cell.font.name),
                 size=font_config.get('size', cell.font.size),
                 bold=font_config.get('bold', cell.font.bold),
                 italic=font_config.get('italic', cell.font.italic),
-                color=font_config.get('color', cell.font.color)
+                color=font_config.get('color', cell.font.color),
+                underline=_underline if _underline is not None else cell.font.underline,
+                strikethrough=font_config.get('strikethrough', cell.font.strikethrough),
             )
 
-        # 背景颜色
+        # 背景颜色 / 填充
         if 'fill' in formatting:
             fill_config = formatting['fill']
-            cell.fill = PatternFill(
-                start_color=fill_config.get('color', 'FFFFFF'),
-                end_color=fill_config.get('color', 'FFFFFF'),
-                fill_type='solid'
-            )
+            _fill_type = fill_config.get('type', 'solid').lower()
+            if _fill_type == 'solid':
+                cell.fill = PatternFill(
+                    start_color=fill_config.get('color', 'FFFFFF'),
+                    end_color=fill_config.get('color', 'FFFFFF'),
+                    fill_type='solid'
+                )
+            elif _fill_type == 'gradient':
+                cell.fill = GradientFill(
+                    type=fill_config.get('gradient_type', 'linear'),
+                    degree=fill_config.get('degree', 0),
+                    stop=[PatternFill(start_color=c, end_color=c, fill_type='solid')
+                          for c in fill_config.get('colors', ['FFFFFF', 'D9D9D9'])]
+                )
+            elif _fill_type == 'pattern':
+                cell.fill = PatternFill(
+                    patternType=fill_config.get('patternType', 'lightGray'),
+                    fgColor=fill_config.get('fgColor', '00000000'),
+                    bgColor=fill_config.get('bgColor', '00000000'),
+                )
 
-        # 对齐方式
+        # 对齐方式（含换行、旋转、缩进、自动换行）
         if 'alignment' in formatting:
             align_config = formatting['alignment']
             cell.alignment = Alignment(
                 horizontal=align_config.get('horizontal', cell.alignment.horizontal),
-                vertical=align_config.get('vertical', cell.alignment.vertical)
+                vertical=align_config.get('vertical', cell.alignment.vertical),
+                wrap_text=align_config.get('wrap_text', cell.alignment.wrap_text),
+                text_rotation=align_config.get('text_rotation', cell.alignment.text_rotation),
+                indent=align_config.get('indent', cell.alignment.indent),
+                shrink_to_fit=align_config.get('shrink_to_fit', cell.alignment.shrink_to_fit),
             )
 
         # 数字格式
         if 'number_format' in formatting:
             cell.number_format = formatting['number_format']
+
+        # 行内边框（可选，与 set_borders 工具互补）
+        if 'border' in formatting:
+            border_config = formatting['border']
+            from openpyxl.styles import Side, Border as Bdr
+            def _make_side(cfg):
+                if not cfg or isinstance(cfg, str):
+                    return Side(style=cfg or 'thin',
+                                color=border_config.get('color', '000000'))
+                return Side(style=cfg.get('style', 'thin'),
+                            color=cfg.get('color', border_config.get('color', '000000')))
+
+            cell.border = Bdr(
+                left=_make_side(border_config.get('left')),
+                right=_make_side(border_config.get('right')),
+                top=_make_side(border_config.get('top')),
+                bottom=_make_side(border_config.get('bottom')),
+                diagonal=_make_side(border_config.get('diagonal')),
+                diagonalDirection=border_config.get('diagonal_direction'),
+                outline=border_config.get('outline'),
+                start=border_config.get('start'),
+                end=border_config.get('end'),
+            )
 
     def _parse_and_resolve_sheet(self, workbook, range_expression: str,
                                   sheet_name: Optional[str] = None):

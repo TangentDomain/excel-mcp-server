@@ -2248,14 +2248,20 @@ def excel_format_cells(
     """单元格样式统一入口：字体样式 + 合并/拆分 + 边框，一个工具完成所有外观操作。
 
     支持的操作类别（可在单次调用中组合使用）：
-      📝 字体: bold, italic, underline, font_size, font_color
-      🎨 单元格: bg_color(背景), alignment(对齐), wrap_text, number_format
+      📝 字体: bold, italic, underline('single'/'double'/'singleAccounting'), strikethrough,
+              font_size, font_color, font_name
+      🎨 单元格: bg_color(背景), fill_type(solid/gradient/pattern), gradient_colors, alignment,
+              wrap_text, text_rotation, indent, shrink_to_fit, number_format
       🔗 结构: merge(True=合并), unmerge(True=取消合并)
-      📦 边框: border_style(thin/thick/double/dotted/dashed)
+      📦 边框: border_style(thin/thick/double/dotted/dashed) 或 border{left/right/top/bottom+color}
 
     常用示例:
       加粗表头:           {"bold": True}
+      蓝底白字+双下划线:   {"bg_color": "0000FF", "font_color": "FFFFFF", "underline": "double", "bold": True}
       合并+加粗居中:       {"merge": True, "bold": True, "alignment": "center"}
+      删除线+红色背景:     {"strikethrough": True, "bg_color": "FFCCCC"}
+      渐变背景色:         {"gradient_colors": ["4472C4", "ED7D31"], "gradient_type": "linear"}
+      边框（四边不同）:    {"border": {"top": "medium", "bottom": "thin", "color": "000000"}}
       仅合并:             {"merge": True}
       边框:               {"border_style": "thin"}
       合并+边框+背景色:     {"merge": True, "border_style": "thin", "bg_color": "FFFF00"}
@@ -2269,12 +2275,17 @@ def excel_format_cells(
         sheet_name: 工作表名称
         cell_range: 单元格范围（如 "A1:C10" 或 "Sheet1!A1:C10"，不含!时自动拼接sheet_name）
         formatting: 样式配置字典（可同时指定多项，按 merge/unmerge → format → border 顺序执行）:
-            bold/italic/underline: bool
-            font_size: int | font_color/bg_color: str
-            number_format: str | alignment: left/center/right
-            wrap_text: bool | border_style: thin/thick/double/dotted/dashed
+            bold/italic/strikethrough: bool
+            underline: 'single'(默认) | 'double' | 'singleAccounting' | 'doubleAccounting'
+            font_size: int | font_color/bg_color: str (HEX)
+            fill_type: 'solid'(默认) | 'gradient' | 'pattern'
+            gradient_colors: list[str] 渐变色数组（如 ["4472C4", "ED7D31"]）
+            number_format: str | alignment: left/center/right/top/bottom
+            wrap_text: bool | text_rotation: int(-90~90度) | indent: int
+            shrink_to_fit: bool
+            border: dict{left/right/top/bottom/diagonal: style|dict, color: str}
             merge: bool (合并单元格) | unmerge: bool (取消合并)
-        preset: 预设样式名（bold/italic/highlight/header）
+        preset: 预设样式名（bold/italic/highlight/header/currency/title/data）
         start_cell/end_cell: 可选，替代 cell_range 使用（如 start_cell="A1", end_cell="E1"）
     """
     if formatting is None and preset is None:
