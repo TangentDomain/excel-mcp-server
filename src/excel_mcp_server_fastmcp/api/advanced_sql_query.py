@@ -2253,6 +2253,7 @@ class AdvancedSQLQueryEngine:
 
         # 辅助函数：解析列名（处理JOIN列映射）
         def resolve_col_name(col_node):
+            """Resolve column name from AST column node."""
             col_name = col_node.name if hasattr(col_node, 'name') and col_node.name else str(col_node)
             # 检查JOIN列映射
             if hasattr(self, '_join_column_mapping') and col_name not in df.columns:

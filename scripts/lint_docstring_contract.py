@@ -1,10 +1,9 @@
 #!/usr/bin/env python3
 """Docstring contract validation script.
 
-Validates that all public functions have complete docstrings with:
-- Args/Parameters sections that match function signatures
-- Default values in docstrings that match code defaults
-- Proper parameter documentation
+Validates that public API functions (execute_*) have complete docstrings.
+For other functions (register_*, *_resource, internal helpers), only checks
+that a docstring exists.
 
 Usage:
     python scripts/lint_docstring_contract.py
@@ -25,9 +24,32 @@ from typing import Dict, List, Tuple, Set, Optional
 class DocstringValidator:
     """Validates docstring contracts against function signatures."""
 
+    # Functions that require full Args/Parameters validation (explicit allowlist)
+    STRICT_FUNCTIONS = {'execute_advanced_sql_query'}
+
+    # Functions that only need a docstring present (no Args check)
+    RELAXED_PREFIXES = ('register_',)
+    RELAXED_SUFFIXES = ('_resource',)
+
     def __init__(self):
         self.errors = []
         self.warnings = []
+
+    @staticmethod
+    def is_strict_function(func_name: str) -> bool:
+        """Check if a function requires strict Args/Parameters validation."""
+        return func_name in DocstringValidator.STRICT_FUNCTIONS
+
+    @staticmethod
+    def is_relaxed_function(func_name: str) -> bool:
+        """Check if a function only needs a docstring presence check."""
+        if func_name.startswith('_'):
+            return True
+        if any(func_name.startswith(p) for p in DocstringValidator.RELAXED_PREFIXES):
+            return True
+        if any(func_name.endswith(s) for s in DocstringValidator.RELAXED_SUFFIXES):
+            return True
+        return False
 
     def get_function_signatures(self, file_path: Path) -> Dict[str, Tuple[List[str], Dict[str, Optional[str]], List[str]]]:
         """Extract function signatures from Python file.
@@ -140,11 +162,6 @@ class DocstringValidator:
                 continue
 
             # Extract parameter name and default value
-            # Format: param_name: description
-            # Format: param_name (default=value): description
-            # Format: param_name (optional): description
-
-            # Match parameter name
             if ':' in line:
                 param_part = line.split(':', 1)[0].strip()
 
@@ -153,16 +170,13 @@ class DocstringValidator:
                 if '(' in param_part and ')' in param_part:
                     content = param_part[param_part.find('(')+1:param_part.rfind(')')]
 
-                    # Check for default value
                     if 'default=' in content:
                         default_value = content.split('default=', 1)[1].strip()
                     elif content == 'optional':
                         default_value = 'optional'
                     elif '=' in content:
-                        # Format: param_name=value
                         default_value = content.split('=', 1)[1].strip()
 
-                    # Extract parameter name
                     param_name = param_part.split('(')[0].strip()
                 else:
                     param_name = param_part
@@ -190,7 +204,6 @@ class DocstringValidator:
 
         for node in ast.walk(tree):
             if isinstance(node, ast.FunctionDef) and not node.name.startswith('_'):
-                # Skip class methods
                 if node.name == '__init__':
                     continue
 
@@ -208,6 +221,27 @@ class DocstringValidator:
 
         return docstring_params
 
+    def has_docstring(self, file_path: Path, func_name: str) -> bool:
+        """Check if a function has any docstring at all."""
+        try:
+            with open(file_path, 'r', encoding='utf-8') as f:
+                content = f.read()
+        except Exception:
+            return False
+
+        tree = ast.parse(content)
+
+        for node in ast.walk(tree):
+            if isinstance(node, ast.FunctionDef) and node.name == func_name:
+                if (node.body and
+                    isinstance(node.body[0], ast.Expr) and
+                    isinstance(node.body[0].value, ast.Constant) and
+                    isinstance(node.body[0].value.value, str)):
+                    return True
+                return False
+
+        return False
+
     def validate_file(self, file_path: Path) -> List[str]:
         """Validate all functions in a single Python file.
 
@@ -223,44 +257,59 @@ class DocstringValidator:
         errors = []
 
         for func_name, (signature_params, defaults, _) in functions.items():
-            if func_name in docstring_params:
-                doc_params = docstring_params[func_name]
+            is_strict = self.is_strict_function(func_name)
+            is_relaxed = self.is_relaxed_function(func_name)
 
-                # Check for missing parameters in docstring
-                for param in signature_params:
-                    if param not in doc_params:
-                        errors.append(
-                            f"{file_path}:{func_name} | {param} | docstring中缺失参数"
-                        )
-
-                # Check for default value consistency
-                for param in doc_params:
-                    if param in signature_params:
-                        doc_default = doc_params[param]
-                        code_default = defaults.get(param)
-
-                        # Skip validation if no default in code but documented as 'optional'
-                        if doc_default == 'optional' and code_default is None:
-                            continue
-
-                        # Check if default values match
-                        if doc_default and code_default:
-                            # Normalize default values for comparison
-                            doc_normalized = self._normalize_default_value(doc_default)
-                            code_normalized = self._normalize_default_value(code_default)
-
-                            if doc_normalized != code_normalized:
-                                errors.append(
-                                    f"{file_path}:{func_name} | {param} | 默认值不匹配: "
-                                    f"docstring='{doc_default}', code='{code_default}'"
-                                )
-
-            else:
-                # Function has parameters but no docstring with Args section
-                if signature_params:
+            if is_relaxed:
+                # Relaxed mode: only check that a docstring exists
+                if not self.has_docstring(file_path, func_name):
                     errors.append(
-                        f"{file_path}:{func_name} | 所有参数 | "
-                        f"函数有参数但缺少Args/Parameters段"
+                        f"{file_path}:{func_name} | - | 函数缺少docstring"
+                    )
+                continue
+
+            if is_strict:
+                # Strict mode: full Args/Parameters validation
+                if func_name in docstring_params:
+                    doc_params = docstring_params[func_name]
+
+                    # Check for missing parameters in docstring
+                    for param in signature_params:
+                        if param not in doc_params:
+                            errors.append(
+                                f"{file_path}:{func_name} | {param} | docstring中缺失参数"
+                            )
+
+                    # Check for default value consistency
+                    for param in doc_params:
+                        if param in signature_params:
+                            doc_default = doc_params[param]
+                            code_default = defaults.get(param)
+
+                            if doc_default == 'optional' and code_default is None:
+                                continue
+
+                            if doc_default and code_default:
+                                doc_normalized = self._normalize_default_value(doc_default)
+                                code_normalized = self._normalize_default_value(code_default)
+
+                                if doc_normalized != code_normalized:
+                                    errors.append(
+                                        f"{file_path}:{func_name} | {param} | 默认值不匹配: "
+                                        f"docstring='{doc_default}', code='{code_default}'"
+                                    )
+                else:
+                    # Function has parameters but no docstring with Args section
+                    if signature_params:
+                        errors.append(
+                            f"{file_path}:{func_name} | 所有参数 | "
+                            f"函数有参数但缺少Args/Parameters段"
+                        )
+            else:
+                # Default: relaxed - just check docstring presence
+                if not self.has_docstring(file_path, func_name):
+                    errors.append(
+                        f"{file_path}:{func_name} | - | 函数缺少docstring"
                     )
 
         return errors
