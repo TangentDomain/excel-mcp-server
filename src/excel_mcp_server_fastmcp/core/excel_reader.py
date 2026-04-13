@@ -435,8 +435,10 @@ class ExcelReader:
         Returns:
             Any: 归一化后的值
         """
-        if isinstance(val, float) and val == int(val) and not (val != val):  # 排除NaN
-            return int(val)
+        if isinstance(val, float) and not (val != val) and not (val == float('inf') or val == float('-inf')):
+            # 排除 NaN 和 Inf，避免 int(inf) 崩溃
+            if val == int(val):
+                return int(val)
         return val
 
     def _get_range_openpyxl(self, range_info: RangeInfo, range_expression: str, include_formatting: bool) -> OperationResult:
