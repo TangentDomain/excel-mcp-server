@@ -4053,13 +4053,27 @@ class AdvancedSQLQueryEngine:
             else:
                 left_on_col, right_on_col, non_equi_cond = self._parse_join_on_condition(on_clause, left_table, right_table, right_alias)
                 # 等值连接:验证列存在
+                # Fix(C2): 三表链式JOIN时,左表列可能已被前次JOIN重命名为"表名.列名"
+                # 需要在result_df中查找原始列名或其别名版本
                 if not non_equi_cond and left_on_col and left_on_col not in result_df.columns:
-                    raise StructuredSQLError(
-                        "column_not_found",
-                        f"左表 '{left_table}' 没有列 '{left_on_col}'.可用列: {list(result_df.columns)}",
-                        hint="请检查ON条件中左表的列名拼写.",
-                        context={"table": left_table, "column_requested": left_on_col, "available_columns": list(result_df.columns)}
-                    )
+                    # 搜索_join_column_mapping中是否有该列的别名版本
+                    resolved_left_on = None
+                    for alias_map in self._join_column_mapping.values():
+                        for orig, aliased in alias_map.items():
+                            if orig == left_on_col and aliased in result_df.columns:
+                                resolved_left_on = aliased
+                                break
+                        if resolved_left_on:
+                            break
+                    if resolved_left_on:
+                        left_on_col = resolved_left_on
+                    else:
+                        raise StructuredSQLError(
+                            "column_not_found",
+                            f"左表 '{left_table}' 没有列 '{left_on_col}'.可用列: {list(result_df.columns)}",
+                            hint="请检查ON条件中左表的列名拼写.",
+                            context={"table": left_table, "column_requested": left_on_col, "available_columns": list(result_df.columns)}
+                        )
                 if right_on_col and right_on_col not in right_df.columns:
                     raise StructuredSQLError(
                         "column_not_found",
@@ -4091,6 +4105,11 @@ class AdvancedSQLQueryEngine:
             # 调整右表ON列名(如果被重命名了)
             if right_on_col:
                 actual_right_on = col_mapping.get(right_on_col, right_on_col)
+
+            # Fix(C2): 三表及以上链式JOIN时,更新left_table为连接结果标识
+            # 使后续JOIN的ON条件解析能正确识别左表已变为前次JOIN的结果
+            # 而非继续使用原始FROM表名去查找列
+            left_table = '_joined_result'
 
             # 合并双行表头描述
             if right_table in self._header_descriptions:
@@ -4128,8 +4147,9 @@ class AdvancedSQLQueryEngine:
                 )
 
             # 合并后删除重复的ON列(右表侧)
-            if actual_right_on and actual_right_on in result_df.columns and actual_right_on != left_on_col:
-                result_df = result_df.drop(columns=[actual_right_on])
+            # Fix(C2): 链式JOIN中,右表的ON列可能被后续JOIN引用(如三表JOIN的第二/三个ON条件)
+            # 因此不再自动删除右表ON列;SELECT阶段会只选取需要的列,多余列不影响正确性
+            # 仅当左右ON列名完全相同时,pandas merge已自动合并为单列,无需处理
 
         return result_df
 
@@ -5302,6 +5322,32 @@ class AdvancedSQLQueryEngine:
         # 保存GROUP BY列到实例变量,供_build_total_row使用
         self._group_by_columns = group_by_columns
 
+        # Fix(E2): 空DataFrame聚合保护 — 0行DataFrame做groupby后访问列会报"Column not found"
+        # 返回含正确列名但0行的结果,或全表聚合时返回1行NULL行(符合SQL标准)
+        if df.empty:
+            ordered_cols = []
+            for i, select_expr in enumerate(parsed_sql.expressions):
+                alias_name, original_expr = self._extract_select_alias(select_expr, i)
+                ordered_cols.append(alias_name)
+            # 全表聚合(无GROUP BY列) → 返回1行NULL结果(SQL标准: COUNT→0, 其他→NULL)
+            if not group_by_columns:
+                result_df = pd.DataFrame(columns=ordered_cols)
+                # 填充一行默认值
+                default_row = {}
+                for i, select_expr in enumerate(parsed_sql.expressions):
+                    alias_name, original_expr = self._extract_select_alias(select_expr, i)
+                    if self._is_aggregate_function(select_expr if not isinstance(select_expr, exp.Alias) else select_expr.this):
+                        func_name = type(original_expr if isinstance(original_expr, exp.AggFunc) else (
+                            select_expr.this if isinstance(select_expr, exp.Alias) else select_expr
+                        )).__name__.lower()
+                        default_row[alias_name] = 0 if func_name == 'count' else None
+                    else:
+                        default_row[alias_name] = None
+                result_df = pd.DataFrame([default_row], columns=ordered_cols)
+                return result_df
+            # 有GROUP BY但无数据 → 返回空结果(0行,有列名)
+            return pd.DataFrame(columns=ordered_cols)
+
         if not aggregations:
             # 没有聚合函数,只应用GROUP BY去重
             if group_by_columns:
@@ -5514,10 +5560,17 @@ class AdvancedSQLQueryEngine:
             pd.DataFrame: 子查询结果
         """
         # sqlglot可能将子查询直接存储为Select(而非Subquery包装)
+        # 也可能存储为Union(UNION/UNION ALL在FROM中时)
         if isinstance(subquery_expr, exp.Subquery):
-            inner_select = subquery_expr.this
+            inner = subquery_expr.this
+            # Fix(A7): Subquery内部可能是Union(如 FROM (SELECT...UNION SELECT...) AS t)
+            if isinstance(inner, exp.Union):
+                return self._execute_union(inner, worksheets_data)
+            inner_select = inner
         elif isinstance(subquery_expr, exp.Select):
             inner_select = subquery_expr
+        elif isinstance(subquery_expr, exp.Union):
+            return self._execute_union(subquery_expr, worksheets_data)
         else:
             raise ValueError(f"不支持子查询类型: {type(subquery_expr)}")
 
