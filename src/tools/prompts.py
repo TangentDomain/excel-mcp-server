@@ -1,12 +1,10 @@
 # MCP Prompts 模板模块
 """预定义的提示模板，方便用户快速执行常用操作"""
 
-from typing import List, Dict, Any
-
 
 def register_prompts(mcp) -> None:
     """注册 MCP Prompts - 预定义常用操作模板"""
-    
+
     @mcp.prompt()
     def compare_versions() -> str:
         """版本对比提示模板"""

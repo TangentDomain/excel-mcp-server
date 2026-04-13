@@ -10,22 +10,22 @@ import logging
 import math
 import os
 import re
-import tempfile
 import time
 from collections import Counter
-from datetime import datetime, date
-from typing import List, Any, Optional
-from openpyxl import load_workbook, Workbook
+from datetime import date, datetime
+from typing import Any
+
+from openpyxl import Workbook, load_workbook
+from openpyxl.styles import Alignment, Border, Font, GradientFill, PatternFill, Side
 from openpyxl.utils import range_boundaries
 from openpyxl.utils.cell import coordinate_from_string
-from openpyxl.styles import Font, PatternFill, GradientFill, Border, Alignment, Side
 
-from ..models.types import RangeInfo, ModifiedCell, OperationResult, RangeType
-from ..utils.validators import ExcelValidator
+from ..models.types import ModifiedCell, OperationResult, RangeType
+from ..utils.exceptions import DataValidationError, SheetNotFoundError
+from ..utils.formula_cache import get_formula_cache
 from ..utils.parsers import RangeParser
 from ..utils.temp_file_manager import TempFileManager
-from ..utils.formula_cache import get_formula_cache
-from ..utils.exceptions import SheetNotFoundError, DataValidationError
+from ..utils.validators import ExcelValidator
 
 logger = logging.getLogger(__name__)
 
@@ -53,11 +53,11 @@ class ExcelWriter:
         """
         try:
             # 尝试以写入模式打开文件来检测锁定
-            test_file = open(self.file_path, 'rb+')
+            test_file = open(self.file_path, "rb+")
             test_file.close()
         except PermissionError as e:
             raise PermissionError(f"文件被锁定或权限不足: {self.file_path}") from e
-        except IOError as e:
+        except OSError as e:
             if e.errno == 13:  # Permission denied
                 raise PermissionError(f"文件被锁定: {self.file_path}") from e
             raise
@@ -83,9 +83,9 @@ class ExcelWriter:
         except PermissionError as e:
             logger.error(f"{operation_name}失败 - 权限错误: {e}")
             raise PermissionError(f"文件保存失败，权限不足或文件被锁定: {self.file_path}") from e
-        except IOError as e:
+        except OSError as e:
             logger.error(f"{operation_name}失败 - IO错误: {e}")
-            raise IOError(f"文件保存失败，IO错误: {e}") from e
+            raise OSError(f"文件保存失败，IO错误: {e}") from e
         except Exception as e:
             logger.error(f"{operation_name}失败 - 未知错误: {e}")
             raise Exception(f"文件保存失败: {str(e)}") from e
@@ -93,9 +93,9 @@ class ExcelWriter:
     def update_range(
         self,
         range_expression: str,
-        data: List[List[Any]],
+        data: list[list[Any]],
         preserve_formulas: bool = True,
-        insert_mode: bool = False
+        insert_mode: bool = False,
     ) -> OperationResult:
         """
         修改Excel文件中指定范围的数据
@@ -122,9 +122,7 @@ class ExcelWriter:
             sheet = self._get_worksheet(workbook, range_info.sheet_name)
 
             # 根据范围类型处理不同的范围格式
-            cell_range_for_boundaries = self._convert_to_cell_range(
-                range_info.cell_range, range_info.range_type, sheet, data
-            )
+            cell_range_for_boundaries = self._convert_to_cell_range(range_info.cell_range, range_info.range_type, sheet, data)
 
             # 获取范围边界
             min_col, min_row, max_col, max_row = range_boundaries(cell_range_for_boundaries)
@@ -147,17 +145,14 @@ class ExcelWriter:
                         if preserve_formulas:
                             for row in sheet.iter_rows():
                                 for cell in row:
-                                    if cell.data_type == 'f':
+                                    if cell.data_type == "f":
                                         formula_positions[cell.coordinate] = cell.value
 
                         sheet.insert_rows(min_row, rows_to_insert)
                         logger.info(f"插入模式：在第{min_row}行插入了{rows_to_insert}行")
 
             # 写入数据（追加模式下新行无公式，跳过公式保留检查）
-            modified_cells = self._write_data(
-                sheet, data, min_row, min_col,
-                preserve_formulas and not is_smart_append
-            )
+            modified_cells = self._write_data(sheet, data, min_row, min_col, preserve_formulas and not is_smart_append)
 
             # 保存文件
             self._safe_save_workbook(workbook, "更新范围数据")
@@ -171,30 +166,22 @@ class ExcelWriter:
                 success=True,
                 data=modified_cells,
                 metadata={
-                    'file_path': self.file_path,
-                    'range': range_expression,
-                    'sheet_name': sheet.title,
-                    'modified_cells_count': len(modified_cells),
-                    'insert_mode': insert_mode,
-                    'mode_description': mode_description,
-                    'rows_inserted': len(data) if insert_mode else 0,
-                    'smart_append': is_smart_append
-                }
+                    "file_path": self.file_path,
+                    "range": range_expression,
+                    "sheet_name": sheet.title,
+                    "modified_cells_count": len(modified_cells),
+                    "insert_mode": insert_mode,
+                    "mode_description": mode_description,
+                    "rows_inserted": len(data) if insert_mode else 0,
+                    "smart_append": is_smart_append,
+                },
             )
 
         except Exception as e:
             logger.error(f"更新范围数据失败: {e}")
-            return OperationResult(
-                success=False,
-                error=str(e)
-            )
+            return OperationResult(success=False, error=str(e))
 
-    def insert_rows(
-        self,
-        sheet_name: Optional[str] = None,
-        row_index: int = 1,
-        count: int = 1
-    ) -> OperationResult:
+    def insert_rows(self, sheet_name: str | None = None, row_index: int = 1, count: int = 1) -> OperationResult:
         """
         在Excel文件中插入空白行
 
@@ -231,28 +218,20 @@ class ExcelWriter:
                 success=True,
                 message=f"成功在第{row_index}行前插入{count}行",
                 metadata={
-                    'file_path': self.file_path,
-                    'sheet_name': sheet.title,
-                    'inserted_at_row': row_index,
-                    'inserted_count': count,
-                    'original_max_row': original_max_row,
-                    'new_max_row': sheet.max_row
-                }
+                    "file_path": self.file_path,
+                    "sheet_name": sheet.title,
+                    "inserted_at_row": row_index,
+                    "inserted_count": count,
+                    "original_max_row": original_max_row,
+                    "new_max_row": sheet.max_row,
+                },
             )
 
         except Exception as e:
             logger.error(f"插入行失败: {e}")
-            return OperationResult(
-                success=False,
-                error=str(e)
-            )
+            return OperationResult(success=False, error=str(e))
 
-    def insert_columns(
-        self,
-        sheet_name: Optional[str] = None,
-        column_index: int = 1,
-        count: int = 1
-    ) -> OperationResult:
+    def insert_columns(self, sheet_name: str | None = None, column_index: int = 1, count: int = 1) -> OperationResult:
         """
         在Excel文件中插入空白列
 
@@ -296,9 +275,7 @@ class ExcelWriter:
                 expected_max_column = original_max_column + count
 
                 if actual_max_column != expected_max_column:
-                    raise Exception(
-                        f"插入列验证失败：期望最大列数为 {expected_max_column}，实际为 {actual_max_column}"
-                    )
+                    raise Exception(f"插入列验证失败：期望最大列数为 {expected_max_column}，实际为 {actual_max_column}")
             finally:
                 verification_workbook.close()
 
@@ -306,28 +283,20 @@ class ExcelWriter:
                 success=True,
                 message=f"成功插入{count}列",
                 metadata={
-                    'file_path': self.file_path,
-                    'sheet_name': sheet.title,
-                    'inserted_at_column': column_index,
-                    'inserted_count': count,
-                    'original_max_column': original_max_column,
-                    'new_max_column': new_max_column
-                }
+                    "file_path": self.file_path,
+                    "sheet_name": sheet.title,
+                    "inserted_at_column": column_index,
+                    "inserted_count": count,
+                    "original_max_column": original_max_column,
+                    "new_max_column": new_max_column,
+                },
             )
 
         except Exception as e:
             logger.error(f"插入列失败: {e}")
-            return OperationResult(
-                success=False,
-                error=str(e)
-            )
+            return OperationResult(success=False, error=str(e))
 
-    def delete_rows(
-        self,
-        sheet_name: Optional[str] = None,
-        start_row: int = 1,
-        count: int = 1
-    ) -> OperationResult:
+    def delete_rows(self, sheet_name: str | None = None, start_row: int = 1, count: int = 1) -> OperationResult:
         """
         删除Excel文件中的行
 
@@ -358,7 +327,7 @@ class ExcelWriter:
                 raise DataValidationError(
                     f"起始行号({start_row})超过工作表最大行数({original_max_row})",
                     f"工作表最大行数为{original_max_row}",
-                    f"请使用不超过{original_max_row}的行号"
+                    f"请使用不超过{original_max_row}的行号",
                 )
 
             # 计算实际删除的行数
@@ -375,28 +344,20 @@ class ExcelWriter:
                 success=True,
                 message=f"成功从第{start_row}行开始删除{actual_count}行",
                 metadata={
-                    'file_path': self.file_path,
-                    'sheet_name': sheet.title,
-                    'deleted_start_row': start_row,
-                    'actual_deleted_count': actual_count,
-                    'original_max_row': original_max_row,
-                    'new_max_row': sheet.max_row
-                }
+                    "file_path": self.file_path,
+                    "sheet_name": sheet.title,
+                    "deleted_start_row": start_row,
+                    "actual_deleted_count": actual_count,
+                    "original_max_row": original_max_row,
+                    "new_max_row": sheet.max_row,
+                },
             )
 
         except Exception as e:
             logger.error(f"删除行失败: {e}")
-            return OperationResult(
-                success=False,
-                error=str(e)
-            )
+            return OperationResult(success=False, error=str(e))
 
-    def delete_columns(
-        self,
-        sheet_name: Optional[str] = None,
-        start_column: int = 1,
-        count: int = 1
-    ) -> OperationResult:
+    def delete_columns(self, sheet_name: str | None = None, start_column: int = 1, count: int = 1) -> OperationResult:
         """
         删除Excel文件中的列
 
@@ -424,9 +385,7 @@ class ExcelWriter:
 
             # 验证删除范围
             if start_column > original_max_column:
-                raise DataValidationError(
-                    f"起始列号({start_column})超过工作表最大列数({original_max_column})"
-                )
+                raise DataValidationError(f"起始列号({start_column})超过工作表最大列数({original_max_column})")
 
             # 计算实际删除的列数
             actual_count = min(count, original_max_column - start_column + 1)
@@ -442,23 +401,20 @@ class ExcelWriter:
                 success=True,
                 message=f"成功删除{actual_count}列",
                 metadata={
-                    'file_path': self.file_path,
-                    'sheet_name': sheet.title,
-                    'deleted_start_column': start_column,
-                    'actual_deleted_count': actual_count,
-                    'original_max_column': original_max_column,
-                    'new_max_column': sheet.max_column
-                }
+                    "file_path": self.file_path,
+                    "sheet_name": sheet.title,
+                    "deleted_start_column": start_column,
+                    "actual_deleted_count": actual_count,
+                    "original_max_column": original_max_column,
+                    "new_max_column": sheet.max_column,
+                },
             )
 
         except Exception as e:
             logger.error(f"删除列失败: {e}")
-            return OperationResult(
-                success=False,
-                error=str(e)
-            )
+            return OperationResult(success=False, error=str(e))
 
-    def _convert_to_cell_range(self, cell_range: str, range_type: RangeType, sheet, data: List[List[Any]]) -> str:
+    def _convert_to_cell_range(self, cell_range: str, range_type: RangeType, sheet, data: list[list[Any]]) -> str:
         """
         检查范围表达式格式的合法性
 
@@ -489,12 +445,8 @@ class ExcelWriter:
 
         elif range_type == RangeType.SINGLE_ROW:
             # 对于单行范围，抛出明确错误
-            row_num = int(cell_range.split(':')[0])  # 规范化后是 "1:1" 格式
-            raise ValueError(
-                f'不支持单行范围格式 "{row_num}"。请使用以下格式之一：\n'
-                f'- 标准格式: "A{row_num}:Z{row_num}" (明确指定列范围)\n'
-                f'- 单列格式: "A{row_num}:A{row_num}" (单列数据)'
-            )
+            row_num = int(cell_range.split(":")[0])  # 规范化后是 "1:1" 格式
+            raise ValueError(f'不支持单行范围格式 "{row_num}"。请使用以下格式之一：\n- 标准格式: "A{row_num}:Z{row_num}" (明确指定列范围)\n- 单列格式: "A{row_num}:A{row_num}" (单列数据)')
 
         elif range_type == RangeType.SINGLE_COLUMN:
             # 对于单列范围，直接返回不做自动扩展
@@ -504,7 +456,7 @@ class ExcelWriter:
             # 其他情况（CELL_RANGE）直接返回
             return cell_range
 
-    def _get_worksheet(self, workbook, sheet_name: Optional[str]):
+    def _get_worksheet(self, workbook, sheet_name: str | None):
         """获取工作表 - 强制要求指定工作表名称
 
         Args:
@@ -518,10 +470,10 @@ class ExcelWriter:
             SheetNotFoundError: 工作表不存在或为空时抛出
         """
         if not sheet_name or not sheet_name.strip():
-            raise SheetNotFoundError(f"工作表名称不能为空，必须明确指定工作表")
+            raise SheetNotFoundError("工作表名称不能为空，必须明确指定工作表")
 
         if not workbook.sheetnames:
-            raise SheetNotFoundError(f"Excel文件中没有任何工作表")
+            raise SheetNotFoundError("Excel文件中没有任何工作表")
 
         if sheet_name not in workbook.sheetnames:
             raise SheetNotFoundError(f"工作表不存在: {sheet_name}，可用工作表: {', '.join(workbook.sheetnames)}")
@@ -531,11 +483,11 @@ class ExcelWriter:
     def _write_data(
         self,
         sheet,
-        data: List[List[Any]],
+        data: list[list[Any]],
         start_row: int,
         start_col: int,
-        preserve_formulas: bool
-    ) -> List[ModifiedCell]:
+        preserve_formulas: bool,
+    ) -> list[ModifiedCell]:
         """写入数据到工作表
 
         Args:
@@ -557,7 +509,7 @@ class ExcelWriter:
                 cell = sheet.cell(row=row_idx, column=col_idx)
 
                 # 保留公式检查
-                if preserve_formulas and cell.data_type == 'f':
+                if preserve_formulas and cell.data_type == "f":
                     continue
 
                 old_value = cell.value
@@ -573,7 +525,7 @@ class ExcelWriter:
                         if isinstance(value, (list, dict, tuple)):
                             # 复杂数据类型转换为JSON字符串
                             cell.value = json.dumps(value, ensure_ascii=False)
-                        elif hasattr(value, '__str__'):
+                        elif hasattr(value, "__str__"):
                             # 有字符串表示的对象
                             cell.value = str(value)
                         else:
@@ -584,20 +536,11 @@ class ExcelWriter:
                         # 设置为空字符串作为最后手段
                         cell.value = ""
 
-                modified_cells.append(ModifiedCell(
-                    coordinate=cell.coordinate,
-                    old_value=old_value,
-                    new_value=value
-                ))
+                modified_cells.append(ModifiedCell(coordinate=cell.coordinate, old_value=old_value, new_value=value))
 
         return modified_cells
 
-    def set_formula(
-        self,
-        cell_address: str,
-        formula: str,
-        sheet_name: Optional[str] = None
-    ) -> OperationResult:
+    def set_formula(self, cell_address: str, formula: str, sheet_name: str | None = None) -> OperationResult:
         """
         设置单元格公式
 
@@ -612,23 +555,17 @@ class ExcelWriter:
         try:
             # 验证公式格式（简单验证）
             if not formula.strip():
-                return OperationResult(
-                    success=False,
-                    error="公式不能为空"
-                )
+                return OperationResult(success=False, error="公式不能为空")
 
             # 确保公式不以等号开头（openpyxl会自动添加）
-            if formula.startswith('='):
+            if formula.startswith("="):
                 formula = formula[1:]
 
             # 验证单元格地址格式
             try:
                 coordinate_from_string(cell_address)
-            except ValueError as e:
-                return OperationResult(
-                    success=False,
-                    error=f"单元格地址格式错误: {cell_address}"
-                )
+            except ValueError:
+                return OperationResult(success=False, error=f"单元格地址格式错误: {cell_address}")
 
             # 加载工作簿并设置公式
             workbook = load_workbook(self.file_path)
@@ -637,7 +574,7 @@ class ExcelWriter:
             # 设置公式
             cell = sheet[cell_address]
             old_value = cell.value
-            old_formula = cell.formula if hasattr(cell, 'formula') else None
+            old_formula = cell.formula if hasattr(cell, "formula") else None
 
             cell.value = f"={formula}"
 
@@ -655,31 +592,23 @@ class ExcelWriter:
 
             return OperationResult(
                 success=True,
-                message=f"公式设置成功",
+                message="公式设置成功",
                 metadata={
-                    'file_path': self.file_path,
-                    'sheet_name': sheet.title,
-                    'cell_address': cell_address,
-                    'formula': formula,
-                    'calculated_value': calculated_value,
-                    'old_value': old_value,
-                    'old_formula': old_formula
-                }
+                    "file_path": self.file_path,
+                    "sheet_name": sheet.title,
+                    "cell_address": cell_address,
+                    "formula": formula,
+                    "calculated_value": calculated_value,
+                    "old_value": old_value,
+                    "old_formula": old_formula,
+                },
             )
 
         except Exception as e:
             logger.error(f"设置公式失败: {e}")
-            return OperationResult(
-                success=False,
-                error=str(e)
-            )
+            return OperationResult(success=False, error=str(e))
 
-    def format_cells(
-        self,
-        range_expression: str,
-        formatting: dict,
-        sheet_name: Optional[str] = None
-    ) -> OperationResult:
+    def format_cells(self, range_expression: str, formatting: dict, sheet_name: str | None = None) -> OperationResult:
         """
         设置单元格格式
 
@@ -700,15 +629,17 @@ class ExcelWriter:
             sheet = self._get_worksheet(workbook, sheet_name or range_info.sheet_name)
 
             # 获取范围边界
-            if range_info.range_type in [RangeType.COLUMN_RANGE, RangeType.SINGLE_COLUMN, RangeType.ROW_RANGE, RangeType.SINGLE_ROW]:
+            if range_info.range_type in [
+                RangeType.COLUMN_RANGE,
+                RangeType.SINGLE_COLUMN,
+                RangeType.ROW_RANGE,
+                RangeType.SINGLE_ROW,
+            ]:
                 # 处理整行或整列
                 cells_range = sheet[range_expression.replace(f"{sheet.title}!", "")]
             else:
                 min_col, min_row, max_col, max_row = range_boundaries(range_info.cell_range)
-                cells_range = sheet.iter_rows(
-                    min_row=min_row, max_row=max_row,
-                    min_col=min_col, max_col=max_col
-                )
+                cells_range = sheet.iter_rows(min_row=min_row, max_row=max_row, min_col=min_col, max_col=max_col)
 
             formatted_count = 0
 
@@ -732,26 +663,19 @@ class ExcelWriter:
                 success=True,
                 message=f"成功格式化{formatted_count}个单元格",
                 metadata={
-                    'file_path': self.file_path,
-                    'sheet_name': sheet.title,
-                    'range': range_expression,
-                    'formatted_count': formatted_count,
-                    'formatting_applied': formatting
-                }
+                    "file_path": self.file_path,
+                    "sheet_name": sheet.title,
+                    "range": range_expression,
+                    "formatted_count": formatted_count,
+                    "formatting_applied": formatting,
+                },
             )
 
         except Exception as e:
             logger.error(f"格式化失败: {e}")
-            return OperationResult(
-                success=False,
-                error=str(e)
-            )
+            return OperationResult(success=False, error=str(e))
 
-    def evaluate_formula(
-        self,
-        formula: str,
-        context_sheet: Optional[str] = None
-    ) -> OperationResult:
+    def evaluate_formula(self, formula: str, context_sheet: str | None = None) -> OperationResult:
         """
         临时执行Excel公式并返回计算结果，不修改文件
         使用缓存机制提升性能
@@ -767,15 +691,12 @@ class ExcelWriter:
             start_time = time.time()
 
             # 确保公式不以等号开头
-            if formula.startswith('='):
+            if formula.startswith("="):
                 formula = formula[1:]
 
             # 验证公式格式
             if not formula.strip():
-                return OperationResult(
-                    success=False,
-                    error="公式不能为空"
-                )
+                return OperationResult(success=False, error="公式不能为空")
 
             # 尝试从缓存获取结果
             cache = get_formula_cache()
@@ -793,20 +714,20 @@ class ExcelWriter:
                     message="公式执行成功（缓存）",
                     data=cached_result,
                     metadata={
-                        'formula': formula,
-                        'result': cached_result,
-                        'result_type': result_type,
-                        'execution_time_ms': execution_time,
-                        'context_sheet': context_sheet or "default",
-                        'cached': True,
-                        'cache_stats': cache.get_stats()
-                    }
+                        "formula": formula,
+                        "result": cached_result,
+                        "result_type": result_type,
+                        "execution_time_ms": execution_time,
+                        "context_sheet": context_sheet or "default",
+                        "cached": True,
+                        "cache_stats": cache.get_stats(),
+                    },
                 )
 
             # 缓存未命中
             # 快速路径：先判断是否纯算术公式（无单元格引用）
             # 纯算术公式直接用 Python 计算，完全跳过临时工作簿创建和磁盘I/O
-            if not re.search(r'[A-Za-z]+\d+', formula):
+            if not re.search(r"[A-Za-z]+\d+", formula):
                 logger.debug(f"检测到纯算术公式，使用快速计算（跳过工作簿创建）: {formula}")
                 calculated_value = self._fast_calculate(formula)
             else:
@@ -822,14 +743,12 @@ class ExcelWriter:
 
                 try:
                     # 使用xlcalculator计算公式
-                    calculated_value = self._calculate_with_xlcalculator(
-                        temp_file_path, formula, temp_workbook
-                    )
+                    calculated_value = self._calculate_with_xlcalculator(temp_file_path, formula, temp_workbook)
 
                 except ImportError:
                     return OperationResult(
                         success=False,
-                        error="需要安装xlcalculator库来支持公式计算: pip install xlcalculator"
+                        error="需要安装xlcalculator库来支持公式计算: pip install xlcalculator",
                     )
                 except Exception as calc_error:
                     # 如果xlcalculator失败，尝试基础的手动解析
@@ -850,22 +769,19 @@ class ExcelWriter:
                 message="公式执行成功",
                 data=calculated_value,
                 metadata={
-                    'formula': formula,
-                    'result': calculated_value,
-                    'result_type': result_type,
-                    'execution_time_ms': execution_time,
-                    'context_sheet': context_sheet or "default",
-                    'cached': False,
-                    'cache_stats': cache.get_stats()
-                }
+                    "formula": formula,
+                    "result": calculated_value,
+                    "result_type": result_type,
+                    "execution_time_ms": execution_time,
+                    "context_sheet": context_sheet or "default",
+                    "cached": False,
+                    "cache_stats": cache.get_stats(),
+                },
             )
 
         except Exception as e:
             logger.error(f"公式执行失败: {e}")
-            return OperationResult(
-                success=False,
-                error=f"公式执行失败: {str(e)}"
-            )
+            return OperationResult(success=False, error=f"公式执行失败: {str(e)}")
 
     def _detect_file_format(self) -> str:
         """检测Excel文件格式
@@ -886,27 +802,22 @@ class ExcelWriter:
         """
         if not self.file_path or not os.path.exists(self.file_path):
             logger.debug("无文件路径或文件不存在，使用默认格式 xlsx")
-            return 'xlsx'
+            return "xlsx"
 
         # 从文件扩展名提取格式
         _, ext = os.path.splitext(self.file_path)
-        ext = ext.lower().lstrip('.')
+        ext = ext.lower().lstrip(".")
 
         # 验证格式是否受支持
-        supported_formats = {'xlsx', 'xls', 'xlsm', 'xltx', 'xltm', 'xlsb'}
+        supported_formats = {"xlsx", "xls", "xlsm", "xltx", "xltm", "xlsb"}
         if ext in supported_formats:
             logger.debug(f"检测到文件格式: {ext}")
             return ext
 
         logger.warning(f"不支持的文件格式 '{ext}'，使用默认格式 xlsx")
-        return 'xlsx'
+        return "xlsx"
 
-    def _create_temp_workbook(
-        self,
-        context_sheet: Optional[str],
-        cache,
-        formula: str = None
-    ) -> tuple:
+    def _create_temp_workbook(self, context_sheet: str | None, cache, formula: str = None) -> tuple:
         """创建临时工作簿用于计算，检测并保留原始文件格式
 
         Args:
@@ -919,7 +830,7 @@ class ExcelWriter:
         """
         # 检测公式是否包含单元格引用（字母+数字模式如A1, B2, SUM(A1:A10)）
         # formula=None 表示直接调用（非evaluate_formula路径），默认需要加载数据
-        has_cell_ref = formula is None or bool(re.search(r'[A-Za-z]+\d+', formula or ''))
+        has_cell_ref = formula is None or bool(re.search(r"[A-Za-z]+\d+", formula or ""))
 
         # 创建临时工作簿进行计算
         temp_workbook = Workbook()
@@ -940,9 +851,8 @@ class ExcelWriter:
                 max_rows = min(source_sheet.max_row or 1000, 1000)
                 max_cols = min(source_sheet.max_column or 100, 100)
                 for row_idx, row_data in enumerate(
-                    source_sheet.iter_rows(
-                        max_row=max_rows, max_col=max_cols, values_only=True
-                    ), start=1
+                    source_sheet.iter_rows(max_row=max_rows, max_col=max_cols, values_only=True),
+                    start=1,
                 ):
                     for col_idx, value in enumerate(row_data, start=1):
                         if value is not None:
@@ -955,7 +865,7 @@ class ExcelWriter:
             logger.debug("无文件路径或公式不含单元格引用，使用空工作簿进行计算")
 
         # 保存到临时文件
-        temp_file_path = TempFileManager.create_temp_excel_file(suffix='.xlsx')
+        temp_file_path = TempFileManager.create_temp_excel_file(suffix=".xlsx")
         temp_workbook.save(temp_file_path)
 
         # 缓存工作簿
@@ -963,12 +873,7 @@ class ExcelWriter:
 
         return temp_workbook, temp_file_path
 
-    def _calculate_with_xlcalculator(
-        self,
-        temp_file_path: str,
-        formula: str,
-        temp_workbook
-    ) -> any:
+    def _calculate_with_xlcalculator(self, temp_file_path: str, formula: str, temp_workbook) -> any:
         """使用xlcalculator进行计算
 
         Args:
@@ -979,11 +884,11 @@ class ExcelWriter:
         Returns:
             any: 计算结果
         """
-        from xlcalculator import ModelCompiler, Evaluator
+        from xlcalculator import Evaluator, ModelCompiler
 
         # 在临时单元格中设置要计算的公式
         temp_sheet = temp_workbook.active
-        calc_cell = temp_sheet['Z1']
+        calc_cell = temp_sheet["Z1"]
         calc_cell.value = f"={formula}"
 
         # 一次性保存（包含数据和公式）
@@ -995,7 +900,7 @@ class ExcelWriter:
         evaluator = Evaluator(model)
 
         # 计算Z1位置的公式
-        calculated_value = evaluator.evaluate('Calculation!Z1')
+        calculated_value = evaluator.evaluate("Calculation!Z1")
         return calculated_value
 
     def _fast_calculate(self, formula: str) -> any:
@@ -1011,65 +916,64 @@ class ExcelWriter:
         Returns:
             计算结果
         """
-        import math
-        from datetime import datetime, date
+        from datetime import date, datetime
 
         # Excel 函数名 → Python 映射
         safe_names = {
             # 数学函数
-            'SUM': lambda *args: sum(args) if args else 0,
-            'AVG': lambda *args: sum(args) / len(args) if args else 0,
-            'MIN': min,
-            'MAX': max,
-            'COUNT': lambda *args: sum(1 for a in args if a is not None),
-            'ABS': abs,
-            'ROUND': round,
-            'INT': int,
-            'MOD': lambda a, b: a % b,
-            'POWER': pow,
-            'SQRT': math.sqrt,
-            'FLOOR': math.floor,
-            'CEILING': math.ceil,
-            'LN': math.log,
-            'LOG': math.log10,
-            'LOG10': math.log10,
-            'EXP': math.exp,
-            'PI': math.pi,
-            'E': math.e,
-            'SIN': math.sin,
-            'COS': math.cos,
-            'TAN': math.tan,
-            'DEGREES': math.degrees,
-            'RADIANS': math.radians,
+            "SUM": lambda *args: sum(args) if args else 0,
+            "AVG": lambda *args: sum(args) / len(args) if args else 0,
+            "MIN": min,
+            "MAX": max,
+            "COUNT": lambda *args: sum(1 for a in args if a is not None),
+            "ABS": abs,
+            "ROUND": round,
+            "INT": int,
+            "MOD": lambda a, b: a % b,
+            "POWER": pow,
+            "SQRT": math.sqrt,
+            "FLOOR": math.floor,
+            "CEILING": math.ceil,
+            "LN": math.log,
+            "LOG": math.log10,
+            "LOG10": math.log10,
+            "EXP": math.exp,
+            "PI": math.pi,
+            "E": math.e,
+            "SIN": math.sin,
+            "COS": math.cos,
+            "TAN": math.tan,
+            "DEGREES": math.degrees,
+            "RADIANS": math.radians,
             # 逻辑函数
-            'IF': lambda cond, t, f: t if cond else f,
-            'AND': lambda *args: all(args),
-            'OR': lambda *args: any(args),
-            'NOT': lambda x: not x,
-            'TRUE': True,
-            'FALSE': False,
-            'NA': None,
+            "IF": lambda cond, t, f: t if cond else f,
+            "AND": lambda *args: all(args),
+            "OR": lambda *args: any(args),
+            "NOT": lambda x: not x,
+            "TRUE": True,
+            "FALSE": False,
+            "NA": None,
             # 文本函数
-            'CONCATENATE': lambda *args: ''.join(str(a) for a in args),
-            'LEFT': lambda s, n=1: str(s)[:int(n)],
-            'RIGHT': lambda s, n=1: str(s)[-int(n):] if int(n) > 0 else '',
-            'MID': lambda s, start, length: str(s)[int(start)-1:int(start)-1+int(length)],
-            'LEN': lambda s: len(str(s)),
-            'UPPER': lambda s: str(s).upper(),
-            'LOWER': lambda s: str(s).lower(),
-            'TRIM': lambda s: str(s).strip(),
-            'TEXT': lambda v, fmt=None: str(v),
-            'VALUE': lambda v: float(v) if '.' in str(v) else int(v),
+            "CONCATENATE": lambda *args: "".join(str(a) for a in args),
+            "LEFT": lambda s, n=1: str(s)[: int(n)],
+            "RIGHT": lambda s, n=1: str(s)[-int(n) :] if int(n) > 0 else "",
+            "MID": lambda s, start, length: str(s)[int(start) - 1 : int(start) - 1 + int(length)],
+            "LEN": lambda s: len(str(s)),
+            "UPPER": lambda s: str(s).upper(),
+            "LOWER": lambda s: str(s).lower(),
+            "TRIM": lambda s: str(s).strip(),
+            "TEXT": lambda v, fmt=None: str(v),
+            "VALUE": lambda v: float(v) if "." in str(v) else int(v),
             # 日期函数
-            'TODAY': date.today(),
-            'NOW': datetime.now(),
-            'DATE': lambda y, m, d: date(int(y), int(m), int(d)),
-            'YEAR': lambda d: d.year if hasattr(d, 'year') else 0,
-            'MONTH': lambda d: d.month if hasattr(d, 'month') else 0,
-            'DAY': lambda d: d.day if hasattr(d, 'day') else 0,
+            "TODAY": date.today(),
+            "NOW": datetime.now(),
+            "DATE": lambda y, m, d: date(int(y), int(m), int(d)),
+            "YEAR": lambda d: d.year if hasattr(d, "year") else 0,
+            "MONTH": lambda d: d.month if hasattr(d, "month") else 0,
+            "DAY": lambda d: d.day if hasattr(d, "day") else 0,
             # 统计
-            'MEDIAN': lambda *args: sorted(args)[len(args)//2] if args else 0,
-            'MODE': lambda *args: max(set(args), key=args.count) if args else 0,
+            "MEDIAN": lambda *args: sorted(args)[len(args) // 2] if args else 0,
+            "MODE": lambda *args: max(set(args), key=args.count) if args else 0,
         }
 
         try:
@@ -1078,10 +982,10 @@ class ExcelWriter:
 
             # 处理 Excel 比较运算符（Python 已支持）
             # 处理 & 连接符 → +
-            py_expr = re.sub(r'&', '+', py_expr)
+            py_expr = re.sub(r"&", "+", py_expr)
 
             # 处理 != (Excel 用 <>)
-            py_expr = re.sub(r'<>', '!=', py_expr)
+            py_expr = re.sub(r"<>", "!=", py_expr)
 
             result = eval(py_expr, {"__builtins__": {}}, safe_names)
             return result
@@ -1091,16 +995,17 @@ class ExcelWriter:
             temp_workbook = Workbook()
             temp_sheet = temp_workbook.active
             temp_sheet.title = "Calculation"
-            temp_file_path = TempFileManager.create_temp_excel_file(suffix='.xlsx')
-            calc_cell = temp_sheet['Z1']
+            temp_file_path = TempFileManager.create_temp_excel_file(suffix=".xlsx")
+            calc_cell = temp_sheet["Z1"]
             calc_cell.value = f"={formula}"
             temp_workbook.save(temp_file_path)
 
-            from xlcalculator import ModelCompiler, Evaluator
+            from xlcalculator import Evaluator, ModelCompiler
+
             compiler = ModelCompiler()
             model = compiler.read_and_parse_archive(temp_file_path)
             evaluator = Evaluator(model)
-            return evaluator.evaluate('Calculation!Z1')
+            return evaluator.evaluate("Calculation!Z1")
 
     def _fallback_calculation(self, temp_file_path: str, formula: str) -> any:
         """备用计算方法
@@ -1144,6 +1049,7 @@ class ExcelWriter:
                 # 检查是否是xlcalculator的数字类型
                 try:
                     from xlcalculator.xlfunctions.func_xltypes import Number
+
                     if isinstance(value, Number):
                         return "number"
                 except ImportError:
@@ -1154,7 +1060,7 @@ class ExcelWriter:
                     return "date"
 
                 # 如果是xlcalculator的类型，尝试获取实际值
-                if hasattr(value, 'value'):
+                if hasattr(value, "value"):
                     actual_value = value.value
                     if isinstance(actual_value, (int, float)):
                         return "number"
@@ -1177,7 +1083,7 @@ class ExcelWriter:
             Any: 计算结果，如果表达式不合法则返回 None
         """
         try:
-            tree = ast.parse(expr, mode='eval')
+            tree = ast.parse(expr, mode="eval")
             # 只允许数字常量和算术运算符
             for node in ast.walk(tree):
                 if isinstance(node, (ast.Expression, ast.BinOp, ast.UnaryOp, ast.operator)):
@@ -1187,32 +1093,41 @@ class ExcelWriter:
                         return None
                 else:
                     return None
-            return eval(compile(tree, '<expr>', 'eval'))
+            return eval(compile(tree, "<expr>", "eval"))
         except (SyntaxError, TypeError, ValueError, ZeroDivisionError):
             return None
 
     # 范围统计函数分发表: (正则模式, 处理函数)
     # 模式组: (start_cell, end_cell) 或 (start_cell, end_cell, extra_param)
     _RANGE_FORMULAS = [
-        (r'SUM\(([A-Z]+\d+):([A-Z]+\d+)\)', '_formula_range_sum'),
-        (r'AVERAGE\(([A-Z]+\d+):([A-Z]+\d+)\)', '_formula_range_average'),
-        (r'COUNT\(([A-Z]+\d+):([A-Z]+\d+)\)', '_formula_range_count'),
-        (r'MIN\(([A-Z]+\d+):([A-Z]+\d+)\)', '_formula_range_min'),
-        (r'MAX\(([A-Z]+\d+):([A-Z]+\d+)\)', '_formula_range_max'),
-        (r'MEDIAN\(([A-Z]+\d+):([A-Z]+\d+)\)', '_formula_range_median'),
-        (r'STDEV(?:\.S)?\(([A-Z]+\d+):([A-Z]+\d+)\)', '_formula_range_stdev'),
-        (r'VAR(?:\.S)?\(([A-Z]+\d+):([A-Z]+\d+)\)', '_formula_range_var'),
-        (r'PERCENTILE\(([A-Z]+\d+):([A-Z]+\d+),\s*([0-9.]+)\)', '_formula_range_percentile'),
-        (r'QUARTILE\(([A-Z]+\d+):([A-Z]+\d+),\s*([0-3])\)', '_formula_range_quartile'),
-        (r'MODE(?:\.SNGL)?\(([A-Z]+\d+):([A-Z]+\d+)\)', '_formula_range_mode'),
-        (r'SKEW\(([A-Z]+\d+):([A-Z]+\d+)\)', '_formula_range_skew'),
-        (r'KURT\(([A-Z]+\d+):([A-Z]+\d+)\)', '_formula_range_kurt'),
-        (r'GEOMEAN\(([A-Z]+\d+):([A-Z]+\d+)\)', '_formula_range_geomean'),
-        (r'HARMEAN\(([A-Z]+\d+):([A-Z]+\d+)\)', '_formula_range_harmean'),
+        (r"SUM\(([A-Z]+\d+):([A-Z]+\d+)\)", "_formula_range_sum"),
+        (r"AVERAGE\(([A-Z]+\d+):([A-Z]+\d+)\)", "_formula_range_average"),
+        (r"COUNT\(([A-Z]+\d+):([A-Z]+\d+)\)", "_formula_range_count"),
+        (r"MIN\(([A-Z]+\d+):([A-Z]+\d+)\)", "_formula_range_min"),
+        (r"MAX\(([A-Z]+\d+):([A-Z]+\d+)\)", "_formula_range_max"),
+        (r"MEDIAN\(([A-Z]+\d+):([A-Z]+\d+)\)", "_formula_range_median"),
+        (r"STDEV(?:\.S)?\(([A-Z]+\d+):([A-Z]+\d+)\)", "_formula_range_stdev"),
+        (r"VAR(?:\.S)?\(([A-Z]+\d+):([A-Z]+\d+)\)", "_formula_range_var"),
+        (
+            r"PERCENTILE\(([A-Z]+\d+):([A-Z]+\d+),\s*([0-9.]+)\)",
+            "_formula_range_percentile",
+        ),
+        (r"QUARTILE\(([A-Z]+\d+):([A-Z]+\d+),\s*([0-3])\)", "_formula_range_quartile"),
+        (r"MODE(?:\.SNGL)?\(([A-Z]+\d+):([A-Z]+\d+)\)", "_formula_range_mode"),
+        (r"SKEW\(([A-Z]+\d+):([A-Z]+\d+)\)", "_formula_range_skew"),
+        (r"KURT\(([A-Z]+\d+):([A-Z]+\d+)\)", "_formula_range_kurt"),
+        (r"GEOMEAN\(([A-Z]+\d+):([A-Z]+\d+)\)", "_formula_range_geomean"),
+        (r"HARMEAN\(([A-Z]+\d+):([A-Z]+\d+)\)", "_formula_range_harmean"),
         # 条件统计函数（第三组是条件表达式）
-        (r'COUNTIF\(([A-Z]+\d+):([A-Z]+\d+),\s*"?([^"]+)"?\)', '_formula_range_countif'),
-        (r'SUMIF\(([A-Z]+\d+):([A-Z]+\d+),\s*"?([^"]+)"?\)', '_formula_range_sumif'),
-        (r'AVERAGEIF\(([A-Z]+\d+):([A-Z]+\d+),\s*"?([^"]+)"?\)', '_formula_range_averageif'),
+        (
+            r'COUNTIF\(([A-Z]+\d+):([A-Z]+\d+),\s*"?([^"]+)"?\)',
+            "_formula_range_countif",
+        ),
+        (r'SUMIF\(([A-Z]+\d+):([A-Z]+\d+),\s*"?([^"]+)"?\)', "_formula_range_sumif"),
+        (
+            r'AVERAGEIF\(([A-Z]+\d+):([A-Z]+\d+),\s*"?([^"]+)"?\)',
+            "_formula_range_averageif",
+        ),
     ]
 
     def _basic_formula_parse(self, formula: str, sheet) -> any:
@@ -1220,20 +1135,20 @@ class ExcelWriter:
         formula = formula.strip()
 
         # 简单数学表达式（优先处理，不依赖工作表）
-        if re.match(r'^[\d\+\-\*\/\s\(\)\.]+$', formula):
+        if re.match(r"^[\d\+\-\*\/\s\(\)\.]+$", formula):
             result = self._safe_eval_expr(formula)
             if result is not None:
                 return result
 
         # 数字列表统计函数（不依赖工作表）
-        list_match = re.match(r'(SUM|AVERAGE)\(([\d\s\,]+)\)', formula, re.IGNORECASE)
+        list_match = re.match(r"(SUM|AVERAGE)\(([\d\s\,]+)\)", formula, re.IGNORECASE)
         if list_match:
             func_name, numbers_str = list_match.groups()
             try:
-                numbers = [float(n.strip()) for n in numbers_str.split(',') if n.strip()]
+                numbers = [float(n.strip()) for n in numbers_str.split(",") if n.strip()]
                 if not numbers:
                     return 0
-                if func_name.upper() == 'SUM':
+                if func_name.upper() == "SUM":
                     return sum(numbers)
                 return sum(numbers) / len(numbers)
             except Exception as e:
@@ -1252,10 +1167,10 @@ class ExcelWriter:
             return self._formula_if(if_match.group(1), if_match.group(2), if_match.group(3))
 
         # CONCATENATE函数
-        concat_match = re.match(r'CONCATENATE\((.+)\)', formula, re.IGNORECASE)
+        concat_match = re.match(r"CONCATENATE\((.+)\)", formula, re.IGNORECASE)
         if concat_match:
-            args = concat_match.group(1).split(',')
-            return ''.join(arg.strip().strip('"') for arg in args)
+            args = concat_match.group(1).split(",")
+            return "".join(arg.strip().strip('"') for arg in args)
 
         return None
 
@@ -1307,17 +1222,17 @@ class ExcelWriter:
         return self._numpy_harmean(self._get_range_values(sheet, start, end))
 
     def _formula_range_countif(self, sheet, start, end, condition):
-        return self._apply_condition(self._get_range_values(sheet, start, end), condition, 'count')
+        return self._apply_condition(self._get_range_values(sheet, start, end), condition, "count")
 
     def _formula_range_sumif(self, sheet, start, end, condition):
-        return self._apply_condition(self._get_range_values(sheet, start, end), condition, 'sum')
+        return self._apply_condition(self._get_range_values(sheet, start, end), condition, "sum")
 
     def _formula_range_averageif(self, sheet, start, end, condition):
-        return self._apply_condition(self._get_range_values(sheet, start, end), condition, 'average')
+        return self._apply_condition(self._get_range_values(sheet, start, end), condition, "average")
 
     def _formula_if(self, condition: str, true_val: str, false_val: str):
         """IF函数简单实现（支持>和<比较）"""
-        for op_str, op_fn in [('>', float.__gt__), ('<', float.__lt__)]:
+        for op_str, op_fn in [(">", float.__gt__), ("<", float.__lt__)]:
             if op_str in condition:
                 parts = condition.split(op_str)
                 if len(parts) == 2:
@@ -1342,35 +1257,35 @@ class ExcelWriter:
             float or int: 筛选后的聚合结果
         """
         # 解析条件
-        if condition.startswith('>='):
-            op, threshold = '>=', float(condition[2:])
-        elif condition.startswith('<='):
-            op, threshold = '<=', float(condition[2:])
-        elif condition.startswith('>'):
-            op, threshold = '>', float(condition[1:])
-        elif condition.startswith('<'):
-            op, threshold = '<', float(condition[1:])
-        elif condition.startswith('='):
-            op, threshold = '=', float(condition[1:])
+        if condition.startswith(">="):
+            op, threshold = ">=", float(condition[2:])
+        elif condition.startswith("<="):
+            op, threshold = "<=", float(condition[2:])
+        elif condition.startswith(">"):
+            op, threshold = ">", float(condition[1:])
+        elif condition.startswith("<"):
+            op, threshold = "<", float(condition[1:])
+        elif condition.startswith("="):
+            op, threshold = "=", float(condition[1:])
         else:
-            op, threshold = '=', float(condition)
+            op, threshold = "=", float(condition)
 
         # 筛选
-        if op == '>':
+        if op == ">":
             filtered = [v for v in values if v > threshold]
-        elif op == '<':
+        elif op == "<":
             filtered = [v for v in values if v < threshold]
-        elif op == '>=':
+        elif op == ">=":
             filtered = [v for v in values if v >= threshold]
-        elif op == '<=':
+        elif op == "<=":
             filtered = [v for v in values if v <= threshold]
         else:
             filtered = [v for v in values if v == threshold]
 
         # 聚合
-        if mode == 'count':
+        if mode == "count":
             return len(filtered)
-        elif mode == 'sum':
+        elif mode == "sum":
             return sum(filtered)
         else:  # average
             return sum(filtered) / len(filtered) if filtered else 0
@@ -1400,8 +1315,14 @@ class ExcelWriter:
 
     # ==================== Numpy统计函数实现 ====================
 
-    def _numpy_op(self, values: list, np_func_name, fallback_func,
-                  min_values: int = 0, numpy_kwargs: dict = None) -> float:
+    def _numpy_op(
+        self,
+        values: list,
+        np_func_name,
+        fallback_func,
+        min_values: int = 0,
+        numpy_kwargs: dict = None,
+    ) -> float:
         """统一的numpy计算+Python降级模式，消除15个numpy方法的重复try/except
 
         Args:
@@ -1416,6 +1337,7 @@ class ExcelWriter:
         """
         try:
             import numpy as np
+
             if len(values) < min_values:
                 return 0
             kwargs = numpy_kwargs or {}
@@ -1441,7 +1363,7 @@ class ExcelWriter:
         """Python原生样本标准差"""
         mean = sum(values) / len(values)
         variance = sum((x - mean) ** 2 for x in values) / (len(values) - 1)
-        return variance ** 0.5
+        return variance**0.5
 
     @staticmethod
     def _python_var(values: list) -> float:
@@ -1462,48 +1384,47 @@ class ExcelWriter:
 
     def _numpy_average(self, values: list) -> float:
         """计算平均值"""
-        return self._numpy_op(values, 'mean',
-                              lambda v: sum(v) / len(v) if v else 0)
+        return self._numpy_op(values, "mean", lambda v: sum(v) / len(v) if v else 0)
 
     def _numpy_min(self, values: list) -> float:
         """计算最小值"""
-        return self._numpy_op(values, 'min', min)
+        return self._numpy_op(values, "min", min)
 
     def _numpy_max(self, values: list) -> float:
         """计算最大值"""
-        return self._numpy_op(values, 'max', max)
+        return self._numpy_op(values, "max", max)
 
     def _numpy_median(self, values: list) -> float:
         """计算中位数"""
-        return self._numpy_op(values, 'median', self._python_median)
+        return self._numpy_op(values, "median", self._python_median)
 
     def _numpy_stdev(self, values: list) -> float:
         """计算样本标准差"""
-        return self._numpy_op(values, 'std', self._python_stdev, min_values=2,
-                              numpy_kwargs={'ddof': 1})
+        return self._numpy_op(values, "std", self._python_stdev, min_values=2, numpy_kwargs={"ddof": 1})
 
     def _numpy_var(self, values: list) -> float:
         """计算样本方差"""
-        return self._numpy_op(values, 'var', self._python_var, min_values=2,
-                              numpy_kwargs={'ddof': 1})
+        return self._numpy_op(values, "var", self._python_var, min_values=2, numpy_kwargs={"ddof": 1})
 
     def _numpy_percentile(self, values: list, percentile: float) -> float:
         """计算百分位数"""
-        return self._numpy_op(values, 'percentile',
-                              lambda v: self._python_percentile(v, percentile),
-                              numpy_kwargs={'q': percentile * 100})
+        return self._numpy_op(
+            values,
+            "percentile",
+            lambda v: self._python_percentile(v, percentile),
+            numpy_kwargs={"q": percentile * 100},
+        )
 
     def _numpy_quartile(self, values: list, quartile: int) -> float:
         """计算四分位数"""
         quartile_map = {0: 0, 1: 0.25, 2: 0.5, 3: 0.75}
         return self._numpy_percentile(values, quartile_map.get(quartile, 0.5))
 
-
-
     def _numpy_mode(self, values: list) -> float:
         """计算众数"""
         try:
             from scipy import stats
+
             if not values:
                 return 0
             mode_result = stats.mode(values, keepdims=True)
@@ -1519,6 +1440,7 @@ class ExcelWriter:
         """计算偏度"""
         try:
             from scipy import stats
+
             if len(values) < 3:
                 return 0
             return float(stats.skew(values))
@@ -1529,6 +1451,7 @@ class ExcelWriter:
         """计算峰度"""
         try:
             from scipy import stats
+
             if len(values) < 4:
                 return 0
             return float(stats.kurtosis(values))
@@ -1539,6 +1462,7 @@ class ExcelWriter:
         """计算几何平均数"""
         try:
             from scipy import stats
+
             if not values or any(v <= 0 for v in values):
                 return 0
             return float(stats.gmean(values))
@@ -1554,6 +1478,7 @@ class ExcelWriter:
         """计算调和平均数"""
         try:
             from scipy import stats
+
             if not values or any(v <= 0 for v in values):
                 return 0
             return float(stats.hmean(values))
@@ -1595,94 +1520,96 @@ class ExcelWriter:
             None
         """
         # 字体格式
-        if 'font' in formatting:
-            font_config = formatting['font']
+        if "font" in formatting:
+            font_config = formatting["font"]
             # 处理 underline 值：支持 'single'/'double'/'singleAccounting'/'doubleAccounting'/True/False
-            _underline = font_config.get('underline', None)
+            _underline = font_config.get("underline", None)
             if _underline is True:
-                _underline = 'single'
+                _underline = "single"
             elif _underline is False:
-                _underline = 'none'
+                _underline = "none"
 
             cell.font = Font(
-                name=font_config.get('name', cell.font.name),
-                size=font_config.get('size', cell.font.size),
-                bold=font_config.get('bold', cell.font.bold),
-                italic=font_config.get('italic', cell.font.italic),
-                color=font_config.get('color', cell.font.color),
+                name=font_config.get("name", cell.font.name),
+                size=font_config.get("size", cell.font.size),
+                bold=font_config.get("bold", cell.font.bold),
+                italic=font_config.get("italic", cell.font.italic),
+                color=font_config.get("color", cell.font.color),
                 underline=_underline if _underline is not None else cell.font.underline,
-                strikethrough=font_config.get('strikethrough', cell.font.strikethrough),
+                strikethrough=font_config.get("strikethrough", cell.font.strikethrough),
             )
 
         # 背景颜色 / 填充
-        if 'fill' in formatting:
-            fill_config = formatting['fill']
-            _fill_type = fill_config.get('type', 'solid').lower()
-            if _fill_type == 'solid':
+        if "fill" in formatting:
+            fill_config = formatting["fill"]
+            _fill_type = fill_config.get("type", "solid").lower()
+            if _fill_type == "solid":
                 cell.fill = PatternFill(
-                    start_color=fill_config.get('color', 'FFFFFF'),
-                    end_color=fill_config.get('color', 'FFFFFF'),
-                    fill_type='solid'
+                    start_color=fill_config.get("color", "FFFFFF"),
+                    end_color=fill_config.get("color", "FFFFFF"),
+                    fill_type="solid",
                 )
-            elif _fill_type == 'gradient':
+            elif _fill_type == "gradient":
                 from openpyxl.styles.colors import Color as Clr
                 from openpyxl.styles.fills import Stop
-                _colors = fill_config.get('colors', ['FFFFFF', 'D9D9D9'])
+
+                _colors = fill_config.get("colors", ["FFFFFF", "D9D9D9"])
                 _n = len(_colors)
                 cell.fill = GradientFill(
-                    type=fill_config.get('gradient_type', 'linear'),
-                    degree=fill_config.get('degree', 0),
-                    stop=[Stop(color=Clr(c), position=i/(_n-1) if _n > 1 else 0)
-                          for i, c in enumerate(_colors)]
+                    type=fill_config.get("gradient_type", "linear"),
+                    degree=fill_config.get("degree", 0),
+                    stop=[Stop(color=Clr(c), position=i / (_n - 1) if _n > 1 else 0) for i, c in enumerate(_colors)],
                 )
-            elif _fill_type == 'pattern':
+            elif _fill_type == "pattern":
                 cell.fill = PatternFill(
-                    patternType=fill_config.get('patternType', 'lightGray'),
-                    fgColor=fill_config.get('fgColor', '00000000'),
-                    bgColor=fill_config.get('bgColor', '00000000'),
+                    patternType=fill_config.get("patternType", "lightGray"),
+                    fgColor=fill_config.get("fgColor", "00000000"),
+                    bgColor=fill_config.get("bgColor", "00000000"),
                 )
 
         # 对齐方式（含换行、旋转、缩进、自动换行）
-        if 'alignment' in formatting:
-            align_config = formatting['alignment']
+        if "alignment" in formatting:
+            align_config = formatting["alignment"]
             cell.alignment = Alignment(
-                horizontal=align_config.get('horizontal', cell.alignment.horizontal),
-                vertical=align_config.get('vertical', cell.alignment.vertical),
-                wrap_text=align_config.get('wrap_text', cell.alignment.wrap_text),
-                text_rotation=align_config.get('text_rotation', cell.alignment.text_rotation),
-                indent=align_config.get('indent', cell.alignment.indent),
-                shrink_to_fit=align_config.get('shrink_to_fit', cell.alignment.shrink_to_fit),
+                horizontal=align_config.get("horizontal", cell.alignment.horizontal),
+                vertical=align_config.get("vertical", cell.alignment.vertical),
+                wrap_text=align_config.get("wrap_text", cell.alignment.wrap_text),
+                text_rotation=align_config.get("text_rotation", cell.alignment.text_rotation),
+                indent=align_config.get("indent", cell.alignment.indent),
+                shrink_to_fit=align_config.get("shrink_to_fit", cell.alignment.shrink_to_fit),
             )
 
         # 数字格式
-        if 'number_format' in formatting:
-            cell.number_format = formatting['number_format']
+        if "number_format" in formatting:
+            cell.number_format = formatting["number_format"]
 
         # 行内边框（可选，与 set_borders 工具互补）
-        if 'border' in formatting:
-            border_config = formatting['border']
-            from openpyxl.styles import Side, Border as Bdr
+        if "border" in formatting:
+            border_config = formatting["border"]
+            from openpyxl.styles import Border as Bdr
+            from openpyxl.styles import Side
+
             def _make_side(cfg):
                 if not cfg or isinstance(cfg, str):
-                    return Side(style=cfg or 'thin',
-                                color=border_config.get('color', '000000'))
-                return Side(style=cfg.get('style', 'thin'),
-                            color=cfg.get('color', border_config.get('color', '000000')))
+                    return Side(style=cfg or "thin", color=border_config.get("color", "000000"))
+                return Side(
+                    style=cfg.get("style", "thin"),
+                    color=cfg.get("color", border_config.get("color", "000000")),
+                )
 
             cell.border = Bdr(
-                left=_make_side(border_config.get('left')),
-                right=_make_side(border_config.get('right')),
-                top=_make_side(border_config.get('top')),
-                bottom=_make_side(border_config.get('bottom')),
-                diagonal=_make_side(border_config.get('diagonal')),
-                diagonal_direction=border_config.get('diagonal_direction'),
-                outline=border_config.get('outline', True),
-                start=border_config.get('start'),
-                end=border_config.get('end'),
+                left=_make_side(border_config.get("left")),
+                right=_make_side(border_config.get("right")),
+                top=_make_side(border_config.get("top")),
+                bottom=_make_side(border_config.get("bottom")),
+                diagonal=_make_side(border_config.get("diagonal")),
+                diagonal_direction=border_config.get("diagonal_direction"),
+                outline=border_config.get("outline", True),
+                start=border_config.get("start"),
+                end=border_config.get("end"),
             )
 
-    def _parse_and_resolve_sheet(self, workbook, range_expression: str,
-                                  sheet_name: Optional[str] = None):
+    def _parse_and_resolve_sheet(self, workbook, range_expression: str, sheet_name: str | None = None):
         """解析范围表达式并获取工作表，消除merge/unmerge/borders的重复逻辑
 
         Args:
@@ -1696,7 +1623,7 @@ class ExcelWriter:
         Raises:
             SheetNotFoundError: 工作表不存在
         """
-        if sheet_name and '!' not in range_expression:
+        if sheet_name and "!" not in range_expression:
             full_range = f"{sheet_name}!{range_expression}"
         else:
             full_range = range_expression
@@ -1708,7 +1635,7 @@ class ExcelWriter:
 
         return range_info, workbook[range_info.sheet_name]
 
-    def _get_worksheet_or_raise(self, workbook, sheet_name: Optional[str] = None):
+    def _get_worksheet_or_raise(self, workbook, sheet_name: str | None = None):
         """获取工作表（支持可选sheet_name，不存在则用活动表）
 
         Args:
@@ -1729,11 +1656,7 @@ class ExcelWriter:
             worksheet = workbook.active
             return worksheet, worksheet.title
 
-    def merge_cells(
-        self,
-        range_expression: str,
-        sheet_name: Optional[str] = None
-    ) -> OperationResult:
+    def merge_cells(self, range_expression: str, sheet_name: str | None = None) -> OperationResult:
         """
         合并单元格
 
@@ -1746,8 +1669,7 @@ class ExcelWriter:
         """
         try:
             workbook = load_workbook(self.file_path)
-            range_info, worksheet = self._parse_and_resolve_sheet(
-                workbook, range_expression, sheet_name)
+            range_info, worksheet = self._parse_and_resolve_sheet(workbook, range_expression, sheet_name)
 
             worksheet.merge_cells(range_info.cell_range)
 
@@ -1758,27 +1680,17 @@ class ExcelWriter:
                 success=True,
                 message=f"成功合并单元格范围: {range_info.cell_range}",
                 data={
-                    'merged_range': range_info.cell_range,
-                    'sheet_name': range_info.sheet_name
+                    "merged_range": range_info.cell_range,
+                    "sheet_name": range_info.sheet_name,
                 },
-                metadata={
-                    'operation': 'merge_cells',
-                    'file_path': self.file_path
-                }
+                metadata={"operation": "merge_cells", "file_path": self.file_path},
             )
 
         except Exception as e:
             logger.error(f"合并单元格失败: {e}")
-            return OperationResult(
-                success=False,
-                error=f"合并单元格失败: {str(e)}"
-            )
+            return OperationResult(success=False, error=f"合并单元格失败: {str(e)}")
 
-    def unmerge_cells(
-        self,
-        range_expression: str,
-        sheet_name: Optional[str] = None
-    ) -> OperationResult:
+    def unmerge_cells(self, range_expression: str, sheet_name: str | None = None) -> OperationResult:
         """
         取消合并单元格
 
@@ -1791,8 +1703,7 @@ class ExcelWriter:
         """
         try:
             workbook = load_workbook(self.file_path)
-            range_info, worksheet = self._parse_and_resolve_sheet(
-                workbook, range_expression, sheet_name)
+            range_info, worksheet = self._parse_and_resolve_sheet(workbook, range_expression, sheet_name)
 
             worksheet.unmerge_cells(range_info.cell_range)
 
@@ -1803,27 +1714,21 @@ class ExcelWriter:
                 success=True,
                 message=f"成功取消合并单元格范围: {range_info.cell_range}",
                 data={
-                    'unmerged_range': range_info.cell_range,
-                    'sheet_name': range_info.sheet_name
+                    "unmerged_range": range_info.cell_range,
+                    "sheet_name": range_info.sheet_name,
                 },
-                metadata={
-                    'operation': 'unmerge_cells',
-                    'file_path': self.file_path
-                }
+                metadata={"operation": "unmerge_cells", "file_path": self.file_path},
             )
 
         except Exception as e:
             logger.error(f"取消合并单元格失败: {e}")
-            return OperationResult(
-                success=False,
-                error=f"取消合并单元格失败: {str(e)}"
-            )
+            return OperationResult(success=False, error=f"取消合并单元格失败: {str(e)}")
 
     def set_borders(
         self,
         range_expression: str,
         border_style: str = "thin",
-        sheet_name: Optional[str] = None
+        sheet_name: str | None = None,
     ) -> OperationResult:
         """
         设置单元格边框
@@ -1838,8 +1743,7 @@ class ExcelWriter:
         """
         try:
             workbook = load_workbook(self.file_path)
-            range_info, worksheet = self._parse_and_resolve_sheet(
-                workbook, range_expression, sheet_name)
+            range_info, worksheet = self._parse_and_resolve_sheet(workbook, range_expression, sheet_name)
 
             # 创建边框样式
             side = Side(style=border_style)
@@ -1850,7 +1754,7 @@ class ExcelWriter:
             try:
                 # 尝试直接使用范围
                 for row in worksheet[range_info.cell_range]:
-                    if hasattr(row, '__iter__'):  # 确保row是可迭代的
+                    if hasattr(row, "__iter__"):  # 确保row是可迭代的
                         for cell in row:
                             cell.border = border
                             cell_count += 1
@@ -1874,30 +1778,19 @@ class ExcelWriter:
                 success=True,
                 message=f"成功设置 {cell_count} 个单元格的边框",
                 data={
-                    'range': range_info.cell_range,
-                    'border_style': border_style,
-                    'cell_count': cell_count,
-                    'sheet_name': range_info.sheet_name
+                    "range": range_info.cell_range,
+                    "border_style": border_style,
+                    "cell_count": cell_count,
+                    "sheet_name": range_info.sheet_name,
                 },
-                metadata={
-                    'operation': 'set_borders',
-                    'file_path': self.file_path
-                }
+                metadata={"operation": "set_borders", "file_path": self.file_path},
             )
 
         except Exception as e:
             logger.error(f"设置边框失败: {e}")
-            return OperationResult(
-                success=False,
-                error=f"设置边框失败: {str(e)}"
-            )
+            return OperationResult(success=False, error=f"设置边框失败: {str(e)}")
 
-    def set_row_height(
-        self,
-        row_number: int,
-        height: float,
-        sheet_name: Optional[str] = None
-    ) -> OperationResult:
+    def set_row_height(self, row_number: int, height: float, sheet_name: str | None = None) -> OperationResult:
         """
         设置行高
 
@@ -1924,29 +1817,18 @@ class ExcelWriter:
                 success=True,
                 message=f"成功设置第 {row_number} 行的高度为 {height} 磅",
                 data={
-                    'row_number': row_number,
-                    'height': height,
-                    'sheet_name': sheet_name
+                    "row_number": row_number,
+                    "height": height,
+                    "sheet_name": sheet_name,
                 },
-                metadata={
-                    'operation': 'set_row_height',
-                    'file_path': self.file_path
-                }
+                metadata={"operation": "set_row_height", "file_path": self.file_path},
             )
 
         except Exception as e:
             logger.error(f"设置行高失败: {e}")
-            return OperationResult(
-                success=False,
-                error=f"设置行高失败: {str(e)}"
-            )
+            return OperationResult(success=False, error=f"设置行高失败: {str(e)}")
 
-    def set_column_width(
-        self,
-        column: str,
-        width: float,
-        sheet_name: Optional[str] = None
-    ) -> OperationResult:
+    def set_column_width(self, column: str, width: float, sheet_name: str | None = None) -> OperationResult:
         """
         设置列宽
 
@@ -1973,19 +1855,13 @@ class ExcelWriter:
                 success=True,
                 message=f"成功设置列 {column.upper()} 的宽度为 {width} 字符",
                 data={
-                    'column': column.upper(),
-                    'width': width,
-                    'sheet_name': sheet_name
+                    "column": column.upper(),
+                    "width": width,
+                    "sheet_name": sheet_name,
                 },
-                metadata={
-                    'operation': 'set_column_width',
-                    'file_path': self.file_path
-                }
+                metadata={"operation": "set_column_width", "file_path": self.file_path},
             )
 
         except Exception as e:
             logger.error(f"设置列宽失败: {e}")
-            return OperationResult(
-                success=False,
-                error=f"设置列宽失败: {str(e)}"
-            )
+            return OperationResult(success=False, error=f"设置列宽失败: {str(e)}")

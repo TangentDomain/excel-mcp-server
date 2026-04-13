@@ -3,18 +3,17 @@ Excel MCP Server - 自定义异常类
 
 定义了项目中使用的所有自定义异常，包含详细的错误信息和修复建议
 """
-from typing import List
 
 
 class ExcelException(Exception):
     """Excel操作基础异常"""
-    
+
     def __init__(self, message: str, hint: str = None, suggested_fix: str = None):
         self.message = message
         self.hint = hint
         self.suggested_fix = suggested_fix
         super().__init__(self.get_formatted_message())
-    
+
     def get_formatted_message(self) -> str:
         """格式化错误消息，包含提示和修复建议"""
         parts = [f"Excel操作错误: {self.message}"]
@@ -27,7 +26,7 @@ class ExcelException(Exception):
 
 class ExcelFileNotFoundError(FileNotFoundError):
     """文件不存在异常 - 继承自Python内置FileNotFoundError"""
-    
+
     def __init__(self, file_path: str, hint: str = None):
         self.message = f"Excel文件不存在: {file_path}"
         self.hint = hint
@@ -37,8 +36,8 @@ class ExcelFileNotFoundError(FileNotFoundError):
 
 class InvalidFormatError(ExcelException):
     """无效文件格式异常"""
-    
-    def __init__(self, file_path: str, expected_formats: List[str] = None):
+
+    def __init__(self, file_path: str, expected_formats: list[str] = None):
         message = f"无效的Excel文件格式: {file_path}"
         hint = "文件必须是Excel格式（.xlsx, .xls）"
         expected = f"支持的格式: {', '.join(expected_formats or ['.xlsx', '.xls'])}" if expected_formats else ""
@@ -48,7 +47,7 @@ class InvalidFormatError(ExcelException):
 
 class InvalidRangeError(ExcelException):
     """无效范围异常"""
-    
+
     def __init__(self, range_expression: str, reason: str = None):
         message = f"无效的Excel范围表达式: {range_expression}"
         hint = reason or "范围表达式格式不正确"
@@ -58,8 +57,8 @@ class InvalidRangeError(ExcelException):
 
 class SheetNotFoundError(ExcelException):
     """工作表不存在异常"""
-    
-    def __init__(self, sheet_name: str, available_sheets: List[str] = None):
+
+    def __init__(self, sheet_name: str, available_sheets: list[str] = None):
         message = f"工作表不存在: {sheet_name}"
         hint = "工作表名称区分大小写"
         available = f"可用工作表: {', '.join(available_sheets)}" if available_sheets else ""
@@ -80,7 +79,7 @@ class DataValidationError(ExcelException):
 
 class OperationLimitError(ExcelException):
     """操作限制异常"""
-    
+
     def __init__(self, operation: str, limit: str, reason: str = None):
         message = f"操作超出限制: {operation}"
         hint = f"限制: {limit}"
@@ -91,7 +90,7 @@ class OperationLimitError(ExcelException):
 
 class ExcelMCPError(ExcelException):
     """Excel MCP 通用操作异常"""
-    
+
     def __init__(self, operation: str, error_code: str = None, **kwargs):
         message = f"Excel MCP操作失败: {operation}"
         if error_code:

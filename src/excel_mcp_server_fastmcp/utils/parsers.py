@@ -5,7 +5,6 @@ Excel MCP Server - 解析工具
 """
 
 import re
-from typing import Dict, Any
 
 from ..models.types import RangeInfo, RangeType
 from .exceptions import InvalidRangeError
@@ -34,8 +33,8 @@ class RangeParser:
         range_expr = range_expr.strip()
 
         # 分离工作表名和单元格范围
-        if '!' in range_expr:
-            sheet_name, cell_range = range_expr.split('!', 1)
+        if "!" in range_expr:
+            sheet_name, cell_range = range_expr.split("!", 1)
         else:
             sheet_name = None
             cell_range = range_expr
@@ -46,11 +45,7 @@ class RangeParser:
         # 规范化范围表达式
         normalized_range = cls._normalize_range(cell_range, range_type)
 
-        return RangeInfo(
-            sheet_name=sheet_name,
-            cell_range=normalized_range,
-            range_type=range_type
-        )
+        return RangeInfo(sheet_name=sheet_name, cell_range=normalized_range, range_type=range_type)
 
     @classmethod
     def _detect_range_type(cls, cell_range: str) -> RangeType:
@@ -67,23 +62,23 @@ class RangeParser:
             InvalidRangeError: 无效的范围表达式
         """
         # 检测整行模式 (如 "1:1", "3:5")
-        if re.match(r'^\d+:\d+$', cell_range):
+        if re.match(r"^\d+:\d+$", cell_range):
             return RangeType.ROW_RANGE
 
         # 检测整列模式 (如 "A:A", "B:D")
-        elif re.match(r'^[A-Z]+:[A-Z]+$', cell_range):
+        elif re.match(r"^[A-Z]+:[A-Z]+$", cell_range):
             return RangeType.COLUMN_RANGE
 
         # 检测单行模式 (如 "1", 只读取第1行)
-        elif re.match(r'^\d+$', cell_range):
+        elif re.match(r"^\d+$", cell_range):
             return RangeType.SINGLE_ROW
 
         # 检测单列模式 (如 "A", 只读取A列)
-        elif re.match(r'^[A-Z]+$', cell_range):
+        elif re.match(r"^[A-Z]+$", cell_range):
             return RangeType.SINGLE_COLUMN
 
         # 检测单元格范围模式 (如 "A1:B2", "A1")
-        elif re.match(r'^[A-Z]+\d+$|^[A-Z]+\d+:[A-Z]+\d+$', cell_range):
+        elif re.match(r"^[A-Z]+\d+$|^[A-Z]+\d+:[A-Z]+\d+$", cell_range):
             return RangeType.CELL_RANGE
 
         # 如果都不匹配，抛出异常

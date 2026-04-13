@@ -5,15 +5,14 @@ Excel MCP Server - Excel管理模块
 """
 
 import logging
-import os
-from typing import List, Optional
 from pathlib import Path
+
 from openpyxl import Workbook, load_workbook
 from openpyxl.utils import get_column_letter
 
-from ..models.types import SheetInfo, OperationResult
+from ..models.types import OperationResult, SheetInfo
+from ..utils.exceptions import DataValidationError, SheetNotFoundError
 from ..utils.validators import ExcelValidator
-from ..utils.exceptions import SheetNotFoundError, DataValidationError
 
 # 设置日志级别为INFO以便调试
 logger = logging.getLogger(__name__)
@@ -24,11 +23,7 @@ class ExcelManager:
     """Excel文件和工作表管理器"""
 
     @classmethod
-    def create_file(
-        cls,
-        file_path: str,
-        sheet_names: Optional[List[str]] = None
-    ) -> OperationResult:
+    def create_file(cls, file_path: str, sheet_names: list[str] | None = None) -> OperationResult:
         """
         创建新的Excel文件
 
@@ -59,27 +54,31 @@ class ExcelManager:
                         raise DataValidationError(
                             f"工作表名称不能为空: 索引 {i}",
                             "工作表名称不能为空白字符串",
-                            "请为所有工作表提供有效的名称"
+                            "请为所有工作表提供有效的名称",
                         )
 
                     sheet = workbook.create_sheet(title=sheet_name.strip())
-                    created_sheets.append(SheetInfo(
-                        index=i,
-                        name=sheet.title,
-                        max_row=1,
-                        max_column=1,
-                        max_column_letter='A'
-                    ))
+                    created_sheets.append(
+                        SheetInfo(
+                            index=i,
+                            name=sheet.title,
+                            max_row=1,
+                            max_column=1,
+                            max_column_letter="A",
+                        )
+                    )
             else:
                 # write_only 模式需要手动创建默认工作表
-                sheet = workbook.create_sheet(title='Sheet1')
-                created_sheets = [SheetInfo(
-                    index=0,
-                    name='Sheet1',
-                    max_row=1,
-                    max_column=1,
-                    max_column_letter='A'
-                )]
+                sheet = workbook.create_sheet(title="Sheet1")
+                created_sheets = [
+                    SheetInfo(
+                        index=0,
+                        name="Sheet1",
+                        max_row=1,
+                        max_column=1,
+                        max_column_letter="A",
+                    )
+                ]
 
             # 保存文件
             workbook.save(validated_path)
@@ -89,17 +88,14 @@ class ExcelManager:
                 data=created_sheets,
                 message=f"成功创建Excel文件，包含{len(created_sheets)}个工作表",
                 metadata={
-                    'file_path': validated_path,
-                    'total_sheets': len(created_sheets)
-                }
+                    "file_path": validated_path,
+                    "total_sheets": len(created_sheets),
+                },
             )
 
         except Exception as e:
             logger.error(f"创建Excel文件失败: {e}")
-            return OperationResult(
-                success=False,
-                error=str(e)
-            )
+            return OperationResult(success=False, error=str(e))
 
     def __init__(self, file_path: str):
         """
@@ -118,14 +114,11 @@ class ExcelManager:
             OperationResult: 包含工作表信息列表的结果
         """
         from .excel_reader import ExcelReader
+
         reader = ExcelReader(self.file_path)
         return reader.list_sheets()
 
-    def create_sheet(
-        self,
-        sheet_name: str,
-        index: Optional[int] = None
-    ) -> OperationResult:
+    def create_sheet(self, sheet_name: str, index: int | None = None) -> OperationResult:
         """
         在Excel文件中创建新工作表，支持中文字符
 
@@ -178,7 +171,7 @@ class ExcelManager:
                 name=new_sheet.title,
                 max_row=1,
                 max_column=1,
-                max_column_letter='A'
+                max_column_letter="A",
             )
 
             return OperationResult(
@@ -186,18 +179,15 @@ class ExcelManager:
                 data=sheet_info,
                 message=f"成功创建工作表: {sheet_name}",
                 metadata={
-                    'file_path': self.file_path,
-                    'total_sheets': len(workbook.sheetnames),
-                    'all_sheets': workbook.sheetnames
-                }
+                    "file_path": self.file_path,
+                    "total_sheets": len(workbook.sheetnames),
+                    "all_sheets": workbook.sheetnames,
+                },
             )
 
         except Exception as e:
             logger.error(f"创建工作表失败: {e}")
-            return OperationResult(
-                success=False,
-                error=str(e)
-            )
+            return OperationResult(success=False, error=str(e))
 
     def _validate_sheet_name(self, name: str) -> None:
         """
@@ -220,21 +210,15 @@ class ExcelManager:
             raise DataValidationError("工作表名称不能为空")
 
         # 检查非法字符
-        invalid_chars = r'[/\\?*\[\]:]'
+        invalid_chars = r"[/\\?*\[\]:]"
         illegal = re.findall(invalid_chars, name)
         if illegal:
-            chars_str = ', '.join(sorted(set(illegal)))
-            raise DataValidationError(
-                f"工作表名称包含非法字符: {chars_str}。"
-                f"Excel工作表名称不能包含以下字符: / \\ ? * [ ] :"
-            )
+            chars_str = ", ".join(sorted(set(illegal)))
+            raise DataValidationError(f"工作表名称包含非法字符: {chars_str}。Excel工作表名称不能包含以下字符: / \\ ? * [ ] :")
 
         # 检查长度限制（31字符是Excel硬限制）
         if len(name) > 31:
-            raise DataValidationError(
-                f"工作表名称过长: {len(name)}个字符，"
-                f"Excel限制最多31个字符。请缩短名称或使用缩写。"
-            )
+            raise DataValidationError(f"工作表名称过长: {len(name)}个字符，Excel限制最多31个字符。请缩短名称或使用缩写。")
 
     def _sanitize_sheet_name(self, name: str) -> str:
         """
@@ -250,8 +234,8 @@ class ExcelManager:
         import re
 
         # 替换非法字符
-        invalid_chars = r'[/\\?*\[\]:]'
-        name = re.sub(invalid_chars, '_', name)
+        invalid_chars = r"[/\\?*\[\]:]"
+        name = re.sub(invalid_chars, "_", name)
 
         # 移除首尾空白
         name = name.strip()
@@ -283,9 +267,9 @@ class ExcelManager:
         fallback_base = "Sheet"
 
         # 尝试从原始名称中提取英文字符
-        ascii_chars = re.findall(r'[a-zA-Z0-9]', original_name)
+        ascii_chars = re.findall(r"[a-zA-Z0-9]", original_name)
         if ascii_chars:
-            fallback_base = ''.join(ascii_chars)[:10]  # 最多取10个字符
+            fallback_base = "".join(ascii_chars)[:10]  # 最多取10个字符
 
         # 确保名称唯一
         counter = 1
@@ -351,34 +335,33 @@ class ExcelManager:
             remaining_sheet_infos = []
             for i, sheet_name_iter in enumerate(workbook.sheetnames):
                 sheet = workbook[sheet_name_iter]
-                remaining_sheet_infos.append(SheetInfo(
-                    index=i,
-                    name=sheet_name_iter,
-                    max_row=sheet.max_row,
-                    max_column=sheet.max_column,
-                    max_column_letter=get_column_letter(sheet.max_column)
-                ))
+                remaining_sheet_infos.append(
+                    SheetInfo(
+                        index=i,
+                        name=sheet_name_iter,
+                        max_row=sheet.max_row,
+                        max_column=sheet.max_column,
+                        max_column_letter=get_column_letter(sheet.max_column),
+                    )
+                )
 
             return OperationResult(
                 success=True,
                 data=remaining_sheet_infos,  # 添加data字段
                 message=f"成功删除工作表: {deleted_sheet_name}",
                 metadata={
-                    'file_path': self.file_path,
-                    'deleted_sheet': deleted_sheet_name,
-                    'deleted_index': deleted_sheet_index,
-                    'new_active_sheet': workbook.active.title,
-                    'remaining_sheets': workbook.sheetnames,
-                    'total_sheets': len(workbook.sheetnames)
-                }
+                    "file_path": self.file_path,
+                    "deleted_sheet": deleted_sheet_name,
+                    "deleted_index": deleted_sheet_index,
+                    "new_active_sheet": workbook.active.title,
+                    "remaining_sheets": workbook.sheetnames,
+                    "total_sheets": len(workbook.sheetnames),
+                },
             )
 
         except Exception as e:
             logger.error(f"删除工作表失败: {e}")
-            return OperationResult(
-                success=False,
-                error=str(e)
-            )
+            return OperationResult(success=False, error=str(e))
 
     def rename_sheet(self, old_name: str, new_name: str) -> OperationResult:
         """
@@ -434,7 +417,7 @@ class ExcelManager:
                 name=new_name,
                 max_row=sheet.max_row,
                 max_column=sheet.max_column,
-                max_column_letter=get_column_letter(sheet.max_column) if sheet.max_column > 0 else 'A'
+                max_column_letter=get_column_letter(sheet.max_column) if sheet.max_column > 0 else "A",
             )
 
             return OperationResult(
@@ -442,27 +425,24 @@ class ExcelManager:
                 message=f"成功将工作表 '{old_name}' 重命名为 '{new_name}'",
                 data=renamed_sheet_info,
                 metadata={
-                    'file_path': self.file_path,
-                    'old_name': old_name,
-                    'new_name': new_name,
-                    'sheet_index': old_index,
-                    'all_sheets': workbook.sheetnames
-                }
+                    "file_path": self.file_path,
+                    "old_name": old_name,
+                    "new_name": new_name,
+                    "sheet_index": old_index,
+                    "all_sheets": workbook.sheetnames,
+                },
             )
 
         except Exception as e:
             logger.error(f"重命名工作表失败: {e}")
-            return OperationResult(
-                success=False,
-                error=str(e)
-            )
+            return OperationResult(success=False, error=str(e))
 
     def copy_sheet(
         self,
         source_name: str,
-        new_name: Optional[str] = None,
-        index: Optional[int] = None,
-        streaming: bool = True
+        new_name: str | None = None,
+        index: int | None = None,
+        streaming: bool = True,
     ) -> OperationResult:
         """
         复制工作表到同一文件中（含数据和格式）
@@ -485,6 +465,7 @@ class ExcelManager:
             # 流式复制路径：读取数据后重建工作表，大文件性能更好
             if streaming:
                 from .streaming_writer import StreamingWriter
+
                 if StreamingWriter.is_available():
                     try:
                         return self._copy_sheet_streaming(source_name, new_name, index)
@@ -494,7 +475,7 @@ class ExcelManager:
             workbook = load_workbook(self.file_path)
 
             if source_name not in workbook.sheetnames:
-                available = ', '.join(workbook.sheetnames)
+                available = ", ".join(workbook.sheetnames)
                 raise SheetNotFoundError(f"工作表不存在: {source_name}（可用: {available}）")
 
             source_sheet = workbook[source_name]
@@ -536,7 +517,7 @@ class ExcelManager:
                 name=new_name,
                 max_row=target.max_row,
                 max_column=target.max_column,
-                max_column_letter=get_column_letter(target.max_column) if target.max_column > 0 else 'A'
+                max_column_letter=get_column_letter(target.max_column) if target.max_column > 0 else "A",
             )
 
             return OperationResult(
@@ -544,15 +525,15 @@ class ExcelManager:
                 data=sheet_info,
                 message=f"成功复制工作表 '{source_name}' 为 '{new_name}'（{target.max_row}行 × {target.max_column}列）",
                 metadata={
-                    'file_path': self.file_path,
-                    'source_name': source_name,
-                    'new_name': new_name,
-                    'copied_rows': target.max_row,
-                    'copied_columns': target.max_column,
-                    'new_index': new_index,
-                    'total_sheets': len(workbook.sheetnames),
-                    'all_sheets': workbook.sheetnames
-                }
+                    "file_path": self.file_path,
+                    "source_name": source_name,
+                    "new_name": new_name,
+                    "copied_rows": target.max_row,
+                    "copied_columns": target.max_column,
+                    "new_index": new_index,
+                    "total_sheets": len(workbook.sheetnames),
+                    "all_sheets": workbook.sheetnames,
+                },
             )
 
         except Exception as e:
@@ -562,8 +543,8 @@ class ExcelManager:
     def _copy_sheet_streaming(
         self,
         source_name: str,
-        new_name: Optional[str] = None,
-        index: Optional[int] = None
+        new_name: str | None = None,
+        index: int | None = None,
     ) -> OperationResult:
         """
         流式复制工作表：读取源数据后用calamine+write_only重建，大文件性能更好
@@ -576,8 +557,6 @@ class ExcelManager:
         Returns:
             OperationResult: 复制操作的结果
         """
-        import tempfile
-        import shutil
 
         # 自动生成新名称
         if not new_name or not new_name.strip():
@@ -588,21 +567,19 @@ class ExcelManager:
         # 使用calamine读取源工作表数据
         try:
             from python_calamine import CalamineWorkbook
+
             cal_wb = CalamineWorkbook.from_path(self.file_path)
         except Exception as e:
             logger.warning(f"calamine读取失败，降级到openpyxl: {e}")
             return self.copy_sheet(source_name, new_name, index, streaming=False)
 
         if source_name not in cal_wb.sheet_names:
-            available = ', '.join(cal_wb.sheet_names)
+            available = ", ".join(cal_wb.sheet_names)
             raise SheetNotFoundError(f"工作表不存在: {source_name}（可用: {available}）")
 
         source_rows = cal_wb.get_sheet_by_name(source_name).to_python()
         if not source_rows:
-            return OperationResult(
-                success=False,
-                error=f"源工作表 '{source_name}' 为空或读取失败"
-            )
+            return OperationResult(success=False, error=f"源工作表 '{source_name}' 为空或读取失败")
 
         # 处理名称冲突（只需检查sheet_names列表，无需读取数据）
         existing_names = set(cal_wb.sheet_names)
@@ -639,31 +616,25 @@ class ExcelManager:
         return OperationResult(
             success=True,
             data={
-                'index': len(cal_wb.sheet_names),
-                'name': new_name,
-                'max_row': total_rows,
-                'max_column': total_cols,
-                'max_column_letter': get_column_letter(total_cols) if total_cols > 0 else 'A'
+                "index": len(cal_wb.sheet_names),
+                "name": new_name,
+                "max_row": total_rows,
+                "max_column": total_cols,
+                "max_column_letter": get_column_letter(total_cols) if total_cols > 0 else "A",
             },
             message=f"成功复制工作表 '{source_name}' 为 '{new_name}'（{total_rows}行 × {total_cols}列，流式模式）",
             metadata={
-                'file_path': self.file_path,
-                'source_name': source_name,
-                'new_name': new_name,
-                'copied_rows': total_rows,
-                'copied_columns': total_cols,
-                'mode': 'streaming',
-                'col_widths_preserved': True
-            }
+                "file_path": self.file_path,
+                "source_name": source_name,
+                "new_name": new_name,
+                "copied_rows": total_rows,
+                "copied_columns": total_cols,
+                "mode": "streaming",
+                "col_widths_preserved": True,
+            },
         )
 
-    def rename_column(
-        self,
-        sheet_name: str,
-        old_header: str,
-        new_header: str,
-        header_row: int = 1
-    ) -> OperationResult:
+    def rename_column(self, sheet_name: str, old_header: str, new_header: str, header_row: int = 1) -> OperationResult:
         """
         重命名指定工作表的列（修改表头单元格值）
 
@@ -693,7 +664,7 @@ class ExcelManager:
             workbook = load_workbook(self.file_path)
 
             if sheet_name not in workbook.sheetnames:
-                available = ', '.join(workbook.sheetnames)
+                available = ", ".join(workbook.sheetnames)
                 raise SheetNotFoundError(f"工作表不存在: {sheet_name}（可用: {available}）")
 
             sheet = workbook[sheet_name]
@@ -716,12 +687,10 @@ class ExcelManager:
                     v = sheet.cell(row=header_row, column=col).value
                     if v is not None:
                         actual_headers.append(str(v).strip())
-                raise DataValidationError(
-                    f"在行 {header_row} 中未找到列名 '{old_header}'（实际列名: {', '.join(actual_headers[:10])}）"
-                )
+                raise DataValidationError(f"在行 {header_row} 中未找到列名 '{old_header}'（实际列名: {', '.join(actual_headers[:10])}）")
 
             # 修改列名
-            old_value = sheet.cell(row=header_row, column=col_idx).value
+            sheet.cell(row=header_row, column=col_idx).value
             sheet.cell(row=header_row, column=col_idx).value = new_header
             col_letter = get_column_letter(col_idx)
 
@@ -731,13 +700,13 @@ class ExcelManager:
                 success=True,
                 message=f"成功将列 '{old_header}' 重命名为 '{new_header}'（{col_letter}{header_row}）",
                 metadata={
-                    'file_path': self.file_path,
-                    'sheet_name': sheet_name,
-                    'old_header': old_header,
-                    'new_header': new_header,
-                    'cell': f"{col_letter}{header_row}",
-                    'header_row': header_row
-                }
+                    "file_path": self.file_path,
+                    "sheet_name": sheet_name,
+                    "old_header": old_header,
+                    "new_header": new_header,
+                    "cell": f"{col_letter}{header_row}",
+                    "header_row": header_row,
+                },
             )
 
         except Exception as e:
@@ -765,17 +734,17 @@ class ExcelManager:
             # 获取文件系统信息
             stat_info = os.stat(file_path)
             file_size = stat_info.st_size
-            created_time = datetime.fromtimestamp(stat_info.st_ctime).strftime('%Y-%m-%d %H:%M:%S')
-            modified_time = datetime.fromtimestamp(stat_info.st_mtime).strftime('%Y-%m-%d %H:%M:%S')
+            created_time = datetime.fromtimestamp(stat_info.st_ctime).strftime("%Y-%m-%d %H:%M:%S")
+            modified_time = datetime.fromtimestamp(stat_info.st_mtime).strftime("%Y-%m-%d %H:%M:%S")
 
             # 获取文件格式
-            file_format = Path(file_path).suffix.lower().lstrip('.')
+            file_format = Path(file_path).suffix.lower().lstrip(".")
 
             # 加载工作簿获取详细信息（非read_only模式以获取准确数据维度）
             workbook = load_workbook(file_path)
             sheet_count = len(workbook.sheetnames)
             sheet_names = workbook.sheetnames
-            has_macros = file_format == 'xlsm'
+            has_macros = file_format == "xlsm"
 
             # 统计第一个工作表的行列范围
             total_rows = 0
@@ -799,41 +768,38 @@ class ExcelManager:
 
             # 构建返回数据
             file_data = {
-                'file_path': file_path,
-                'file_name': Path(file_path).name,
-                'file_size': file_size,
-                'file_size_mb': round(file_size / 1024 / 1024, 2),
-                'created_time': created_time,
-                'modified_time': modified_time,
-                'format': file_format,
-                'sheet_count': sheet_count,
-                'sheet_names': sheet_names,
-                'has_macros': has_macros,
-                'total_rows': total_rows,
-                'total_cols': total_cols
+                "file_path": file_path,
+                "file_name": Path(file_path).name,
+                "file_size": file_size,
+                "file_size_mb": round(file_size / 1024 / 1024, 2),
+                "created_time": created_time,
+                "modified_time": modified_time,
+                "format": file_format,
+                "sheet_count": sheet_count,
+                "sheet_names": sheet_names,
+                "has_macros": has_macros,
+                "total_rows": total_rows,
+                "total_cols": total_cols,
             }
             # 仅当格式化范围与数据范围不同时才报告格式化维度
             if formatted_rows != total_rows or formatted_cols != total_cols:
-                file_data['formatted_rows'] = formatted_rows
-                file_data['formatted_cols'] = formatted_cols
+                file_data["formatted_rows"] = formatted_rows
+                file_data["formatted_cols"] = formatted_cols
 
             return OperationResult(
                 success=True,
                 message=f"成功获取文件信息: {file_path}",
                 data=file_data,
                 metadata={
-                    'file_format': file_format,
-                    'is_macro_enabled': has_macros,
-                    'sheet_summary': {name: f"工作表{i+1}" for i, name in enumerate(sheet_names)}
-                }
+                    "file_format": file_format,
+                    "is_macro_enabled": has_macros,
+                    "sheet_summary": {name: f"工作表{i + 1}" for i, name in enumerate(sheet_names)},
+                },
             )
 
         except Exception as e:
             logger.error(f"获取文件信息失败: {e}")
-            return OperationResult(
-                success=False,
-                error=f"获取文件信息失败: {str(e)}"
-            )
+            return OperationResult(success=False, error=f"获取文件信息失败: {str(e)}")
 
     def upsert_row(
         self,
@@ -842,7 +808,7 @@ class ExcelManager:
         key_value,
         updates: dict,
         header_row: int = 1,
-        streaming: bool = True
+        streaming: bool = True,
     ) -> OperationResult:
         """
         Upsert行：按键列查找，存在则更新，不存在则插入新行。
@@ -874,10 +840,15 @@ class ExcelManager:
             # 流式写入路径
             if streaming:
                 from .streaming_writer import StreamingWriter
+
                 if StreamingWriter.is_available():
                     success, message, meta = StreamingWriter.upsert_row(
-                        self.file_path, sheet_name, key_column, key_value,
-                        updates, header_row
+                        self.file_path,
+                        sheet_name,
+                        key_column,
+                        key_value,
+                        updates,
+                        header_row,
                     )
                     if success:
                         return OperationResult(
@@ -885,12 +856,12 @@ class ExcelManager:
                             data=meta,
                             message=message,
                             metadata={
-                                'file_path': self.file_path,
-                                'sheet_name': sheet_name,
-                                'key_column': key_column,
-                                'key_value': str(key_value),
-                                **meta
-                            }
+                                "file_path": self.file_path,
+                                "sheet_name": sheet_name,
+                                "key_column": key_column,
+                                "key_value": str(key_value),
+                                **meta,
+                            },
                         )
                     else:
                         logger.warning(f"流式upsert失败，降级到openpyxl: {message}")
@@ -899,7 +870,7 @@ class ExcelManager:
             workbook = load_workbook(self.file_path)
 
             if sheet_name not in workbook.sheetnames:
-                available = ', '.join(workbook.sheetnames)
+                available = ", ".join(workbook.sheetnames)
                 raise SheetNotFoundError(f"工作表不存在: {sheet_name}（可用: {available}）")
 
             sheet = workbook[sheet_name]
@@ -920,11 +891,7 @@ class ExcelManager:
             if _next_row <= sheet.max_row:
                 _next_vals = [sheet.cell(row=_next_row, column=c).value for c in range(1, sheet.max_column + 1)]
                 _next_strs = [v for v in _next_vals if v is not None]
-                _is_english_row = (
-                    len(_next_strs) >= 2
-                    and all(isinstance(v, str) and v.strip() and v.strip()[0].isalpha() and v.strip()[0].isascii()
-                           for v in _next_strs)
-                )
+                _is_english_row = len(_next_strs) >= 2 and all(isinstance(v, str) and v.strip() and v.strip()[0].isalpha() and v.strip()[0].isascii() for v in _next_strs)
                 if _is_english_row:
                     for col in range(1, min(sheet.max_column + 1, len(_next_vals) + 1)):
                         val = _next_vals[col - 1]
@@ -935,9 +902,7 @@ class ExcelManager:
 
             if key_column not in col_map:
                 actual = list(col_map.keys())[:10]
-                raise DataValidationError(
-                    f"键列 '{key_column}' 不存在。实际列名: {', '.join(actual)}"
-                )
+                raise DataValidationError(f"键列 '{key_column}' 不存在。实际列名: {', '.join(actual)}")
 
             key_col_idx = col_map[key_column]
 
@@ -966,21 +931,21 @@ class ExcelManager:
                 return OperationResult(
                     success=True,
                     data={
-                        'action': 'update',
-                        'row': target_row,
-                        'updated_columns': updated_cols,
-                        'updated_count': len(updated_cols)
+                        "action": "update",
+                        "row": target_row,
+                        "updated_columns": updated_cols,
+                        "updated_count": len(updated_cols),
                     },
                     message=f"更新行 {target_row}（键列 '{key_column}'='{key_value}'），修改了 {len(updated_cols)} 列",
                     metadata={
-                        'file_path': self.file_path,
-                        'sheet_name': sheet_name,
-                        'key_column': key_column,
-                        'key_value': str(key_value),
-                        'action': 'update',
-                        'target_row': target_row,
-                        'updated_columns': updated_cols
-                    }
+                        "file_path": self.file_path,
+                        "sheet_name": sheet_name,
+                        "key_column": key_column,
+                        "key_value": str(key_value),
+                        "action": "update",
+                        "target_row": target_row,
+                        "updated_columns": updated_cols,
+                    },
                 )
             else:
                 # INSERT: 在末尾追加新行
@@ -1004,34 +969,28 @@ class ExcelManager:
                 return OperationResult(
                     success=True,
                     data={
-                        'action': 'insert',
-                        'row': new_row,
-                        'inserted_columns': inserted_cols,
-                        'inserted_count': len(inserted_cols)
+                        "action": "insert",
+                        "row": new_row,
+                        "inserted_columns": inserted_cols,
+                        "inserted_count": len(inserted_cols),
                     },
                     message=f"插入新行 {new_row}（键列 '{key_column}'='{key_value}'），写入了 {len(inserted_cols)} 列",
                     metadata={
-                        'file_path': self.file_path,
-                        'sheet_name': sheet_name,
-                        'key_column': key_column,
-                        'key_value': str(key_value),
-                        'action': 'insert',
-                        'new_row': new_row,
-                        'inserted_columns': inserted_cols
-                    }
+                        "file_path": self.file_path,
+                        "sheet_name": sheet_name,
+                        "key_column": key_column,
+                        "key_value": str(key_value),
+                        "action": "insert",
+                        "new_row": new_row,
+                        "inserted_columns": inserted_cols,
+                    },
                 )
 
         except Exception as e:
             logger.error(f"Upsert行失败: {e}")
             return OperationResult(success=False, error=str(e))
 
-    def batch_insert_rows(
-        self,
-        sheet_name: str,
-        data: list,
-        header_row: int = 1,
-        streaming: bool = True
-    ) -> OperationResult:
+    def batch_insert_rows(self, sheet_name: str, data: list, header_row: int = 1, streaming: bool = True) -> OperationResult:
         """
         批量插入多行数据到工作表末尾。
 
@@ -1070,20 +1029,19 @@ class ExcelManager:
             # 流式写入路径（calamine读取 + write_only写入）
             if streaming:
                 from .streaming_writer import StreamingWriter
+
                 if StreamingWriter.is_available():
-                    success, message, meta = StreamingWriter.batch_insert_rows(
-                        self.file_path, sheet_name, data, header_row
-                    )
+                    success, message, meta = StreamingWriter.batch_insert_rows(self.file_path, sheet_name, data, header_row)
                     if success:
                         return OperationResult(
                             success=True,
                             data=meta,
                             message=message,
                             metadata={
-                                'file_path': self.file_path,
-                                'sheet_name': sheet_name,
-                                **meta
-                            }
+                                "file_path": self.file_path,
+                                "sheet_name": sheet_name,
+                                **meta,
+                            },
                         )
                     else:
                         logger.warning(f"流式写入失败，降级到openpyxl: {message}")
@@ -1093,6 +1051,7 @@ class ExcelManager:
             col_map = {}
             try:
                 from python_calamine import CalamineWorkbook
+
                 cal_wb = CalamineWorkbook.from_path(self.file_path)
                 for sn in cal_wb.sheet_names:
                     if sn == sheet_name:
@@ -1108,7 +1067,7 @@ class ExcelManager:
             # calamine 未获取到表头时，降级到 openpyxl
             workbook = load_workbook(self.file_path)
             if sheet_name not in workbook.sheetnames:
-                available = ', '.join(workbook.sheetnames)
+                available = ", ".join(workbook.sheetnames)
                 workbook.close()
                 raise SheetNotFoundError(f"工作表不存在: {sheet_name}（可用: {available}）")
 
@@ -1150,21 +1109,21 @@ class ExcelManager:
             return OperationResult(
                 success=True,
                 data={
-                    'action': 'batch_insert',
-                    'start_row': start_row,
-                    'end_row': start_row + inserted_count - 1,
-                    'inserted_count': inserted_count,
-                    'unknown_columns': unknown_list
+                    "action": "batch_insert",
+                    "start_row": start_row,
+                    "end_row": start_row + inserted_count - 1,
+                    "inserted_count": inserted_count,
+                    "unknown_columns": unknown_list,
                 },
                 message=f"批量插入 {inserted_count} 行（第{start_row}-{start_row + inserted_count - 1}行）",
                 metadata={
-                    'file_path': self.file_path,
-                    'sheet_name': sheet_name,
-                    'action': 'batch_insert',
-                    'start_row': start_row,
-                    'inserted_count': inserted_count,
-                    'unknown_columns': unknown_list
-                }
+                    "file_path": self.file_path,
+                    "sheet_name": sheet_name,
+                    "action": "batch_insert",
+                    "start_row": start_row,
+                    "inserted_count": inserted_count,
+                    "unknown_columns": unknown_list,
+                },
             )
 
         except Exception as e:

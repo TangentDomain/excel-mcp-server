@@ -5,17 +5,24 @@ Excel MCP Server - Excel比较模块
 """
 
 import logging
-from typing import List, Dict, Any, Optional, Tuple
+from typing import Any
+
 from openpyxl import load_workbook
 from openpyxl.utils import get_column_letter
 
 from ..models.types import (
-    OperationResult, ComparisonResult, SheetComparison,
-    CellDifference, ComparisonOptions, DifferenceType,
-    RowDifference, StructuredSheetComparison, FieldDifference
+    CellDifference,
+    ComparisonOptions,
+    ComparisonResult,
+    DifferenceType,
+    FieldDifference,
+    OperationResult,
+    RowDifference,
+    SheetComparison,
+    StructuredSheetComparison,
 )
-from ..utils.validators import ExcelValidator
 from ..utils.exceptions import SheetNotFoundError
+from ..utils.validators import ExcelValidator
 
 logger = logging.getLogger(__name__)
 
@@ -23,7 +30,7 @@ logger = logging.getLogger(__name__)
 class ExcelComparer:
     """Excel文件比较器"""
 
-    def __init__(self, comparison_options: Optional[ComparisonOptions] = None):
+    def __init__(self, comparison_options: ComparisonOptions | None = None):
         """
         初始化Excel比较器
 
@@ -36,7 +43,7 @@ class ExcelComparer:
         self,
         file1_path: str,
         file2_path: str,
-        options: Optional[ComparisonOptions] = None
+        options: ComparisonOptions | None = None,
     ) -> OperationResult:
         """
         比较两个Excel文件
@@ -60,8 +67,16 @@ class ExcelComparer:
             logger.info(f"开始比较文件: {file1_path} vs {file2_path}")
 
             # 加载两个Excel文件 - 比较操作使用只读模式
-            workbook1 = load_workbook(file1_path, data_only=not compare_options.compare_formulas, read_only=True)
-            workbook2 = load_workbook(file2_path, data_only=not compare_options.compare_formulas, read_only=True)
+            workbook1 = load_workbook(
+                file1_path,
+                data_only=not compare_options.compare_formulas,
+                read_only=True,
+            )
+            workbook2 = load_workbook(
+                file2_path,
+                data_only=not compare_options.compare_formulas,
+                read_only=True,
+            )
 
             # 比较文件结构
             structural_differences = self._compare_file_structure(workbook1, workbook2)
@@ -72,19 +87,15 @@ class ExcelComparer:
 
             total_differences = 0
             for sheet_name in all_sheet_names:
-                sheet_comparison = self._compare_sheets(
-                    workbook1, workbook2, sheet_name, compare_options
-                )
+                sheet_comparison = self._compare_sheets(workbook1, workbook2, sheet_name, compare_options)
                 sheet_comparisons.append(sheet_comparison)
                 total_differences += sheet_comparison.total_differences
 
             # 判断文件是否完全相同
-            identical = (total_differences == 0 and len(structural_differences) == 0)
+            identical = total_differences == 0 and len(structural_differences) == 0
 
             # 生成摘要
-            summary = self._generate_comparison_summary(
-                sheet_comparisons, structural_differences, total_differences
-            )
+            summary = self._generate_comparison_summary(sheet_comparisons, structural_differences, total_differences)
 
             comparison_result = ComparisonResult(
                 file1_path=file1_path,
@@ -93,7 +104,7 @@ class ExcelComparer:
                 total_differences=total_differences,
                 sheet_comparisons=sheet_comparisons,
                 structural_differences=structural_differences,
-                summary=summary
+                summary=summary,
             )
 
             logger.info(f"文件比较完成，共发现 {total_differences} 处差异")
@@ -103,18 +114,15 @@ class ExcelComparer:
                 data=comparison_result,
                 message=f"成功比较两个Excel文件，发现 {total_differences} 处差异",
                 metadata={
-                    'total_differences': total_differences,
-                    'sheets_compared': len(sheet_comparisons),
-                    'identical': identical
-                }
+                    "total_differences": total_differences,
+                    "sheets_compared": len(sheet_comparisons),
+                    "identical": identical,
+                },
             )
 
         except Exception as e:
             logger.error(f"文件比较失败: {e}")
-            return OperationResult(
-                success=False,
-                error=f"文件比较失败: {str(e)}"
-            )
+            return OperationResult(success=False, error=f"文件比较失败: {str(e)}")
 
     def compare_sheets(
         self,
@@ -122,7 +130,7 @@ class ExcelComparer:
         sheet1_name: str,
         file2_path: str,
         sheet2_name: str,
-        options: Optional[ComparisonOptions] = None
+        options: ComparisonOptions | None = None,
     ) -> OperationResult:
         """
         比较两个工作表
@@ -148,8 +156,16 @@ class ExcelComparer:
             logger.info(f"开始比较工作表: {file1_path}[{sheet1_name}] vs {file2_path}[{sheet2_name}]")
 
             # 加载Excel文件 - 比较操作使用只读模式
-            workbook1 = load_workbook(file1_path, data_only=not compare_options.compare_formulas, read_only=True)
-            workbook2 = load_workbook(file2_path, data_only=not compare_options.compare_formulas, read_only=True)
+            workbook1 = load_workbook(
+                file1_path,
+                data_only=not compare_options.compare_formulas,
+                read_only=True,
+            )
+            workbook2 = load_workbook(
+                file2_path,
+                data_only=not compare_options.compare_formulas,
+                read_only=True,
+            )
 
             # 检查工作表是否存在
             if sheet1_name not in workbook1.sheetnames:
@@ -170,13 +186,14 @@ class ExcelComparer:
 
                 # 创建StructuredDataComparison对象
                 from ..models.types import StructuredDataComparison
+
                 result_data = StructuredDataComparison(
                     sheet_name=f"{sheet1_name} vs {sheet2_name}",
                     exists_in_file1=True,
                     exists_in_file2=True,
                     row_differences=row_differences,
                     total_differences=len(row_differences),
-                    structural_changes=structural_changes
+                    structural_changes=structural_changes,
                 )
                 message = f"成功比较两个工作表的结构化数据，发现 {len(row_differences)} 处差异"
             else:
@@ -190,7 +207,7 @@ class ExcelComparer:
                     exists_in_file2=True,
                     differences=differences,
                     total_differences=len(differences),
-                    structural_changes=structural_changes
+                    structural_changes=structural_changes,
                 )
                 message = f"成功比较两个工作表，发现 {len(differences)} 处差异"
 
@@ -201,25 +218,22 @@ class ExcelComparer:
                 data=result_data,
                 message=message,
                 metadata={
-                    'file1': file1_path,
-                    'sheet1': sheet1_name,
-                    'file2': file2_path,
-                    'sheet2': sheet2_name,
-                    'total_differences': result_data.total_differences,
-                    'comparison_type': 'structured' if compare_options.structured_comparison else 'cell-by-cell'
-                }
+                    "file1": file1_path,
+                    "sheet1": sheet1_name,
+                    "file2": file2_path,
+                    "sheet2": sheet2_name,
+                    "total_differences": result_data.total_differences,
+                    "comparison_type": "structured" if compare_options.structured_comparison else "cell-by-cell",
+                },
             )
 
         except Exception as e:
             logger.error(f"工作表比较失败: {e}")
-            return OperationResult(
-                success=False,
-                error=f"工作表比较失败: {str(e)}"
-            )
+            return OperationResult(success=False, error=f"工作表比较失败: {str(e)}")
 
     # ==================== 分支 ====================
     # --- 文件结构比较 ---
-    def _compare_file_structure(self, workbook1, workbook2) -> Dict[str, Any]:
+    def _compare_file_structure(self, workbook1, workbook2) -> dict[str, Any]:
         """比较文件结构差异"""
         structural_differences = {}
 
@@ -228,10 +242,10 @@ class ExcelComparer:
         sheet_count2 = len(workbook2.sheetnames)
 
         if sheet_count1 != sheet_count2:
-            structural_differences['sheet_count'] = {
-                'file1': sheet_count1,
-                'file2': sheet_count2,
-                'difference': sheet_count2 - sheet_count1
+            structural_differences["sheet_count"] = {
+                "file1": sheet_count1,
+                "file2": sheet_count2,
+                "difference": sheet_count2 - sheet_count1,
             }
 
         # 比较工作表名称
@@ -242,20 +256,14 @@ class ExcelComparer:
         removed_sheets = sheets1 - sheets2
 
         if added_sheets:
-            structural_differences['added_sheets'] = list(added_sheets)
+            structural_differences["added_sheets"] = list(added_sheets)
 
         if removed_sheets:
-            structural_differences['removed_sheets'] = list(removed_sheets)
+            structural_differences["removed_sheets"] = list(removed_sheets)
 
         return structural_differences
 
-    def _compare_sheets(
-        self,
-        workbook1,
-        workbook2,
-        sheet_name: str,
-        options: ComparisonOptions
-    ) -> SheetComparison:
+    def _compare_sheets(self, workbook1, workbook2, sheet_name: str, options: ComparisonOptions) -> SheetComparison:
         """比较单个工作表"""
         exists_in_file1 = sheet_name in workbook1.sheetnames
         exists_in_file2 = sheet_name in workbook2.sheetnames
@@ -272,19 +280,23 @@ class ExcelComparer:
 
         elif exists_in_file1 and not exists_in_file2:
             # 第二个文件中没有这个工作表
-            differences.append(CellDifference(
-                coordinate="SHEET",
-                difference_type=DifferenceType.SHEET_REMOVED,
-                sheet_name=sheet_name
-            ))
+            differences.append(
+                CellDifference(
+                    coordinate="SHEET",
+                    difference_type=DifferenceType.SHEET_REMOVED,
+                    sheet_name=sheet_name,
+                )
+            )
 
         elif not exists_in_file1 and exists_in_file2:
             # 第一个文件中没有这个工作表
-            differences.append(CellDifference(
-                coordinate="SHEET",
-                difference_type=DifferenceType.SHEET_ADDED,
-                sheet_name=sheet_name
-            ))
+            differences.append(
+                CellDifference(
+                    coordinate="SHEET",
+                    difference_type=DifferenceType.SHEET_ADDED,
+                    sheet_name=sheet_name,
+                )
+            )
 
         return SheetComparison(
             sheet_name=sheet_name,
@@ -292,15 +304,10 @@ class ExcelComparer:
             exists_in_file2=exists_in_file2,
             differences=differences,
             total_differences=len(differences) if isinstance(differences, list) else 0,
-            structural_changes=structural_changes
+            structural_changes=structural_changes,
         )
 
-    def _compare_worksheet_data(
-        self,
-        sheet1,
-        sheet2,
-        options: ComparisonOptions
-    ) -> List[CellDifference]:
+    def _compare_worksheet_data(self, sheet1, sheet2, options: ComparisonOptions) -> list[CellDifference]:
         """比较工作表数据"""
         # 如果启用结构化比较，使用ID-based比较
         if options.structured_comparison:
@@ -309,12 +316,7 @@ class ExcelComparer:
         # 否则使用传统的单元格级比较
         return self._compare_cell_by_cell(sheet1, sheet2, options)
 
-    def _compare_cell_by_cell(
-        self,
-        sheet1,
-        sheet2,
-        options: ComparisonOptions
-    ) -> List[CellDifference]:
+    def _compare_cell_by_cell(self, sheet1, sheet2, options: ComparisonOptions) -> list[CellDifference]:
         """传统的逐单元格比较"""
         differences = []
 
@@ -345,12 +347,7 @@ class ExcelComparer:
 
         return differences
 
-    def _compare_structured_data(
-        self,
-        sheet1,
-        sheet2,
-        options: ComparisonOptions
-    ) -> List[RowDifference]:
+    def _compare_structured_data(self, sheet1, sheet2, options: ComparisonOptions) -> list[RowDifference]:
         """结构化数据比较，返回行级差异"""
         # 获取表头
         headers1 = self._extract_headers(sheet1, options.header_row)
@@ -361,20 +358,12 @@ class ExcelComparer:
         data_rows2 = self._extract_data_rows(sheet2, options.header_row, headers2, options.id_column)
 
         # 比较数据行，传入工作表名称
-        sheet_name = getattr(sheet1, 'title', 'Unknown')
-        differences = self._compare_data_rows(
-            data_rows1, data_rows2, headers1, headers2, options, sheet_name
-        )
+        sheet_name = getattr(sheet1, "title", "Unknown")
+        differences = self._compare_data_rows(data_rows1, data_rows2, headers1, headers2, options, sheet_name)
 
         return differences
 
-    def _compare_cell_values(
-        self,
-        cell1,
-        cell2,
-        coordinate: str,
-        options: ComparisonOptions
-    ) -> Optional[CellDifference]:
+    def _compare_cell_values(self, cell1, cell2, coordinate: str, options: ComparisonOptions) -> CellDifference | None:
         """比较单元格值"""
         value1 = cell1.value
         value2 = cell2.value
@@ -399,12 +388,12 @@ class ExcelComparer:
                 coordinate=coordinate,
                 difference_type=DifferenceType.VALUE_CHANGED,
                 old_value=cell1.value,
-                new_value=cell2.value
+                new_value=cell2.value,
             )
 
         return None
 
-    def _compare_cell_formats(self, cell1, cell2, coordinate: str) -> Optional[CellDifference]:
+    def _compare_cell_formats(self, cell1, cell2, coordinate: str) -> CellDifference | None:
         """比较单元格格式"""
         # 简化的格式比较，可以根据需要扩展
         format1 = str(cell1.number_format) if cell1.number_format else ""
@@ -415,12 +404,12 @@ class ExcelComparer:
                 coordinate=coordinate,
                 difference_type=DifferenceType.FORMAT_CHANGED,
                 old_format=format1,
-                new_format=format2
+                new_format=format2,
             )
 
         return None
 
-    def _get_sheet_structural_changes(self, sheet1, sheet2) -> Dict[str, Any]:
+    def _get_sheet_structural_changes(self, sheet1, sheet2) -> dict[str, Any]:
         """获取工作表结构变化"""
         structural_changes = {}
 
@@ -429,26 +418,26 @@ class ExcelComparer:
         mc1, mc2 = sheet1.max_column or 0, sheet2.max_column or 0
 
         if mr1 != mr2:
-            structural_changes['max_row'] = {
-                'sheet1': mr1,
-                'sheet2': mr2,
-                'difference': mr2 - mr1
+            structural_changes["max_row"] = {
+                "sheet1": mr1,
+                "sheet2": mr2,
+                "difference": mr2 - mr1,
             }
 
         if mc1 != mc2:
-            structural_changes['max_column'] = {
-                'sheet1': mc1,
-                'sheet2': mc2,
-                'difference': mc2 - mc1
+            structural_changes["max_column"] = {
+                "sheet1": mc1,
+                "sheet2": mc2,
+                "difference": mc2 - mc1,
             }
 
         return structural_changes
 
     def _generate_comparison_summary(
         self,
-        sheet_comparisons: List[SheetComparison],
-        structural_differences: Dict[str, Any],
-        total_differences: int
+        sheet_comparisons: list[SheetComparison],
+        structural_differences: dict[str, Any],
+        total_differences: int,
     ) -> str:
         """生成比较结果摘要"""
         if total_differences == 0 and len(structural_differences) == 0:
@@ -459,19 +448,19 @@ class ExcelComparer:
         if total_differences > 0:
             summary_parts.append(f"发现 {total_differences} 处数据差异")
 
-        if 'sheet_count' in structural_differences:
-            sheet_diff = structural_differences['sheet_count']['difference']
+        if "sheet_count" in structural_differences:
+            sheet_diff = structural_differences["sheet_count"]["difference"]
             if sheet_diff > 0:
                 summary_parts.append(f"增加了 {sheet_diff} 个工作表")
             else:
                 summary_parts.append(f"减少了 {abs(sheet_diff)} 个工作表")
 
-        if 'added_sheets' in structural_differences:
-            added = len(structural_differences['added_sheets'])
+        if "added_sheets" in structural_differences:
+            added = len(structural_differences["added_sheets"])
             summary_parts.append(f"新增 {added} 个工作表")
 
-        if 'removed_sheets' in structural_differences:
-            removed = len(structural_differences['removed_sheets'])
+        if "removed_sheets" in structural_differences:
+            removed = len(structural_differences["removed_sheets"])
             summary_parts.append(f"删除 {removed} 个工作表")
 
         # 统计有差异的工作表
@@ -482,12 +471,7 @@ class ExcelComparer:
         return "；".join(summary_parts)
 
     # --- 结构化数据比较（旧版） ---
-    def _compare_structured_data_old(
-        self,
-        sheet1,
-        sheet2,
-        options: ComparisonOptions
-    ) -> StructuredSheetComparison:
+    def _compare_structured_data_old(self, sheet1, sheet2, options: ComparisonOptions) -> StructuredSheetComparison:
         """比较结构化数据（表格化数据）"""
         # 提取表头
         headers1 = self._extract_headers(sheet1, options.header_row)
@@ -501,7 +485,7 @@ class ExcelComparer:
         data_rows2 = self._extract_data_rows(sheet2, options.header_row, headers2, options.id_column)
 
         # 比较数据行，传入工作表名称
-        sheet_name = getattr(sheet1, 'title', 'Unknown')
+        sheet_name = getattr(sheet1, "title", "Unknown")
         row_differences = self._compare_data_rows(data_rows1, data_rows2, headers1, headers2, options, sheet_name)
 
         # 统计差异（不再预计算统计信息，减少冗余）
@@ -515,12 +499,12 @@ class ExcelComparer:
             headers2=headers2,
             header_differences=header_differences,
             row_differences=row_differences,
-            total_differences=total_differences
+            total_differences=total_differences,
             # 已移除冗余统计字段：identical_rows, modified_rows, added_rows, removed_rows
             # 客户端可以从 row_differences 按需计算这些统计信息
         )
 
-    def _extract_headers(self, sheet, header_row: int) -> List[str]:
+    def _extract_headers(self, sheet, header_row: int) -> list[str]:
         """从工作表中提取表头"""
         headers = []
         for col in range(1, (sheet.max_column or 0) + 1):
@@ -531,7 +515,7 @@ class ExcelComparer:
                 headers.append(f"Column{col}")  # 为空表头生成默认名称
         return headers
 
-    def _extract_data_rows(self, sheet, header_row: int, headers: List[str], id_column) -> Dict[Any, Dict]:
+    def _extract_data_rows(self, sheet, header_row: int, headers: list[str], id_column) -> dict[Any, dict]:
         """从工作表中提取数据行，以ID为键"""
         data_rows = {}
 
@@ -558,14 +542,11 @@ class ExcelComparer:
 
             # 检查是否为空行
             if not self._is_empty_row(row_data):
-                data_rows[row_id] = {
-                    'data': row_data,
-                    'row_index': row_num
-                }
+                data_rows[row_id] = {"data": row_data, "row_index": row_num}
 
         return data_rows
 
-    def _get_id_column_index(self, id_column, headers: List[str]) -> Optional[int]:
+    def _get_id_column_index(self, id_column, headers: list[str]) -> int | None:
         """获取ID列的索引"""
         if id_column is None:
             return None
@@ -582,7 +563,7 @@ class ExcelComparer:
 
         return None
 
-    def _compare_headers(self, headers1: List[str], headers2: List[str]) -> List[str]:
+    def _compare_headers(self, headers1: list[str], headers2: list[str]) -> list[str]:
         """比较表头差异"""
         differences = []
 
@@ -597,19 +578,19 @@ class ExcelComparer:
             header2 = headers2[i] if i < len(headers2) else None
 
             if header1 != header2:
-                differences.append(f"列{i+1}: '{header1}' vs '{header2}'")
+                differences.append(f"列{i + 1}: '{header1}' vs '{header2}'")
 
         return differences
 
     def _compare_data_rows(
         self,
-        data_rows1: Dict,
-        data_rows2: Dict,
-        headers1: List[str],
-        headers2: List[str],
+        data_rows1: dict,
+        data_rows2: dict,
+        headers1: list[str],
+        headers2: list[str],
         options: ComparisonOptions,
-        sheet_name: str
-    ) -> List[RowDifference]:
+        sheet_name: str,
+    ) -> list[RowDifference]:
         """比较数据行（ID对象变化优化版）"""
         differences = []
 
@@ -622,51 +603,55 @@ class ExcelComparer:
 
             if row1 and row2:
                 # 两个文件都有这一行，比较内容
-                changed_differences, unchanged_differences = self._compare_row_data_detailed(
-                    row1['data'], row2['data'], headers1, headers2, options
-                )
+                changed_differences, unchanged_differences = self._compare_row_data_detailed(row1["data"], row2["data"], headers1, headers2, options)
 
                 if changed_differences:
-                    differences.append(RowDifference(
-                        row_id=row_id,
-                        difference_type=DifferenceType.ROW_MODIFIED,
-                        row_index1=row1['row_index'],
-                        row_index2=row2['row_index'],
-                        sheet_name=sheet_name,
-                        detailed_field_differences=changed_differences,
-                        unchanged_field_differences=unchanged_differences
-                    ))
+                    differences.append(
+                        RowDifference(
+                            row_id=row_id,
+                            difference_type=DifferenceType.ROW_MODIFIED,
+                            row_index1=row1["row_index"],
+                            row_index2=row2["row_index"],
+                            sheet_name=sheet_name,
+                            detailed_field_differences=changed_differences,
+                            unchanged_field_differences=unchanged_differences,
+                        )
+                    )
 
             elif row1 and not row2:
                 # 第二个文件中没有这一行
-                differences.append(RowDifference(
-                    row_id=row_id,
-                    difference_type=DifferenceType.ROW_REMOVED,
-                    row_index1=row1['row_index'],
-                    row_index2=0,  # 不存在于第二个文件，使用0表示
-                    sheet_name=sheet_name
-                ))
+                differences.append(
+                    RowDifference(
+                        row_id=row_id,
+                        difference_type=DifferenceType.ROW_REMOVED,
+                        row_index1=row1["row_index"],
+                        row_index2=0,  # 不存在于第二个文件，使用0表示
+                        sheet_name=sheet_name,
+                    )
+                )
 
             elif not row1 and row2:
                 # 第一个文件中没有这一行
-                differences.append(RowDifference(
-                    row_id=row_id,
-                    difference_type=DifferenceType.ROW_ADDED,
-                    row_index1=0,  # 不存在于第一个文件，使用0表示
-                    row_index2=row2['row_index'],
-                    sheet_name=sheet_name
-                ))
+                differences.append(
+                    RowDifference(
+                        row_id=row_id,
+                        difference_type=DifferenceType.ROW_ADDED,
+                        row_index1=0,  # 不存在于第一个文件，使用0表示
+                        row_index2=row2["row_index"],
+                        sheet_name=sheet_name,
+                    )
+                )
 
         return differences
 
     def _compare_row_data_detailed(
         self,
-        row_data1: Dict,
-        row_data2: Dict,
-        headers1: List[str],
-        headers2: List[str],
-        options: ComparisonOptions
-    ) -> tuple[List[FieldDifference], List[FieldDifference]]:
+        row_data1: dict,
+        row_data2: dict,
+        headers1: list[str],
+        headers2: list[str],
+        options: ComparisonOptions,
+    ) -> tuple[list[FieldDifference], list[FieldDifference]]:
         """比较行数据，返回详细格式的差异和未变化字段（精简版 - 去除字符串格式冗余）"""
         changed_differences = []
         unchanged_differences = []
@@ -703,7 +688,7 @@ class ExcelComparer:
                     field_name=field,
                     old_value=value1,
                     new_value=value1,  # 未变化，所以新旧值相同
-                    change_type="unchanged"
+                    change_type="unchanged",
                 )
                 unchanged_differences.append(unchanged_diff)
 
@@ -714,7 +699,7 @@ class ExcelComparer:
         field_name: str,
         old_value: Any,
         new_value: Any,
-        options: ComparisonOptions
+        options: ComparisonOptions,
     ) -> FieldDifference:
         """创建精简的字段差异对象（去除计算冗余）"""
         # 确定变化类型
@@ -732,7 +717,7 @@ class ExcelComparer:
             field_name=field_name,
             old_value=old_value,
             new_value=new_value,
-            change_type=change_type
+            change_type=change_type,
         )
 
     def _create_field_difference(
@@ -740,7 +725,7 @@ class ExcelComparer:
         field_name: str,
         old_value: Any,
         new_value: Any,
-        options: ComparisonOptions
+        options: ComparisonOptions,
     ) -> FieldDifference:
         """创建详细的字段差异对象（已弃用 - 使用精简版）"""
         # 重定向到精简版本
@@ -748,12 +733,12 @@ class ExcelComparer:
 
     def _compare_row_data(
         self,
-        row_data1: Dict,
-        row_data2: Dict,
-        headers1: List[str],
-        headers2: List[str],
-        options: ComparisonOptions
-    ) -> List[str]:
+        row_data1: dict,
+        row_data2: dict,
+        headers1: list[str],
+        headers2: list[str],
+        options: ComparisonOptions,
+    ) -> list[str]:
         """比较单行数据的字段差异（游戏开发友好版，简化返回）- 已弃用，保留兼容性"""
         # 获取详细差异并转换为字符串格式（为了保持向后兼容性）
         detailed_differences = self._compare_row_data_detailed(row_data1, row_data2, headers1, headers2, options)
@@ -791,7 +776,7 @@ class ExcelComparer:
             else:
                 return f"{field}: '{old_value}' → '{new_value}'"
 
-    def _try_parse_number(self, value: Any) -> Optional[float]:
+    def _try_parse_number(self, value: Any) -> float | None:
         """尝试将值解析为数字"""
         if isinstance(value, (int, float)):
             return float(value)
@@ -799,7 +784,7 @@ class ExcelComparer:
         if isinstance(value, str):
             try:
                 # 移除可能的单位符号和空格
-                clean_value = value.strip().replace('%', '').replace(',', '')
+                clean_value = value.strip().replace("%", "").replace(",", "")
                 return float(clean_value)
             except ValueError:
                 pass
@@ -809,14 +794,29 @@ class ExcelComparer:
     def _is_game_config_field(self, field: str) -> bool:
         """判断是否是常见的游戏配置字段"""
         game_fields = {
-            '名称', 'name', '技能名', '装备名', '道具名', '怪物名',
-            '描述', 'description', 'desc', '说明',
-            '品质', 'quality', '等级', 'level', 'lv',
-            '类型', 'type', '分类', 'category'
+            "名称",
+            "name",
+            "技能名",
+            "装备名",
+            "道具名",
+            "怪物名",
+            "描述",
+            "description",
+            "desc",
+            "说明",
+            "品质",
+            "quality",
+            "等级",
+            "level",
+            "lv",
+            "类型",
+            "type",
+            "分类",
+            "category",
         }
         return field.lower() in [f.lower() for f in game_fields]
 
-    def _extract_object_name(self, row_data: Dict[str, Any], headers: List[str]) -> str:
+    def _extract_object_name(self, row_data: dict[str, Any], headers: list[str]) -> str:
         """从行数据中提取对象名称"""
         # 特殊处理：如果是表头行（ID行），返回专门的标识
         first_col_value = row_data.get(headers[0]) if headers else None
@@ -824,7 +824,17 @@ class ExcelComparer:
             return "表头定义"
 
         # 常见的名称字段
-        name_fields = ['名称', 'name', '技能名', '装备名', '道具名', '怪物名', '称号', 'title', '备注']
+        name_fields = [
+            "名称",
+            "name",
+            "技能名",
+            "装备名",
+            "道具名",
+            "怪物名",
+            "称号",
+            "title",
+            "备注",
+        ]
 
         # 优先查找专门的名称字段
         for header in headers:
@@ -845,8 +855,8 @@ class ExcelComparer:
         self,
         row_id: Any,
         object_name: str,
-        detailed_differences: List[FieldDifference],
-        game_friendly: bool
+        detailed_differences: list[FieldDifference],
+        game_friendly: bool,
     ) -> str:
         """从详细差异生成ID对象的变化摘要（精简版）"""
         if not game_friendly:
@@ -863,7 +873,7 @@ class ExcelComparer:
 
             # 按行显示变化，每行最多2个
             for i in range(0, len(detailed_differences), 2):
-                line_diffs = detailed_differences[i:i+2]
+                line_diffs = detailed_differences[i : i + 2]
                 formatted_diffs = [self._format_field_difference_for_summary(d) for d in line_diffs]
                 summary += f"\n   • {' | '.join(formatted_diffs)}"
 
@@ -897,8 +907,8 @@ class ExcelComparer:
         self,
         row_id: Any,
         object_name: str,
-        field_differences: List[str],
-        game_friendly: bool
+        field_differences: list[str],
+        game_friendly: bool,
     ) -> str:
         """生成ID对象的变化摘要（已弃用 - 保留兼容性）"""
         if not game_friendly:
@@ -913,11 +923,11 @@ class ExcelComparer:
 
             # 将所有变化按行显示，每行最多显示2个变化以保持可读性
             for i in range(0, len(field_differences), 2):
-                line_changes = field_differences[i:i+2]
+                line_changes = field_differences[i : i + 2]
                 summary += f"\n   • {' | '.join(line_changes)}"
 
             return summary
 
-    def _is_empty_row(self, row_data: Dict) -> bool:
+    def _is_empty_row(self, row_data: dict) -> bool:
         """检查行是否为空"""
         return all(value is None or value == "" for value in row_data.values())

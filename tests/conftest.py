@@ -2,15 +2,17 @@
 Test configuration and fixtures for Excel MCP Server tests
 """
 
-import pytest
-import tempfile
-import shutil
-import uuid
-import time
 import logging
+import shutil
+import tempfile
+import time
+import uuid
 from pathlib import Path
+
+import pytest
 from openpyxl import Workbook
-from openpyxl.styles import Font, PatternFill, Alignment
+from openpyxl.styles import Alignment, Font, PatternFill
+
 
 # 注册自定义标记（消除 PytestUnknownMarkWarning）
 def pytest_configure(config):
@@ -25,8 +27,9 @@ def pytest_configure(config):
     config.addinivalue_line("markers", "xdist_group: pytest-xdist 并行分组")
     config.addinivalue_line("markers", "timeout: 超时限制")
 
+
 # Set up logging to suppress warnings
-logging.getLogger('openpyxl').setLevel(logging.ERROR)
+logging.getLogger("openpyxl").setLevel(logging.ERROR)
 
 
 @pytest.fixture(autouse=True)
@@ -34,6 +37,7 @@ def clear_sql_engine_cache():
     """在每个测试之前清除SQL引擎缓存，避免并行测试时的缓存污染"""
     try:
         from excel_mcp_server_fastmcp.api.advanced_sql_query import _get_engine
+
         engine = _get_engine()
         engine.clear_cache()
     except ImportError:
@@ -89,6 +93,7 @@ def temp_dir():
     finally:
         # Ensure all Excel file handles are closed by forcing garbage collection
         import gc
+
         gc.collect()
         safe_rmtree(temp_path)
 
@@ -100,15 +105,15 @@ def temp_dir_with_excel_files(temp_dir):
     for i in range(3):
         wb = Workbook()
         ws = wb.active
-        ws.title = f"Sheet{i+1}"
+        ws.title = f"Sheet{i + 1}"
 
         # Add some test data
-        ws['A1'] = f"标题{i+1}"
-        ws['B1'] = f"数据{i+1}"
-        ws['A2'] = f"内容{i+1}"
-        ws['B2'] = i * 100
+        ws["A1"] = f"标题{i + 1}"
+        ws["B1"] = f"数据{i + 1}"
+        ws["A2"] = f"内容{i + 1}"
+        ws["B2"] = i * 100
 
-        file_path = temp_dir / f"test_file_{i+1}.xlsx"
+        file_path = temp_dir / f"test_file_{i + 1}.xlsx"
         wb.save(str(file_path))
 
     yield str(temp_dir)
@@ -136,7 +141,7 @@ def sample_excel_file(temp_dir, request):
         ["张三", 25, "技术部", 8000],
         ["李四", 30, "市场部", 9000],
         ["王五", 28, "技术部", 8500],
-        ["赵六", 35, "人事部", 9500]
+        ["赵六", 35, "人事部", 9500],
     ]
 
     for row in data:
@@ -157,8 +162,8 @@ def sample_excel_file(temp_dir, request):
     # Create second sheet with dual header format
     ws2 = wb.create_sheet("Sheet2")
     ws2.append(["产品描述", "销量描述", "单价描述"])  # Row 1: descriptions
-    ws2.append(["product", "sales", "price"])      # Row 2: field_names
-    ws2.append(["A", 100, 50])                    # Row 3+: actual data
+    ws2.append(["product", "sales", "price"])  # Row 2: field_names
+    ws2.append(["A", 100, 50])  # Row 3+: actual data
     ws2.append(["B", 200, 30])
 
     wb.save(file_path)
@@ -196,9 +201,9 @@ def multi_sheet_excel_file(temp_dir, request):
     sheet_names = ["数据", "图表", "汇总", "分析"]
     for name in sheet_names:
         ws = wb.create_sheet(name)
-        ws.append(["测试数据描述", "值描述"])   # Row 1: descriptions
-        ws.append(["test_data", "value"])    # Row 2: field_names
-        ws.append(["项目1", 100])            # Row 3+: actual data
+        ws.append(["测试数据描述", "值描述"])  # Row 1: descriptions
+        ws.append(["test_data", "value"])  # Row 2: field_names
+        ws.append(["项目1", 100])  # Row 3+: actual data
         ws.append(["项目2", 200])
 
     wb.save(file_path)
@@ -219,7 +224,7 @@ def formula_excel_file(temp_dir):
         ["数值A", "数值B", "和", "积", "平均"],
         [10, 20, "=A2+B2", "=A2*B2", "=AVERAGE(A2:B2)"],
         [30, 40, "=A3+B3", "=A3*B3", "=AVERAGE(A3:B3)"],
-        [50, 60, "=A4+B4", "=A4*B4", "=AVERAGE(A4:B4)"]
+        [50, 60, "=A4+B4", "=A4*B4", "=AVERAGE(A4:B4)"],
     ]
 
     for row in data:

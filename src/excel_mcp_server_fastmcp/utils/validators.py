@@ -6,15 +6,20 @@ Excel MCP Server - 验证工具
 
 import re
 from pathlib import Path
-from typing import Optional, Tuple, Dict, Any
+from typing import Any
 
-from .exceptions import ExcelFileNotFoundError, InvalidFormatError, DataValidationError, OperationLimitError
+from .exceptions import (
+    DataValidationError,
+    ExcelFileNotFoundError,
+    InvalidFormatError,
+    OperationLimitError,
+)
 
 
 class ExcelValidator:
     """Excel操作验证器"""
 
-    SUPPORTED_FORMATS = ['.xlsx', '.xlsm', '.xls']
+    SUPPORTED_FORMATS = [".xlsx", ".xlsm", ".xls"]
     MAX_ROWS_OPERATION = 1000
     MAX_COLUMNS_OPERATION = 100
 
@@ -43,7 +48,7 @@ class ExcelValidator:
         return str(path.absolute())
 
     @classmethod
-    def validate_sheet_name(cls, sheet_name: Optional[str]) -> None:
+    def validate_sheet_name(cls, sheet_name: str | None) -> None:
         """
         验证工作表名称
 
@@ -57,7 +62,7 @@ class ExcelValidator:
             raise DataValidationError(
                 "工作表名称不能为空",
                 "工作表名称不能为空白字符串",
-                "请提供有效的工作表名称"
+                "请提供有效的工作表名称",
             )
 
     @classmethod
@@ -76,19 +81,19 @@ class ExcelValidator:
             raise DataValidationError(
                 "行索引无效",
                 "行索引必须为正整数",
-                "请使用1开始的行号（如第1行、第2行等），不要使用0或负数"
+                "请使用1开始的行号（如第1行、第2行等），不要使用0或负数",
             )
         if count < 1:
             raise DataValidationError(
                 "操作行数无效",
                 "操作行数必须为正整数",
-                "请指定要操作的正数行数（如插入1行、删除5行等）"
+                "请指定要操作的正数行数（如插入1行、删除5行等）",
             )
         if count > cls.MAX_ROWS_OPERATION:
             raise OperationLimitError(
-                "批量行操作", 
+                "批量行操作",
                 f"单次最多{cls.MAX_ROWS_OPERATION}行",
-                f"建议分批操作，例如每次{cls.MAX_ROWS_OPERATION}行，或减少单次操作的规模"
+                f"建议分批操作，例如每次{cls.MAX_ROWS_OPERATION}行，或减少单次操作的规模",
             )
 
     @classmethod
@@ -107,19 +112,19 @@ class ExcelValidator:
             raise DataValidationError(
                 "列索引无效",
                 "列索引必须为正整数",
-                "请使用1开始的列号（如第1列A、第2列B等），或使用列字母（如'A', 'B'）"
+                "请使用1开始的列号（如第1列A、第2列B等），或使用列字母（如'A', 'B'）",
             )
         if count < 1:
             raise DataValidationError(
                 "操作列数无效",
                 "操作列数必须为正整数",
-                "请指定要操作的正数列数（如插入1列、删除3列等）"
+                "请指定要操作的正数列数（如插入1列、删除3列等）",
             )
         if count > cls.MAX_COLUMNS_OPERATION:
             raise OperationLimitError(
-                "批量列操作", 
+                "批量列操作",
                 f"单次最多{cls.MAX_COLUMNS_OPERATION}列",
-                f"建议分批操作，例如每次{cls.MAX_COLUMNS_OPERATION}列，或减少单次操作的规模"
+                f"建议分批操作，例如每次{cls.MAX_COLUMNS_OPERATION}列，或减少单次操作的规模",
             )
 
     @classmethod
@@ -137,17 +142,17 @@ class ExcelValidator:
         """
         if len(data) > range_rows:
             raise DataValidationError(
-                f"数据行数超出范围", 
+                "数据行数超出范围",
                 f"数据有{len(data)}行，但目标范围只有{range_rows}行",
-                f"请调整数据行数到{range_rows}行以内，或扩大目标范围（如将A1:C10改为A1:C{len(data)}）"
+                f"请调整数据行数到{range_rows}行以内，或扩大目标范围（如将A1:C10改为A1:C{len(data)}）",
             )
 
         for row_idx, row_data in enumerate(data):
             if len(row_data) > range_cols:
                 raise DataValidationError(
-                    f"第{row_idx + 1}行数据列数超出范围", 
+                    f"第{row_idx + 1}行数据列数超出范围",
                     f"该行有{len(row_data)}列数据，但目标范围只有{range_cols}列",
-                    f"请检查第{row_idx + 1}行的数据，确保列数不超过{range_cols}列，或扩大目标范围"
+                    f"请检查第{row_idx + 1}行的数据，确保列数不超过{range_cols}列，或扩大目标范围",
                 )
 
     @classmethod
@@ -169,50 +174,49 @@ class ExcelValidator:
         """
         import os
         import platform
-        
+
         if not file_path or not isinstance(file_path, str):
             raise DataValidationError("文件路径不能为空且必须是字符串")
-        
+
         # 检查路径是否包含空字符
-        if '\x00' in file_path:
+        if "\x00" in file_path:
             raise DataValidationError("文件路径包含无效字符（空字符）")
-        
+
         # 在Unix系统上检测Windows风格的路径（包含驱动器号如 Z:\）
         system = platform.system()
-        if system != 'Windows':
+        if system != "Windows":
             # 检查Windows绝对路径模式 (如 Z:\, C:\, \\server\share)
-            if len(file_path) >= 2 and file_path[1] == ':':
+            if len(file_path) >= 2 and file_path[1] == ":":
                 raise DataValidationError(f"无效的Unix路径（包含Windows驱动器号）: {file_path}")
-            if file_path.startswith('\\\\'):
+            if file_path.startswith("\\\\"):
                 raise DataValidationError(f"无效的Unix路径（包含UNC路径）: {file_path}")
-        
+
         path = Path(file_path)
-        
+
         # 检查文件名部分是否有效（不能是保留名、不能包含无效字符等）
         file_name = path.name
         if not file_name:
             raise DataValidationError(f"无效的文件路径（缺少文件名）: {file_path}")
-        
+
         # 检查Windows保留文件名（即使在Unix上也拒绝，以保持跨平台兼容）
         import re
-        windows_reserved = re.compile(r'^(CON|PRN|AUX|NUL|COM[1-9]|LPT[1-9])(\.|$)', re.IGNORECASE)
+
+        windows_reserved = re.compile(r"^(CON|PRN|AUX|NUL|COM[1-9]|LPT[1-9])(\.|$)", re.IGNORECASE)
         name_without_ext = Path(file_name).stem
         if windows_reserved.match(name_without_ext):
             raise DataValidationError(f"文件名是Windows系统保留名: {file_name}")
-        
+
         # 检查文件名中的无效字符
         invalid_chars = '<>:"/\\|?*'
         for char in invalid_chars:
             if char in file_name:
                 raise DataValidationError(f"文件名包含无效字符 '{char}': {file_name}")
-        
+
         if path.exists() and not overwrite:
             raise FileExistsError(f"文件已存在: {file_path}")
 
-        if path.suffix.lower() not in ['.xlsx', '.xlsm']:
-            raise InvalidFormatError(
-                f"不支持的文件格式: {path.suffix}，请使用 .xlsx 或 .xlsm"
-            )
+        if path.suffix.lower() not in [".xlsx", ".xlsm"]:
+            raise InvalidFormatError(f"不支持的文件格式: {path.suffix}，请使用 .xlsx 或 .xlsm")
 
         # 验证父目录是否可写（如果父目录存在）
         parent = path.parent
@@ -232,7 +236,7 @@ class ExcelValidator:
         return str(path.absolute())
 
     @classmethod
-    def validate_range_expression(cls, range_expr: str) -> Dict[str, Any]:
+    def validate_range_expression(cls, range_expr: str) -> dict[str, Any]:
         """
         严格验证范围表达式格式
 
@@ -251,17 +255,13 @@ class ExcelValidator:
         range_expr = range_expr.strip()
 
         # 检查是否包含工作表名（必须包含感叹号）
-        if '!' not in range_expr:
-            raise DataValidationError(
-                f"范围表达式必须包含工作表名和感叹号，格式示例: 'Sheet1!A1:C10'，当前: '{range_expr}'"
-            )
+        if "!" not in range_expr:
+            raise DataValidationError(f"范围表达式必须包含工作表名和感叹号，格式示例: 'Sheet1!A1:C10'，当前: '{range_expr}'")
 
         # 分离工作表名和范围
-        parts = range_expr.split('!', 1)
+        parts = range_expr.split("!", 1)
         if len(parts) != 2:
-            raise DataValidationError(
-                f"范围表达式格式错误，应该只有一个感叹号，当前: '{range_expr}'"
-            )
+            raise DataValidationError(f"范围表达式格式错误，应该只有一个感叹号，当前: '{range_expr}'")
 
         sheet_name = parts[0].strip()
         range_part = parts[1].strip()
@@ -271,7 +271,7 @@ class ExcelValidator:
             raise DataValidationError("工作表名不能为空")
 
         # 检查工作表名中的无效字符
-        invalid_chars = ['[', ']', '*', ':', '?', '/', '\\']
+        invalid_chars = ["[", "]", "*", ":", "?", "/", "\\"]
         for char in invalid_chars:
             if char in sheet_name:
                 raise DataValidationError(f"工作表名包含无效字符: '{char}'")
@@ -288,15 +288,15 @@ class ExcelValidator:
         range_info = cls._parse_range_part(range_part)
 
         return {
-            'success': True,
-            'sheet_name': sheet_name,
-            'range_part': range_part,
-            'range_info': range_info,
-            'normalized_range': f"{sheet_name}!{range_part}"
+            "success": True,
+            "sheet_name": sheet_name,
+            "range_part": range_part,
+            "range_info": range_info,
+            "normalized_range": f"{sheet_name}!{range_part}",
         }
 
     @classmethod
-    def _parse_range_part(cls, range_part: str) -> Dict[str, Any]:
+    def _parse_range_part(cls, range_part: str) -> dict[str, Any]:
         """
         解析范围部分，支持多种格式
 
@@ -307,71 +307,65 @@ class ExcelValidator:
             范围解析信息
         """
         # 标准单元格范围: A1:C10
-        range_pattern = r'^([A-Z]+[0-9]+):([A-Z]+[0-9]+)$'
+        range_pattern = r"^([A-Z]+[0-9]+):([A-Z]+[0-9]+)$"
         match = re.match(range_pattern, range_part.upper())
         if match:
             start_cell, end_cell = match.groups()
             return {
-                'type': 'cell_range',
-                'start_cell': start_cell,
-                'end_cell': end_cell,
-                'start_col': cls._col_to_num(re.match(r'^([A-Z]+)', start_cell).group(1)),
-                'start_row': int(re.match(r'[A-Z]+([0-9]+)$', start_cell).group(1)),
-                'end_col': cls._col_to_num(re.match(r'^([A-Z]+)', end_cell).group(1)),
-                'end_row': int(re.match(r'[A-Z]+([0-9]+)$', end_cell).group(1))
+                "type": "cell_range",
+                "start_cell": start_cell,
+                "end_cell": end_cell,
+                "start_col": cls._col_to_num(re.match(r"^([A-Z]+)", start_cell).group(1)),
+                "start_row": int(re.match(r"[A-Z]+([0-9]+)$", start_cell).group(1)),
+                "end_col": cls._col_to_num(re.match(r"^([A-Z]+)", end_cell).group(1)),
+                "end_row": int(re.match(r"[A-Z]+([0-9]+)$", end_cell).group(1)),
             }
 
         # 行范围: 1:10 或 5:5
-        row_range_pattern = r'^([0-9]+):([0-9]+)$'
+        row_range_pattern = r"^([0-9]+):([0-9]+)$"
         match = re.match(row_range_pattern, range_part)
         if match:
             start_row, end_row = match.groups()
             return {
-                'type': 'row_range',
-                'start_row': int(start_row),
-                'end_row': int(end_row)
+                "type": "row_range",
+                "start_row": int(start_row),
+                "end_row": int(end_row),
             }
 
         # 列范围: A:C
-        col_range_pattern = r'^([A-Z]+):([A-Z]+)$'
+        col_range_pattern = r"^([A-Z]+):([A-Z]+)$"
         match = re.match(col_range_pattern, range_part.upper())
         if match:
             start_col, end_col = match.groups()
             return {
-                'type': 'column_range',
-                'start_col': cls._col_to_num(start_col),
-                'end_col': cls._col_to_num(end_col)
+                "type": "column_range",
+                "start_col": cls._col_to_num(start_col),
+                "end_col": cls._col_to_num(end_col),
             }
 
         # 单行: 5
-        single_row_pattern = r'^([0-9]+)$'
+        single_row_pattern = r"^([0-9]+)$"
         match = re.match(single_row_pattern, range_part)
         if match:
             row = match.group(1)
-            return {
-                'type': 'single_row',
-                'row': int(row)
-            }
+            return {"type": "single_row", "row": int(row)}
 
         # 单列: A
-        single_col_pattern = r'^([A-Z]+)$'
+        single_col_pattern = r"^([A-Z]+)$"
         match = re.match(single_col_pattern, range_part.upper())
         if match:
             col = match.group(1)
-            return {
-                'type': 'single_column',
-                'column': cls._col_to_num(col)
-            }
+            return {"type": "single_column", "column": cls._col_to_num(col)}
 
         # 单个单元格: A1
-        single_cell_pattern = r'^([A-Z]+[0-9]+)$'
+        single_cell_pattern = r"^([A-Z]+[0-9]+)$"
         match = re.match(single_cell_pattern, range_part.upper())
         if match:
             cell = match.group(1)
             return {
-                'type': 'single_cell',
-                'column': cls._col_to_num(re.match(r'^([A-Z]+)', cell).group(1)),
-                'row': int(re.match(r'[A-Z]+([0-9]+)$', cell).group(1))
+                "type": "single_cell",
+                "column": cls._col_to_num(re.match(r"^([A-Z]+)", cell).group(1)),
+                "row": int(re.match(r"[A-Z]+([0-9]+)$", cell).group(1)),
             }
 
         # 如果没有匹配任何已知格式，抛出异常
@@ -390,11 +384,11 @@ class ExcelValidator:
         """
         result = 0
         for i, char in enumerate(col):
-            result = result * 26 + (ord(char.upper()) - ord('A') + 1)
+            result = result * 26 + (ord(char.upper()) - ord("A") + 1)
         return result
 
     @classmethod
-    def validate_operation_scale(cls, range_info: Dict[str, Any]) -> Dict[str, Any]:
+    def validate_operation_scale(cls, range_info: dict[str, Any]) -> dict[str, Any]:
         """
         验证操作规模，防止过大的操作影响性能
 
@@ -404,20 +398,20 @@ class ExcelValidator:
         Returns:
             规模评估结果
         """
-        if 'start_row' in range_info and 'end_row' in range_info:
-            rows = range_info['end_row'] - range_info['start_row'] + 1
-        elif 'row' in range_info:
+        if "start_row" in range_info and "end_row" in range_info:
+            rows = range_info["end_row"] - range_info["start_row"] + 1
+        elif "row" in range_info:
             rows = 1
-        elif 'start_row' in range_info:
+        elif "start_row" in range_info:
             rows = 1
         else:
             rows = 1
 
-        if 'start_col' in range_info and 'end_col' in range_info:
-            cols = range_info['end_col'] - range_info['start_col'] + 1
-        elif 'column' in range_info:
+        if "start_col" in range_info and "end_col" in range_info:
+            cols = range_info["end_col"] - range_info["start_col"] + 1
+        elif "column" in range_info:
             cols = 1
-        elif 'start_col' in range_info:
+        elif "start_col" in range_info:
             cols = 1
         else:
             cols = 1
@@ -437,26 +431,27 @@ class ExcelValidator:
 
         # 检查是否超过限制
         if rows > cls.MAX_ROWS_OPERATION:
-            raise DataValidationError(
-                f"操作行数({rows})超过限制({cls.MAX_ROWS_OPERATION})"
-            )
+            raise DataValidationError(f"操作行数({rows})超过限制({cls.MAX_ROWS_OPERATION})")
 
         if cols > cls.MAX_COLUMNS_OPERATION:
-            raise DataValidationError(
-                f"操作列数({cols})超过限制({cls.MAX_COLUMNS_OPERATION})"
-            )
+            raise DataValidationError(f"操作列数({cols})超过限制({cls.MAX_COLUMNS_OPERATION})")
 
         return {
-            'rows': rows,
-            'columns': cols,
-            'total_cells': total_cells,
-            'risk_level': risk_level,
-            'warning': warning,
-            'within_limits': True
+            "rows": rows,
+            "columns": cols,
+            "total_cells": total_cells,
+            "risk_level": risk_level,
+            "warning": warning,
+            "within_limits": True,
         }
 
     @staticmethod
-    def get_workbook_and_sheet(file_path: str, sheet_name: str = None, read_only: bool = False, data_only: bool = False):
+    def get_workbook_and_sheet(
+        file_path: str,
+        sheet_name: str = None,
+        read_only: bool = False,
+        data_only: bool = False,
+    ):
         """加载 workbook 并获取指定的工作表
 
         Args:
@@ -482,7 +477,7 @@ class ExcelValidator:
                 raise DataValidationError(
                     f"工作表 '{sheet_name}' 不存在",
                     f"可用工作表: {', '.join(wb.sheetnames)}",
-                    "请使用正确的工作表名称"
+                    "请使用正确的工作表名称",
                 )
             ws = wb[sheet_name]
         else:

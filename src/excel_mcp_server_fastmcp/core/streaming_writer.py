@@ -11,18 +11,19 @@ copy-modify-write 方案：用 calamine 读取 + write_only 模式写入，
 
 import logging
 import os
-import re
 import shutil
 import tempfile
-from typing import List, Dict, Any, Optional, Tuple, Callable
+from collections.abc import Callable
+from typing import Any
 
 from openpyxl import Workbook, load_workbook
-from openpyxl.utils import get_column_letter, column_index_from_string
+from openpyxl.utils import get_column_letter
 
 logger = logging.getLogger(__name__)
 
 try:
     from python_calamine import CalamineWorkbook
+
     _HAS_CALAMINE = True
 except ImportError:
     _HAS_CALAMINE = False
@@ -49,10 +50,10 @@ class StreamingWriter:
         cls,
         file_path: str,
         sheet_name: str,
-        data: List[Dict[str, Any]],
+        data: list[dict[str, Any]],
         header_row: int = 1,
         preserve_col_widths: bool = True,
-    ) -> Tuple[bool, str, Dict[str, Any]]:
+    ) -> tuple[bool, str, dict[str, Any]]:
         """流式批量插入行（calamine读取 + write_only写入）
 
         Args:
@@ -97,18 +98,12 @@ class StreamingWriter:
                         # 检测双行表头：第1行中文描述 + 第2行英文字段名
                         _is_dual = False
                         if header_row < len(rows):
-                            _row1 = [str(v).strip() if v is not None else '' for v in rows[header_row - 1]]
-                            _row2 = [str(v).strip() if v is not None else '' for v in rows[header_row]]
+                            _row1 = [str(v).strip() if v is not None else "" for v in rows[header_row - 1]]
+                            _row2 = [str(v).strip() if v is not None else "" for v in rows[header_row]]
                             # 第2行全是有效英文/字母开头？
-                            _r2_valid = all(
-                                v and v[0].isalpha() and v[0].isascii()
-                                for v in _row2 if v
-                            )
+                            _r2_valid = all(v and v[0].isalpha() and v[0].isascii() for v in _row2 if v)
                             # 第1行有中文？
-                            _r1_cn = any(
-                                any('\u4e00' <= ch <= '\u9fff' for ch in v)
-                                for v in _row1 if v
-                            )
+                            _r1_cn = any(any("\u4e00" <= ch <= "\u9fff" for ch in v) for v in _row1 if v)
                             _is_dual = _r2_valid and _r1_cn and len([v for v in _row2 if v]) >= 2
 
                         if _is_dual:
@@ -131,7 +126,7 @@ class StreamingWriter:
                     target_sheet_data = rows
 
             if sheet_name not in all_sheets_data:
-                available = ', '.join(all_sheets_data.keys())
+                available = ", ".join(all_sheets_data.keys())
                 return False, f"工作表不存在: {sheet_name}（可用: {available}）", {}
 
             if not col_map:
@@ -143,7 +138,11 @@ class StreamingWriter:
 
             for row_data in data:
                 if not isinstance(row_data, dict):
-                    return False, f"行数据必须是字典，实际类型: {type(row_data).__name__}", {}
+                    return (
+                        False,
+                        f"行数据必须是字典，实际类型: {type(row_data).__name__}",
+                        {},
+                    )
 
                 # 计算最大列数
                 max_col = max(col_map.values()) if col_map else 0
@@ -165,11 +164,7 @@ class StreamingWriter:
                     wb_meta = load_workbook(file_path)
                     if sheet_name in wb_meta.sheetnames:
                         ws_meta = wb_meta[sheet_name]
-                        col_widths = {
-                            col_letter: dim.width
-                            for col_letter, dim in ws_meta.column_dimensions.items()
-                            if dim.width
-                        }
+                        col_widths = {col_letter: dim.width for col_letter, dim in ws_meta.column_dimensions.items() if dim.width}
                     wb_meta.close()
                 except Exception as e:
                     logger.warning(f"读取列宽失败，跳过: {e}")
@@ -200,7 +195,7 @@ class StreamingWriter:
                     ws.append(row)
 
             # 5. 原子替换：写入临时文件 → 替换原文件
-            fd, tmp_path = tempfile.mkstemp(suffix='.xlsx', dir=os.path.dirname(file_path))
+            fd, tmp_path = tempfile.mkstemp(suffix=".xlsx", dir=os.path.dirname(file_path))
             os.close(fd)
 
             try:
@@ -217,19 +212,20 @@ class StreamingWriter:
             start_row = len(target_sheet_data) + 1
             end_row = start_row + len(data) - 1
 
-            return True, (
-                f"流式批量插入 {len(data)} 行"
-                f"（第{start_row}-{end_row}行）"
-            ), {
-                'action': 'batch_insert_streaming',
-                'start_row': start_row,
-                'end_row': end_row,
-                'inserted_count': len(data),
-                'total_rows_after': len(new_rows),
-                'unknown_columns': sorted(unknown_cols)[:5] if unknown_cols else [],
-                'mode': 'streaming',
-                'col_widths_preserved': len(col_widths) > 0,
-            }
+            return (
+                True,
+                (f"流式批量插入 {len(data)} 行（第{start_row}-{end_row}行）"),
+                {
+                    "action": "batch_insert_streaming",
+                    "start_row": start_row,
+                    "end_row": end_row,
+                    "inserted_count": len(data),
+                    "total_rows_after": len(new_rows),
+                    "unknown_columns": sorted(unknown_cols)[:5] if unknown_cols else [],
+                    "mode": "streaming",
+                    "col_widths_preserved": len(col_widths) > 0,
+                },
+            )
 
         except Exception as e:
             logger.error(f"流式批量插入失败: {e}")
@@ -242,10 +238,10 @@ class StreamingWriter:
         sheet_name: str,
         key_column: str,
         key_value: Any,
-        updates: Dict[str, Any],
+        updates: dict[str, Any],
         header_row: int = 1,
         preserve_col_widths: bool = True,
-    ) -> Tuple[bool, str, Dict[str, Any]]:
+    ) -> tuple[bool, str, dict[str, Any]]:
         """流式upsert行：按键列查找并更新/插入
 
         Args:
@@ -282,11 +278,7 @@ class StreamingWriter:
                     if _next_idx < len(rows):
                         _next_row_vals = rows[_next_idx]
                         _next_strs = [v for v in _next_row_vals if v is not None]
-                        _is_english_row = (
-                            len(_next_strs) >= 2
-                            and all(isinstance(v, str) and v.strip() and v.strip()[0].isalpha() and v.strip()[0].isascii()
-                                   for v in _next_strs)
-                        )
+                        _is_english_row = len(_next_strs) >= 2 and all(isinstance(v, str) and v.strip() and v.strip()[0].isalpha() and v.strip()[0].isascii() for v in _next_strs)
                         if _is_english_row:
                             for col_idx, val in enumerate(_next_row_vals, 1):
                                 if val is not None:
@@ -296,12 +288,16 @@ class StreamingWriter:
                     target_rows = list(rows)  # 深拷贝
 
             if sheet_name not in all_sheets_data:
-                available = ', '.join(all_sheets_data.keys())
+                available = ", ".join(all_sheets_data.keys())
                 return False, f"工作表不存在: {sheet_name}（可用: {available}）", {}
 
             if key_column not in col_map:
                 actual = list(col_map.keys())[:10]
-                return False, f"键列 '{key_column}' 不存在。实际列名: {', '.join(actual)}", {}
+                return (
+                    False,
+                    f"键列 '{key_column}' 不存在。实际列名: {', '.join(actual)}",
+                    {},
+                )
 
             key_col_idx = col_map[key_column]
 
@@ -323,7 +319,7 @@ class StreamingWriter:
                             target_row = row_num
                             break
 
-            action = 'update'
+            action = "update"
             if target_row is not None:
                 # UPDATE: 修改已有行
                 updated_cols = []
@@ -335,7 +331,7 @@ class StreamingWriter:
                         updated_cols.append(col_name_stripped)
             else:
                 # INSERT: 追加新行
-                action = 'insert'
+                action = "insert"
                 max_col = max(col_map.values()) if col_map else 0
                 new_row = [None] * max_col
                 updated_cols = []
@@ -361,11 +357,7 @@ class StreamingWriter:
                     wb_meta = load_workbook(file_path)
                     if sheet_name in wb_meta.sheetnames:
                         ws_meta = wb_meta[sheet_name]
-                        col_widths = {
-                            col_letter: dim.width
-                            for col_letter, dim in ws_meta.column_dimensions.items()
-                            if dim.width
-                        }
+                        col_widths = {col_letter: dim.width for col_letter, dim in ws_meta.column_dimensions.items() if dim.width}
                     wb_meta.close()
                 except Exception as e:
                     logger.warning(f"读取列宽失败，跳过: {e}")
@@ -386,7 +378,7 @@ class StreamingWriter:
                 for row in sheet_rows:
                     ws.append(row)
 
-            fd, tmp_path = tempfile.mkstemp(suffix='.xlsx', dir=os.path.dirname(file_path))
+            fd, tmp_path = tempfile.mkstemp(suffix=".xlsx", dir=os.path.dirname(file_path))
             os.close(fd)
 
             try:
@@ -398,17 +390,17 @@ class StreamingWriter:
                     os.unlink(tmp_path)
                 raise
 
-            return True, (
-                f"流式{'更新' if action == 'update' else '插入'}行 {target_row}"
-                f"（键列 '{key_column}'='{key_value}'），"
-                f"修改了 {len(updated_cols)} 列"
-            ), {
-                'action': action,
-                'row': target_row,
-                'updated_columns': updated_cols,
-                'mode': 'streaming',
-                'col_widths_preserved': len(col_widths) > 0,
-            }
+            return (
+                True,
+                (f"流式{'更新' if action == 'update' else '插入'}行 {target_row}（键列 '{key_column}'='{key_value}'），修改了 {len(updated_cols)} 列"),
+                {
+                    "action": action,
+                    "row": target_row,
+                    "updated_columns": updated_cols,
+                    "mode": "streaming",
+                    "col_widths_preserved": len(col_widths) > 0,
+                },
+            )
 
         except Exception as e:
             logger.error(f"流式upsert失败: {e}")
@@ -419,9 +411,9 @@ class StreamingWriter:
         cls,
         file_path: str,
         sheet_name: str,
-        modify_fn: Callable[[List[List[Any]]], Tuple[bool, str, List[List[Any]], Dict[str, Any]]],
+        modify_fn: Callable[[list[list[Any]]], tuple[bool, str, list[list[Any]], dict[str, Any]]],
         preserve_col_widths: bool = True,
-    ) -> Tuple[bool, str, Dict[str, Any]]:
+    ) -> tuple[bool, str, dict[str, Any]]:
         """通用 copy-modify-write：calamine读取 → 修改 → write_only写入
 
         Args:
@@ -455,16 +447,14 @@ class StreamingWriter:
                             col_map[str(cell_val).strip()] = col_idx
 
             if sheet_name not in all_sheets_data:
-                available = ', '.join(all_sheets_data.keys())
+                available = ", ".join(all_sheets_data.keys())
                 return False, f"工作表不存在: {sheet_name}（可用: {available}）", {}
 
             if target_rows is None:
                 return False, f"工作表 '{sheet_name}' 为空", {}
 
             # 2. 调用修改函数
-            success, message, modified_rows, extra_meta = modify_fn(
-                target_rows, 1, col_map
-            )
+            success, message, modified_rows, extra_meta = modify_fn(target_rows, 1, col_map)
             if not success:
                 return False, message, extra_meta
 
@@ -478,11 +468,7 @@ class StreamingWriter:
                     wb_meta = load_workbook(file_path)
                     if sheet_name in wb_meta.sheetnames:
                         ws_meta = wb_meta[sheet_name]
-                        col_widths = {
-                            col_letter: dim.width
-                            for col_letter, dim in ws_meta.column_dimensions.items()
-                            if dim.width
-                        }
+                        col_widths = {col_letter: dim.width for col_letter, dim in ws_meta.column_dimensions.items() if dim.width}
                     wb_meta.close()
                 except Exception as e:
                     logger.warning(f"读取列宽失败，跳过: {e}")
@@ -507,7 +493,7 @@ class StreamingWriter:
                     ws.append(row)
 
             # 6. 原子替换
-            fd, tmp_path = tempfile.mkstemp(suffix='.xlsx', dir=os.path.dirname(file_path))
+            fd, tmp_path = tempfile.mkstemp(suffix=".xlsx", dir=os.path.dirname(file_path))
             os.close(fd)
 
             try:
@@ -519,7 +505,7 @@ class StreamingWriter:
                     os.unlink(tmp_path)
                 raise
 
-            meta = {'mode': 'streaming', 'col_widths_preserved': len(col_widths) > 0}
+            meta = {"mode": "streaming", "col_widths_preserved": len(col_widths) > 0}
             meta.update(extra_meta)
             return True, message, meta
 
@@ -535,7 +521,7 @@ class StreamingWriter:
         start_row: int,
         count: int = 1,
         preserve_col_widths: bool = True,
-    ) -> Tuple[bool, str, Dict[str, Any]]:
+    ) -> tuple[bool, str, dict[str, Any]]:
         """流式删除行：calamine读取 → 删除行 → write_only写入
 
         Args:
@@ -558,19 +544,26 @@ class StreamingWriter:
 
         def _modify(rows, header_row, col_map):
             if start_row > len(rows):
-                return False, f"起始行号({start_row})超过工作表总行数({len(rows)})", rows, {}
+                return (
+                    False,
+                    f"起始行号({start_row})超过工作表总行数({len(rows)})",
+                    rows,
+                    {},
+                )
             actual_count = min(count, len(rows) - start_row + 1)
-            new_rows = rows[:start_row - 1] + rows[start_row - 1 + actual_count:]
-            return True, (
-                f"流式删除第{start_row}-{start_row + actual_count - 1}行"
-                f"（共{actual_count}行）"
-            ), new_rows, {
-                'action': 'delete_rows_streaming',
-                'start_row': start_row,
-                'actual_count': actual_count,
-                'original_rows': len(rows),
-                'new_rows': len(new_rows),
-            }
+            new_rows = rows[: start_row - 1] + rows[start_row - 1 + actual_count :]
+            return (
+                True,
+                (f"流式删除第{start_row}-{start_row + actual_count - 1}行（共{actual_count}行）"),
+                new_rows,
+                {
+                    "action": "delete_rows_streaming",
+                    "start_row": start_row,
+                    "actual_count": actual_count,
+                    "original_rows": len(rows),
+                    "new_rows": len(new_rows),
+                },
+            )
 
         return cls._copy_modify_write(file_path, sheet_name, _modify, preserve_col_widths)
 
@@ -579,9 +572,9 @@ class StreamingWriter:
         cls,
         file_path: str,
         sheet_name: str,
-        row_numbers: List[int],
+        row_numbers: list[int],
         preserve_col_widths: bool = True,
-    ) -> Tuple[bool, str, Dict[str, Any]]:
+    ) -> tuple[bool, str, dict[str, Any]]:
         """流式批量删除多行：一次性删除所有指定行，仅一次文件I/O。
 
         Args:
@@ -605,23 +598,26 @@ class StreamingWriter:
 
         def _modify(rows, header_row, col_map):
             if unique_rows[-1] > len(rows):
-                return False, (
-                    f"行号({unique_rows[-1]})超过工作表总行数({len(rows)})"
-                ), rows, {}
+                return (
+                    False,
+                    (f"行号({unique_rows[-1]})超过工作表总行数({len(rows)})"),
+                    rows,
+                    {},
+                )
             # 构建 0-based 索引集合，高效过滤
             del_indices = {r - 1 for r in unique_rows}
-            new_rows = [
-                row for idx, row in enumerate(rows) if idx not in del_indices
-            ]
-            return True, (
-                f"流式批量删除{len(unique_rows)}行"
-                f"（{len(rows)}→{len(new_rows)}行）"
-            ), new_rows, {
-                'action': 'batch_delete_rows_streaming',
-                'deleted_count': len(unique_rows),
-                'original_rows': len(rows),
-                'new_rows': len(new_rows),
-            }
+            new_rows = [row for idx, row in enumerate(rows) if idx not in del_indices]
+            return (
+                True,
+                (f"流式批量删除{len(unique_rows)}行（{len(rows)}→{len(new_rows)}行）"),
+                new_rows,
+                {
+                    "action": "batch_delete_rows_streaming",
+                    "deleted_count": len(unique_rows),
+                    "original_rows": len(rows),
+                    "new_rows": len(new_rows),
+                },
+            )
 
         return cls._copy_modify_write(file_path, sheet_name, _modify, preserve_col_widths)
 
@@ -633,7 +629,7 @@ class StreamingWriter:
         start_column: int,
         count: int = 1,
         preserve_col_widths: bool = True,
-    ) -> Tuple[bool, str, Dict[str, Any]]:
+    ) -> tuple[bool, str, dict[str, Any]]:
         """流式删除列：calamine读取 → 删除列 → write_only写入
 
         Args:
@@ -660,7 +656,12 @@ class StreamingWriter:
 
             max_col = max(len(r) for r in rows) if rows else 0
             if start_column > max_col:
-                return False, f"起始列号({start_column})超过工作表最大列数({max_col})", rows, {}
+                return (
+                    False,
+                    f"起始列号({start_column})超过工作表最大列数({max_col})",
+                    rows,
+                    {},
+                )
 
             actual_count = min(count, max_col - start_column + 1)
             end_col = start_column + actual_count - 1  # inclusive
@@ -668,19 +669,21 @@ class StreamingWriter:
             new_rows = []
             for row in rows:
                 # 删除 start_column-1 到 end_col-1 位置的元素
-                new_row = row[:start_column - 1] + row[end_col:]
+                new_row = row[: start_column - 1] + row[end_col:]
                 new_rows.append(new_row)
 
-            return True, (
-                f"流式删除第{start_column}-{end_col}列"
-                f"（共{actual_count}列）"
-            ), new_rows, {
-                'action': 'delete_columns_streaming',
-                'start_column': start_column,
-                'actual_count': actual_count,
-                'original_columns': max_col,
-                'new_columns': max_col - actual_count,
-            }
+            return (
+                True,
+                (f"流式删除第{start_column}-{end_col}列（共{actual_count}列）"),
+                new_rows,
+                {
+                    "action": "delete_columns_streaming",
+                    "start_column": start_column,
+                    "actual_count": actual_count,
+                    "original_columns": max_col,
+                    "new_columns": max_col - actual_count,
+                },
+            )
 
         return cls._copy_modify_write(file_path, sheet_name, _modify, preserve_col_widths)
 
@@ -691,10 +694,10 @@ class StreamingWriter:
         sheet_name: str,
         start_row: int,
         start_col: int,
-        data: List[List[Any]],
+        data: list[list[Any]],
         preserve_formulas: bool = True,
         preserve_col_widths: bool = True,
-    ) -> Tuple[bool, str, Dict[str, Any]]:
+    ) -> tuple[bool, str, dict[str, Any]]:
         """流式覆盖范围：calamine读取 → 覆盖指定范围 → write_only写入
 
         仅支持覆盖模式（insert_mode=False），不保留公式。
@@ -742,18 +745,19 @@ class StreamingWriter:
                         rows[row_idx][col_idx] = value
                         updated_cells += 1
 
-                return True, (
-                    f"流式覆盖 {len(data)} 行×{max(len(r) for r in data)} 列"
-                    f"（从{sheet_name}!{get_column_letter(start_col)}{start_row}，"
-                    f"共{updated_cells}个单元格）"
-                ), rows, {
-                    'action': 'update_range_streaming',
-                    'start_row': start_row,
-                    'start_col': start_col,
-                    'rows_written': len(data),
-                    'cols_written': max(len(r) for r in data),
-                    'updated_cells': updated_cells,
-                }
+                return (
+                    True,
+                    (f"流式覆盖 {len(data)} 行×{max(len(r) for r in data)} 列（从{sheet_name}!{get_column_letter(start_col)}{start_row}，共{updated_cells}个单元格）"),
+                    rows,
+                    {
+                        "action": "update_range_streaming",
+                        "start_row": start_row,
+                        "start_col": start_col,
+                        "rows_written": len(data),
+                        "cols_written": max(len(r) for r in data),
+                        "updated_cells": updated_cells,
+                    },
+                )
 
             return cls._copy_modify_write(file_path, sheet_name, _modify, preserve_col_widths)
 
@@ -767,10 +771,10 @@ class StreamingWriter:
         file_path: str,
         sheet_name: str,
         start_row: int,
-        data: List[List[Any]],
+        data: list[list[Any]],
         preserve_formulas: bool = True,
         preserve_col_widths: bool = True,
-    ) -> Tuple[bool, str, Dict[str, Any]]:
+    ) -> tuple[bool, str, dict[str, Any]]:
         """流式插入行：calamine读取 → 在指定行位置插入 → write_only写入
 
         支持在任意行位置插入新行，保留原有数据下移。
@@ -813,15 +817,17 @@ class StreamingWriter:
                     rows.insert(start_row - 1 + r_offset, new_row)
 
                 inserted_count = len(data)
-                return True, (
-                    f"流式插入 {inserted_count} 行到 {sheet_name}!{start_row}，"
-                    f"原有数据自动下移"
-                ), rows, {
-                    'action': 'insert_rows_streaming',
-                    'start_row': start_row,
-                    'rows_inserted': inserted_count,
-                    'total_rows': len(rows),
-                }
+                return (
+                    True,
+                    (f"流式插入 {inserted_count} 行到 {sheet_name}!{start_row}，原有数据自动下移"),
+                    rows,
+                    {
+                        "action": "insert_rows_streaming",
+                        "start_row": start_row,
+                        "rows_inserted": inserted_count,
+                        "total_rows": len(rows),
+                    },
+                )
 
             return cls._copy_modify_write(file_path, sheet_name, _modify, preserve_col_widths)
 
@@ -838,7 +844,7 @@ class StreamingWriter:
         count: int,
         preserve_formulas: bool = True,
         preserve_col_widths: bool = True,
-    ) -> Tuple[bool, str, Dict[str, Any]]:
+    ) -> tuple[bool, str, dict[str, Any]]:
         """流式插入空列：calamine读取 → 在指定列位置插入空列 → write_only写入
 
         支持在任意列位置插入空列，保留原有数据右移。
@@ -868,15 +874,17 @@ class StreamingWriter:
                     for _ in range(count):
                         row.insert(start_column - 1, None)
 
-                return True, (
-                    f"流式插入 {count} 列到 {sheet_name}!{get_column_letter(start_column)}，"
-                    f"原有数据自动右移"
-                ), rows, {
-                    'action': 'insert_columns_streaming',
-                    'start_column': start_column,
-                    'columns_inserted': count,
-                    'total_columns': max(len(r) for r in rows) if rows else 0,
-                }
+                return (
+                    True,
+                    (f"流式插入 {count} 列到 {sheet_name}!{get_column_letter(start_column)}，原有数据自动右移"),
+                    rows,
+                    {
+                        "action": "insert_columns_streaming",
+                        "start_column": start_column,
+                        "columns_inserted": count,
+                        "total_columns": max(len(r) for r in rows) if rows else 0,
+                    },
+                )
 
             return cls._copy_modify_write(file_path, sheet_name, _modify, preserve_col_widths)
 

@@ -23,21 +23,21 @@ except ImportError as e:
 
 # 导入工具模块
 from .tools import (
-    register_resources,
-    register_file_tools,
-    register_data_tools,
-    register_search_tools,
-    register_format_tools,
     register_compare_tools,
-    register_sql_tools,
+    register_data_tools,
+    register_file_tools,
+    register_format_tools,
     register_prompts,
+    register_resources,
+    register_search_tools,
+    register_sql_tools,
 )
 
 # ==================== 日志配置 ====================
 logging.basicConfig(
     level=logging.DEBUG,
-    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
-    handlers=[logging.StreamHandler()]
+    format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
+    handlers=[logging.StreamHandler()],
 )
 logger = logging.getLogger(__name__)
 
@@ -86,7 +86,7 @@ mcp = FastMCP(
 5. excel_format_cells - 格式美化
 """,
     debug=True,
-    log_level="DEBUG"
+    log_level="DEBUG",
 )
 
 
@@ -95,28 +95,28 @@ def setup_server() -> FastMCP:
     """设置并注册所有MCP组件"""
     logger.info("正在注册 MCP Resources...")
     register_resources(mcp)
-    
+
     logger.info("正在注册 MCP Prompts...")
     register_prompts(mcp)
-    
+
     logger.info("正在注册文件操作工具...")
     register_file_tools(mcp)
-    
+
     logger.info("正在注册数据操作工具...")
     register_data_tools(mcp)
-    
+
     logger.info("正在注册搜索工具...")
     register_search_tools(mcp)
-    
+
     logger.info("正在注册格式工具...")
     register_format_tools(mcp)
-    
+
     logger.info("正在注册对比工具...")
     register_compare_tools(mcp)
-    
+
     logger.info("正在注册SQL工具...")
     register_sql_tools(mcp)
-    
+
     logger.info("MCP 服务器组件注册完成!")
     return mcp
 

@@ -7,23 +7,29 @@ Excel MCP Server - Excel读取模块
 
 import logging
 import os
-from typing import List, Dict, Any, Optional
+
 from openpyxl import load_workbook
-from openpyxl.utils import range_boundaries, column_index_from_string, get_column_letter
+from openpyxl.utils import column_index_from_string, get_column_letter, range_boundaries
 
 from ..models.types import (
-    RangeInfo, RangeType, CellInfo, SheetInfo,
-    ExcelData, ExcelDimensions, OperationResult
+    CellInfo,
+    ExcelData,
+    ExcelDimensions,
+    OperationResult,
+    RangeInfo,
+    RangeType,
+    SheetInfo,
 )
-from ..utils.validators import ExcelValidator
-from ..utils.parsers import RangeParser
 from ..utils.exceptions import SheetNotFoundError
+from ..utils.parsers import RangeParser
+from ..utils.validators import ExcelValidator
 
 logger = logging.getLogger(__name__)
 
 # 尝试导入calamine，不可用时降级到openpyxl
 try:
     from python_calamine import CalamineWorkbook, SheetVisibleEnum
+
     _HAS_CALAMINE = True
     # SheetVisibleEnum成员不可哈希，用int值映射
     _CALAMINE_VISIBLE_MAP = {
@@ -69,14 +75,11 @@ class ExcelReader:
         """
         self.file_path = ExcelValidator.validate_file_path(file_path)
         self._workbook_cache = {}  # 缓存不同参数的openpyxl工作簿
-        self._calamine_wb = None   # calamine工作簿缓存（只缓存一个，因为不支持参数变体）
+        self._calamine_wb = None  # calamine工作簿缓存（只缓存一个，因为不支持参数变体）
         self._file_size = _get_file_size(file_path)
         self._is_large = self._file_size > _LARGE_FILE_THRESHOLD
         if self._is_large:
-            logger.info(
-                f"大文件检测: {file_path} ({self._file_size / 1024 / 1024:.1f}MB), "
-                f"将使用优化读取模式"
-            )
+            logger.info(f"大文件检测: {file_path} ({self._file_size / 1024 / 1024:.1f}MB), 将使用优化读取模式")
 
     def _get_calamine_workbook(self):
         """
@@ -102,11 +105,7 @@ class ExcelReader:
         """
         cache_key = (read_only, data_only)
         if cache_key not in self._workbook_cache:
-            self._workbook_cache[cache_key] = load_workbook(
-                self.file_path,
-                read_only=read_only,
-                data_only=data_only
-            )
+            self._workbook_cache[cache_key] = load_workbook(self.file_path, read_only=read_only, data_only=data_only)
         return self._workbook_cache[cache_key]
 
     def close(self):
@@ -133,10 +132,8 @@ class ExcelReader:
                     ws = wb.get_sheet_by_name(name)
                     # 读取工作表可见性
                     state = "visible"
-                    if hasattr(wb, 'sheets_metadata') and i < len(wb.sheets_metadata):
-                        state = _CALAMINE_VISIBLE_MAP.get(
-                            int(wb.sheets_metadata[i].visible), "visible"
-                        )
+                    if hasattr(wb, "sheets_metadata") and i < len(wb.sheets_metadata):
+                        state = _CALAMINE_VISIBLE_MAP.get(int(wb.sheets_metadata[i].visible), "visible")
                     sheet_info = SheetInfo(
                         index=i,
                         name=name,
@@ -151,11 +148,11 @@ class ExcelReader:
                     success=True,
                     data=sheets_info,
                     metadata={
-                        'file_path': self.file_path,
-                        'total_sheets': len(sheets_info),
-                        'file_size_mb': round(self._file_size / 1024 / 1024, 1),
-                        'is_large_file': self._is_large,
-                    }
+                        "file_path": self.file_path,
+                        "total_sheets": len(sheets_info),
+                        "file_size_mb": round(self._file_size / 1024 / 1024, 1),
+                        "is_large_file": self._is_large,
+                    },
                 )
             except Exception as e:
                 logger.debug(f"calamine list_sheets失败，回退openpyxl: {e}")
@@ -168,7 +165,7 @@ class ExcelReader:
             for i, sheet_name in enumerate(workbook.sheetnames):
                 sheet = workbook[sheet_name]
                 # openpyxl sheet_state: 'visible', 'hidden', 'veryHidden'
-                state = getattr(sheet, 'sheet_state', 'visible') or 'visible'
+                state = getattr(sheet, "sheet_state", "visible") or "visible"
 
                 sheet_info = SheetInfo(
                     index=i,
@@ -184,25 +181,18 @@ class ExcelReader:
                 success=True,
                 data=sheets_info,
                 metadata={
-                    'file_path': self.file_path,
-                    'total_sheets': len(sheets_info),
-                    'file_size_mb': round(self._file_size / 1024 / 1024, 1),
-                    'is_large_file': self._is_large,
-                }
+                    "file_path": self.file_path,
+                    "total_sheets": len(sheets_info),
+                    "file_size_mb": round(self._file_size / 1024 / 1024, 1),
+                    "is_large_file": self._is_large,
+                },
             )
 
         except Exception as e:
             logger.error(f"获取工作表列表失败: {e}")
-            return OperationResult(
-                success=False,
-                error=str(e)
-            )
+            return OperationResult(success=False, error=str(e))
 
-    def get_range(
-        self,
-        range_expression: str,
-        include_formatting: bool = False
-    ) -> OperationResult:
+    def get_range(self, range_expression: str, include_formatting: bool = False) -> OperationResult:
         """
         获取Excel文件中指定范围的数据
 
@@ -259,16 +249,15 @@ class ExcelReader:
 
         data = []
         for row in sheet.iter_rows(
-            min_row=min_row, max_row=max_row,
-            min_col=min_col, max_col=max_col,
-            values_only=False
+            min_row=min_row,
+            max_row=max_row,
+            min_col=min_col,
+            max_col=max_col,
+            values_only=False,
         ):
             row_data = []
             for cell in row:
-                cell_info = CellInfo(
-                    coordinate=cell.coordinate,
-                    value=cell.value
-                )
+                cell_info = CellInfo(coordinate=cell.coordinate, value=cell.value)
                 row_data.append(cell_info)
             data.append(row_data)
 
@@ -276,22 +265,22 @@ class ExcelReader:
             rows=max_row - min_row + 1,
             columns=max_col - min_col + 1,
             start_row=min_row,
-            start_column=min_col
+            start_column=min_col,
         )
 
         return OperationResult(
             success=True,
             data=data,
             metadata={
-                'file_path': self.file_path,
-                'range': range_expression,
-                'range_type': range_info.range_type.value,
-                'sheet_name': sheet_name,
-                'dimensions': dimensions.__dict__,
-                'optimized': True,
-                'file_size_mb': round(self._file_size / 1024 / 1024, 1),
-                'rows_loaded': max_row - min_row + 1,
-            }
+                "file_path": self.file_path,
+                "range": range_expression,
+                "range_type": range_info.range_type.value,
+                "sheet_name": sheet_name,
+                "dimensions": dimensions.__dict__,
+                "optimized": True,
+                "file_size_mb": round(self._file_size / 1024 / 1024, 1),
+                "rows_loaded": max_row - min_row + 1,
+            },
         )
 
     def _get_range_calamine(self, range_info: RangeInfo, range_expression: str) -> OperationResult:
@@ -311,34 +300,26 @@ class ExcelReader:
             raise SheetNotFoundError("工作表名称不能为空，必须明确指定工作表")
 
         if sheet_name not in wb.sheet_names:
-            raise SheetNotFoundError(
-                f"工作表不存在: {sheet_name}，可用工作表: {', '.join(wb.sheet_names)}"
-            )
+            raise SheetNotFoundError(f"工作表不存在: {sheet_name}，可用工作表: {', '.join(wb.sheet_names)}")
 
         ws = wb.get_sheet_by_name(sheet_name)
         all_rows = list(ws.to_python())
 
-        data, dimensions = self._extract_range_from_rows(
-            all_rows, range_info
-        )
+        data, dimensions = self._extract_range_from_rows(all_rows, range_info)
 
         return OperationResult(
             success=True,
             data=data,
             metadata={
-                'file_path': self.file_path,
-                'range': range_expression,
-                'range_type': range_info.range_type.value,
-                'sheet_name': sheet_name,
-                'dimensions': dimensions.__dict__
-            }
+                "file_path": self.file_path,
+                "range": range_expression,
+                "range_type": range_info.range_type.value,
+                "sheet_name": sheet_name,
+                "dimensions": dimensions.__dict__,
+            },
         )
 
-    def _extract_range_from_rows(
-        self,
-        all_rows: List[List],
-        range_info: RangeInfo
-    ) -> tuple[ExcelData, ExcelDimensions]:
+    def _extract_range_from_rows(self, all_rows: list[list], range_info: RangeInfo) -> tuple[ExcelData, ExcelDimensions]:
         """从已加载的行数据中提取指定范围（0-based索引）
 
         Args:
@@ -351,7 +332,7 @@ class ExcelReader:
         data = []
 
         if range_info.range_type in [RangeType.ROW_RANGE, RangeType.SINGLE_ROW]:
-            row_parts = range_info.cell_range.split(':')
+            row_parts = range_info.cell_range.split(":")
             start_row = int(row_parts[0]) - 1  # 转为0-based
             end_row = int(row_parts[1]) - 1
 
@@ -362,7 +343,7 @@ class ExcelReader:
                     col_letter = get_column_letter(c + 1)
                     cell_info = CellInfo(
                         coordinate=f"{col_letter}{r + 1}",
-                        value=self._normalize_calamine_value(val)
+                        value=self._normalize_calamine_value(val),
                     )
                     row_data.append(cell_info)
                 data.append(row_data)
@@ -372,11 +353,11 @@ class ExcelReader:
                 rows=end_row - start_row + 1,
                 columns=max_col,
                 start_row=start_row + 1,
-                start_column=1
+                start_column=1,
             )
 
         elif range_info.range_type in [RangeType.COLUMN_RANGE, RangeType.SINGLE_COLUMN]:
-            col_parts = range_info.cell_range.split(':')
+            col_parts = range_info.cell_range.split(":")
             start_col = column_index_from_string(col_parts[0]) - 1  # 转为0-based
             end_col = column_index_from_string(col_parts[1]) - 1
 
@@ -387,7 +368,7 @@ class ExcelReader:
                     val = row_values[c] if c < len(row_values) else None
                     cell_info = CellInfo(
                         coordinate=f"{col_letter}{r + 1}",
-                        value=self._normalize_calamine_value(val)
+                        value=self._normalize_calamine_value(val),
                     )
                     row_data.append(cell_info)
                 data.append(row_data)
@@ -396,7 +377,7 @@ class ExcelReader:
                 rows=len(all_rows),
                 columns=end_col - start_col + 1,
                 start_row=1,
-                start_column=start_col + 1
+                start_column=start_col + 1,
             )
 
         else:
@@ -411,7 +392,7 @@ class ExcelReader:
                     val = row_values[c] if c < len(row_values) else None
                     cell_info = CellInfo(
                         coordinate=f"{col_letter}{r + 1}",
-                        value=self._normalize_calamine_value(val)
+                        value=self._normalize_calamine_value(val),
                     )
                     row_data.append(cell_info)
                 data.append(row_data)
@@ -420,7 +401,7 @@ class ExcelReader:
                 rows=max_row - min_row + 1,
                 columns=max_col - min_col + 1,
                 start_row=min_row,
-                start_column=min_col
+                start_column=min_col,
             )
 
         return data, dimensions
@@ -435,7 +416,7 @@ class ExcelReader:
         Returns:
             Any: 归一化后的值
         """
-        if isinstance(val, float) and not (val != val) and not (val == float('inf') or val == float('-inf')):
+        if isinstance(val, float) and not (val != val) and not (val == float("inf") or val == float("-inf")):
             # 排除 NaN 和 Inf，避免 int(inf) 崩溃
             if val == int(val):
                 return int(val)
@@ -456,30 +437,25 @@ class ExcelReader:
             workbook = self._get_workbook(read_only=True, data_only=True)
             sheet = self._get_worksheet_openpyxl(workbook, range_info.sheet_name)
 
-            data, dimensions = self._get_range_data_openpyxl(
-                sheet, range_info, include_formatting
-            )
+            data, dimensions = self._get_range_data_openpyxl(sheet, range_info, include_formatting)
 
             return OperationResult(
                 success=True,
                 data=data,
                 metadata={
-                    'file_path': self.file_path,
-                    'range': range_expression,
-                    'range_type': range_info.range_type.value,
-                    'sheet_name': sheet.title,
-                    'dimensions': dimensions.__dict__
-                }
+                    "file_path": self.file_path,
+                    "range": range_expression,
+                    "range_type": range_info.range_type.value,
+                    "sheet_name": sheet.title,
+                    "dimensions": dimensions.__dict__,
+                },
             )
 
         except Exception as e:
             logger.error(f"获取范围数据失败: {e}")
-            return OperationResult(
-                success=False,
-                error=str(e)
-            )
+            return OperationResult(success=False, error=str(e))
 
-    def _get_worksheet_openpyxl(self, workbook, sheet_name: Optional[str]):
+    def _get_worksheet_openpyxl(self, workbook, sheet_name: str | None):
         """获取openpyxl工作表
 
         Args:
@@ -493,10 +469,10 @@ class ExcelReader:
             SheetNotFoundError: 工作表不存在时抛出
         """
         if not sheet_name or not sheet_name.strip():
-            raise SheetNotFoundError(f"工作表名称不能为空，必须明确指定工作表")
+            raise SheetNotFoundError("工作表名称不能为空，必须明确指定工作表")
 
         if not workbook.sheetnames:
-            raise SheetNotFoundError(f"Excel文件中没有任何工作表")
+            raise SheetNotFoundError("Excel文件中没有任何工作表")
 
         if sheet_name not in workbook.sheetnames:
             raise SheetNotFoundError(f"工作表不存在: {sheet_name}，可用工作表: {', '.join(workbook.sheetnames)}")
@@ -506,12 +482,7 @@ class ExcelReader:
     # 向后兼容别名（excel_operations.py直接调用此方法）
     _get_worksheet = _get_worksheet_openpyxl
 
-    def _get_range_data_openpyxl(
-        self,
-        sheet,
-        range_info: RangeInfo,
-        include_formatting: bool
-    ) -> tuple[ExcelData, ExcelDimensions]:
+    def _get_range_data_openpyxl(self, sheet, range_info: RangeInfo, include_formatting: bool) -> tuple[ExcelData, ExcelDimensions]:
         """根据范围类型获取数据（openpyxl）
 
         Args:
@@ -530,12 +501,7 @@ class ExcelReader:
         else:
             return self._get_cell_range_data(sheet, range_info, include_formatting)
 
-    def _get_row_data(
-        self,
-        sheet,
-        range_info: RangeInfo,
-        include_formatting: bool
-    ) -> tuple[ExcelData, ExcelDimensions]:
+    def _get_row_data(self, sheet, range_info: RangeInfo, include_formatting: bool) -> tuple[ExcelData, ExcelDimensions]:
         """获取行范围数据
 
         Args:
@@ -546,7 +512,7 @@ class ExcelReader:
         Returns:
             tuple: (ExcelData, ExcelDimensions) 元组，包含行数据和维度信息
         """
-        row_parts = range_info.cell_range.split(':')
+        row_parts = range_info.cell_range.split(":")
         start_row = int(row_parts[0])
         end_row = int(row_parts[1])
 
@@ -580,17 +546,12 @@ class ExcelReader:
             rows=end_row - start_row + 1,
             columns=max_col_found,
             start_row=start_row,
-            start_column=1
+            start_column=1,
         )
 
         return data, dimensions
 
-    def _get_column_data(
-        self,
-        sheet,
-        range_info: RangeInfo,
-        include_formatting: bool
-    ) -> tuple[ExcelData, ExcelDimensions]:
+    def _get_column_data(self, sheet, range_info: RangeInfo, include_formatting: bool) -> tuple[ExcelData, ExcelDimensions]:
         """获取列范围数据
 
         Args:
@@ -601,7 +562,7 @@ class ExcelReader:
         Returns:
             tuple: (ExcelData, ExcelDimensions) 元组，包含列数据和维度信息
         """
-        col_parts = range_info.cell_range.split(':')
+        col_parts = range_info.cell_range.split(":")
         start_col = column_index_from_string(col_parts[0])
         end_col = column_index_from_string(col_parts[1])
         max_row = sheet.max_row
@@ -619,17 +580,12 @@ class ExcelReader:
             rows=max_row,
             columns=end_col - start_col + 1,
             start_row=1,
-            start_column=start_col
+            start_column=start_col,
         )
 
         return data, dimensions
 
-    def _get_cell_range_data(
-        self,
-        sheet,
-        range_info: RangeInfo,
-        include_formatting: bool
-    ) -> tuple[ExcelData, ExcelDimensions]:
+    def _get_cell_range_data(self, sheet, range_info: RangeInfo, include_formatting: bool) -> tuple[ExcelData, ExcelDimensions]:
         """获取单元格范围数据
 
         Args:
@@ -655,7 +611,7 @@ class ExcelReader:
             rows=max_row - min_row + 1,
             columns=max_col - min_col + 1,
             start_row=min_row,
-            start_column=min_col
+            start_column=min_col,
         )
 
         return data, dimensions
@@ -670,20 +626,17 @@ class ExcelReader:
         Returns:
             CellInfo: 单元格信息对象
         """
-        if hasattr(cell, 'coordinate'):
+        if hasattr(cell, "coordinate"):
             coordinate = cell.coordinate
         else:
-            coordinate = f"{get_column_letter(cell.column)}{cell.row}" if hasattr(cell, 'row') and hasattr(cell, 'column') else "A1"
+            coordinate = f"{get_column_letter(cell.column)}{cell.row}" if hasattr(cell, "row") and hasattr(cell, "column") else "A1"
 
-        cell_info = CellInfo(
-            coordinate=coordinate,
-            value=cell.value
-        )
+        cell_info = CellInfo(coordinate=coordinate, value=cell.value)
 
-        if include_formatting and hasattr(cell, 'data_type'):
+        if include_formatting and hasattr(cell, "data_type"):
             cell_info.data_type = cell.data_type
-            cell_info.number_format = getattr(cell, 'number_format', None)
-            cell_info.font = str(cell.font) if hasattr(cell, 'font') and cell.font else None
-            cell_info.fill = str(cell.fill) if hasattr(cell, 'fill') and cell.fill else None
+            cell_info.number_format = getattr(cell, "number_format", None)
+            cell_info.font = str(cell.font) if hasattr(cell, "font") and cell.font else None
+            cell_info.fill = str(cell.fill) if hasattr(cell, "fill") and cell.fill else None
 
         return cell_info

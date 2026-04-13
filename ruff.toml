@@ -1,0 +1,46 @@
+# Ruff configuration for excel-mcp-server
+# 游戏工具项目，兼顾代码质量与实用性
+
+line-length = 200
+target-version = "py310"
+
+[lint]
+select = [
+    "E",   # pycodestyle errors
+    "W",   # pycodestyle warnings
+    "F",   # pyflakes
+    "I",   # isort
+    "UP",  # pyupgrade
+]
+
+ignore = [
+    "E402",   # module level import not at top of file（延迟导入/条件导入常见）
+    "F403",   # from xxx import *（项目 __init__.py 设计如此）
+    "F405",   # name may be undefined from star import（同上）
+    "E741",   # ambiguous variable name l（lambda 短参数常见）
+    "E721",   # use is for type comparisons（isinstance + type 混用可接受）
+]
+
+[lint.per-file-ignores]
+"tests/*" = [
+    "E501",   # line too long（测试 SQL 字符串天然很长）
+    "F821",   # undefined name（诊断脚本常见）
+    "F811",   # redefinition（测试脚本常见）
+    "E722",   # bare except（测试清理代码）
+    "F401",   # unused import（测试探索性代码）
+    "F541",   # f-string without placeholders（print 调试语句）
+    "E401",   # multiple imports on one line（测试快速写法）
+]
+
+"src/excel_mcp_server_fastmcp/api/advanced_sql_query.py" = [
+    "F841",   # unused variable（调试/预留变量）
+    "F541",   # f-string without placeholders（中文错误消息）
+    "E722",   # bare except（兜底异常处理）
+]
+"src/excel_mcp_server_fastmcp/api/excel_operations.py" = [
+    "F841",   # unused variable（调试预留）
+    "F541",   # f-string without placeholders（中文消息）
+]
+"src/excel_mcp_server_fastmcp/server.py" = [
+    "F841",   # unused variable
+]

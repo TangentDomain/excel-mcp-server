@@ -4,15 +4,15 @@ Excel MCP Server - 公式计算缓存管理器
 提供高性能的公式计算缓存机制
 """
 
-import os
-import time
 import hashlib
-import tempfile
-import threading
-from typing import Any, Dict, Optional, Tuple
-from dataclasses import dataclass
-from openpyxl import load_workbook, Workbook
 import logging
+import os
+import threading
+import time
+from dataclasses import dataclass
+from typing import Any
+
+from openpyxl import Workbook
 
 logger = logging.getLogger(__name__)
 
@@ -20,6 +20,7 @@ logger = logging.getLogger(__name__)
 @dataclass
 class CacheEntry:
     """缓存条目"""
+
     value: Any
     timestamp: float
     access_count: int
@@ -30,6 +31,7 @@ class CacheEntry:
 @dataclass
 class WorkbookCache:
     """工作簿缓存"""
+
     workbook: Workbook
     temp_file_path: str
     file_mtime: float
@@ -50,20 +52,15 @@ class FormulaCalculationCache:
         """
         self.max_size = max_size
         self.ttl = ttl
-        self._cache: Dict[str, CacheEntry] = {}
-        self._workbook_cache: Dict[str, WorkbookCache] = {}
+        self._cache: dict[str, CacheEntry] = {}
+        self._workbook_cache: dict[str, WorkbookCache] = {}
         self._lock = threading.RLock()
 
         # 统计信息
         self.hit_count = 0
         self.miss_count = 0
 
-    def _generate_cache_key(
-        self,
-        file_path: str,
-        formula: str,
-        context_sheet: Optional[str] = None
-    ) -> str:
+    def _generate_cache_key(self, file_path: str, formula: str, context_sheet: str | None = None) -> str:
         """生成缓存键"""
         key_data = f"{file_path}:{formula}:{context_sheet or ''}"
         return hashlib.md5(key_data.encode()).hexdigest()
@@ -128,10 +125,7 @@ class FormulaCalculationCache:
             return
 
         # 按访问次数和时间排序，移除最少使用的
-        sorted_entries = sorted(
-            self._cache.items(),
-            key=lambda x: (x[1].access_count, x[1].timestamp)
-        )
+        sorted_entries = sorted(self._cache.items(), key=lambda x: (x[1].access_count, x[1].timestamp))
 
         # 移除最老和最少使用的条目
         entries_to_remove = len(self._cache) - self.max_size + 10  # 多删除10个为后续留空间
@@ -139,7 +133,7 @@ class FormulaCalculationCache:
             key = sorted_entries[i][0]
             del self._cache[key]
 
-    def get_cached_workbook(self, file_path: str) -> Optional[Tuple[Workbook, str]]:
+    def get_cached_workbook(self, file_path: str) -> tuple[Workbook, str] | None:
         """获取缓存的工作簿"""
         with self._lock:
             file_mtime = self._get_file_mtime(file_path)
@@ -149,8 +143,7 @@ class FormulaCalculationCache:
                 wb_cache = self._workbook_cache[cache_key]
 
                 # 检查缓存是否仍然有效
-                if (time.time() - wb_cache.timestamp <= self.ttl and
-                    wb_cache.file_mtime >= file_mtime):
+                if time.time() - wb_cache.timestamp <= self.ttl and wb_cache.file_mtime >= file_mtime:
                     wb_cache.access_count += 1
                     wb_cache.timestamp = time.time()
                     return wb_cache.workbook, wb_cache.temp_file_path
@@ -165,12 +158,7 @@ class FormulaCalculationCache:
 
             return None
 
-    def cache_workbook(
-        self,
-        file_path: str,
-        workbook: Workbook,
-        temp_file_path: str
-    ) -> None:
+    def cache_workbook(self, file_path: str, workbook: Workbook, temp_file_path: str) -> None:
         """缓存工作簿"""
         with self._lock:
             file_mtime = self._get_file_mtime(file_path)
@@ -181,15 +169,10 @@ class FormulaCalculationCache:
                 temp_file_path=temp_file_path,
                 file_mtime=file_mtime,
                 timestamp=time.time(),
-                access_count=1
+                access_count=1,
             )
 
-    def get(
-        self,
-        file_path: str,
-        formula: str,
-        context_sheet: Optional[str] = None
-    ) -> Optional[Any]:
+    def get(self, file_path: str, formula: str, context_sheet: str | None = None) -> Any | None:
         """获取缓存的计算结果"""
         with self._lock:
             cache_key = self._generate_cache_key(file_path, formula, context_sheet)
@@ -218,7 +201,7 @@ class FormulaCalculationCache:
         file_path: str,
         formula: str,
         value: Any,
-        context_sheet: Optional[str] = None
+        context_sheet: str | None = None,
     ) -> None:
         """存储计算结果到缓存"""
         with self._lock:
@@ -237,7 +220,7 @@ class FormulaCalculationCache:
                 timestamp=time.time(),
                 access_count=1,
                 file_mtime=file_mtime,
-                formula_hash=formula_hash
+                formula_hash=formula_hash,
             )
 
             logger.debug(f"缓存已存储: {formula}")
@@ -287,20 +270,20 @@ class FormulaCalculationCache:
                     logger.warning(f"清理临时文件失败: {e}")
                 del self._workbook_cache[key]
 
-    def get_stats(self) -> Dict[str, Any]:
+    def get_stats(self) -> dict[str, Any]:
         """获取缓存统计信息"""
         with self._lock:
             total_requests = self.hit_count + self.miss_count
             hit_rate = (self.hit_count / total_requests * 100) if total_requests > 0 else 0
 
             return {
-                'cache_size': len(self._cache),
-                'workbook_cache_size': len(self._workbook_cache),
-                'max_size': self.max_size,
-                'hit_count': self.hit_count,
-                'miss_count': self.miss_count,
-                'hit_rate': round(hit_rate, 2),
-                'ttl': self.ttl
+                "cache_size": len(self._cache),
+                "workbook_cache_size": len(self._workbook_cache),
+                "max_size": self.max_size,
+                "hit_count": self.hit_count,
+                "miss_count": self.miss_count,
+                "hit_rate": round(hit_rate, 2),
+                "ttl": self.ttl,
             }
 
 

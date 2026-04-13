@@ -8,30 +8,20 @@ Excel MCP Server - Excel操作API模块
 
 import logging
 import re
-from collections import Counter
-from typing import Dict, Any, List, Optional, Union
-from openpyxl import load_workbook
-from openpyxl.utils import get_column_letter, column_index_from_string
+from typing import Any
 
-from ..core.excel_reader import ExcelReader
-from ..core.excel_writer import ExcelWriter
-from ..core.excel_manager import ExcelManager
-from ..core.excel_search import ExcelSearcher
+from openpyxl import load_workbook
+from openpyxl.utils import column_index_from_string, get_column_letter
+
 from ..core.excel_compare import ExcelComparer
 from ..core.excel_converter import ExcelConverter
+from ..core.excel_manager import ExcelManager
+from ..core.excel_reader import ExcelReader
+from ..core.excel_search import ExcelSearcher
+from ..core.excel_writer import ExcelWriter
 from ..models.types import ComparisonOptions
-from ..utils.formatter import format_operation_result
 from ..utils.config import MAX_SEARCH_FILES
-from ..utils.exceptions import (
-    ExcelException,
-    SheetNotFoundError,
-    InvalidRangeError,
-    DataValidationError,
-    InvalidFormatError,
-    OperationLimitError,
-    ExcelFileNotFoundError,
-    ExcelMCPError
-)
+from ..utils.formatter import format_operation_result
 from .header_analyzer import HeaderAnalyzer
 
 logger = logging.getLogger(__name__)
@@ -46,12 +36,12 @@ class ExcelOperations:
 
     # ==================== 日志系统 ====================
     DEBUG_LOG_ENABLED: bool = False
-    _LOG_PREFIX = '[API][ExcelOperations]'
+    _LOG_PREFIX = "[API][ExcelOperations]"
 
     # ==================== 主干API ====================
 
     @classmethod
-    def query(cls, file_path: str, sql: str, include_headers: bool = True) -> Dict[str, Any]:
+    def query(cls, file_path: str, sql: str, include_headers: bool = True) -> dict[str, Any]:
         """
         @intention 执行SQL查询Excel数据
 
@@ -65,6 +55,7 @@ class ExcelOperations:
         """
         try:
             from .advanced_sql_query import AdvancedSQLQueryEngine
+
             engine = AdvancedSQLQueryEngine()
             result = engine.execute_sql_query(file_path, sql, include_headers=include_headers)
             return result
@@ -74,12 +65,7 @@ class ExcelOperations:
             return cls._format_error_result(error_msg)
 
     @classmethod
-    def get_range(
-        cls,
-        file_path: str,
-        range_expression: str,
-        include_formatting: bool = False
-    ) -> Dict[str, Any]:
+    def get_range(cls, file_path: str, range_expression: str, include_formatting: bool = False) -> dict[str, Any]:
         """
         @intention 获取Excel文件中指定范围的数据，提供完整的业务逻辑处理
 
@@ -100,8 +86,8 @@ class ExcelOperations:
         try:
             # 步骤1: 验证参数格式
             validation_result = cls._validate_range_format(range_expression)
-            if not validation_result['valid']:
-                return cls._format_error_result(validation_result['error'])
+            if not validation_result["valid"]:
+                return cls._format_error_result(validation_result["error"])
 
             # 步骤2: 执行数据读取
             reader = ExcelReader(file_path)
@@ -121,11 +107,11 @@ class ExcelOperations:
         cls,
         file_path: str,
         range_expression: str,
-        data: List[List[Any]],
+        data: list[list[Any]],
         preserve_formulas: bool = True,
         insert_mode: bool = False,
-        streaming: bool = True
-    ) -> Dict[str, Any]:
+        streaming: bool = True,
+    ) -> dict[str, Any]:
         """
         @intention 更新Excel文件中指定范围的数据，支持插入和覆盖模式
 
@@ -147,18 +133,12 @@ class ExcelOperations:
             return cls._format_error_result("数据不能为空")
 
         if not isinstance(data, list):
-            return cls._format_error_result(
-                f"数据格式错误：data 应该是二维数组 [[row1], [row2], ...]，"
-                f"实际收到类型: {type(data).__name__}"
-            )
+            return cls._format_error_result(f"数据格式错误：data 应该是二维数组 [[row1], [row2], ...]，实际收到类型: {type(data).__name__}")
 
         # 验证每一行是否都是列表
         for i, row in enumerate(data):
             if not isinstance(row, list):
-                return cls._format_error_result(
-                    f"数据格式错误：第 {i+1} 行应该是列表，实际收到类型: {type(row).__name__}。"
-                    "data 应该是二维数组 [[row1], [row2], ...]"
-                )
+                return cls._format_error_result(f"数据格式错误：第 {i + 1} 行应该是列表，实际收到类型: {type(row).__name__}。data 应该是二维数组 [[row1], [row2], ...]")
 
         if cls.DEBUG_LOG_ENABLED:
             logger.info(f"{cls._LOG_PREFIX} 开始更新范围数据: {range_expression}, 模式: {'插入' if insert_mode else '覆盖'}")
@@ -166,54 +146,64 @@ class ExcelOperations:
         try:
             # 步骤1: 验证参数格式
             validation_result = cls._validate_range_format(range_expression)
-            if not validation_result['valid']:
-                return cls._format_error_result(validation_result['error'])
+            if not validation_result["valid"]:
+                return cls._format_error_result(validation_result["error"])
 
             # 步骤2: 扩展流式写入路径（支持覆盖+插入模式）
             if streaming:
-                from excel_mcp_server_fastmcp.core.streaming_writer import StreamingWriter
+                from excel_mcp_server_fastmcp.core.streaming_writer import (
+                    StreamingWriter,
+                )
+
                 if StreamingWriter.is_available():
                     try:
                         from excel_mcp_server_fastmcp.utils.parsers import RangeParser
+
                         range_info_parsed = RangeParser.parse_range_expression(range_expression)
                         sheet_name = range_info_parsed.sheet_name
 
                         if sheet_name:
                             # 解析起始行列
                             from openpyxl.utils import range_boundaries
-                            min_col, min_row, max_col, max_row = range_boundaries(
-                                range_info_parsed.cell_range
-                            )
-                            
+
+                            min_col, min_row, max_col, max_row = range_boundaries(range_info_parsed.cell_range)
+
                             # 根据模式选择不同的流式写入方法
                             if not insert_mode:
                                 # 覆盖模式 - 直接使用流式写入
                                 success, message, meta = StreamingWriter.update_range(
-                                    file_path, sheet_name, min_row, min_col, data,
-                                    preserve_formulas=preserve_formulas
+                                    file_path,
+                                    sheet_name,
+                                    min_row,
+                                    min_col,
+                                    data,
+                                    preserve_formulas=preserve_formulas,
                                 )
                             else:
                                 # 插入模式 - 使用流式插入
                                 success, message, meta = StreamingWriter.insert_rows_streaming(
-                                    file_path, sheet_name, min_row, data, 
-                                    preserve_formulas=preserve_formulas
+                                    file_path,
+                                    sheet_name,
+                                    min_row,
+                                    data,
+                                    preserve_formulas=preserve_formulas,
                                 )
-                            
+
                             if success:
                                 return {
-                                    'success': True,
-                                    'message': message,
-                                    'data': meta,
-                                    'metadata': {
-                                        'file_path': file_path,
-                                        'sheet_name': sheet_name,
-                                        'range': range_expression,
-                                        'streaming_mode': 'insert' if insert_mode else 'overwrite',
-                                        **meta
-                                    }
+                                    "success": True,
+                                    "message": message,
+                                    "data": meta,
+                                    "metadata": {
+                                        "file_path": file_path,
+                                        "sheet_name": sheet_name,
+                                        "range": range_expression,
+                                        "streaming_mode": "insert" if insert_mode else "overwrite",
+                                        **meta,
+                                    },
                                 }
                             else:
-                                logger.warning(f"流式{ '插入' if insert_mode else '覆盖' }操作失败，降级到openpyxl: {message}")
+                                logger.warning(f"流式{'插入' if insert_mode else '覆盖'}操作失败，降级到openpyxl: {message}")
                     except Exception as parse_err:
                         logger.warning(f"流式update_range范围解析失败，降级到openpyxl: {parse_err}")
 
@@ -230,7 +220,7 @@ class ExcelOperations:
             return cls._format_error_result(error_msg)
 
     @classmethod
-    def list_sheets(cls, file_path: str) -> Dict[str, Any]:
+    def list_sheets(cls, file_path: str) -> dict[str, Any]:
         """
         @intention 获取Excel文件中所有工作表基本信息（Token优化版本）
 
@@ -259,31 +249,28 @@ class ExcelOperations:
                 for sheet in result.data:
                     # 获取工作表的基本信息
                     sheet_info = {
-                        'name': sheet.name,
-                        'rows': 0,  # 默认值，后续更新
-                        'cols': 0,  # 默认值，后续更新
-                        'state': sheet.sheet_state,
+                        "name": sheet.name,
+                        "rows": 0,  # 默认值，后续更新
+                        "cols": 0,  # 默认值，后续更新
+                        "state": sheet.sheet_state,
                     }
                     sheets_info.append(sheet_info)
                     sheet_names.append(sheet.name)  # 向后兼容：简单名称列表
-            
-            total_sheets = result.metadata.get('total_sheets', len(sheets_info)) if result.metadata else len(sheets_info)
+
+            total_sheets = result.metadata.get("total_sheets", len(sheets_info)) if result.metadata else len(sheets_info)
 
             # Token优化：简化响应结构，移除重复字段，只保留核心信息
             # 保持向后兼容：提供两种格式，旧格式直接在顶层，新格式在data中
             response = {
-                'success': True,
-                'message': f"获取到 {len(sheets_info)} 个工作表",
-                'sheets': sheet_names,  # 向后兼容：简单的工作表名称列表
-                'total_sheets': total_sheets,  # 向后兼容：直接提供total_sheets字段
-                'data': {
-                    'sheets': sheets_info,  # Token优化：详细信息列表
-                    'total_sheets': total_sheets
+                "success": True,
+                "message": f"获取到 {len(sheets_info)} 个工作表",
+                "sheets": sheet_names,  # 向后兼容：简单的工作表名称列表
+                "total_sheets": total_sheets,  # 向后兼容：直接提供total_sheets字段
+                "data": {
+                    "sheets": sheets_info,  # Token优化：详细信息列表
+                    "total_sheets": total_sheets,
                 },
-                'meta': {
-                    'total_sheets': total_sheets,
-                    'file_path': file_path
-                }
+                "meta": {"total_sheets": total_sheets, "file_path": file_path},
             }
 
             return response
@@ -306,8 +293,8 @@ class ExcelOperations:
         file_path: str,
         sheet_name: str,
         header_row: int = 1,
-        max_columns: Optional[int] = None
-    ) -> Dict[str, Any]:
+        max_columns: int | None = None,
+    ) -> dict[str, Any]:
         """
         @intention 获取指定工作表的表头信息，支持游戏开发双行模式（字段描述+字段名）
 
@@ -353,36 +340,36 @@ class ExcelOperations:
 
             # 步骤3: 解析双行表头信息
             header_info = cls._parse_dual_header_data(result.data, max_columns)
-            is_dual_header = header_info.get('is_dual_header', False)
+            is_dual_header = header_info.get("is_dual_header", False)
 
             # 如果是双行表头，field_names用第2行；否则用第1行
-            effective_headers = header_info['field_names'] if is_dual_header else header_info['descriptions']
+            effective_headers = header_info["field_names"] if is_dual_header else header_info["descriptions"]
 
             return {
-                'success': True,
+                "success": True,
                 # 向后兼容：直接提供核心字段在顶层
-                'field_names': header_info['field_names'],
-                'descriptions': header_info['descriptions'],
-                'headers': effective_headers,
-                'header_count': len(effective_headers),
-                'sheet_name': sheet_name,
-                'is_dual_header': is_dual_header,
+                "field_names": header_info["field_names"],
+                "descriptions": header_info["descriptions"],
+                "headers": effective_headers,
+                "header_count": len(effective_headers),
+                "sheet_name": sheet_name,
+                "is_dual_header": is_dual_header,
                 # 统一data字段，集中核心数据
-                'data': {
-                    'field_names': header_info['field_names'],
-                    'descriptions': header_info['descriptions'],
-                    'headers': effective_headers,
-                    'is_dual_header': is_dual_header
+                "data": {
+                    "field_names": header_info["field_names"],
+                    "descriptions": header_info["descriptions"],
+                    "headers": effective_headers,
+                    "is_dual_header": is_dual_header,
                 },
-                'meta': {
-                    'sheet_name': sheet_name,
-                    'header_row': header_row,
-                    'header_count': len(effective_headers),
-                    'max_columns': max_columns,
-                    'dual_row_mode': is_dual_header,
-                    'header_type': 'dual' if is_dual_header else 'single'
+                "meta": {
+                    "sheet_name": sheet_name,
+                    "header_row": header_row,
+                    "header_count": len(effective_headers),
+                    "max_columns": max_columns,
+                    "dual_row_mode": is_dual_header,
+                    "header_type": "dual" if is_dual_header else "single",
                 },
-                'message': f"成功获取{len(effective_headers)}个表头字段（{'双行表头：描述+字段名' if is_dual_header else '单行表头'}）"
+                "message": f"成功获取{len(effective_headers)}个表头字段（{'双行表头：描述+字段名' if is_dual_header else '单行表头'}）",
             }
 
         except Exception as e:
@@ -398,11 +385,7 @@ class ExcelOperations:
                     logger.warning(f"{cls._LOG_PREFIX} 清理ExcelReader资源时发生错误: {cleanup_error}")
 
     @classmethod
-    def create_file(
-        cls,
-        file_path: str,
-        sheet_names: Optional[List[str]] = None
-    ) -> Dict[str, Any]:
+    def create_file(cls, file_path: str, sheet_names: list[str] | None = None) -> dict[str, Any]:
         """
         @intention 创建新的Excel文件，支持自定义工作表配置
 
@@ -435,7 +418,7 @@ class ExcelOperations:
 
     # --- 参数验证 ---
     @classmethod
-    def _validate_range_format(cls, range_expression: str) -> Dict[str, Any]:
+    def _validate_range_format(cls, range_expression: str) -> dict[str, Any]:
         """
         @intention 验证范围表达式格式
 
@@ -448,18 +431,24 @@ class ExcelOperations:
                 - error (str, optional): 错误信息，仅在 valid=False 时存在
         """
         if not range_expression or not range_expression.strip():
-            return {'valid': False, 'error': 'range参数不能为空'}
+            return {"valid": False, "error": "range参数不能为空"}
 
-        if '!' not in range_expression:
+        if "!" not in range_expression:
             return {
-                'valid': False,
-                'error': f"range必须包含工作表名。当前格式: '{range_expression}'，正确格式示例: 'Sheet1!A1:B2'"
+                "valid": False,
+                "error": f"range必须包含工作表名。当前格式: '{range_expression}'，正确格式示例: 'Sheet1!A1:B2'",
             }
 
-        return {'valid': True}
+        return {"valid": True}
 
     @classmethod
-    def _build_header_range(cls, sheet_name: str, header_row: int, max_columns: Optional[int], dual_row: bool = False) -> str:
+    def _build_header_range(
+        cls,
+        sheet_name: str,
+        header_row: int,
+        max_columns: int | None,
+        dual_row: bool = False,
+    ) -> str:
         """
         @intention 构建表头范围表达式，支持单行或双行模式
 
@@ -493,7 +482,7 @@ class ExcelOperations:
                 return f"{sheet_name}!A{header_row}:CV{header_row}"  # CV = 第100列
 
     @classmethod
-    def _parse_header_data(cls, data: List[List], max_columns: Optional[int]) -> List[str]:
+    def _parse_header_data(cls, data: list[list], max_columns: int | None) -> list[str]:
         """
         @intention 解析表头数据
 
@@ -509,7 +498,7 @@ class ExcelOperations:
             first_row = data[0]
             for i, cell_info in enumerate(first_row):
                 # 处理CellInfo对象和普通值
-                cell_value = getattr(cell_info, 'value', cell_info) if hasattr(cell_info, 'value') else cell_info
+                cell_value = getattr(cell_info, "value", cell_info) if hasattr(cell_info, "value") else cell_info
 
                 # 转换为字符串并清理
                 if cell_value is not None:
@@ -536,7 +525,7 @@ class ExcelOperations:
         return headers
 
     @classmethod
-    def _parse_dual_header_data(cls, data: List[List], max_columns: Optional[int]) -> Dict[str, List[str]]:
+    def _parse_dual_header_data(cls, data: list[list], max_columns: int | None) -> dict[str, list[str]]:
         """
         @intention 解析双行表头数据（字段描述 + 字段名），支持空值fallback机制
 
@@ -554,9 +543,9 @@ class ExcelOperations:
 
         if not data or len(data) < 2:
             return {
-                'descriptions': descriptions,
-                'field_names': field_names,
-                'is_dual_header': False
+                "descriptions": descriptions,
+                "field_names": field_names,
+                "is_dual_header": False,
             }
 
         # 解析第一行（字段描述）
@@ -572,8 +561,10 @@ class ExcelOperations:
         # 检测是否为双行表头（与server.py的_detect_dual_header逻辑一致）
         # 注意：data中的元素可能是CellInfo对象，需要通过.value访问实际值
         def _cell_str(c):
-            if c is None: return None
-            if hasattr(c, 'value'): return c.value
+            if c is None:
+                return None
+            if hasattr(c, "value"):
+                return c.value
             return c
 
         is_dual_header = False
@@ -581,27 +572,21 @@ class ExcelOperations:
         if len(first_row) >= 2 and len(second_row) >= 2:
             # 第二行是否全是有效英文字段名
             second_row_strs = [_cell_str(c) for c in second_row if _cell_str(c) is not None]
-            all_valid_names = all(
-                isinstance(v, str) and v.strip() and v.strip()[0].isalpha() and v.strip()[0].isascii()
-                for v in second_row_strs
-            )
+            all_valid_names = all(isinstance(v, str) and v.strip() and v.strip()[0].isalpha() and v.strip()[0].isascii() for v in second_row_strs)
             # 第一行是否有中文
             first_row_strs = [_cell_str(c) for c in first_row if _cell_str(c) is not None]
-            any_chinese = any(
-                isinstance(v, str) and any('\u4e00' <= ch <= '\u9fff' for ch in v)
-                for v in first_row_strs
-            )
+            any_chinese = any(isinstance(v, str) and any("\u4e00" <= ch <= "\u9fff" for ch in v) for v in first_row_strs)
             is_dual_header = all_valid_names and any_chinese and len(second_row_strs) >= 2
 
         for i in range(max_cols):
             # 处理字段描述（第1行）
             desc_cell = first_row[i] if i < len(first_row) else None
-            desc_value = getattr(desc_cell, 'value', desc_cell) if hasattr(desc_cell, 'value') else desc_cell
+            desc_value = getattr(desc_cell, "value", desc_cell) if hasattr(desc_cell, "value") else desc_cell
             desc_str = str(desc_value).strip() if desc_value is not None and str(desc_value).strip() else ""
 
             # 处理字段名（第2行）
             name_cell = second_row[i] if i < len(second_row) else None
-            name_value = getattr(name_cell, 'value', name_cell) if hasattr(name_cell, 'value') else name_cell
+            name_value = getattr(name_cell, "value", name_cell) if hasattr(name_cell, "value") else name_cell
             name_str = str(name_value).strip() if name_value is not None and str(name_value).strip() else ""
 
             # 🆕 智能Fallback机制
@@ -627,12 +612,8 @@ class ExcelOperations:
             # 只有在没有指定max_columns时才进行智能停止
             if not max_columns:
                 # 检查原始数据是否为完全空（描述和字段名都是原始空值）
-                desc_is_empty = (desc_cell is None or
-                               (hasattr(desc_cell, 'value') and desc_cell.value is None) or
-                               (not hasattr(desc_cell, 'value') and desc_cell is None))
-                name_is_empty = (name_cell is None or
-                               (hasattr(name_cell, 'value') and name_cell.value is None) or
-                               (not hasattr(name_cell, 'value') and name_cell is None))
+                desc_is_empty = desc_cell is None or (hasattr(desc_cell, "value") and desc_cell.value is None) or (not hasattr(desc_cell, "value") and desc_cell is None)
+                name_is_empty = name_cell is None or (hasattr(name_cell, "value") and name_cell.value is None) or (not hasattr(name_cell, "value") and name_cell is None)
 
                 # 如果当前列完全为空，检查接下来连续3列是否也为空
                 if desc_is_empty and name_is_empty:
@@ -641,12 +622,8 @@ class ExcelOperations:
                         check_desc = first_row[j] if j < len(first_row) else None
                         check_name = second_row[j] if j < len(second_row) else None
 
-                        desc_empty = (check_desc is None or
-                                    (hasattr(check_desc, 'value') and check_desc.value is None) or
-                                    (not hasattr(check_desc, 'value') and check_desc is None))
-                        name_empty = (check_name is None or
-                                    (hasattr(check_name, 'value') and check_name.value is None) or
-                                    (not hasattr(check_name, 'value') and check_name is None))
+                        desc_empty = check_desc is None or (hasattr(check_desc, "value") and check_desc.value is None) or (not hasattr(check_desc, "value") and check_desc is None)
+                        name_empty = check_name is None or (hasattr(check_name, "value") and check_name.value is None) or (not hasattr(check_name, "value") and check_name is None)
 
                         if desc_empty and name_empty:
                             consecutive_empty += 1
@@ -665,9 +642,9 @@ class ExcelOperations:
                 break
 
         return {
-            'descriptions': descriptions,
-            'field_names': field_names,
-            'is_dual_header': is_dual_header
+            "descriptions": descriptions,
+            "field_names": field_names,
+            "is_dual_header": is_dual_header,
         }
 
     @classmethod
@@ -675,14 +652,14 @@ class ExcelOperations:
         cls,
         file_path: str,
         pattern: str,
-        sheet_name: Optional[str] = None,
+        sheet_name: str | None = None,
         case_sensitive: bool = False,
         whole_word: bool = False,
         use_regex: bool = False,
         include_values: bool = True,
         include_formulas: bool = False,
-        range: Optional[str] = None
-    ) -> Dict[str, Any]:
+        range: str | None = None,
+    ) -> dict[str, Any]:
         """
         @intention 在Excel文件中搜索单元格内容（VSCode风格搜索选项）
 
@@ -706,7 +683,6 @@ class ExcelOperations:
             logger.info(f"{cls._LOG_PREFIX} 开始{search_type}搜索({case_info}): {pattern}")
 
         try:
-
             searcher = ExcelSearcher(file_path)
 
             # 构建正则表达式模式
@@ -719,14 +695,21 @@ class ExcelOperations:
 
                 # 如果是全词匹配，添加单词边界
                 if whole_word:
-                    regex_pattern = r'\b' + escaped_pattern + r'\b'
+                    regex_pattern = r"\b" + escaped_pattern + r"\b"
                 else:
                     regex_pattern = escaped_pattern
 
             # 构建正则表达式标志
             regex_flags = "" if case_sensitive else "i"
 
-            result = searcher.regex_search(regex_pattern, regex_flags, include_values, include_formulas, sheet_name, range)
+            result = searcher.regex_search(
+                regex_pattern,
+                regex_flags,
+                include_values,
+                include_formulas,
+                sheet_name,
+                range,
+            )
             return format_operation_result(result)
 
         except Exception as e:
@@ -746,10 +729,10 @@ class ExcelOperations:
         include_values: bool = True,
         include_formulas: bool = False,
         recursive: bool = True,
-        file_extensions: Optional[List[str]] = None,
-        file_pattern: Optional[str] = None,
-        max_files: int = MAX_SEARCH_FILES
-    ) -> Dict[str, Any]:
+        file_extensions: list[str] | None = None,
+        file_pattern: str | None = None,
+        max_files: int = MAX_SEARCH_FILES,
+    ) -> dict[str, Any]:
         """
         @intention 在目录下的所有Excel文件中搜索内容（VSCode风格搜索选项）
 
@@ -770,7 +753,6 @@ class ExcelOperations:
             logger.info(f"{cls._LOG_PREFIX} 开始目录{search_type}搜索({case_info}): {directory_path}")
 
         try:
-
             # 构建正则表达式模式
             if use_regex:
                 # 直接使用用户提供的正则表达式
@@ -781,7 +763,7 @@ class ExcelOperations:
 
                 # 如果是全词匹配，添加单词边界
                 if whole_word:
-                    regex_pattern = r'\b' + escaped_pattern + r'\b'
+                    regex_pattern = r"\b" + escaped_pattern + r"\b"
                 else:
                     regex_pattern = escaped_pattern
 
@@ -789,8 +771,15 @@ class ExcelOperations:
             regex_flags = "" if case_sensitive else "i"
 
             result = ExcelSearcher.search_directory_static(
-                directory_path, regex_pattern, regex_flags, include_values, include_formulas,
-                recursive, file_extensions, file_pattern, max_files
+                directory_path,
+                regex_pattern,
+                regex_flags,
+                include_values,
+                include_formulas,
+                recursive,
+                file_extensions,
+                file_pattern,
+                max_files,
             )
             return format_operation_result(result)
 
@@ -801,7 +790,7 @@ class ExcelOperations:
             return cls._format_error_result(error_msg)
 
     @classmethod
-    def get_all_headers(cls, file_path: str, header_row: int = 1, max_columns: Optional[int] = None) -> Dict[str, Any]:
+    def get_all_headers(cls, file_path: str, header_row: int = 1, max_columns: int | None = None) -> dict[str, Any]:
         """
         @intention 获取Excel文件中所有工作表的双行表头信息（字段描述+字段名）
 
@@ -833,68 +822,81 @@ class ExcelOperations:
         try:
             # 步骤1: 获取所有工作表列表
             sheets_result = cls.list_sheets(file_path)
-            if not sheets_result.get('success'):
+            if not sheets_result.get("success"):
                 return sheets_result
 
             # 步骤2: 获取每个工作表的双行表头
             sheets_with_headers = []
             # Operations层内部调用，从data中取sheets列表
-            sheets_data = sheets_result.get('data', {}).get('sheets', sheets_result.get('sheets', []))
-            sheets = [s['name'] if isinstance(s, dict) else s for s in sheets_data]
+            sheets_data = sheets_result.get("data", {}).get("sheets", sheets_result.get("sheets", []))
+            sheets = [s["name"] if isinstance(s, dict) else s for s in sheets_data]
 
             for sheet_name in sheets:
                 try:
-                    header_result = cls.get_headers(file_path, sheet_name, header_row=header_row, max_columns=max_columns)
+                    header_result = cls.get_headers(
+                        file_path,
+                        sheet_name,
+                        header_row=header_row,
+                        max_columns=max_columns,
+                    )
 
-                    if header_result.get('success'):
+                    if header_result.get("success"):
                         # Operations层内部调用，优先从data取
-                        hdr_data = header_result.get('data', header_result)
-                        headers = hdr_data.get('headers', [])
-                        descriptions = hdr_data.get('descriptions', [])
-                        field_names = hdr_data.get('field_names', [])
+                        hdr_data = header_result.get("data", header_result)
+                        headers = hdr_data.get("headers", [])
+                        descriptions = hdr_data.get("descriptions", [])
+                        field_names = hdr_data.get("field_names", [])
 
                         # 如果没有获取到field_names，使用headers作为fallback
                         if not field_names and headers:
                             field_names = headers
 
-                        sheets_with_headers.append({
-                            'name': sheet_name,
-                            'headers': field_names,         # 兼容性字段，使用字段名
-                            'descriptions': descriptions,   # 字段描述（第1行）
-                            'field_names': field_names,     # 字段名（第2行）
-                            'header_count': len(field_names)
-                        })
+                        sheets_with_headers.append(
+                            {
+                                "name": sheet_name,
+                                "headers": field_names,  # 兼容性字段，使用字段名
+                                "descriptions": descriptions,  # 字段描述（第1行）
+                                "field_names": field_names,  # 字段名（第2行）
+                                "header_count": len(field_names),
+                            }
+                        )
                     else:
-                        sheets_with_headers.append({
-                            'name': sheet_name,
-                            'headers': [],
-                            'descriptions': [],
-                            'field_names': [],
-                            'header_count': 0,
-                            'error': header_result.get('error', '未知错误')
-                        })
+                        sheets_with_headers.append(
+                            {
+                                "name": sheet_name,
+                                "headers": [],
+                                "descriptions": [],
+                                "field_names": [],
+                                "header_count": 0,
+                                "error": header_result.get("error", "未知错误"),
+                            }
+                        )
 
                 except Exception as e:
-                    sheets_with_headers.append({
-                        'name': sheet_name,
-                        'headers': [],
-                        'descriptions': [],
-                        'field_names': [],
-                        'header_count': 0,
-                        'error': str(e)
-                    })
+                    sheets_with_headers.append(
+                        {
+                            "name": sheet_name,
+                            "headers": [],
+                            "descriptions": [],
+                            "field_names": [],
+                            "header_count": 0,
+                            "error": str(e),
+                        }
+                    )
 
-            return format_operation_result({
-                'success': True,
-                'data': {
-                    'sheets_with_headers': sheets_with_headers,
-                    'total_sheets': len(sheets)
-                },
-                # 保持顶层兼容性
-                'sheets_with_headers': sheets_with_headers,
-                'file_path': file_path,
-                'total_sheets': len(sheets)
-            })
+            return format_operation_result(
+                {
+                    "success": True,
+                    "data": {
+                        "sheets_with_headers": sheets_with_headers,
+                        "total_sheets": len(sheets),
+                    },
+                    # 保持顶层兼容性
+                    "sheets_with_headers": sheets_with_headers,
+                    "file_path": file_path,
+                    "total_sheets": len(sheets),
+                }
+            )
 
         except Exception as e:
             error_msg = f"获取工作表表头失败: {str(e)}"
@@ -908,8 +910,8 @@ class ExcelOperations:
         sheet_name: str,
         row_index: int,
         count: int = 1,
-        streaming: bool = True
-    ) -> Dict[str, Any]:
+        streaming: bool = True,
+    ) -> dict[str, Any]:
         """
         @intention 在指定位置插入空行
 
@@ -929,7 +931,10 @@ class ExcelOperations:
         try:
             # 流式写入路径
             if streaming:
-                from excel_mcp_server_fastmcp.core.streaming_writer import StreamingWriter
+                from excel_mcp_server_fastmcp.core.streaming_writer import (
+                    StreamingWriter,
+                )
+
                 if StreamingWriter.is_available():
                     # 需要先知道列数来创建空行
                     reader = ExcelReader(file_path)
@@ -944,22 +949,20 @@ class ExcelOperations:
                         col_count = 1  # fallback
                     # 创建空行数据用于插入
                     empty_rows = [[None] * col_count for _ in range(count)]
-                    success, message, meta = StreamingWriter.insert_rows_streaming(
-                        file_path, sheet_name, row_index, empty_rows
-                    )
+                    success, message, meta = StreamingWriter.insert_rows_streaming(file_path, sheet_name, row_index, empty_rows)
                     if success:
                         return {
-                            'success': True,
-                            'message': message,
-                            'data': meta,
-                            'metadata': {
-                                'file_path': file_path,
-                                'sheet_name': sheet_name,
-                                'row_index': row_index,
-                                'count': count,
-                                'mode': 'streaming',
-                                **meta
-                            }
+                            "success": True,
+                            "message": message,
+                            "data": meta,
+                            "metadata": {
+                                "file_path": file_path,
+                                "sheet_name": sheet_name,
+                                "row_index": row_index,
+                                "count": count,
+                                "mode": "streaming",
+                                **meta,
+                            },
                         }
                     else:
                         logger.warning(f"流式插入行失败，降级到openpyxl: {message}")
@@ -981,8 +984,8 @@ class ExcelOperations:
         sheet_name: str,
         column_index: int,
         count: int = 1,
-        streaming: bool = True
-    ) -> Dict[str, Any]:
+        streaming: bool = True,
+    ) -> dict[str, Any]:
         """
         @intention 在指定位置插入空列
 
@@ -1002,24 +1005,25 @@ class ExcelOperations:
         try:
             # 流式写入路径
             if streaming:
-                from excel_mcp_server_fastmcp.core.streaming_writer import StreamingWriter
+                from excel_mcp_server_fastmcp.core.streaming_writer import (
+                    StreamingWriter,
+                )
+
                 if StreamingWriter.is_available():
-                    success, message, meta = StreamingWriter.insert_columns_streaming(
-                        file_path, sheet_name, column_index, count
-                    )
+                    success, message, meta = StreamingWriter.insert_columns_streaming(file_path, sheet_name, column_index, count)
                     if success:
                         return {
-                            'success': True,
-                            'message': message,
-                            'data': meta,
-                            'metadata': {
-                                'file_path': file_path,
-                                'sheet_name': sheet_name,
-                                'column_index': column_index,
-                                'count': count,
-                                'mode': 'streaming',
-                                **meta
-                            }
+                            "success": True,
+                            "message": message,
+                            "data": meta,
+                            "metadata": {
+                                "file_path": file_path,
+                                "sheet_name": sheet_name,
+                                "column_index": column_index,
+                                "count": count,
+                                "mode": "streaming",
+                                **meta,
+                            },
                         }
                     else:
                         logger.warning(f"流式插入列失败，降级到openpyxl: {message}")
@@ -1039,9 +1043,9 @@ class ExcelOperations:
         cls,
         file_path: str,
         output_path: str,
-        sheet_name: Optional[str] = None,
-        encoding: str = "utf-8"
-    ) -> Dict[str, Any]:
+        sheet_name: str | None = None,
+        encoding: str = "utf-8",
+    ) -> dict[str, Any]:
         """
         @intention 将Excel工作表导出为CSV文件
 
@@ -1074,8 +1078,8 @@ class ExcelOperations:
         output_path: str,
         sheet_name: str = "Sheet1",
         encoding: str = "utf-8",
-        has_header: bool = True
-    ) -> Dict[str, Any]:
+        has_header: bool = True,
+    ) -> dict[str, Any]:
         """
         @intention 从CSV文件导入数据创建Excel文件
 
@@ -1102,12 +1106,7 @@ class ExcelOperations:
             return cls._format_error_result(error_msg)
 
     @classmethod
-    def convert_format(
-        cls,
-        input_path: str,
-        output_path: str,
-        target_format: str = "xlsx"
-    ) -> Dict[str, Any]:
+    def convert_format(cls, input_path: str, output_path: str, target_format: str = "xlsx") -> dict[str, Any]:
         """
         @intention 转换Excel文件格式
 
@@ -1132,12 +1131,7 @@ class ExcelOperations:
             return cls._format_error_result(error_msg)
 
     @classmethod
-    def merge_files(
-        cls,
-        input_files: List[str],
-        output_path: str,
-        merge_mode: str = "sheets"
-    ) -> Dict[str, Any]:
+    def merge_files(cls, input_files: list[str], output_path: str, merge_mode: str = "sheets") -> dict[str, Any]:
         """
         @intention 合并多个Excel文件
 
@@ -1162,7 +1156,7 @@ class ExcelOperations:
             return cls._format_error_result(error_msg)
 
     @classmethod
-    def get_file_info(cls, file_path: str) -> Dict[str, Any]:
+    def get_file_info(cls, file_path: str) -> dict[str, Any]:
         """
         @intention 获取Excel文件的详细信息
 
@@ -1185,12 +1179,7 @@ class ExcelOperations:
             return cls._format_error_result(error_msg)
 
     @classmethod
-    def create_sheet(
-        cls,
-        file_path: str,
-        sheet_name: str,
-        index: Optional[int] = None
-    ) -> Dict[str, Any]:
+    def create_sheet(cls, file_path: str, sheet_name: str, index: int | None = None) -> dict[str, Any]:
         """
         @intention 在文件中创建新工作表
 
@@ -1216,7 +1205,7 @@ class ExcelOperations:
             return cls._format_error_result(error_msg)
 
     @classmethod
-    def delete_sheet(cls, file_path: str, sheet_name: str) -> Dict[str, Any]:
+    def delete_sheet(cls, file_path: str, sheet_name: str) -> dict[str, Any]:
         """
         @intention 删除指定工作表
 
@@ -1241,12 +1230,7 @@ class ExcelOperations:
             return cls._format_error_result(error_msg)
 
     @classmethod
-    def rename_sheet(
-        cls,
-        file_path: str,
-        old_name: str,
-        new_name: str
-    ) -> Dict[str, Any]:
+    def rename_sheet(cls, file_path: str, old_name: str, new_name: str) -> dict[str, Any]:
         """
         @intention 重命名工作表
 
@@ -1276,10 +1260,10 @@ class ExcelOperations:
         cls,
         file_path: str,
         source_name: str,
-        new_name: Optional[str] = None,
-        index: Optional[int] = None,
-        streaming: bool = True
-    ) -> Dict[str, Any]:
+        new_name: str | None = None,
+        index: int | None = None,
+        streaming: bool = True,
+    ) -> dict[str, Any]:
         """
         @intention 复制工作表（含数据和格式）
 
@@ -1309,8 +1293,8 @@ class ExcelOperations:
         sheet_name: str,
         old_header: str,
         new_header: str,
-        header_row: int = 1
-    ) -> Dict[str, Any]:
+        header_row: int = 1,
+    ) -> dict[str, Any]:
         """
         @intention 重命名列（修改表头单元格值）
 
@@ -1350,8 +1334,8 @@ class ExcelOperations:
         sheet_name: str,
         row_index: int,
         count: int = 1,
-        streaming: bool = True
-    ) -> Dict[str, Any]:
+        streaming: bool = True,
+    ) -> dict[str, Any]:
         """
         @intention 删除指定行
 
@@ -1371,21 +1355,22 @@ class ExcelOperations:
         try:
             # 流式写入路径
             if streaming:
-                from excel_mcp_server_fastmcp.core.streaming_writer import StreamingWriter
+                from excel_mcp_server_fastmcp.core.streaming_writer import (
+                    StreamingWriter,
+                )
+
                 if StreamingWriter.is_available():
-                    success, message, meta = StreamingWriter.delete_rows(
-                        file_path, sheet_name, row_index, count
-                    )
+                    success, message, meta = StreamingWriter.delete_rows(file_path, sheet_name, row_index, count)
                     if success:
                         return {
-                            'success': True,
-                            'message': message,
-                            'data': meta,
-                            'metadata': {
-                                'file_path': file_path,
-                                'sheet_name': sheet_name,
-                                **meta
-                            }
+                            "success": True,
+                            "message": message,
+                            "data": meta,
+                            "metadata": {
+                                "file_path": file_path,
+                                "sheet_name": sheet_name,
+                                **meta,
+                            },
                         }
                     else:
                         logger.warning(f"流式删除行失败，降级到openpyxl: {message}")
@@ -1404,9 +1389,9 @@ class ExcelOperations:
         cls,
         file_path: str,
         sheet_name: str,
-        row_numbers: List[int],
+        row_numbers: list[int],
         streaming: bool = True,
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """批量删除多个行号对应的行，仅一次文件I/O。
 
         Args:
@@ -1419,31 +1404,33 @@ class ExcelOperations:
             Dict: 标准化的操作结果，包含 deleted_count
         """
         if not row_numbers:
-            return {'success': False, 'message': '行号列表为空', 'data': None}
+            return {"success": False, "message": "行号列表为空", "data": None}
 
         try:
             if streaming:
-                from excel_mcp_server_fastmcp.core.streaming_writer import StreamingWriter
+                from excel_mcp_server_fastmcp.core.streaming_writer import (
+                    StreamingWriter,
+                )
+
                 if StreamingWriter.is_available():
-                    success, message, meta = StreamingWriter.batch_delete_rows(
-                        file_path, sheet_name, row_numbers
-                    )
+                    success, message, meta = StreamingWriter.batch_delete_rows(file_path, sheet_name, row_numbers)
                     if success:
                         return {
-                            'success': True,
-                            'message': message,
-                            'data': meta,
-                            'metadata': {
-                                'file_path': file_path,
-                                'sheet_name': sheet_name,
-                                **meta
-                            }
+                            "success": True,
+                            "message": message,
+                            "data": meta,
+                            "metadata": {
+                                "file_path": file_path,
+                                "sheet_name": sheet_name,
+                                **meta,
+                            },
                         }
                     else:
                         logger.warning(f"流式批量删除行失败，降级到openpyxl: {message}")
 
             # openpyxl 降级路径：合并相邻行号为连续区间，逐区间删除
             from excel_mcp_server_fastmcp.core.excel_writer import ExcelWriter
+
             writer = ExcelWriter(file_path)
             sorted_rows = sorted(set(row_numbers))
 
@@ -1469,14 +1456,14 @@ class ExcelOperations:
                     logger.warning(f"删除行 {range_start}+{range_count} 失败: {result.message}")
 
             return {
-                'success': True,
-                'message': f"批量删除了{total_deleted}行（{len(ranges)}个区间）",
-                'data': {'deleted_rows': total_deleted, 'ranges': len(ranges)},
-                'metadata': {
-                    'file_path': file_path,
-                    'sheet_name': sheet_name,
-                    'deleted_rows': total_deleted,
-                }
+                "success": True,
+                "message": f"批量删除了{total_deleted}行（{len(ranges)}个区间）",
+                "data": {"deleted_rows": total_deleted, "ranges": len(ranges)},
+                "metadata": {
+                    "file_path": file_path,
+                    "sheet_name": sheet_name,
+                    "deleted_rows": total_deleted,
+                },
             }
 
         except Exception as e:
@@ -1491,8 +1478,8 @@ class ExcelOperations:
         sheet_name: str,
         column_index: int,
         count: int = 1,
-        streaming: bool = True
-    ) -> Dict[str, Any]:
+        streaming: bool = True,
+    ) -> dict[str, Any]:
         """
         @intention 删除指定列
 
@@ -1512,21 +1499,22 @@ class ExcelOperations:
         try:
             # 流式写入路径
             if streaming:
-                from excel_mcp_server_fastmcp.core.streaming_writer import StreamingWriter
+                from excel_mcp_server_fastmcp.core.streaming_writer import (
+                    StreamingWriter,
+                )
+
                 if StreamingWriter.is_available():
-                    success, message, meta = StreamingWriter.delete_columns(
-                        file_path, sheet_name, column_index, count
-                    )
+                    success, message, meta = StreamingWriter.delete_columns(file_path, sheet_name, column_index, count)
                     if success:
                         return {
-                            'success': True,
-                            'message': message,
-                            'data': meta,
-                            'metadata': {
-                                'file_path': file_path,
-                                'sheet_name': sheet_name,
-                                **meta
-                            }
+                            "success": True,
+                            "message": message,
+                            "data": meta,
+                            "metadata": {
+                                "file_path": file_path,
+                                "sheet_name": sheet_name,
+                                **meta,
+                            },
                         }
                     else:
                         logger.warning(f"流式删除列失败，降级到openpyxl: {message}")
@@ -1541,7 +1529,7 @@ class ExcelOperations:
             return cls._format_error_result(error_msg)
 
     @staticmethod
-    def _normalize_formatting(formatting: Optional[Dict]) -> Dict:
+    def _normalize_formatting(formatting: dict | None) -> dict:
         """将LLM友好的扁平格式转换为Writer层需要的嵌套格式。
 
         扁平格式（API层/LLM输入）:
@@ -1572,24 +1560,31 @@ class ExcelOperations:
             return formatting or {}
 
         # 检测是否已经是嵌套格式（包含 font/fill/alignment 等嵌套键）
-        nested_keys = {'font', 'fill', 'alignment'}
+        nested_keys = {"font", "fill", "alignment"}
         if any(k in formatting and isinstance(formatting.get(k), dict) for k in nested_keys):
             return formatting  # 已经是嵌套格式，直接返回
 
         # 扁平 → 嵌套 转换
-        nested: Dict[str, Any] = {}
-        font_attrs: Dict[str, Any] = {}
-        align_attrs: Dict[str, Any] = {}
+        nested: dict[str, Any] = {}
+        font_attrs: dict[str, Any] = {}
+        align_attrs: dict[str, Any] = {}
 
         flat_to_font = {
-            'bold': 'bold', 'italic': 'italic', 'underline': 'underline',
-            'font_size': 'size', 'font_color': 'color', 'font_name': 'name',
-            'strikethrough': 'strikethrough',
+            "bold": "bold",
+            "italic": "italic",
+            "underline": "underline",
+            "font_size": "size",
+            "font_color": "color",
+            "font_name": "name",
+            "strikethrough": "strikethrough",
         }
         flat_to_align = {
-            'alignment': 'horizontal', 'vertical_alignment': 'vertical',
-            'wrap_text': 'wrap_text', 'text_rotation': 'text_rotation',
-            'indent': 'indent', 'shrink_to_fit': 'shrink_to_fit',
+            "alignment": "horizontal",
+            "vertical_alignment": "vertical",
+            "wrap_text": "wrap_text",
+            "text_rotation": "text_rotation",
+            "indent": "indent",
+            "shrink_to_fit": "shrink_to_fit",
         }
 
         for key, value in formatting.items():
@@ -1597,38 +1592,38 @@ class ExcelOperations:
                 font_attrs[flat_to_font[key]] = value
             elif key in flat_to_align and value is not None:
                 align_attrs[flat_to_align[key]] = value
-            elif key == 'bg_color' and value is not None:
-                nested['fill'] = {'color': str(value)}
-            elif key == 'number_format' and value is not None:
-                nested['number_format'] = str(value)
-            elif key == 'fill_type' and value is not None:
+            elif key == "bg_color" and value is not None:
+                nested["fill"] = {"color": str(value)}
+            elif key == "number_format" and value is not None:
+                nested["number_format"] = str(value)
+            elif key == "fill_type" and value is not None:
                 # 渐变/图案填充类型，与 bg_color 合并到 fill
-                if 'fill' not in nested:
-                    nested['fill'] = {}
-                nested['fill']['type'] = str(value)
-            elif key == 'gradient_colors' and value is not None:
-                if 'fill' not in nested:
-                    nested['fill'] = {}
-                nested['fill']['type'] = 'gradient'
-                nested['fill']['colors'] = list(value) if isinstance(value, (list, tuple)) else [str(value)]
-            elif key == 'gradient_type' and value is not None:
-                if 'fill' not in nested:
-                    nested['fill'] = {}
-                nested['fill']['gradient_type'] = str(value)
-            elif key == 'border' and value is not None:
+                if "fill" not in nested:
+                    nested["fill"] = {}
+                nested["fill"]["type"] = str(value)
+            elif key == "gradient_colors" and value is not None:
+                if "fill" not in nested:
+                    nested["fill"] = {}
+                nested["fill"]["type"] = "gradient"
+                nested["fill"]["colors"] = list(value) if isinstance(value, (list, tuple)) else [str(value)]
+            elif key == "gradient_type" and value is not None:
+                if "fill" not in nested:
+                    nested["fill"] = {}
+                nested["fill"]["gradient_type"] = str(value)
+            elif key == "border" and value is not None:
                 # 行内边框配置：支持简写字符串或详细字典
                 if isinstance(value, str):
-                    nested['border'] = {'style': value}
+                    nested["border"] = {"style": value}
                 else:
-                    nested['border'] = value
+                    nested["border"] = value
             else:
                 # 未知键直接透传（保持向后兼容）
                 nested[key] = value
 
         if font_attrs:
-            nested['font'] = font_attrs
+            nested["font"] = font_attrs
         if align_attrs:
-            nested['alignment'] = align_attrs
+            nested["alignment"] = align_attrs
 
         return nested
 
@@ -1638,9 +1633,9 @@ class ExcelOperations:
         file_path: str,
         sheet_name: str,
         range: str,
-        formatting: Optional[Dict[str, Any]] = None,
-        preset: Optional[str] = None
-    ) -> Dict[str, Any]:
+        formatting: dict[str, Any] | None = None,
+        preset: str | None = None,
+    ) -> dict[str, Any]:
         """
         @intention 设置单元格格式
 
@@ -1662,11 +1657,17 @@ class ExcelOperations:
             # 处理预设格式
             if preset:
                 preset_formats = {
-                    'title': {'font': {'name': '微软雅黑', 'size': 14, 'bold': True}, 'alignment': {'horizontal': 'center'}},
-                    'header': {'font': {'name': '微软雅黑', 'size': 11, 'bold': True}, 'fill': {'color': 'D9D9D9'}},
-                    'data': {'font': {'name': '微软雅黑', 'size': 10}},
-                    'highlight': {'fill': {'color': 'FFFF00'}},
-                    'currency': {'number_format': '¥#,##0.00'}
+                    "title": {
+                        "font": {"name": "微软雅黑", "size": 14, "bold": True},
+                        "alignment": {"horizontal": "center"},
+                    },
+                    "header": {
+                        "font": {"name": "微软雅黑", "size": 11, "bold": True},
+                        "fill": {"color": "D9D9D9"},
+                    },
+                    "data": {"font": {"name": "微软雅黑", "size": 10}},
+                    "highlight": {"fill": {"color": "FFFF00"}},
+                    "currency": {"number_format": "¥#,##0.00"},
                 }
                 formatting = preset_formats.get(preset, formatting or {})
 
@@ -1676,7 +1677,7 @@ class ExcelOperations:
             formatting = cls._normalize_formatting(formatting)
 
             # 构建完整的range表达式
-            if '!' not in range:
+            if "!" not in range:
                 range_expression = f"{sheet_name}!{range}"
             else:
                 range_expression = range
@@ -1691,7 +1692,7 @@ class ExcelOperations:
 
     # --- 错误处理 ---
     @classmethod
-    def _format_error_result(cls, error_message: str) -> Dict[str, Any]:
+    def _format_error_result(cls, error_message: str) -> dict[str, Any]:
         """
         @intention 创建标准化的错误响应
 
@@ -1704,15 +1705,11 @@ class ExcelOperations:
                 - message (str): 错误消息
                 - data (None): 固定为 None
         """
-        return {
-            'success': False,
-            'message': error_message,
-            'data': None
-        }
+        return {"success": False, "message": error_message, "data": None}
 
     # --- 单元格操作扩展 ---
     @classmethod
-    def merge_cells(cls, file_path: str, sheet_name: str, range: str) -> Dict[str, Any]:
+    def merge_cells(cls, file_path: str, sheet_name: str, range: str) -> dict[str, Any]:
         """
         @intention 合并指定范围的单元格
 
@@ -1738,7 +1735,7 @@ class ExcelOperations:
             return cls._format_error_result(error_msg)
 
     @classmethod
-    def unmerge_cells(cls, file_path: str, sheet_name: str, range: str) -> Dict[str, Any]:
+    def unmerge_cells(cls, file_path: str, sheet_name: str, range: str) -> dict[str, Any]:
         """
         @intention 取消合并指定范围的单元格
 
@@ -1764,8 +1761,7 @@ class ExcelOperations:
             return cls._format_error_result(error_msg)
 
     @classmethod
-    def set_borders(cls, file_path: str, sheet_name: str, range: str,
-                   border_style: str = "thin") -> Dict[str, Any]:
+    def set_borders(cls, file_path: str, sheet_name: str, range: str, border_style: str = "thin") -> dict[str, Any]:
         """
         @intention 为指定范围设置边框样式
 
@@ -1792,8 +1788,14 @@ class ExcelOperations:
             return cls._format_error_result(error_msg)
 
     @classmethod
-    def set_row_height(cls, file_path: str, sheet_name: str, row_index: int,
-                      height: float, count: int = 1) -> Dict[str, Any]:
+    def set_row_height(
+        cls,
+        file_path: str,
+        sheet_name: str,
+        row_index: int,
+        height: float,
+        count: int = 1,
+    ) -> dict[str, Any]:
         """
         @intention 调整指定行的高度
 
@@ -1828,8 +1830,14 @@ class ExcelOperations:
             return cls._format_error_result(error_msg)
 
     @classmethod
-    def set_column_width(cls, file_path: str, sheet_name: str, column_index: int,
-                        width: float, count: int = 1) -> Dict[str, Any]:
+    def set_column_width(
+        cls,
+        file_path: str,
+        sheet_name: str,
+        column_index: int,
+        width: float,
+        count: int = 1,
+    ) -> dict[str, Any]:
         """
         @intention 调整指定列的宽度
 
@@ -1847,7 +1855,6 @@ class ExcelOperations:
             logger.info(f"{cls._LOG_PREFIX} 开始调整列宽: 列{column_index}, 宽度{width}, 数量{count}")
 
         try:
-
             writer = ExcelWriter(file_path)
 
             # ExcelWriter.set_column_width(column, width, sheet_name)
@@ -1866,9 +1873,15 @@ class ExcelOperations:
             return cls._format_error_result(error_msg)
 
     @classmethod
-    def compare_sheets(cls, file1_path: str, sheet1_name: str, file2_path: str,
-                      sheet2_name: str, id_column: Union[int, str] = 1,
-                      header_row: int = 1) -> Dict[str, Any]:
+    def compare_sheets(
+        cls,
+        file1_path: str,
+        sheet1_name: str,
+        file2_path: str,
+        sheet2_name: str,
+        id_column: int | str = 1,
+        header_row: int = 1,
+    ) -> dict[str, Any]:
         """
         @intention 比较两个Excel工作表，识别ID对象的新增、删除、修改
 
@@ -1887,15 +1900,12 @@ class ExcelOperations:
             logger.info(f"{cls._LOG_PREFIX} 开始比较工作表: {file1_path}:{sheet1_name} vs {file2_path}:{sheet2_name}")
 
         try:
-
             # 创建比较选项
             options = ComparisonOptions()
             comparer = ExcelComparer(options)
 
             # 执行比较 - 使用正确的参数顺序
-            result = comparer.compare_sheets(
-                file1_path, sheet1_name, file2_path, sheet2_name, options
-            )
+            result = comparer.compare_sheets(file1_path, sheet1_name, file2_path, sheet2_name, options)
             return format_operation_result(result)
 
         except Exception as e:
@@ -1905,8 +1915,7 @@ class ExcelOperations:
 
     # --- 公式操作扩展 ---
     @classmethod
-    def set_formula(cls, file_path: str, sheet_name: str, cell_range: str,
-                   formula: str) -> Dict[str, Any]:
+    def set_formula(cls, file_path: str, sheet_name: str, cell_range: str, formula: str) -> dict[str, Any]:
         """
         @intention 设置指定单元格或区域的公式
 
@@ -1933,7 +1942,7 @@ class ExcelOperations:
             return cls._format_error_result(error_msg)
 
     @classmethod
-    def evaluate_formula(cls, formula: str, context_sheet: Optional[str] = None) -> Dict[str, Any]:
+    def evaluate_formula(cls, formula: str, context_sheet: str | None = None) -> dict[str, Any]:
         """
         @intention 计算公式的值，不修改文件
 
@@ -1958,7 +1967,7 @@ class ExcelOperations:
             return cls._format_error_result(error_msg)
 
     @classmethod
-    def compare_files(cls, file1_path: str, file2_path: str) -> Dict[str, Any]:
+    def compare_files(cls, file1_path: str, file2_path: str) -> dict[str, Any]:
         """
         @intention 比较两个Excel文件的所有工作表
 
@@ -1973,7 +1982,6 @@ class ExcelOperations:
             logger.info(f"{cls._LOG_PREFIX} 开始比较文件: {file1_path} vs {file2_path}")
 
         try:
-
             # 标准文件比较配置
             options = ComparisonOptions(
                 compare_values=True,
@@ -1981,7 +1989,7 @@ class ExcelOperations:
                 compare_formats=False,
                 ignore_empty_cells=True,
                 case_sensitive=True,
-                structured_comparison=False
+                structured_comparison=False,
             )
 
             comparer = ExcelComparer(options)
@@ -1994,12 +2002,7 @@ class ExcelOperations:
             return cls._format_error_result(error_msg)
 
     @classmethod
-    def find_last_row(
-        cls,
-        file_path: str,
-        sheet_name: str,
-        column: Optional[Union[str, int]] = None
-    ) -> Dict[str, Any]:
+    def find_last_row(cls, file_path: str, sheet_name: str, column: str | int | None = None) -> dict[str, Any]:
         """
         @intention 查找表格中最后一行有数据的位置
 
@@ -2113,13 +2116,13 @@ class ExcelOperations:
                     for row_num, row in enumerate(sheet.iter_rows(values_only=False), start=1):
                         try:
                             # 安全地获取单元格值
-                            if hasattr(row, '__len__') and col_index <= len(row):
+                            if hasattr(row, "__len__") and col_index <= len(row):
                                 cell_value = row[col_index - 1].value
                             else:
                                 cell_value = None
                         except (IndexError, AttributeError, TypeError):
                             cell_value = None
-                        
+
                         if cell_value is not None and str(cell_value).strip():
                             last_row = row_num
 
@@ -2129,15 +2132,15 @@ class ExcelOperations:
             reader.close()
 
             return {
-                'success': True,
-                'data': {
-                    'last_row': last_row,
-                    'sheet_name': sheet_name,
-                    'column': column,
-                    'search_scope': search_info
+                "success": True,
+                "data": {
+                    "last_row": last_row,
+                    "sheet_name": sheet_name,
+                    "column": column,
+                    "search_scope": search_info,
                 },
-                'last_row': last_row,  # 兼容性字段
-                'message': f"成功查找{search_info}最后一行: 第{last_row}行" if last_row > 0 else f"{search_info}没有数据"
+                "last_row": last_row,  # 兼容性字段
+                "message": f"成功查找{search_info}最后一行: 第{last_row}行" if last_row > 0 else f"{search_info}没有数据",
             }
 
         except Exception as e:
@@ -2150,9 +2153,9 @@ class ExcelOperations:
         cls,
         file_path: str,
         sheet_name: str,
-        id_column: Union[int, str] = 1,
-        header_row: int = 1
-    ) -> Dict[str, Any]:
+        id_column: int | str = 1,
+        header_row: int = 1,
+    ) -> dict[str, Any]:
         """
         检查Excel工作表中的ID重复情况
 
@@ -2172,13 +2175,13 @@ class ExcelOperations:
             # 参数验证
             if not file_path or not sheet_name:
                 return {
-                    'success': False,
-                    'message': '文件路径和工作表名不能为空',
-                    'has_duplicates': False,
-                    'duplicate_count': 0,
-                    'total_ids': 0,
-                    'unique_ids': 0,
-                    'duplicates': []
+                    "success": False,
+                    "message": "文件路径和工作表名不能为空",
+                    "has_duplicates": False,
+                    "duplicate_count": 0,
+                    "total_ids": 0,
+                    "unique_ids": 0,
+                    "duplicates": [],
                 }
 
             # 自动检测双表头：确定实际表头行和数据起始行
@@ -2198,35 +2201,35 @@ class ExcelOperations:
                 wb = load_workbook(file_path, read_only=True)
             except FileNotFoundError:
                 return {
-                    'success': False,
-                    'message': f'文件不存在: {file_path}',
-                    'has_duplicates': False,
-                    'duplicate_count': 0,
-                    'total_ids': 0,
-                    'unique_ids': 0,
-                    'duplicates': []
+                    "success": False,
+                    "message": f"文件不存在: {file_path}",
+                    "has_duplicates": False,
+                    "duplicate_count": 0,
+                    "total_ids": 0,
+                    "unique_ids": 0,
+                    "duplicates": [],
                 }
             except Exception as e:
                 return {
-                    'success': False,
-                    'message': f'无法加载文件: {str(e)}',
-                    'has_duplicates': False,
-                    'duplicate_count': 0,
-                    'total_ids': 0,
-                    'unique_ids': 0,
-                    'duplicates': []
+                    "success": False,
+                    "message": f"无法加载文件: {str(e)}",
+                    "has_duplicates": False,
+                    "duplicate_count": 0,
+                    "total_ids": 0,
+                    "unique_ids": 0,
+                    "duplicates": [],
                 }
 
             # 检查工作表是否存在
             if sheet_name not in wb.sheetnames:
                 return {
-                    'success': False,
-                    'message': f'工作表不存在: {sheet_name}',
-                    'has_duplicates': False,
-                    'duplicate_count': 0,
-                    'total_ids': 0,
-                    'unique_ids': 0,
-                    'duplicates': []
+                    "success": False,
+                    "message": f"工作表不存在: {sheet_name}",
+                    "has_duplicates": False,
+                    "duplicate_count": 0,
+                    "total_ids": 0,
+                    "unique_ids": 0,
+                    "duplicates": [],
                 }
 
             ws = wb[sheet_name]
@@ -2247,7 +2250,11 @@ class ExcelOperations:
                 # 回退：手动搜索 header_row 行
                 if col_idx is None:
                     try:
-                        for row in ws.iter_rows(min_row=header_row, max_row=header_row, max_col=ws.max_column or 1000):
+                        for row in ws.iter_rows(
+                            min_row=header_row,
+                            max_row=header_row,
+                            max_col=ws.max_column or 1000,
+                        ):
                             for idx, cell in enumerate(row, start=1):
                                 if cell.value is not None and str(cell.value).strip() == id_column.strip():
                                     col_idx = idx
@@ -2262,13 +2269,13 @@ class ExcelOperations:
                         col_idx = column_index_from_string(id_column)
                     except Exception:
                         return {
-                            'success': False,
-                            'message': f'列名 "{id_column}" 未在表头行中找到，也不是有效的列字母',
-                            'has_duplicates': False,
-                            'duplicate_count': 0,
-                            'total_ids': 0,
-                            'unique_ids': 0,
-                            'duplicates': []
+                            "success": False,
+                            "message": f'列名 "{id_column}" 未在表头行中找到，也不是有效的列字母',
+                            "has_duplicates": False,
+                            "duplicate_count": 0,
+                            "total_ids": 0,
+                            "unique_ids": 0,
+                            "duplicates": [],
                         }
             else:
                 col_idx = id_column
@@ -2276,25 +2283,25 @@ class ExcelOperations:
             # 检查表头行是否存在（streaming写入后max_row可能为None，跳过检查）
             if header_row < 1 or (ws.max_row is not None and header_row > ws.max_row):
                 return {
-                    'success': False,
-                    'message': f'表头行不存在: {header_row}',
-                    'has_duplicates': False,
-                    'duplicate_count': 0,
-                    'total_ids': 0,
-                    'unique_ids': 0,
-                    'duplicates': []
+                    "success": False,
+                    "message": f"表头行不存在: {header_row}",
+                    "has_duplicates": False,
+                    "duplicate_count": 0,
+                    "total_ids": 0,
+                    "unique_ids": 0,
+                    "duplicates": [],
                 }
 
             # 检查列是否存在（streaming写入后max_column可能为None，跳过检查）
             if col_idx < 1 or (ws.max_column is not None and col_idx > ws.max_column):
                 return {
-                    'success': False,
-                    'message': f'列不存在或索引超出范围: {col_idx}',
-                    'has_duplicates': False,
-                    'duplicate_count': 0,
-                    'total_ids': 0,
-                    'unique_ids': 0,
-                    'duplicates': []
+                    "success": False,
+                    "message": f"列不存在或索引超出范围: {col_idx}",
+                    "has_duplicates": False,
+                    "duplicate_count": 0,
+                    "total_ids": 0,
+                    "unique_ids": 0,
+                    "duplicates": [],
                 }
 
             # 单次遍历收集ID并构建行号映射
@@ -2302,8 +2309,13 @@ class ExcelOperations:
             total_ids = 0
 
             for row_idx, row_data in enumerate(
-                ws.iter_rows(min_row=_data_start_row, min_col=col_idx, max_col=col_idx, values_only=True),
-                start=_data_start_row
+                ws.iter_rows(
+                    min_row=_data_start_row,
+                    min_col=col_idx,
+                    max_col=col_idx,
+                    values_only=True,
+                ),
+                start=_data_start_row,
             ):
                 cell_value = row_data[0] if row_data else None
                 if cell_value is not None:
@@ -2318,11 +2330,7 @@ class ExcelOperations:
             for id_value, rows in id_to_rows.items():
                 if len(rows) > 1:
                     duplicate_count += 1
-                    duplicates.append({
-                        'id_value': id_value,
-                        'count': len(rows),
-                        'rows': rows
-                    })
+                    duplicates.append({"id_value": id_value, "count": len(rows), "rows": rows})
 
             unique_ids = len(id_to_rows)
 
@@ -2332,13 +2340,13 @@ class ExcelOperations:
             message = f"共检查{total_ids}个ID，发现{duplicate_count}个重复ID" if has_duplicates else f"共检查{total_ids}个ID，无重复ID"
 
             return {
-                'success': True,
-                'has_duplicates': has_duplicates,
-                'duplicate_count': duplicate_count,
-                'total_ids': total_ids,
-                'unique_ids': unique_ids,
-                'duplicates': duplicates,
-                'message': message
+                "success": True,
+                "has_duplicates": has_duplicates,
+                "duplicate_count": duplicate_count,
+                "total_ids": total_ids,
+                "unique_ids": unique_ids,
+                "duplicates": duplicates,
+                "message": message,
             }
 
         except Exception as e:
@@ -2355,8 +2363,8 @@ class ExcelOperations:
         key_value,
         updates: dict,
         header_row: int = 1,
-        streaming: bool = True
-    ) -> Dict[str, Any]:
+        streaming: bool = True,
+    ) -> dict[str, Any]:
         """
         @intention Upsert行：按键列查找，存在则更新，不存在则插入新行
 
@@ -2377,7 +2385,7 @@ class ExcelOperations:
             _effective_header_row = header_row
             _resolved_key = key_column
             _resolved_updates = updates.copy() if updates else {}
-            
+
             if header_row == 1:
                 try:
                     info = HeaderAnalyzer.analyze(file_path, sheet_name)
@@ -2401,7 +2409,14 @@ class ExcelOperations:
                     pass
 
             manager = ExcelManager(file_path)
-            result = manager.upsert_row(sheet_name, _resolved_key, key_value, _resolved_updates, _effective_header_row, streaming)
+            result = manager.upsert_row(
+                sheet_name,
+                _resolved_key,
+                key_value,
+                _resolved_updates,
+                _effective_header_row,
+                streaming,
+            )
             return format_operation_result(result)
         except Exception as e:
             error_msg = f"Upsert行失败: {str(e)}"
@@ -2415,8 +2430,8 @@ class ExcelOperations:
         sheet_name: str,
         data: list,
         header_row: int = 1,
-        streaming: bool = True
-    ) -> Dict[str, Any]:
+        streaming: bool = True,
+    ) -> dict[str, Any]:
         """
         @intention 批量插入多行数据到工作表末尾
 
@@ -2462,8 +2477,8 @@ class ExcelOperations:
         data: list,
         target_row: int,
         header_row: int = 1,
-        streaming: bool = True
-    ) -> Dict[str, Any]:
+        streaming: bool = True,
+    ) -> dict[str, Any]:
         """
         @intention 在指定行位置前批量插入多行数据
 
@@ -2483,7 +2498,7 @@ class ExcelOperations:
         try:
             count = len(data)
             if count == 0:
-                return {'success': False, 'message': '没有数据需要插入', 'data': None}
+                return {"success": False, "message": "没有数据需要插入", "data": None}
 
             # 自动检测双表头：确定实际表头行
             _effective_header_row = header_row
@@ -2497,7 +2512,7 @@ class ExcelOperations:
 
             # 步骤1：在目标位置插入空行
             insert_result = cls.insert_rows(file_path, sheet_name, target_row, count, streaming)
-            if not insert_result.get('success', False):
+            if not insert_result.get("success", False):
                 return insert_result
 
             # 步骤2：获取表头列名
@@ -2507,14 +2522,19 @@ class ExcelOperations:
             reader.close()
 
             if not header_result.success or not header_result.data:
-                return {'success': False, 'message': f'无法读取表头: 第{_effective_header_row}行', 'data': None}
+                return {
+                    "success": False,
+                    "message": f"无法读取表头: 第{_effective_header_row}行",
+                    "data": None,
+                }
 
             headers = header_result.data[0] if header_result.data else []
             # 从CellInfo对象中提取value（get_range可能返回CellInfo而非原始值）
-            headers = [h.value if hasattr(h, 'value') else h for h in headers]
+            headers = [h.value if hasattr(h, "value") else h for h in headers]
 
             # 步骤3：构建写入数据并使用update_range一次性写入
             from excel_mcp_server_fastmcp.core.excel_writer import ExcelWriter
+
             writer = ExcelWriter(file_path)
 
             num_cols = len(headers)
@@ -2522,7 +2542,7 @@ class ExcelOperations:
             for row_data in data:
                 if not isinstance(row_data, dict):
                     continue
-                row_vals = [row_data.get(col_name, '') for col_name in headers]
+                row_vals = [row_data.get(col_name, "") for col_name in headers]
                 write_data.append(row_vals)
 
             if write_data:
@@ -2533,14 +2553,14 @@ class ExcelOperations:
                 writer.update_range(range_expr, write_data)
 
             return {
-                'success': True,
-                'message': f"在行{target_row}前插入了{count}行数据",
-                'data': {
-                    'inserted_count': count,
-                    'start_row': target_row,
-                    'end_row': target_row + count - 1,
-                    'mode': 'streaming' if streaming else 'standard'
-                }
+                "success": True,
+                "message": f"在行{target_row}前插入了{count}行数据",
+                "data": {
+                    "inserted_count": count,
+                    "start_row": target_row,
+                    "end_row": target_row + count - 1,
+                    "mode": "streaming" if streaming else "standard",
+                },
             }
         except Exception as e:
             error_msg = f"指定位置批量插入行失败: {str(e)}"
@@ -2548,9 +2568,16 @@ class ExcelOperations:
             return cls._format_error_result(error_msg)
 
     @classmethod
-    def create_chart(cls, file_path: str, sheet_name: str, chart_type: str,
-                     data_range: str, title: str = "",
-                     chart_name: str = "", position: str = "B15") -> Dict[str, Any]:
+    def create_chart(
+        cls,
+        file_path: str,
+        sheet_name: str,
+        chart_type: str,
+        data_range: str,
+        title: str = "",
+        chart_name: str = "",
+        position: str = "B15",
+    ) -> dict[str, Any]:
         """在工作表中创建图表。
 
         Args:
@@ -2563,23 +2590,28 @@ class ExcelOperations:
             position: 图表位置(单元格引用, 如 "B15")
         """
         import openpyxl
-        from openpyxl.chart import BarChart, LineChart, PieChart, ScatterChart, AreaChart, Reference
-        from openpyxl.chart.label import DataLabelList
+        from openpyxl.chart import (
+            AreaChart,
+            BarChart,
+            LineChart,
+            PieChart,
+            Reference,
+            ScatterChart,
+        )
 
         # 图表类型映射
         type_map = {
-            'bar': BarChart,
-            'column': BarChart,  # openpyxl中column也是BarChart(不同方向)
-            'line': LineChart,
-            'pie': PieChart,
-            'scatter': ScatterChart,
-            'area': AreaChart,
+            "bar": BarChart,
+            "column": BarChart,  # openpyxl中column也是BarChart(不同方向)
+            "line": LineChart,
+            "pie": PieChart,
+            "scatter": ScatterChart,
+            "area": AreaChart,
         }
 
         chart_type_lower = chart_type.lower().strip()
         if chart_type_lower not in type_map:
-            return cls._format_error_result(
-                f"不支持的图表类型: {chart_type}。支持的类型: {', '.join(type_map.keys())}")
+            return cls._format_error_result(f"不支持的图表类型: {chart_type}。支持的类型: {', '.join(type_map.keys())}")
 
         try:
             wb = openpyxl.load_workbook(file_path)
@@ -2590,8 +2622,8 @@ class ExcelOperations:
             ws = wb[sheet_name]
 
             # 解析数据范围
-            if '!' in data_range:
-                range_sheet, range_ref = data_range.split('!', 1)
+            if "!" in data_range:
+                range_sheet, range_ref = data_range.split("!", 1)
                 if range_sheet != sheet_name:
                     wb.close()
                     return cls._format_error_result(f"数据范围的工作表 '{range_sheet}' 与目标工作表 '{sheet_name}' 不匹配")
@@ -2600,6 +2632,7 @@ class ExcelOperations:
 
             # 解析数据范围边界 (兼容 openpyxl 3.1+: ws[range] 返回 tuple 而非 CellRange)
             from openpyxl.utils import range_boundaries
+
             try:
                 min_col, min_row, max_col, max_row = range_boundaries(range_ref)
                 if max_col < min_col or max_row < min_row:
@@ -2638,7 +2671,7 @@ class ExcelOperations:
             chart.shape = 4
 
             # column 类型改为垂直方向
-            if chart_type_lower == 'column':
+            if chart_type_lower == "column":
                 chart.type = "col"
 
             # 解析位置
@@ -2657,18 +2690,17 @@ class ExcelOperations:
             wb.close()
 
             return {
-                'success': True,
-                'message': f"图表创建成功",
-                'data': {
-                    'chart_type': chart_type,
-                    'chart_title': title or chart_name or '',
-                    'data_range': data_range,
-                    'position': position,
-                    'sheet_name': sheet_name
-                }
+                "success": True,
+                "message": "图表创建成功",
+                "data": {
+                    "chart_type": chart_type,
+                    "chart_title": title or chart_name or "",
+                    "data_range": data_range,
+                    "position": position,
+                    "sheet_name": sheet_name,
+                },
             }
         except Exception as e:
             error_msg = f"图表创建失败: {str(e)}"
             logger.error(f"{cls._LOG_PREFIX} {error_msg}")
             return cls._format_error_result(error_msg)
-

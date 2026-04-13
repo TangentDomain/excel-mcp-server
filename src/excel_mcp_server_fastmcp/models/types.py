@@ -4,24 +4,14 @@ Excel MCP Server - 数据类型定义
 定义了项目中使用的所有数据类型和模型
 """
 
-from typing import Any, Dict, List, Optional, Union
 from dataclasses import dataclass
 from enum import Enum
-
-
-@dataclass
-class FieldDifference:
-    """详细的字段级差异信息（精简版 - 去除计算冗余）"""
-    field_name: str                    # 字段/属性名称
-    old_value: Any                     # 旧值
-    new_value: Any                     # 新值
-    change_type: str                   # 变化类型：数值变化、文本变化等
-    # 已移除冗余字段：numeric_change, percent_change, formatted_change
-    # 这些可以从 old_value 和 new_value 计算得出
+from typing import Any
 
 
 class RangeType(Enum):
     """范围类型枚举"""
+
     CELL_RANGE = "cell_range"
     ROW_RANGE = "row_range"
     COLUMN_RANGE = "column_range"
@@ -31,31 +21,34 @@ class RangeType(Enum):
 
 class MatchType(Enum):
     """搜索匹配类型枚举"""
+
     VALUE = "value"
     FORMULA = "formula"
 
 
 class DifferenceType(Enum):
     """比较差异类型枚举"""
-    VALUE_CHANGED = "value_changed"      # 单元格值变化
-    FORMAT_CHANGED = "format_changed"    # 单元格格式变化
-    CELL_ADDED = "cell_added"           # 新增单元格
-    CELL_REMOVED = "cell_removed"       # 删除单元格
+
+    VALUE_CHANGED = "value_changed"  # 单元格值变化
+    FORMAT_CHANGED = "format_changed"  # 单元格格式变化
+    CELL_ADDED = "cell_added"  # 新增单元格
+    CELL_REMOVED = "cell_removed"  # 删除单元格
     STRUCTURE_CHANGED = "structure_changed"  # 结构变化（行列数）
-    SHEET_ADDED = "sheet_added"         # 新增工作表
-    SHEET_REMOVED = "sheet_removed"     # 删除工作表
-    SHEET_RENAMED = "sheet_renamed"     # 工作表重命名
+    SHEET_ADDED = "sheet_added"  # 新增工作表
+    SHEET_REMOVED = "sheet_removed"  # 删除工作表
+    SHEET_RENAMED = "sheet_renamed"  # 工作表重命名
     # 结构化数据差异类型
-    ROW_ADDED = "row_added"             # 新增行
-    ROW_REMOVED = "row_removed"         # 删除行
-    ROW_MODIFIED = "row_modified"       # 行数据修改
-    HEADER_CHANGED = "header_changed"   # 表头变化
+    ROW_ADDED = "row_added"  # 新增行
+    ROW_REMOVED = "row_removed"  # 删除行
+    ROW_MODIFIED = "row_modified"  # 行数据修改
+    HEADER_CHANGED = "header_changed"  # 表头变化
 
 
 @dataclass
 class RangeInfo:
     """范围信息"""
-    sheet_name: Optional[str]
+
+    sheet_name: str | None
     cell_range: str
     range_type: RangeType
 
@@ -63,6 +56,7 @@ class RangeInfo:
 @dataclass
 class ExcelDimensions:
     """Excel范围维度信息"""
+
     rows: int
     columns: int
     start_row: int
@@ -72,17 +66,19 @@ class ExcelDimensions:
 @dataclass
 class CellInfo:
     """单元格信息"""
+
     coordinate: str
     value: Any
-    data_type: Optional[str] = None
-    number_format: Optional[str] = None
-    font: Optional[str] = None
-    fill: Optional[str] = None
+    data_type: str | None = None
+    number_format: str | None = None
+    font: str | None = None
+    fill: str | None = None
 
 
 @dataclass(frozen=True)
 class SheetInfo:
     """工作表信息"""
+
     index: int
     name: str
     max_row: int
@@ -94,10 +90,11 @@ class SheetInfo:
 @dataclass
 class SearchMatch:
     """搜索匹配结果"""
+
     sheet: str
     cell: str
-    value: Optional[str] = None
-    formula: Optional[str] = None
+    value: str | None = None
+    formula: str | None = None
     match: str = ""
     match_start: int = 0
     match_end: int = 0
@@ -107,16 +104,18 @@ class SearchMatch:
 @dataclass
 class OperationResult:
     """操作结果"""
+
     success: bool
-    message: Optional[str] = None
-    error: Optional[str] = None
-    data: Optional[Any] = None
-    metadata: Optional[Dict[str, Any]] = None
+    message: str | None = None
+    error: str | None = None
+    data: Any | None = None
+    metadata: dict[str, Any] | None = None
 
 
 @dataclass
 class ModifiedCell:
     """修改的单元格信息"""
+
     coordinate: str
     old_value: Any
     new_value: Any
@@ -125,108 +124,116 @@ class ModifiedCell:
 @dataclass
 class CellDifference:
     """单元格差异信息"""
+
     coordinate: str
     difference_type: DifferenceType
-    old_value: Optional[Any] = None
-    new_value: Optional[Any] = None
-    old_format: Optional[str] = None
-    new_format: Optional[str] = None
-    sheet_name: Optional[str] = None
+    old_value: Any | None = None
+    new_value: Any | None = None
+    old_format: str | None = None
+    new_format: str | None = None
+    sheet_name: str | None = None
 
 
 @dataclass
 class SheetComparison:
     """工作表比较结果"""
+
     sheet_name: str
     exists_in_file1: bool
     exists_in_file2: bool
-    differences: List[CellDifference]
+    differences: list[CellDifference]
     total_differences: int
-    structural_changes: Dict[str, Any]  # 结构变化信息
+    structural_changes: dict[str, Any]  # 结构变化信息
 
 
 @dataclass
 class StructuredDataComparison:
     """结构化数据比较结果"""
+
     sheet_name: str
     exists_in_file1: bool
     exists_in_file2: bool
-    row_differences: List['RowDifference']
+    row_differences: list["RowDifference"]
     total_differences: int
-    structural_changes: Dict[str, Any]  # 结构变化信息
+    structural_changes: dict[str, Any]  # 结构变化信息
 
 
 @dataclass
 class ComparisonResult:
     """Excel比较结果"""
+
     file1_path: str
     file2_path: str
     identical: bool
     total_differences: int
-    sheet_comparisons: List[SheetComparison]
-    structural_differences: Dict[str, Any]  # 文件级别的结构差异
+    sheet_comparisons: list[SheetComparison]
+    structural_differences: dict[str, Any]  # 文件级别的结构差异
     summary: str  # 比较结果摘要
 
 
 @dataclass
 class ComparisonOptions:
     """比较选项配置"""
-    compare_values: bool = True      # 比较单元格值
-    compare_formulas: bool = False   # 比较公式
-    compare_formats: bool = False    # 比较格式
+
+    compare_values: bool = True  # 比较单元格值
+    compare_formulas: bool = False  # 比较公式
+    compare_formats: bool = False  # 比较格式
     ignore_empty_cells: bool = True  # 忽略空单元格
-    case_sensitive: bool = True      # 大小写敏感
+    case_sensitive: bool = True  # 大小写敏感
     # 表格化数据比较选项（游戏开发友好）
-    header_row: Optional[int] = 1         # 表头行号（1-based），默认第一行
-    id_column: Optional[Union[int, str]] = 1  # ID列位置（1-based或列名），默认第一列
-    structured_comparison: bool = True    # 默认启用结构化数据比较
-    show_numeric_changes: bool = True     # 显示数值变化量和百分比
-    game_friendly_format: bool = True     # 游戏开发友好的输出格式
-    focus_on_id_changes: bool = True      # 专注于ID对象变化，隐藏位置信息
+    header_row: int | None = 1  # 表头行号（1-based），默认第一行
+    id_column: int | str | None = 1  # ID列位置（1-based或列名），默认第一列
+    structured_comparison: bool = True  # 默认启用结构化数据比较
+    show_numeric_changes: bool = True  # 显示数值变化量和百分比
+    game_friendly_format: bool = True  # 游戏开发友好的输出格式
+    focus_on_id_changes: bool = True  # 专注于ID对象变化，隐藏位置信息
 
 
 @dataclass
 class FieldDifference:
     """字段级差异信息（详细的属性变化）"""
-    field_name: str                    # 字段/属性名称
-    old_value: Any                     # 旧值
-    new_value: Any                     # 新值
-    change_type: str                   # 变化类型：数值变化、文本变化等
-    numeric_change: Optional[float] = None      # 数值变化量
-    percent_change: Optional[float] = None      # 百分比变化
-    formatted_change: Optional[str] = None      # 格式化的变化描述
+
+    field_name: str  # 字段/属性名称
+    old_value: Any  # 旧值
+    new_value: Any  # 新值
+    change_type: str  # 变化类型：数值变化、文本变化等
+    numeric_change: float | None = None  # 数值变化量
+    percent_change: float | None = None  # 百分比变化
+    formatted_change: str | None = None  # 格式化的变化描述
 
 
 @dataclass
 class RowDifference:
     """行级差异信息（精简版 - 仅保留核心定位信息）"""
-    row_id: Any                     # 行的唯一标识（对象ID）
-    difference_type: DifferenceType # 差异类型：行增加、删除、修改
-    row_index1: int                 # 在第一个文件中的行号（必选）
-    row_index2: int                 # 在第二个文件中的行号（必选）
-    sheet_name: str                 # 所在工作表名称（必选）
+
+    row_id: Any  # 行的唯一标识（对象ID）
+    difference_type: DifferenceType  # 差异类型：行增加、删除、修改
+    row_index1: int  # 在第一个文件中的行号（必选）
+    row_index2: int  # 在第二个文件中的行号（必选）
+    sheet_name: str  # 所在工作表名称（必选）
     # 保留详细的字段级差异，客户端可按需格式化
-    detailed_field_differences: Optional[List[FieldDifference]] = None  # 详细的字段级差异
+    detailed_field_differences: list[FieldDifference] | None = None  # 详细的字段级差异
     # 新增：未变化的字段信息，用于完整对象重建
-    unchanged_field_differences: Optional[List[FieldDifference]] = None  # 未变化的字段信息
+    unchanged_field_differences: list[FieldDifference] | None = None  # 未变化的字段信息
 
 
 @dataclass
 class StructuredSheetComparison:
     """结构化工作表比较结果（精简版 - 去除统计冗余）"""
+
     sheet_name: str
     exists_in_file1: bool
     exists_in_file2: bool
-    headers1: Optional[List[str]] = None  # 第一个文件的表头
-    headers2: Optional[List[str]] = None  # 第二个文件的表头
-    header_differences: Optional[List[str]] = None  # 表头差异
-    row_differences: List[RowDifference] = None  # 行级差异
+    headers1: list[str] | None = None  # 第一个文件的表头
+    headers2: list[str] | None = None  # 第二个文件的表头
+    header_differences: list[str] | None = None  # 表头差异
+    row_differences: list[RowDifference] = None  # 行级差异
     total_differences: int = 0
     # 已移除冗余统计字段：identical_rows, modified_rows, added_rows, removed_rows
     # 这些可以从 row_differences 计算得出
 
 
 # 类型别名
-ExcelData = List[List[CellInfo]]
-RawExcelData = List[List[Any]]
-ComparisonData = Dict[str, Any]  # 比较数据类型别名
+ExcelData = list[list[CellInfo]]
+RawExcelData = list[list[Any]]
+ComparisonData = dict[str, Any]  # 比较数据类型别名

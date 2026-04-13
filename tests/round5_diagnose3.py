@@ -1,20 +1,24 @@
 """诊断: 空表上 SUM/AVG 返回空结果的根因"""
+
 import sys
-sys.path.insert(0, '/root/workspace/excel-mcp-server/src')
+
+sys.path.insert(0, "/root/workspace/excel-mcp-server/src")
+import traceback
+
 from openpyxl import Workbook
+
 from excel_mcp_server_fastmcp.api.advanced_sql_query import (
     execute_advanced_sql_query,
 )
-import traceback
 
 # 创建空表测试文件
 wb = Workbook()
 ws = wb.active
 ws.title = "test"
 ws.append(["ID", "Name", "Val"])
-wb.save('/tmp/r5_empty_test.xlsx')
+wb.save("/tmp/r5_empty_test.xlsx")
 
-fp = '/tmp/r5_empty_test.xlsx'
+fp = "/tmp/r5_empty_test.xlsx"
 
 print("=" * 60)
 print("空表聚合查询诊断")
@@ -30,9 +34,9 @@ for sql in [
         r = execute_advanced_sql_query(fp, sql)
         print(f"  success={r.get('success')}")
         print(f"  data={r.get('data')}")
-        if r.get('message'):
+        if r.get("message"):
             print(f"  message={r['message'][:300]}")
-        if r.get('error_code'):
+        if r.get("error_code"):
             print(f"  error_code={r['error_code']}")
     except Exception as e:
         print(f"  EXCEPTION: {e}")
@@ -49,9 +53,9 @@ ws2.title = "test2"
 ws2.append(["ID", "Val"])
 ws2.append([1, 10])
 ws2.append([2, 20])
-wb2.save('/tmp/r5_where_empty.xlsx')
+wb2.save("/tmp/r5_where_empty.xlsx")
 
-fp2 = '/tmp/r5_where_empty.xlsx'
+fp2 = "/tmp/r5_where_empty.xlsx"
 
 for sql in [
     "SELECT COUNT(*) as cnt FROM test2 WHERE ID > 99",
@@ -63,7 +67,7 @@ for sql in [
         r = execute_advanced_sql_query(fp2, sql)
         print(f"  success={r.get('success')}")
         print(f"  data={r.get('data')}")
-        if r.get('message'):
+        if r.get("message"):
             print(f"  message={r['message'][:200]}")
     except Exception as e:
         print(f"  EXCEPTION: {e}")

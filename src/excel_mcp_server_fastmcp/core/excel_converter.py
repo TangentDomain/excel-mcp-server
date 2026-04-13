@@ -4,19 +4,17 @@ Excel MCP Server - Excel转换模块
 提供Excel文件格式转换、导入导出功能
 """
 
-import logging
 import csv
 import json
+import logging
 import os
-import time
-from typing import List, Dict, Any, Optional, Tuple
 from pathlib import Path
-from openpyxl import Workbook, load_workbook
-from openpyxl.utils import get_column_letter
 
-from ..models.types import SheetInfo, OperationResult
+from openpyxl import Workbook, load_workbook
+
+from ..models.types import OperationResult
+from ..utils.exceptions import DataValidationError, ExcelFileNotFoundError
 from ..utils.validators import ExcelValidator
-from ..utils.exceptions import ExcelFileNotFoundError, DataValidationError
 
 logger = logging.getLogger(__name__)
 
@@ -36,8 +34,8 @@ class ExcelConverter:
     def export_to_csv(
         self,
         output_path: str,
-        sheet_name: Optional[str] = None,
-        encoding: str = "utf-8"
+        sheet_name: str | None = None,
+        encoding: str = "utf-8",
     ) -> OperationResult:
         """
         将Excel工作表导出为CSV文件
@@ -59,7 +57,7 @@ class ExcelConverter:
                     raise DataValidationError(
                         f"工作表 '{sheet_name}' 不存在",
                         f"可用工作表: {', '.join(workbook.sheetnames)}",
-                        "请使用正确的工作表名称"
+                        "请使用正确的工作表名称",
                     )
                 sheet = workbook[sheet_name]
             else:
@@ -71,7 +69,7 @@ class ExcelConverter:
             output_dir.mkdir(parents=True, exist_ok=True)
 
             # 写入CSV文件
-            with open(output_path, 'w', newline='', encoding=encoding) as csvfile:
+            with open(output_path, "w", newline="", encoding=encoding) as csvfile:
                 csv_writer = csv.writer(csvfile)
 
                 row_count = 0
@@ -87,17 +85,17 @@ class ExcelConverter:
                 success=True,
                 message=f"成功导出 {row_count} 行数据到CSV文件",
                 data={
-                    'output_path': output_path,
-                    'row_count': row_count,
-                    'sheet_name': sheet_name,
-                    'encoding': encoding
+                    "output_path": output_path,
+                    "row_count": row_count,
+                    "sheet_name": sheet_name,
+                    "encoding": encoding,
                 },
                 metadata={
-                    'source_file': self.file_path,
-                    'sheet_name': sheet_name,
-                    'encoding': encoding,
-                    'row_count': row_count
-                }
+                    "source_file": self.file_path,
+                    "sheet_name": sheet_name,
+                    "encoding": encoding,
+                    "row_count": row_count,
+                },
             )
 
         except Exception as e:
@@ -105,7 +103,7 @@ class ExcelConverter:
             return OperationResult(
                 success=False,
                 error=str(e),
-                metadata={'operation': 'export_to_csv', 'file_path': self.file_path}
+                metadata={"operation": "export_to_csv", "file_path": self.file_path},
             )
 
     @staticmethod
@@ -114,7 +112,7 @@ class ExcelConverter:
         output_path: str,
         sheet_name: str = "Sheet1",
         encoding: str = "utf-8",
-        has_header: bool = True
+        has_header: bool = True,
     ) -> OperationResult:
         """
         从CSV文件导入数据创建Excel文件
@@ -145,7 +143,7 @@ class ExcelConverter:
 
             # 读取CSV数据并流式写入
             row_count = 0
-            with open(csv_path, 'r', encoding=encoding) as csvfile:
+            with open(csv_path, encoding=encoding) as csvfile:
                 csv_reader = csv.reader(csvfile)
 
                 for row_data in csv_reader:
@@ -153,8 +151,8 @@ class ExcelConverter:
                     converted_row = []
                     for value in row_data:
                         try:
-                            if value and value.replace('.', '').replace('-', '').isdigit():
-                                value = float(value) if '.' in value else int(value)
+                            if value and value.replace(".", "").replace("-", "").isdigit():
+                                value = float(value) if "." in value else int(value)
                         except (ValueError, AttributeError):
                             pass
                         converted_row.append(value)
@@ -170,17 +168,17 @@ class ExcelConverter:
                 success=True,
                 message=f"成功从CSV导入 {row_count} 行数据",
                 data={
-                    'output_path': output_path,
-                    'row_count': row_count,
-                    'sheet_name': sheet_name,
-                    'has_header': has_header,
-                    'encoding': encoding
+                    "output_path": output_path,
+                    "row_count": row_count,
+                    "sheet_name": sheet_name,
+                    "has_header": has_header,
+                    "encoding": encoding,
                 },
                 metadata={
-                    'source_file': csv_path,
-                    'encoding': encoding,
-                    'row_count': row_count
-                }
+                    "source_file": csv_path,
+                    "encoding": encoding,
+                    "row_count": row_count,
+                },
             )
 
         except Exception as e:
@@ -188,15 +186,11 @@ class ExcelConverter:
             return OperationResult(
                 success=False,
                 error=str(e),
-                metadata={'operation': 'import_from_csv', 'csv_path': csv_path}
+                metadata={"operation": "import_from_csv", "csv_path": csv_path},
             )
 
     @staticmethod
-    def convert_format(
-        input_path: str,
-        output_path: str,
-        target_format: str = "xlsx"
-    ) -> OperationResult:
+    def convert_format(input_path: str, output_path: str, target_format: str = "xlsx") -> OperationResult:
         """
         转换Excel文件格式
 
@@ -231,15 +225,12 @@ class ExcelConverter:
                     success=True,
                     message=f"成功转换文件格式: {input_format} -> {target_format}",
                     data={
-                        'input_format': input_format,
-                        'output_format': target_format,
-                        'file_size': file_size,
-                        'output_path': output_path
+                        "input_format": input_format,
+                        "output_format": target_format,
+                        "file_size": file_size,
+                        "output_path": output_path,
                     },
-                    metadata={
-                        'input_path': input_path,
-                        'target_format': target_format
-                    }
+                    metadata={"input_path": input_path, "target_format": target_format},
                 )
 
             elif target_format.lower() == "json":
@@ -248,6 +239,7 @@ class ExcelConverter:
                 calamine_ok = False
                 try:
                     from python_calamine import CalamineWorkbook
+
                     cal_wb = CalamineWorkbook.from_path(input_path)
                     for sheet_name in cal_wb.sheet_names:
                         sheet_data = []
@@ -273,25 +265,22 @@ class ExcelConverter:
                                 sheet_data.append(list(row))
                         json_data[sheet_name] = sheet_data
 
-                with open(output_path, 'w', encoding='utf-8') as jsonfile:
+                with open(output_path, "w", encoding="utf-8") as jsonfile:
                     json.dump(json_data, jsonfile, ensure_ascii=False, indent=2)
 
                 file_size = os.path.getsize(output_path)
 
                 return OperationResult(
                     success=True,
-                    message=f"成功转换为JSON格式",
+                    message="成功转换为JSON格式",
                     data={
-                        'input_format': input_format,
-                        'output_format': 'json',
-                        'file_size': file_size,
-                        'output_path': output_path,
-                        'sheet_count': len(json_data)
+                        "input_format": input_format,
+                        "output_format": "json",
+                        "file_size": file_size,
+                        "output_path": output_path,
+                        "sheet_count": len(json_data),
                     },
-                    metadata={
-                        'input_path': input_path,
-                        'target_format': target_format
-                    }
+                    metadata={"input_path": input_path, "target_format": target_format},
                 )
 
             elif target_format.lower() == "csv":
@@ -301,10 +290,11 @@ class ExcelConverter:
                 calamine_ok = False
                 try:
                     from python_calamine import CalamineWorkbook
+
                     cal_wb = CalamineWorkbook.from_path(input_path)
                     first_sheet = cal_wb.sheet_names[0] if cal_wb.sheet_names else ""
                     sheet_name = first_sheet
-                    with open(output_path, 'w', newline='', encoding='utf-8') as csvfile:
+                    with open(output_path, "w", newline="", encoding="utf-8") as csvfile:
                         csv_writer = csv.writer(csvfile)
                         try:
                             rows = cal_wb.get_sheet_by_name(first_sheet).to_python()
@@ -320,7 +310,7 @@ class ExcelConverter:
                 if not calamine_ok:
                     sheet = workbook.active
                     sheet_name = sheet.title
-                    with open(output_path, 'w', newline='', encoding='utf-8') as csvfile:
+                    with open(output_path, "w", newline="", encoding="utf-8") as csvfile:
                         csv_writer = csv.writer(csvfile)
                         for row in sheet.iter_rows(values_only=True):
                             if any(cell is not None for cell in row):
@@ -331,18 +321,15 @@ class ExcelConverter:
 
                 return OperationResult(
                     success=True,
-                    message=f"成功转换为CSV格式",
+                    message="成功转换为CSV格式",
                     data={
-                        'input_format': input_format,
-                        'output_format': 'csv',
-                        'file_size': file_size,
-                        'output_path': output_path,
-                        'row_count': row_count
+                        "input_format": input_format,
+                        "output_format": "csv",
+                        "file_size": file_size,
+                        "output_path": output_path,
+                        "row_count": row_count,
                     },
-                    metadata={
-                        'input_path': input_path,
-                        'target_format': target_format
-                    }
+                    metadata={"input_path": input_path, "target_format": target_format},
                 )
 
             else:
@@ -353,15 +340,11 @@ class ExcelConverter:
             return OperationResult(
                 success=False,
                 error=str(e),
-                metadata={'operation': 'convert_format', 'input_path': input_path}
+                metadata={"operation": "convert_format", "input_path": input_path},
             )
 
     @staticmethod
-    def merge_files(
-        input_files: List[str],
-        output_path: str,
-        merge_mode: str = "sheets"
-    ) -> OperationResult:
+    def merge_files(input_files: list[str], output_path: str, merge_mode: str = "sheets") -> OperationResult:
         """
         合并多个Excel文件
 
@@ -414,9 +397,9 @@ class ExcelConverter:
                         if sheets_data is None:
                             continue
                         for sheet_name, rows in sheets_data:
-                            new_sheet_name = f"File{file_index+1}_{sheet_name}"
+                            new_sheet_name = f"File{file_index + 1}_{sheet_name}"
                             if len(new_sheet_name) > 31:
-                                new_sheet_name = f"F{file_index+1}_{sheet_name[:20]}"[:31]
+                                new_sheet_name = f"F{file_index + 1}_{sheet_name[:20]}"[:31]
 
                             target_sheet = output_workbook.create_sheet(title=new_sheet_name)
                             for row in rows:
@@ -431,9 +414,9 @@ class ExcelConverter:
                         for sheet_name in source_workbook.sheetnames:
                             source_sheet = source_workbook[sheet_name]
 
-                            new_sheet_name = f"File{file_index+1}_{sheet_name}"
+                            new_sheet_name = f"File{file_index + 1}_{sheet_name}"
                             if len(new_sheet_name) > 31:
-                                new_sheet_name = f"F{file_index+1}_{sheet_name[:20]}"[:31]
+                                new_sheet_name = f"F{file_index + 1}_{sheet_name[:20]}"[:31]
 
                             target_sheet = output_workbook.create_sheet(title=new_sheet_name)
 
@@ -498,15 +481,12 @@ class ExcelConverter:
                 success=True,
                 message=f"成功合并 {merged_files} 个文件，共 {total_sheets} 个工作表",
                 data={
-                    'merged_files': merged_files,
-                    'total_sheets': total_sheets,
-                    'output_path': output_path,
-                    'merge_mode': merge_mode
+                    "merged_files": merged_files,
+                    "total_sheets": total_sheets,
+                    "output_path": output_path,
+                    "merge_mode": merge_mode,
                 },
-                metadata={
-                    'input_files': input_files,
-                    'merge_mode': merge_mode
-                }
+                metadata={"input_files": input_files, "merge_mode": merge_mode},
             )
 
         except Exception as e:
@@ -514,5 +494,5 @@ class ExcelConverter:
             return OperationResult(
                 success=False,
                 error=str(e),
-                metadata={'operation': 'merge_files', 'input_files': input_files}
+                metadata={"operation": "merge_files", "input_files": input_files},
             )

@@ -22,13 +22,13 @@ def extract_rich_text(title_obj: Any) -> str:
         t = title_obj.text
         if isinstance(t, str):
             return t
-        if hasattr(t, 'p'):
+        if hasattr(t, "p"):
             parts = []
             for p in t.p:
-                for r in (p.r or []):
-                    if hasattr(r, 't'):
+                for r in p.r or []:
+                    if hasattr(r, "t"):
                         parts.append(r.t)
-            return ''.join(parts)
+            return "".join(parts)
     except Exception:
         pass
     return str(title_obj)[:100]

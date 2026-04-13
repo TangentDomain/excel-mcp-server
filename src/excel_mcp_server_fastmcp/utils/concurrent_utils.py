@@ -7,8 +7,9 @@
 
 import logging
 import os
+from collections.abc import Callable
 from concurrent.futures import ThreadPoolExecutor, as_completed
-from typing import Any, Callable, Dict, List, Optional, Tuple
+from typing import Any
 
 logger = logging.getLogger(__name__)
 
@@ -20,10 +21,10 @@ _BATCH_CHUNK_SIZE = 500
 
 
 def parallel_read_files(
-    file_paths: List[str],
+    file_paths: list[str],
     read_fn: Callable[[str], Any],
-    max_workers: Optional[int] = None,
-) -> List[Tuple[str, Any]]:
+    max_workers: int | None = None,
+) -> list[tuple[str, Any]]:
     """并行读取多个文件。
 
     Args:
@@ -48,13 +49,11 @@ def parallel_read_files(
             logger.error(f"读取文件失败 {file_paths[0]}: {e}")
             return [(file_paths[0], None)]
 
-    results_map: Dict[str, Any] = {}
-    errors: List[str] = []
+    results_map: dict[str, Any] = {}
+    errors: list[str] = []
 
     with ThreadPoolExecutor(max_workers=workers) as executor:
-        future_to_path = {
-            executor.submit(read_fn, fp): fp for fp in file_paths
-        }
+        future_to_path = {executor.submit(read_fn, fp): fp for fp in file_paths}
         for future in as_completed(future_to_path):
             fp = future_to_path[future]
             try:
@@ -72,10 +71,10 @@ def parallel_read_files(
 
 
 def parallel_map(
-    items: List[Any],
+    items: list[Any],
     process_fn: Callable[[Any], Any],
-    max_workers: Optional[int] = None,
-) -> List[Any]:
+    max_workers: int | None = None,
+) -> list[Any]:
     """并行处理列表中的每个元素。
 
     Args:
@@ -94,13 +93,10 @@ def parallel_map(
     if len(items) <= 2:
         return [process_fn(item) for item in items]
 
-    results_map: Dict[int, Any] = {}
+    results_map: dict[int, Any] = {}
 
     with ThreadPoolExecutor(max_workers=workers) as executor:
-        future_to_idx = {
-            executor.submit(process_fn, item): idx
-            for idx, item in enumerate(items)
-        }
+        future_to_idx = {executor.submit(process_fn, item): idx for idx, item in enumerate(items)}
         for future in as_completed(future_to_idx):
             idx = future_to_idx[future]
             try:
@@ -113,10 +109,10 @@ def parallel_map(
 
 
 def parallel_validate_batch_data(
-    rows: List[Dict[str, Any]],
-    validate_fn: Callable[[Dict[str, Any]], Optional[str]],
-    max_workers: Optional[int] = None,
-) -> List[Optional[str]]:
+    rows: list[dict[str, Any]],
+    validate_fn: Callable[[dict[str, Any]], str | None],
+    max_workers: int | None = None,
+) -> list[str | None]:
     """并行验证批量数据行，返回每行的错误信息（None表示通过）。
 
     Args:
@@ -134,13 +130,10 @@ def parallel_validate_batch_data(
     if len(rows) <= _BATCH_CHUNK_SIZE:
         return [validate_fn(row) for row in rows]
 
-    results_map: Dict[int, Optional[str]] = {}
+    results_map: dict[int, str | None] = {}
 
     with ThreadPoolExecutor(max_workers=workers) as executor:
-        future_to_idx = {
-            executor.submit(validate_fn, row): idx
-            for idx, row in enumerate(rows)
-        }
+        future_to_idx = {executor.submit(validate_fn, row): idx for idx, row in enumerate(rows)}
         for future in as_completed(future_to_idx):
             idx = future_to_idx[future]
             try:
@@ -153,10 +146,10 @@ def parallel_validate_batch_data(
 
 
 def parallel_group_execute(
-    groups: Dict[str, List[Any]],
-    process_fn: Callable[[str, List[Any]], Any],
-    max_workers: Optional[int] = None,
-) -> Dict[str, Any]:
+    groups: dict[str, list[Any]],
+    process_fn: Callable[[str, list[Any]], Any],
+    max_workers: int | None = None,
+) -> dict[str, Any]:
     """按分组并行执行操作，每个分组一个线程。
 
     Args:
@@ -174,13 +167,10 @@ def parallel_group_execute(
     if len(groups) <= 2:
         return {key: process_fn(key, data) for key, data in groups.items()}
 
-    results: Dict[str, Any] = {}
+    results: dict[str, Any] = {}
 
     with ThreadPoolExecutor(max_workers=workers) as executor:
-        future_to_key = {
-            executor.submit(process_fn, key, data): key
-            for key, data in groups.items()
-        }
+        future_to_key = {executor.submit(process_fn, key, data): key for key, data in groups.items()}
         for future in as_completed(future_to_key):
             key = future_to_key[future]
             try:
