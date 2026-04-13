@@ -658,6 +658,18 @@ class AdvancedSQLQueryEngine:
                 # 因为 MySQL 方言将 || 解析为逻辑 OR，需要提前转换
                 sql = self._preprocess_dpipe_to_concat(sql)
 
+                # 预处理: 自动为 MySQL 保留字标识符添加反引号
+                # 解决 Key/Value/Status 等常见列名导致 sqlglot ParseError 的问题
+                sql = self._preprocess_reserved_words(sql)
+
+                # 多语句SQL检测与处理：分号分隔的多个语句逐条执行，合并结果
+                # sqlglot.parse_one() 只返回第一条语句，需要手动拆分
+                _stripped_for_check = sql.strip()
+                if ';' in _stripped_for_check and not _stripped_for_check.endswith(';'):
+                    # 包含中间分号 → 多语句（排除尾部分号的常见写法）
+                    return self._execute_multi_statement(sql, file_path, worksheets_data,
+                                                         include_headers, output_format, limit)
+
                 parsed_sql = sqlglot.parse_one(sql, dialect="mysql")
 
                 # 保存解析后的SQL,用于错误提示中的窗口函数别名检测
@@ -1151,6 +1163,290 @@ class AdvancedSQLQueryEngine:
         """
         # 当前不进行预处理转换,由 _process_select_expression 中的运行时检测处理
         return sql
+
+    # MySQL 保留字中常被用作 Excel 列名的关键字集合（精简版）
+    # 这些字在 MySQL 方言中作为未引用标识符会导致 sqlglot 解析失败
+    # 通过逐词测试验证（sqlglot 27.29.0 + MySQL dialect），仅以下词在 SELECT/INSERT 列表位置会报 ParseError：
+    #   - KEY: 最常见问题（本地化表的 Key 列、配置表的主键列名）
+    #   - INDEX: 在 INSERT 列表中冲突
+    #   - CHECK / CONSTRAINT: 在 INSERT 列表中冲突
+    # 注意：不包含 SQL 结构关键字（SELECT/FROM/WHERE/INSERT/VALUES/CASE 等），
+    #       那些关键字如果被引用反而会破坏 SQL 语法。
+    _MYSQL_RESERVED_AS_COLUMNS = frozenset({
+        'KEY', 'INDEX', 'CHECK', 'CONSTRAINT',
+    })
+
+    def _preprocess_reserved_words(self, sql: str) -> str:
+        """
+        预处理SQL：将未加反引号的MySQL保留字标识符自动加上反引号。
+
+        问题背景：
+        sqlglot 的 MySQL 方言解析器对某些保留字（如 Key, Value, Status, Name 等）
+        作为未引用标识符时会报 ParseError。但游戏配置表中这些名称极其常见（如
+        本地化表的 Key 列、掉落表的概率 Value 列等）。
+
+        解决方案：
+        在 SQL 解析前，扫描并自动为匹配保留字的裸标识符添加反引号。
+        使用状态机逐字符分析，避免在字符串内部误替换。
+
+        Args:
+            sql: 原始 SQL 语句
+
+        Returns:
+            str: 处理后的 SQL 语句
+        """
+        import re
+
+        reserved = self._MYSQL_RESERVED_AS_COLUMNS
+        result = []
+        i = 0
+        n = len(sql)
+
+        while i < n:
+            # 跳过单引号字符串
+            if sql[i] == "'":
+                j = i + 1
+                while j < n:
+                    if sql[j] == "'" and j + 1 < n and sql[j + 1] == "'":
+                        j += 2  # 转义的单引号 ''
+                    elif sql[j] == "'":
+                        break
+                    else:
+                        j += 1
+                result.append(sql[i:j + 1])
+                i = j + 1
+                continue
+
+            # 跳过双引号字符串
+            if sql[i] == '"':
+                j = i + 1
+                while j < n:
+                    if sql[j] == '"':
+                        break
+                    else:
+                        j += 1
+                result.append(sql[i:j + 1])
+                i = j + 1
+                continue
+
+            # 跳过反引号引用的标识符（已引用的不需要处理）
+            if sql[i] == '`':
+                j = i + 1
+                while j < n and sql[j] != '`':
+                    j += 1
+                result.append(sql[i:j + 1])  # include closing backtick
+                i = j + 1
+                continue
+
+            # 跳过数字开头（数字字面量）
+            if sql[i].isdigit():
+                j = i
+                while j < n and (sql[j].isdigit() or sql[j] == '.' or sql[j] in 'eE+-'):
+                    j += 1
+                result.append(sql[i:j])
+                i = j
+                continue
+
+            # 检测标识符（字母或下划线开头，后跟字母/数字/下划线/中文）
+            if sql[i].isalpha() or sql[i] == '_':
+                j = i
+                while j < n and (sql[j].isalnum() or sql[j] == '_' or ord(sql[j]) > 127):
+                    j += 1
+                word = sql[i:j]
+                upper_word = word.upper()
+
+                # 判断是否需要加反引号：
+                # 1. 是保留字
+                # 2. 前面不是 "." （避免引用 table.column 的列名部分被错误处理，
+                #    实际上这种情况也需要保护，所以也处理）
+                if upper_word in reserved:
+                    # 确保不在字符串或已引用上下文中（前面逻辑已保证）
+                    # 额外检查：前面紧邻的字符不应是 @ （MySQL变量）
+                    if i > 0 and sql[i - 1] == '@':
+                        result.append(word)
+                    else:
+                        result.append('`' + word + '`')
+                else:
+                    result.append(word)
+                i = j
+                continue
+
+            # 其他原样保留
+            result.append(sql[i])
+            i += 1
+
+        return ''.join(result)
+
+    def _execute_multi_statement(self, sql: str, file_path: str, worksheets_data: dict,
+                                  include_headers: bool, output_format: str, limit: int) -> dict:
+        """
+        执行多语句SQL（分号分隔的多条语句）。
+
+        将 SQL 按分号拆分为多条独立语句，逐条执行，合并结果返回。
+        支持混合 SELECT / UPDATE / INSERT / DELETE 语句的组合。
+
+        Args:
+            sql: 原始多语句 SQL（包含分号分隔符）
+            file_path: Excel 文件路径
+            worksheets_data: 工作表数据字典
+            include_headers: 是否包含表头
+            output_format: 输出格式
+            limit: 行数限制
+
+        Returns:
+            dict: 合并后的结果，格式与单条查询一致
+        """
+        import time
+
+        _start = time.time()
+        all_results = []       # 所有 SELECT 查询的结果行
+        all_columns = []       # 所有 SELECT 查询的列名
+        affected_total = 0     # 写入操作影响的总行数
+        statements_executed = 0
+        errors = []
+
+        # 智能拆分：按分号分割，但尊重字符串内的分号（单引号/双引号内的不算）
+        raw_parts = []
+        current = []
+        in_single_quote = False
+        in_double_quote = False
+        for ch in sql:
+            if ch == "'" and not in_double_quote:
+                in_single_quote = not in_single_quote
+                current.append(ch)
+            elif ch == '"' and not in_single_quote:
+                in_double_quote = not in_double_quote
+                current.append(ch)
+            elif ch == ';' and not in_single_quote and not in_double_quote:
+                raw_parts.append(''.join(current))
+                current = []
+            else:
+                current.append(ch)
+        if current:
+            raw_parts.append(''.join(current))
+
+        # 过滤空语句并逐条执行
+        statements = [s.strip() for s in raw_parts if s.strip()]
+        for idx, stmt in enumerate(statements):
+            try:
+                # 根据语句类型路由到对应的执行方法
+                stmt_upper = stmt.strip().upper()
+                if stmt_upper.startswith(('SELECT ', 'WITH ', '(', 'SELECT\n', 'SELECT\r')):
+                    result = self._execute_single_select(stmt, file_path, worksheets_data,
+                                                         include_headers, output_format, limit)
+                    statements_executed += 1
+                    if result.get('success') and result.get('data'):
+                        all_results.extend(result['data'])
+                        if 'columns' in result:
+                            all_columns.extend(result['columns']) if isinstance(result['columns'], list) else None
+                    else:
+                        errors.append(f"语句{idx+1}: {result.get('message', '未知错误')[:80]}")
+                elif stmt_upper.startswith('UPDATE '):
+                    result = execute_advanced_update_query(file_path, stmt)
+                    statements_executed += 1
+                    if result.get('success'):
+                        affected_total += result.get('affected_rows', 0)
+                    else:
+                        errors.append(f"语句{idx+1}(UPDATE): {result.get('message', '')[:80]}")
+                elif stmt_upper.startswith('INSERT '):
+                    result = execute_advanced_insert_query(file_path, stmt)
+                    statements_executed += 1
+                    if result.get('success'):
+                        affected_total += result.get('affected_rows', 1)
+                    else:
+                        errors.append(f"语句{idx+1}(INSERT): {result.get('message', '')[:80]}")
+                elif stmt_upper.startswith('DELETE '):
+                    result = execute_advanced_delete_query(file_path, stmt)
+                    statements_executed += 1
+                    if result.get('success'):
+                        affected_total += result.get('affected_rows', 0)
+                    else:
+                        errors.append(f"语句{idx+1}(DELETE): {result.get('message', '')[:80]}")
+                else:
+                    # 尝试作为 SELECT 执行
+                    result = self._execute_single_select(stmt, file_path, worksheets_data,
+                                                         include_headers, output_format, limit)
+                    statements_executed += 1
+                    if result.get('success') and result.get('data'):
+                        all_results.extend(result['data'])
+                    else:
+                        errors.append(f"语句{idx+1}: {result.get('message', '未知错误')[:80]}")
+
+            except Exception as e:
+                errors.append(f"语句{idx+1}异常: {str(e)[:100]}")
+
+        _elapsed = (time.time() - _start) * 1000
+
+        # 构建合并结果
+        has_query_data = len(all_results) > 0
+        has_write_ops = affected_total > 0
+
+        return {
+            'success': len(errors) < len(statements),  # 部分成功也算 success
+            'message': (
+                f"多语句执行完成: {statements_executed}/{len(statements)} 条成功"
+                + (f", 返回 {len(all_results)} 行" if has_query_data else "")
+                + (f", 影响 {affected_total} 行" if has_write_ops else "")
+                + (f"\n⚠️ 错误: {'; '.join(errors)}" if errors else "")
+            ),
+            'data': all_results,
+            'columns': all_columns if all_columns else None,
+            'row_count': len(all_results),
+            'query_info': {
+                'statement_count': len(statements),
+                'statements_executed': statements_executed,
+                'query_rows': len(all_results),
+                'affected_rows_total': affected_total,
+                'errors': errors,
+                'execution_time_ms': round(_elapsed, 1),
+                'multi_statement': True,
+            }
+        }
+
+    def _execute_single_select(self, sql: str, file_path: str, worksheets_data: dict,
+                                include_headers: bool, output_format: str, limit: int) -> dict:
+        """执行单条 SELECT 语句（供多语句调用）。"""
+        import sqlglot
+        from sqlglot import exp as sg_exp
+        import difflib
+        import time
+
+        _query_start = time.time()
+
+        # 复用相同的预处理管线
+        sql_processed = self._preprocess_quoted_identifiers(sql)
+        sql_processed = self._preprocess_dpipe_to_concat(sql_processed)
+        sql_processed = self._preprocess_reserved_words(sql_processed)
+
+        try:
+            parsed_sql = sqlglot.parse_one(sql_processed, dialect="mysql")
+        except Exception as e:
+            return {'success': False, 'message': f'解析错误: {e}', 'data': [], 'row_count': 0}
+
+        try:
+            if isinstance(parsed_sql, sg_exp.Union):
+                result_data = self._execute_union(parsed_sql, worksheets_data, limit)
+            elif isinstance(parsed_sql, (sg_exp.Except, sg_exp.Intersect)):
+                result_data = self._execute_except_intersect(parsed_sql, worksheets_data, limit)
+            else:
+                result_data = self._execute_query(parsed_sql, worksheets_data, limit)
+
+            _query_elapsed = (time.time() - _query_start) * 1000
+
+            has_group_by = not isinstance(parsed_sql, (sg_exp.Union, sg_exp.Except, sg_exp.Intersect)) and parsed_sql.args.get('group') is not None
+            has_having = parsed_sql.args.get('having') is not None
+
+            result = self._format_query_result(
+                result_data, file_path, sql, worksheets_data,
+                include_headers, has_group_by=has_group_by, has_having=has_having,
+                parsed_sql=parsed_sql, df_before_where=self._df_before_where,
+                output_format=output_format
+            )
+            result['query_info']['execution_time_ms'] = round(_query_elapsed, 1)
+            return result
+
+        except Exception as e:
+            return {'success': False, 'message': f'执行错误: {e}', 'data': [], 'row_count': 0}
 
     def _is_likely_dpipe_concatenation(self, or_expr) -> bool:
         """
@@ -6824,6 +7120,9 @@ class AdvancedSQLQueryEngine:
         # 清理ANSI转义序列(终端粘贴可能带入的不可见字符)
         sql = re.sub(r'\x1b\[[0-9;]*[a-zA-Z]', '', sql)
 
+        # 预处理: 自动为 MySQL 保留字标识符添加反引号
+        sql = self._preprocess_reserved_words(sql)
+
         # 解析UPDATE语句
         # 中文列名替换(与SELECT查询保持一致)
         try:
@@ -7026,6 +7325,9 @@ class AdvancedSQLQueryEngine:
 
         sql = re.sub(r'\x1b\[[0-9;]*[a-zA-Z]', '', sql)
 
+        # 预处理: 自动为 MySQL 保留字标识符添加反引号
+        sql = self._preprocess_reserved_words(sql)
+
         try:
             parsed = sqlglot.parse_one(sql, read='mysql')
         except ParseError as e:
@@ -7171,6 +7473,9 @@ class AdvancedSQLQueryEngine:
             return {'success': False, 'message': 'SQLGLOT未安装'}
 
         sql = re.sub(r'\x1b\[[0-9;]*[a-zA-Z]', '', sql)
+
+        # 预处理: 自动为 MySQL 保留字标识符添加反引号
+        sql = self._preprocess_reserved_words(sql)
 
         try:
             parsed = sqlglot.parse_one(sql, read='mysql')

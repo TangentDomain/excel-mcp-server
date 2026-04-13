@@ -205,7 +205,7 @@ wheels = [
 
 [[package]]
 name = "excel-mcp-server-fastmcp"
-version = "1.9.6"
+version = "1.9.7"
 source = { editable = "." }
 dependencies = [
     { name = "mcp" },
