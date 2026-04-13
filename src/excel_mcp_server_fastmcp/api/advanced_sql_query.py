@@ -4202,14 +4202,20 @@ class AdvancedSQLQueryEngine:
             raise ValueError(f"JOIN ON条件格式不支持,请使用等值连接: ON a.id = b.id")
 
         def resolve_column(col_expr) -> tuple:
+            """解析列引用。返回 (col_name, table_part, is_simple_column)"""
             if isinstance(col_expr, exp.Column):
                 col_name = col_expr.name
                 table_part = col_expr.table if hasattr(col_expr, 'table') and col_expr.table else None
-                return col_name, table_part
-            return str(col_expr), None
+                return col_name, table_part, True
+            return str(col_expr), None, False
 
-        left_col, left_tbl = resolve_column(left_expr)
-        right_col, right_tbl = resolve_column(right_expr)
+        left_col, left_tbl, left_is_col = resolve_column(left_expr)
+        right_col, right_tbl, right_is_col = resolve_column(right_expr)
+
+        # 如果EQ的任一侧不是简单列引用（如表达式拼接、函数调用等），
+        # 则走非等值连接路径（cross join + row filter）
+        if not left_is_col or not right_is_col:
+            return (None, None, on_clause)
 
         # 判断哪个属于左表,哪个属于右表
         if left_tbl:
