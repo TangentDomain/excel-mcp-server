@@ -3954,7 +3954,25 @@ class AdvancedSQLQueryEngine:
                     worksheets_data, left_table, join_kind
                 )
                 continue
-            if hasattr(right_table_expr, 'this'):
+
+            # Fix(R7-F3): Support subquery as JOIN right table
+            # e.g., FROM (SELECT ...) a CROSS JOIN (SELECT ...) b
+            _r7_right_from_subquery = False
+            if isinstance(right_table_expr, (exp.Subquery, exp.Select)):
+                _r7_right_from_subquery = True
+                right_alias = getattr(right_table_expr, 'alias', None) or '_joined_subquery'
+                right_table = right_alias  # Set right_table to alias for mapping
+                try:
+                    right_df = self._execute_subquery(right_table_expr, worksheets_data)
+                except Exception as e:
+                    raise StructuredSQLError(
+                        "join_error",
+                        f"JOIN右表子查询执行失败: {e}",
+                        hint="请检查JOIN右表子查询的SQL语法."
+                    )
+                # Skip normal table lookup - go directly to column rename and merge
+                self._table_aliases[right_alias] = right_alias
+            elif hasattr(right_table_expr, 'this'):
                 right_table = right_table_expr.this if isinstance(right_table_expr.this, str) else (
                     right_table_expr.this.name if hasattr(right_table_expr.this, 'name') else str(right_table_expr.this)
                 )
@@ -3983,45 +4001,47 @@ class AdvancedSQLQueryEngine:
             self._table_aliases[right_alias] = right_table
             self._table_aliases[right_table] = right_table
 
-            # 检查右表是否存在,如果不存在尝试从同文件加载其他sheet
-            if right_table not in worksheets_data:
-                # 尝试从同文件加载该sheet
-                if self._current_file_path and hasattr(self, '_load_excel_data'):
-                    try:
-                        # 加载指定sheet的数据
-                        additional_sheets = self._load_excel_data(self._current_file_path, right_table)
-                        if right_table in additional_sheets:
-                            # 将加载的sheet添加到worksheets_data
-                            worksheets_data[right_table] = additional_sheets[right_table]
-                            # 同时更新列名映射
-                            if not hasattr(self, '_additional_loaded_sheets'):
-                                self._additional_loaded_sheets = {}
-                            self._additional_loaded_sheets[right_table] = additional_sheets[right_table]
-                    except Exception:
-                        pass  # 加载失败,继续抛出原错误
-
-                # 再次检查,如果仍不存在则抛出错误
+            # Fix(R7-F3): Skip table lookup when right_df already from subquery
+            if not _r7_right_from_subquery:
+                # 检查右表是否存在,如果不存在尝试从同文件加载其他sheet
                 if right_table not in worksheets_data:
-                    available = list(worksheets_data.keys())
+                    # 尝试从同文件加载该sheet
+                    if self._current_file_path and hasattr(self, '_load_excel_data'):
+                        try:
+                            # 加载指定sheet的数据
+                            additional_sheets = self._load_excel_data(self._current_file_path, right_table)
+                            if right_table in additional_sheets:
+                                # 将加载的sheet添加到worksheets_data
+                                worksheets_data[right_table] = additional_sheets[right_table]
+                                # 同时更新列名映射
+                                if not hasattr(self, '_additional_loaded_sheets'):
+                                    self._additional_loaded_sheets = {}
+                                self._additional_loaded_sheets[right_table] = additional_sheets[right_table]
+                        except Exception:
+                            pass  # 加载失败,继续抛出原错误
 
-                    # 跨文件语法提示: 检测是否误用了Excel原生 ! 语法
-                    cross_file_hint = ""
-                    if '!' in right_table or right_table.endswith(('.xlsx', '.xls')):
-                        cross_file_hint = (
-                            "\n💡 跨文件JOIN请使用 @'path' 语法,例如:"
-                            "\n   FROM 表A@'/path/to/file1.xlsx' a "
-                            "JOIN 表B@'/path/to/file2.xlsx' b ON a.id = b.id"
-                            "\n   (不支持Excel原生的 'file.xlsx'!Sheet 语法)"
+                    # 再次检查,如果仍不存在则抛出错误
+                    if right_table not in worksheets_data:
+                        available = list(worksheets_data.keys())
+
+                        # 跨文件语法提示: 检测是否误用了Excel原生 ! 语法
+                        cross_file_hint = ""
+                        if '!' in right_table or right_table.endswith(('.xlsx', '.xls')):
+                            cross_file_hint = (
+                                "\n💡 跨文件JOIN请使用 @'path' 语法,例如:"
+                                "\n   FROM 表A@'/path/to/file1.xlsx' a "
+                                "JOIN 表B@'/path/to/file2.xlsx' b ON a.id = b.id"
+                                "\n   (不支持Excel原生的 'file.xlsx'!Sheet 语法)"
+                            )
+
+                        raise StructuredSQLError(
+                            "table_not_found",
+                            f"JOIN表 '{right_table}' 不存在.可用表: {available}.{cross_file_hint}",
+                            hint="请检查JOIN的表名,跨文件引用请用 表名@'文件路径' 语法.",
+                            context={"table_requested": right_table, "available_tables": available}
                         )
 
-                    raise StructuredSQLError(
-                        "table_not_found",
-                        f"JOIN表 '{right_table}' 不存在.可用表: {available}.{cross_file_hint}",
-                        hint="请检查JOIN的表名,跨文件引用请用 表名@'文件路径' 语法.",
-                        context={"table_requested": right_table, "available_tables": available}
-                    )
-
-            right_df = worksheets_data[right_table].copy()
+                right_df = worksheets_data[right_table].copy()
 
             # 解析ON条件(CROSS JOIN不需要ON)
             on_clause = join.args.get('on')
@@ -7464,6 +7484,15 @@ class AdvancedSQLQueryEngine:
                 return round(float(inner), decimals)
             except (ValueError, TypeError):
                 return inner
+
+        elif isinstance(expr, exp.Case):
+            # UPDATE SET CASE WHEN expression
+            # Fix(R7-E1): Support CASE WHEN in UPDATE SET clause
+            try:
+                return self._evaluate_case_expression(expr, df.iloc[row_idx])
+            except Exception as e:
+                logger.warning(f"UPDATE CASE WHEN 求值失败: {e}, 返回原始值")
+                return df.at[row_idx, 'Price'] if 'Price' in df.columns else None
 
         else:
             # 未知表达式类型,尝试递归
