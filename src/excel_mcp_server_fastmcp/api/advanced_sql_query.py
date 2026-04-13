@@ -1090,7 +1090,10 @@ class AdvancedSQLQueryEngine:
         """
         # 删除完全为空的行和列
         df = df.dropna(how='all')
-        df = df.dropna(axis=1, how='all')
+        # Fix(R11): 空表(0行)时,pandas的dropna(axis=1, how='all')会误删所有列
+        # 因为0行DataFrame中每列都算"全NA"。仅在有数据行时才清理全空列。
+        if len(df) > 0:
+            df = df.dropna(axis=1, how='all')
 
         # 重置索引
         df = df.reset_index(drop=True)
@@ -3814,6 +3817,17 @@ class AdvancedSQLQueryEngine:
             raise ValueError(f"列 '{qualified or col_name}' 不存在")
         elif isinstance(expr, exp.Literal):
             val = expr.this
+            # Fix(R11): sqlglot将数值字面量(含科学计数法如1e100)存储为字符串
+            # 直接用字符串创建Series会导致与数值列运算时类型不匹配崩溃
+            if not expr.is_string and isinstance(val, str):
+                try:
+                    # 尝试转为int(更精确),失败则转float
+                    val = int(val)
+                except (ValueError, OverflowError):
+                    try:
+                        val = float(val)
+                    except (ValueError, OverflowError):
+                        pass  # 保持原字符串值
             return pd.Series([val] * len(df), index=df.index)
         elif isinstance(expr, (exp.Add, exp.Sub, exp.Mul, exp.Div)):
             return self._evaluate_math_expression(expr, df)
@@ -4643,10 +4657,15 @@ class AdvancedSQLQueryEngine:
         
         if is_string:
             return expr.this
+        # Fix(R11): 先尝试int(更精确),再尝试float(支持科学计数法如1e100/1.5e-10)
+        # 原逻辑用'.'判断类型,但科学计数法不含点导致int()失败返回字符串
         try:
-            return float(expr.this) if '.' in str(expr.this) else int(expr.this)
-        except (ValueError, TypeError):
-            return expr.this
+            return int(expr.this)
+        except (ValueError, TypeError, OverflowError):
+            try:
+                return float(expr.this)
+            except (ValueError, TypeError, OverflowError):
+                return expr.this
 
     def _in_to_pandas(self, in_expr: exp.In, df, negate: bool = False) -> str:
         """将IN/NOT IN条件转换为pandas表达式(支持子查询和值列表)
