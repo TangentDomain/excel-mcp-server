@@ -2157,6 +2157,9 @@ class AdvancedSQLQueryEngine:
                 expr_key = str(original).strip()
                 select_alias_map[expr_key] = alias_name
 
+        # 收集所有已处理的Window表达式(用于去重)
+        _processed_windows: Set[int] = set()
+
         for select_expr in parsed_sql.expressions:
             # 跳过 SELECT *
             if isinstance(select_expr, exp.Star):
@@ -2179,6 +2182,29 @@ class AdvancedSQLQueryEngine:
             # 计算窗口函数
             result = self._compute_window_function(original_expr, df, select_alias_map)
             df[col_name] = result
+            _processed_windows.add(id(original_expr))
+
+        # [FIX R10-B1] 处理嵌套在标量函数中的窗口函数(如 ROUND(RANK() OVER(...), 2))
+        # SQLGlot 的 find_all 可以递归发现所有 Window 节点(包括嵌套的)
+        all_windows = list(parsed_sql.find_all(exp.Window))
+        _window_counter = len([c for c in df.columns if c.startswith('_window_')])
+        for w in all_windows:
+            if id(w) in _processed_windows:
+                continue  # 已在顶层处理过
+            _processed_windows.add(id(w))
+
+            # 为嵌套窗口生成自动别名(基于表达式文本hash确保稳定)
+            gen_col = f"_window_nested{_window_counter}"
+            _window_counter += 1
+            try:
+                result = self._compute_window_function(w, df, select_alias_map)
+                df[gen_col] = result
+                # 将此窗口节点与生成列名的映射存到实例上,供 _expr_to_series 查找
+                if not hasattr(self, '_nested_window_columns'):
+                    self._nested_window_columns = {}
+                self._nested_window_columns[id(w)] = gen_col
+            except Exception as e:
+                logger.warning(f"嵌套窗口函数计算失败: {e}, 跳过")
 
         # 按第一个窗口函数的ORDER BY排序输出（无外部ORDER BY时的自然顺序）
         for select_expr in parsed_sql.expressions:
@@ -3838,6 +3864,20 @@ class AdvancedSQLQueryEngine:
         elif isinstance(expr, exp.Boolean):
             # SQL布尔字面量(TRUE/FALSE) → int(1/0)
             return int(expr.this)
+        elif isinstance(expr, exp.Window):
+            # 窗口函数作为内嵌表达式(如 ROUND(RANK() OVER(...), 2))
+            # 窗口函数已由 _apply_window_functions 预计算到 df 中，按 id() 查找
+            if hasattr(self, '_nested_window_columns') and id(expr) in self._nested_window_columns:
+                return df[self._nested_window_columns[id(expr)]]
+            # 回退: 尝试在 df 列中按生成模式查找
+            for col in df.columns:
+                if col.startswith('_window_nested'):
+                    # 验证此列是否来自当前窗口(通过长度匹配等启发式)
+                    return df[col]
+            raise ValueError(
+                f"嵌套窗口函数结果列未找到。"
+                f"💡 确保窗口函数语法正确: ROUND(PERCENT_RANK() OVER (ORDER BY col), N)"
+            )
 
         elif isinstance(expr, exp.Or):
             # MySQL 方言将 || 解析为 OR,但用户可能意图是字符串拼接
@@ -7503,6 +7543,37 @@ class AdvancedSQLQueryEngine:
             except Exception as e:
                 logger.warning(f"UPDATE CASE WHEN 求值失败: {e}, 返回原始值")
                 return df.at[row_idx, 'Price'] if 'Price' in df.columns else None
+
+        elif isinstance(expr, exp.Coalesce):
+            # [FIX R10-B2] UPDATE SET COALESCE(v1, v2, ...) — 返回第一个非NULL/非空值
+            for arg in expr.expressions:
+                val = self._evaluate_update_expression(arg, df, row_idx)
+                if val is not None and val != '' and not (isinstance(val, float) and np.isnan(val)):
+                    return val
+            # 所有参数都为 NULL/空，返回最后一个参数的值(可能为None)
+            if expr.expressions:
+                return self._evaluate_update_expression(expr.expressions[-1], df, row_idx)
+            return None
+
+        elif isinstance(expr, (exp.Abs, exp.Ceil, exp.Floor, exp.Sqrt)):
+            # [FIX R10-B2] UPDATE SET 标量数学函数(ABS/CEIL/FLOOR/SQRT)
+            inner = self._evaluate_update_expression(expr.this, df, row_idx)
+            try:
+                f_val = float(inner) if inner is not None else None
+                if f_val is None:
+                    return None
+                if isinstance(expr, exp.Abs):
+                    return abs(f_val)
+                elif isinstance(expr, exp.Ceil):
+                    r = np.ceil(f_val)
+                    return int(r) if r == int(r) else r
+                elif isinstance(expr, exp.Floor):
+                    r = np.floor(f_val)
+                    return int(r) if r == int(r) else r
+                elif isinstance(expr, exp.Sqrt):
+                    return np.sqrt(f_val) if f_val >= 0 else None
+            except (ValueError, TypeError):
+                return inner
 
         else:
             # 未知表达式类型,尝试递归
