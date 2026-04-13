@@ -14,17 +14,53 @@ jobs:
       FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
     steps:
       - uses: actions/checkout@v5
+
       - uses: actions/setup-python@v6
         with:
           python-version: "3.11"
           cache: pip
           cache-dependency-path: pyproject.toml
+
       - name: Install dependencies
-        run: pip install -e ".[test]"
+        run: |
+          pip install -e ".[test]"
+          pip install ruff
+
       - name: Check docstring contracts
         run: python3 scripts/lint_docstring_contract.py
-      - name: Run pre-commit checks
-        run: bash scripts/pre_commit_check.sh
+
+      - name: Ruff format check
+        run: ruff format --check src/ tests/
+
+      - name: Ruff lint check
+        run: ruff check src/ tests/
+
+      - name: Check for merge conflicts
+        run: |
+          if find . \( -name "*.py" -o -name "*.md" \) \
+             -not -path "*/__pycache__/*" \
+             -not -path "*/.git/*" \
+             -not -path "*/.venv/*" \
+             -not -path "*/docs/archive/*" \
+             | xargs grep -l "<<<<<<<" 2>/dev/null; then
+            echo "ERROR: 发现未解决的合并冲突"
+            exit 1
+          fi
+          echo "✓ 无合并冲突"
+
+      - name: Scan for sensitive info
+        run: |
+          if find . \( -name "*.py" -o -name "*.yml" -o -name "*.yaml" -o -name "*.toml" \) \
+             -not -path "*/__pycache__/*" \
+             -not -path "*/.venv/*" \
+             -not -path "*/test_data/*" \
+             -not -path "*/dist/*" \
+             -not -path "*/.git/*" \
+             | xargs grep -lE "(AK[A-Za-z0-9_]{20,}|LTAI[A-Za-z0-9_]{20,}|secret\s*=\s*[\"'])" 2>/dev/null; then
+            echo "ERROR: 发现可能的敏感信息（AK/LTAI/secret）"
+            exit 1
+          fi
+          echo "✓ 无敏感信息泄露"
 
   test:
     strategy:
