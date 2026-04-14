@@ -1,3 +1,3 @@
 """Excel MCP Server package - game dev focused Excel configuration table MCP server."""
 
-__version__ = "1.9.9"
+__version__ = "1.10.0"

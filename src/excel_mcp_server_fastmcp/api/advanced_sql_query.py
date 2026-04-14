@@ -3687,6 +3687,20 @@ class AdvancedSQLQueryEngine:
         # 检查是否有聚合函数
         has_aggregate = self._check_has_aggregate_function(parsed_sql)
 
+        # [FIX R14-B1] 当同时存在GROUP BY和窗口函数时，窗口函数需要在GROUP BY之前计算
+        # 因为GROUP BY会丢弃非分组列，而窗口函数的ORDER BY/PARTITION BY可能引用这些列
+        has_window = self._has_window_function(parsed_sql)
+        has_group_by = parsed_sql.args.get("group") is not None or has_aggregate
+        _precomputed_windows = False  # 标记是否已预计算窗口函数
+
+        if has_group_by and has_window:
+            try:
+                base_df = self._apply_window_functions(parsed_sql, base_df)
+                _precomputed_windows = True
+            except Exception:
+                # 预计算失败时，回退到原有流程（在GROUP BY后再尝试）
+                _precomputed_windows = False
+
         # 应用GROUP BY和聚合
         if parsed_sql.args.get("group") or has_aggregate:
             # 有GROUP BY或有聚合函数时,应用分组聚合
@@ -3703,7 +3717,9 @@ class AdvancedSQLQueryEngine:
 
         # 应用窗口函数(ROW_NUMBER, RANK, DENSE_RANK)
         # 窗口函数在GROUP BY/HAVING之后,ORDER BY/SELECT之前计算
-        base_df = self._apply_window_functions(parsed_sql, base_df)
+        # [FIX R14-B1] 如果已在GROUP BY前预计算过，则跳过
+        if not _precomputed_windows:
+            base_df = self._apply_window_functions(parsed_sql, base_df)
 
         if parsed_sql.args.get("group") or has_aggregate:
             # ORDER BY(聚合查询:在GROUP BY之后)
@@ -6282,8 +6298,14 @@ class AdvancedSQLQueryEngine:
         if not aggregations:
             # 没有聚合函数,只应用GROUP BY去重
             if group_by_columns:
+                # [FIX R14-B1] 包含预计算的窗口函数列(已在GROUP BY前通过_apply_window_functions添加到df)
+                _window_cols = [c for c in df.columns if c.startswith('_window_') or
+                               any(self._extract_select_alias(expr, i)[0] == c and
+                                   isinstance(self._extract_select_alias(expr, i)[1], exp.Window)
+                                   for i, expr in enumerate(parsed_sql.expressions))]
+                _result_cols = list(group_by_columns) + [c for c in _window_cols if c not in group_by_columns]
                 # 性能优化:使用drop_duplicates的subset参数避免全列比较
-                return df[group_by_columns].drop_duplicates(subset=group_by_columns).reset_index(drop=True)
+                return df[_result_cols].drop_duplicates(subset=group_by_columns).reset_index(drop=True)
             else:
                 return df
 
@@ -6388,10 +6410,18 @@ class AdvancedSQLQueryEngine:
             elif isinstance(original_expr, exp.Subquery):
                 result_data[alias_name] = grouped[alias_name].first().reset_index(drop=True)
             # 处理普通列(GROUP BY列)
-            elif hasattr(original_expr, "name"):
+            elif hasattr(original_expr, "name") and original_expr.name:
                 col_name = original_expr.name
                 if col_name in group_by_columns:
                     result_data[alias_name] = grouped[col_name].first().reset_index(drop=True)
+
+            # [FIX R14-B1] 处理窗口函数表达式(已在GROUP BY前预计算到df)
+            # 窗口函数列已通过_apply_window_functions添加到DataFrame,此处从grouped取first
+            elif isinstance(original_expr, exp.Window):
+                if alias_name in df.columns:
+                    result_data[alias_name] = grouped[alias_name].first().reset_index(drop=True)
+                elif alias_name.startswith('_window_') and alias_name in df.columns:
+                    result_data[alias_name] = grouped[alias_name].first().reset_index(drop=True)
 
         # 处理SELECT *的情况：添加所有GROUP BY列
         has_star = any(isinstance(self._extract_select_alias(expr, 0)[1], exp.Star) for expr in parsed_sql.expressions)
@@ -8532,8 +8562,9 @@ class AdvancedSQLQueryEngine:
         elif isinstance(expr, exp.Case):
             # UPDATE SET CASE WHEN expression
             # Fix(R7-E1): Support CASE WHEN in UPDATE SET clause
+            # Fix(R14-B2): 必须用关键字参数传 row,否则 df 参数会接收 Series 导致向量化模式错误
             try:
-                return self._evaluate_case_expression(expr, df.iloc[row_idx])
+                return self._evaluate_case_expression(expr, None, row=df.iloc[row_idx])
             except Exception as e:
                 logger.warning(f"UPDATE CASE WHEN 求值失败: {e}, 返回原始值")
                 return df.at[row_idx, "Price"] if "Price" in df.columns else None
