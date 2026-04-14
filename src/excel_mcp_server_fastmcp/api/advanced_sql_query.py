@@ -2522,7 +2522,7 @@ class AdvancedSQLQueryEngine:
             if col_name not in df.columns:
                 # [FIX R16-B3] _cn_to_en_map 可能未初始化（UNION查询路径不经过表头解析）
                 # 使用 getattr 提供默认空字典避免 AttributeError
-                cn_to_en_map = getattr(self, '_cn_to_en_map', {})
+                cn_to_en_map = getattr(self, "_cn_to_en_map", {})
                 for cn_name, en_name in cn_to_en_map.items():
                     if col_name == cn_name:
                         col_name = en_name
@@ -2957,7 +2957,12 @@ class AdvancedSQLQueryEngine:
         # 窗口聚合函数: AVG/SUM/COUNT/MIN/MAX OVER (...)
         if func_type in _window_agg_funcs:
             return self._compute_window_aggregate(
-                func_type, df, partition_cols, order_cols, ascending, window_expr,
+                func_type,
+                df,
+                partition_cols,
+                order_cols,
+                ascending,
+                window_expr,
                 select_alias_map or {},
             )
 
@@ -3168,7 +3173,8 @@ class AdvancedSQLQueryEngine:
                     # 从聚合函数表达式中提取内部列名进行匹配
                     # 例如 orig_expr='SUM(s.Quantity)', expr_str='S.QUANTITY'
                     import re as _re
-                    agg_match = _re.match(r'(AVG|SUM|COUNT|MAX|MIN)\s*\(\s*(.+?)\s*\)$', ou)
+
+                    agg_match = _re.match(r"(AVG|SUM|COUNT|MAX|MIN)\s*\(\s*(.+?)\s*\)$", ou)
                     if agg_match:
                         agg_inner = agg_match.group(2).strip()
                         if agg_inner == expr_str or agg_inner.endswith(expr_str) or expr_str.endswith(agg_inner):
@@ -4378,7 +4384,7 @@ class AdvancedSQLQueryEngine:
         if isinstance(expr, exp.AggFunc):
             return expr
         # 递归检查子节点: this 和 expression (二元操作数)
-        for child_attr in ('this', 'expression'):
+        for child_attr in ("this", "expression"):
             child = getattr(expr, child_attr, None)
             if child is not None:
                 result = self._find_inner_aggregate(child)
@@ -4413,6 +4419,7 @@ class AdvancedSQLQueryEngine:
             应用标量函数后的 Series
         """
         import numpy as np
+
         func_type = type(scalar_expr)
 
         numeric_series = pd.to_numeric(agg_series, errors="coerce")
@@ -5962,9 +5969,7 @@ class AdvancedSQLQueryEngine:
                     try:
                         if not (hasattr(self, "_current_worksheets") and self._current_worksheets):
                             return False
-                        sub_result = self._execute_subquery(
-                            condition.expressions[0], self._current_worksheets
-                        )
+                        sub_result = self._execute_subquery(condition.expressions[0], self._current_worksheets)
                         if sub_result.empty:
                             return False
                         sub_values = sub_result.iloc[:, 0].dropna().tolist()
@@ -6414,10 +6419,12 @@ class AdvancedSQLQueryEngine:
             # 没有聚合函数,只应用GROUP BY去重
             if group_by_columns:
                 # [FIX R14-B1] 包含预计算的窗口函数列(已在GROUP BY前通过_apply_window_functions添加到df)
-                _window_cols = [c for c in df.columns if c.startswith('_window_') or
-                               any(self._extract_select_alias(expr, i)[0] == c and
-                                   isinstance(self._extract_select_alias(expr, i)[1], exp.Window)
-                                   for i, expr in enumerate(parsed_sql.expressions))]
+                _window_cols = [
+                    c
+                    for c in df.columns
+                    if c.startswith("_window_")
+                    or any(self._extract_select_alias(expr, i)[0] == c and isinstance(self._extract_select_alias(expr, i)[1], exp.Window) for i, expr in enumerate(parsed_sql.expressions))
+                ]
                 _result_cols = list(group_by_columns) + [c for c in _window_cols if c not in group_by_columns]
                 # 性能优化:使用drop_duplicates的subset参数避免全列比较
                 return df[_result_cols].drop_duplicates(subset=group_by_columns).reset_index(drop=True)
@@ -6510,6 +6517,7 @@ class AdvancedSQLQueryEngine:
                     except Exception as e:
                         logger.warning("标量函数+聚合计算失败 %s: %s", alias_name, e)
                         import traceback
+
                         traceback.print_exc()
                         result_data[alias_name] = pd.Series([None])
                 else:
@@ -6535,7 +6543,7 @@ class AdvancedSQLQueryEngine:
             elif isinstance(original_expr, exp.Window):
                 if alias_name in df.columns:
                     result_data[alias_name] = grouped[alias_name].first().reset_index(drop=True)
-                elif alias_name.startswith('_window_') and alias_name in df.columns:
+                elif alias_name.startswith("_window_") and alias_name in df.columns:
                     result_data[alias_name] = grouped[alias_name].first().reset_index(drop=True)
 
         # 处理SELECT *的情况：添加所有GROUP BY列
@@ -6760,12 +6768,13 @@ class AdvancedSQLQueryEngine:
                 # SQL CAST FLOAT→INT 行为: 向零截断 (truncate toward zero)
                 # 不能直接用 .astype("Int64"), 因为非整数值(如 3.14)会抛 TypeError
                 import numpy as np
+
                 float_vals = np.asarray(numeric, dtype=float)
                 truncated = np.trunc(float_vals)  # 向零截断,匹配 SQL 标准
                 # 构造 Int64 Series (支持 NA)
                 result = []
                 for i in range(len(truncated)):
-                    if np.isnan(numeric.iloc[i]) if hasattr(numeric, 'iloc') else np.isnan(float_vals[i]):
+                    if np.isnan(numeric.iloc[i]) if hasattr(numeric, "iloc") else np.isnan(float_vals[i]):
                         result.append(pd.NA)
                     else:
                         result.append(int(truncated[i]))
