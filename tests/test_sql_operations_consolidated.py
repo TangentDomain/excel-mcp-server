@@ -271,8 +271,8 @@ class TestSQLBasicQuery:
         
         assert result['success'] is True
         data = result.get('data', [])
-        # 引擎会自动添加TOTAL汇总行，所以是表头 + 3个部门 + 1个TOTAL = 5行
-        assert len(data) == 5
+        # 表头 + 3个部门 = 4行
+        assert len(data) == 4
 
     def test_group_by_with_having(self, employee_data_file):
         """测试HAVING子句"""
@@ -281,8 +281,8 @@ class TestSQLBasicQuery:
         
         assert result['success'] is True
         data = result.get('data', [])
-        # 应该只返回有多个员工的部门（加上TOTAL汇总行）
-        assert len(data) >= 3  # 表头 + 至少1个部门 + TOTAL行
+        # 应该只返回有多个员工的部门
+        assert len(data) >= 2  # 表头 + 至少1个部门
 
 
 class TestSQLAdvancedFeatures:

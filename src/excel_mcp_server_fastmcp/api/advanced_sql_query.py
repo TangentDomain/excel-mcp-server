@@ -6320,7 +6320,7 @@ class AdvancedSQLQueryEngine:
           正确按所有GROUP BY列分组，而非仅按计算列分组
         - 确保所有GROUP BY列都包含在最终结果中
         """
-        print(f"[DEBUG-ENTRY] _apply_group_by_aggregation called with {len(df)} rows")
+        
         group_by_columns = []
         group_clause = parsed_sql.args.get("group")
         if group_clause:
@@ -6388,7 +6388,7 @@ class AdvancedSQLQueryEngine:
         for temp_alias, agg_func in having_aggregations.items():
             self._having_agg_in_select_map[agg_func.sql()] = temp_alias
 
-        # 保存GROUP BY列到实例变量,供_build_total_row使用
+        # 保存GROUP BY列到实例变量
         self._group_by_columns = group_by_columns
 
         # Fix(E2): 空DataFrame聚合保护 — 0行DataFrame做groupby后访问列会报"Column not found"
@@ -6465,7 +6465,7 @@ class AdvancedSQLQueryEngine:
         # 按照SQL SELECT表达式的顺序构建结果
         result_data = {}
         ordered_columns = []
-        print(f"[DEBUG-GB] SELECT expressions count: {len(parsed_sql.expressions)}")
+        
 
         # 按SELECT表达式顺序处理列
         for i, select_expr in enumerate(parsed_sql.expressions):
@@ -6476,7 +6476,8 @@ class AdvancedSQLQueryEngine:
                 continue
 
             ordered_columns.append(alias_name)
-            print(f"[DEBUG-GB] Processing[{i}] alias={alias_name}, orig_type={type(original_expr).__name__}")
+
+
 
             # 处理聚合函数
             is_agg = self._is_aggregate_function(select_expr if not isinstance(select_expr, exp.Alias) else select_expr.this)
@@ -6512,7 +6513,7 @@ class AdvancedSQLQueryEngine:
                             agg_series = pd.Series([None])
                         # 直接对聚合结果应用标量函数（避免 _expr_to_series 解析 Agg 节点失败）
                         scalar_result = self._apply_scalar_to_agg_result(original_expr, agg_series)
-                        print(f"[DEBUG-ROUND] alias={alias_name}, agg_result={list(agg_result)}, scalar_result={list(scalar_result)}")
+
                         result_data[alias_name] = scalar_result.reset_index(drop=True)
                     except Exception as e:
                         logger.warning("标量函数+聚合计算失败 %s: %s", alias_name, e)
@@ -6605,7 +6606,6 @@ class AdvancedSQLQueryEngine:
             result_df = pd.DataFrame(result_data, columns=ordered_columns).reset_index(drop=True)
         except Exception as e:
             # 如果创建DataFrame失败,尝试逐列构建
-            print(f"警告:构建结果DataFrame时出错: {e}")
             result_data = {k: v.reset_index(drop=True) for k, v in result_data.items()}
             result_df = pd.DataFrame(result_data, columns=ordered_columns).reset_index(drop=True)
 
@@ -7462,50 +7462,6 @@ class AdvancedSQLQueryEngine:
 
         return df
 
-    def _build_total_row(self, result_df: pd.DataFrame, group_by_columns: list[str] = []) -> list | None:
-        """构建GROUP BY聚合结果的TOTAL汇总行
-
-        Args:
-            result_df (pd.DataFrame): 结果DataFrame
-            group_by_columns (List[str]): GROUP BY列名列表,跳过这些列的求和
-
-        Returns:
-            Optional[List]: TOTAL汇总行,如果没有数值列则返回None
-        """
-        if result_df.empty or len(result_df) <= 1:
-            return None
-
-        # Create a copy to avoid modifying original
-        total_row = [""] * len(result_df.columns)
-
-        # First pass: ensure GROUP BY columns are preserved correctly
-        for i, col in enumerate(result_df.columns):
-            if col in group_by_columns:
-                # Copy the first value from each group for GROUP BY columns
-                total_row[i] = result_df.iloc[0, i]
-
-        # Second pass: calculate sums for non-GROUP BY numeric columns
-        has_numeric = False
-        for i, col in enumerate(result_df.columns):
-            if col in group_by_columns:
-                continue
-
-            # Try to convert to numeric
-            series = pd.to_numeric(result_df[col], errors="coerce")
-
-            # Check if this column is numeric enough
-            if series.notna().sum() > 0:
-                # Calculate sum and serialize
-                col_sum = series.sum()
-                total_row[i] = self._serialize_value(col_sum)
-                has_numeric = True
-
-        # Mark as TOTAL row only if we have numeric aggregations
-        if has_numeric:
-            total_row[0] = "TOTAL"
-
-        return total_row if has_numeric else None
-
     def _generate_markdown_table(self, data: list, max_rows: int = MARKDOWN_TABLE_MAX_ROWS) -> str:
         """生成Markdown格式表格
 
@@ -7600,14 +7556,6 @@ class AdvancedSQLQueryEngine:
             data = data[:keep_rows]
             truncated = True
 
-        # GROUP BY 聚合结果自动追加 TOTAL 行(HAVING过滤时不添加)
-        has_total_row = False
-        if has_group_by and include_headers and not has_having:
-            total_row = self._build_total_row(result_df, self._group_by_columns)
-            if total_row:
-                data.append(total_row)
-                has_total_row = True
-
         # 双行表头:构建列描述映射
         column_descriptions = {}
         if hasattr(self, "_header_descriptions") and self._header_descriptions:
@@ -7627,12 +7575,12 @@ class AdvancedSQLQueryEngine:
 
         result = {
             "success": True,
-            "message": f"SQL查询成功执行,返回 {data_row_count} 行结果" + ("(含TOTAL汇总行)" if has_total_row else "") + perf_hint,
+            "message": f"SQL查询成功执行,返回 {data_row_count} 行结果" + perf_hint,
             "data": data,
             "query_info": {
                 "original_rows": total_original_rows,
                 "filtered_rows": data_row_count,
-                "returned_rows": len(data) - (1 if include_headers else 0) - (1 if has_total_row else 0),
+                "returned_rows": len(data) - (1 if include_headers else 0),
                 "truncated": truncated,
                 "query_applied": True,
                 "sql_query": sql,

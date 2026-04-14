@@ -566,7 +566,7 @@ if _cleaned:
 # 创建FastMCP服务器实例，开启调试模式和详细日志
 mcp = FastMCP(
     name="excel-mcp",
-    instructions=r"""🎮 游戏开发Excel配置表管理专家 — 34个工具
+    instructions=r"""🎮 游戏开发Excel配置表管理专家 — 35个工具
 
 ## 🔥 核心原则：SQL优先
 
@@ -622,6 +622,13 @@ mcp = FastMCP(
 └─ 🗑️ 删行？
     按条件删？────────────────────────────→ excel_delete_query（SQL DELETE，必须WHERE）
     按行号删？────────────────────────────→ excel_delete_rows（row_index从1开始）
+
+═══ 高级脚本 ═══
+🐍 循环/复杂逻辑/重复操作？──────────────→ excel_run_python（直接执行Python代码）
+    可用变量: query(sql), update(sql), insert(sql), delete(sql), ExcelOperations
+    ✅ query()直接返回[[headers],[row1],...] 无需再取["data"]
+    ✅ 批量循环修改 → for循环遍历行
+    ✅ SQL无法表达的逻辑 → 纯Python自由操作
 
 ═══ 结构操作 ═══
 文件？                      → excel_create_file / excel_export_to_csv / excel_import_from_csv
@@ -2663,6 +2670,64 @@ def excel_compare_sheets(
         if _err:
             return _err
     return _wrap(ExcelOperations.compare_sheets(file1_path, sheet1_name, file2_path, sheet2_name, id_column, header_row))
+
+
+# ==================== 高级脚本 ====================
+@mcp.tool()
+@_validate_file_path()
+@_track_call
+def excel_run_python(
+    file_path: str,
+    code: str,
+    sheet_name: str | None = None,
+    timeout: int = 30,
+) -> dict[str, Any]:
+    """🐍 直接执行Python代码操作Excel文件，适用于循环/复杂逻辑/重复操作。
+
+    当SQL无法表达你的逻辑（如逐行循环、复杂条件、自定义函数）时，用此工具直接写Python代码。
+    比多次调用MCP工具更节省token。直接调用现有API，file_path已预绑定。
+
+    可用变量:
+    - file_path: 当前Excel文件路径
+    - sheet_name: 指定的工作表名称
+    - query(sql): 执行SQL查询，直接返回 [[headers], [row1], ...]
+    - update(sql, dry_run=False): 执行SQL更新（= excel_update_query）
+    - insert(sql): 执行SQL插入（= excel_insert_query）
+    - delete(sql, dry_run=False): 执行SQL删除（= excel_delete_query）
+    - ExcelOperations: 完整Excel操作类（get_range, update_range, upsert_row等）
+
+    代码示例:
+        # SQL查询 - 直接拿到数据行
+        rows = query("SELECT * FROM 装备 WHERE Price > 100")
+        headers = rows[0]
+        for row in rows[1:]:
+            print(row[headers.index("Name")])
+
+        # 循环+SQL组合
+        rows = query("SELECT ID, Price FROM 装备")
+        for row in rows[1:]:
+            update(f"UPDATE 装备 SET Price = {row[1] * 1.1} WHERE ID = {row[0]}")
+
+        # 调用ExcelOperations
+        ExcelOperations.upsert_row(file_path, "装备", "ID", 1, {"Price": 999})
+
+    Args:
+        file_path: Excel文件路径
+        code: Python代码（支持表达式和多行语句）
+        sheet_name: 工作表名称（默认活跃工作表）
+        timeout: 超时秒数，默认30，最大120
+    """
+    if not code or not code.strip():
+        return _fail("code不能为空", meta={"error_code": "MISSING_CODE"})
+
+    timeout = max(1, min(timeout, 120))
+
+    try:
+        from .api.script_runner import execute_python_script
+
+        return _wrap(execute_python_script(file_path, code, sheet_name, timeout))
+    except Exception as e:
+        return _fail(f"脚本执行失败: {e}", meta={"error_code": "SCRIPT_ERROR"})
 
 
 # ==================== 主程序 ====================

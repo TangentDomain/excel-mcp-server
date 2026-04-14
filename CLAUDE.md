@@ -111,6 +111,107 @@ for i in range(1, 51):
 wb.save('/tmp/test_data.xlsx')
 ```
 
+## 🌐 MCP 工具直接测试
+
+### 测试场景设计
+
+通过 Claude Code 直接调用 MCP 工具进行真实场景测试：
+
+**基础功能测试**:
+```sql
+-- 简单查询
+SELECT * FROM 装备配置 WHERE Rarity = 'Legendary'
+
+-- 排序和限制
+SELECT Name, Price FROM 装备配置 ORDER BY Price DESC LIMIT 5
+
+-- 聚合统计
+SELECT Rarity, COUNT(*) as Count, AVG(Price) as AvgPrice
+FROM 装备配置 GROUP BY Rarity
+```
+
+**高级功能测试**:
+```sql
+-- CTE 子查询
+WITH HighValueItems AS (
+    SELECT * FROM 装备配置 WHERE Price > 1000
+)
+SELECT * FROM HighValueItems WHERE BaseAtk > 50
+
+-- 窗口函数
+SELECT Name, Price,
+       RANK() OVER (ORDER BY Price DESC) as PriceRank
+FROM 装备配置
+
+-- 多表 JOIN
+SELECT e.Name, m.Name, d.DropRate
+FROM 装备配置 e
+JOIN 掉落配置 d ON e.ID = d.ItemID
+JOIN 怪物配置 m ON d.MonsterID = m.ID
+```
+
+**批量操作测试**:
+```sql
+-- 批量更新
+UPDATE 装备配置 SET Price = ROUND(Price * 1.1, 2)
+WHERE Rarity IN ('Epic', 'Legendary')
+
+-- 批量插入
+INSERT INTO 装备配置 (ID, Name, BaseAtk, Price, Rarity)
+VALUES (100, 'Excalibur', 150, 9999.99, 'Legendary')
+```
+
+### MCP 连接诊断
+
+**检查 MCP 服务器状态**:
+```bash
+# 使用诊断脚本
+./verify_mcp.sh
+
+# 或手动测试
+echo '{"jsonrpc":"2.0","id":1,"method":"ping"}' | \
+  uv run excel-mcp-server-fastmcp --stdio 2>&1 | head -5
+```
+
+**常见连接问题**:
+
+1. **路径问题**
+   - 症状: `Cannot find module`
+   - 解决: `.mcp.json` 使用相对路径 `"."`
+
+2. **导入错误**
+   - 症状: `cannot import name 'main'`
+   - 解决: 检查 `__init__.py` 是否导出 main 函数
+
+3. **环境变量**
+   - 调试: 添加 `PYTHONUNBUFFERED=1` 和 `MCP_DEBUG=1`
+
+### 极限测试场景
+
+验证服务器在高负载下的表现：
+
+```sql
+-- 复杂嵌套查询
+WITH RankedItems AS (
+    SELECT *,
+           ROW_NUMBER() OVER (PARTITION BY Rarity ORDER BY Price DESC) as rn
+    FROM 装备配置
+),
+Filtered AS (
+    SELECT * FROM RankedItems WHERE rn <= 3
+)
+SELECT e.Name, e.Price,
+       (SELECT COUNT(*) FROM 掉落配置 d WHERE d.ItemID = e.ID) as DropCount
+FROM Filtered e
+WHERE e.Price > (SELECT AVG(Price) * 2 FROM 装备配置)
+```
+
+**性能指标**:
+- 简单查询: < 10ms
+- 复杂 JOIN: < 50ms
+- 窗口函数: < 30ms
+- 批量更新: < 100ms
+
 ## 🔧 开发工作流
 
 ### 1. 功能开发
@@ -278,5 +379,5 @@ __version__ = "1.9.3"  # 递增版本号
 
 ---
 
-**最后更新**: 2026-04-13
+**最后更新**: 2026-04-14
 **维护者**: tangjian
