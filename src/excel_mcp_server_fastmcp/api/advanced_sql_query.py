@@ -2860,6 +2860,12 @@ class AdvancedSQLQueryEngine:
                 for table_alias, col_map in self._join_column_mapping.items():
                     if col_name in col_map and col_map[col_name] in df.columns:
                         return col_map[col_name]
+            # [FIX R15-B1] 裸列名找不到时，尝试在df.columns中匹配 "table.col" 格式
+            # 场景: JOIN后列名变为 p.Category，但AST中取出的是裸名 Category
+            if col_name not in df.columns:
+                for fc in df.columns:
+                    if fc.endswith(f".{col_name}") or fc.endswith(f"_{col_name}"):
+                        return fc
             return col_name
 
         # 解析 PARTITION BY
@@ -2933,7 +2939,10 @@ class AdvancedSQLQueryEngine:
 
         # 窗口聚合函数: AVG/SUM/COUNT/MIN/MAX OVER (...)
         if func_type in _window_agg_funcs:
-            return self._compute_window_aggregate(func_type, df, partition_cols, order_cols, ascending, window_expr)
+            return self._compute_window_aggregate(
+                func_type, df, partition_cols, order_cols, ascending, window_expr,
+                select_alias_map or {},
+            )
 
         raise ValueError(f"不支持的窗口函数: {func_type}")
 
@@ -3102,6 +3111,7 @@ class AdvancedSQLQueryEngine:
         order_cols: list,
         ascending: list,
         window_expr,
+        select_alias_map: dict = None,
     ) -> pd.Series:
         """窗口聚合函数: AVG/SUM/COUNT/MIN/MAX OVER (...)
 
@@ -3122,6 +3132,32 @@ class AdvancedSQLQueryEngine:
                     if col_name in col_map and col_map[col_name] in df.columns:
                         col_name = col_map[col_name]
                         break
+            # [FIX R15-B1] 裸列名找不到时，尝试匹配 "table.col" 格式（与 resolve_col_name 保持一致）
+            if col_name not in df.columns:
+                for fc in df.columns:
+                    if fc.endswith(f".{col_name}") or fc.endswith(f"_{col_name}"):
+                        col_name = fc
+                        break
+            # [FIX R15-B1c] GROUP BY 后原始列不存在，通过 select_alias_map 反向查找
+            # 场景: AVG(s.Quantity) OVER (...) 在 GROUP BY 后执行，s.Quantity 已被聚合为 TotalSold
+            if col_name not in df.columns and select_alias_map:
+                expr_str = str(inner).upper()
+                for orig_expr, alias in select_alias_map.items():
+                    ou = orig_expr.upper()
+                    # 精确匹配
+                    if ou == expr_str and alias in df.columns:
+                        col_name = alias
+                        break
+                    # 从聚合函数表达式中提取内部列名进行匹配
+                    # 例如 orig_expr='SUM(s.Quantity)', expr_str='S.QUANTITY'
+                    import re as _re
+                    agg_match = _re.match(r'(AVG|SUM|COUNT|MAX|MIN)\s*\(\s*(.+?)\s*\)$', ou)
+                    if agg_match:
+                        agg_inner = agg_match.group(2).strip()
+                        if agg_inner == expr_str or agg_inner.endswith(expr_str) or expr_str.endswith(agg_inner):
+                            if alias in df.columns:
+                                col_name = alias
+                                break
 
         numeric_col = col_name and col_name in df.columns
         if numeric_col and func_type != "Count":
@@ -3362,6 +3398,33 @@ class AdvancedSQLQueryEngine:
         target_col_expr = lag_func.this
         target_col = target_col_expr.name if hasattr(target_col_expr, "name") else str(target_col_expr)
 
+        # [FIX R15-B3] 处理内层聚合表达式: LAG(MAX(Price)) 等
+        # 当内层是聚合函数(Max/Min/Sum/Avg/Count)时，target_col可能为空
+        # 需要通过select_alias_map反向查找对应的别名列
+        if not target_col or target_col not in df.columns:
+            expr_str = str(target_col_expr).strip()
+            if expr_str in (select_alias_map or {}):
+                alias_name = select_alias_map[expr_str]
+                if alias_name in df.columns:
+                    target_col = alias_name
+            if target_col not in df.columns:
+                agg_funcs = {"Max", "Min", "Sum", "Avg", "Count"}
+                func_type = type(lag_func.this).__name__ if hasattr(lag_func, "this") else ""
+                if func_type in agg_funcs:
+                    found = False
+                    for expr_key, alias_name in (select_alias_map or {}).items():
+                        if func_type.upper() in expr_key.upper() and alias_name in df.columns:
+                            target_col = alias_name
+                            found = True
+                            break
+                    # [FIX R15-B3b] 递归提取内层AST节点直到找到Column节点
+                    if not found:
+                        node = lag_func.this
+                        while hasattr(node, "this") and not isinstance(node, exp.Column):
+                            node = node.this
+                        if isinstance(node, exp.Column) and node.name and node.name in df.columns:
+                            target_col = node.name
+
         # 解析偏移量参数（默认为1）
         offset = 1
         if hasattr(lag_func, "args") and "offset" in lag_func.args:
@@ -3388,7 +3451,9 @@ class AdvancedSQLQueryEngine:
 
         # 分组计算LAG
         if partition_cols:
-            result = pd.Series(None, index=df.index, dtype=float)
+            # [FIX R15-B2] 推断目标列的dtype，避免字符串列赋值到float Series报错
+            target_dtype = df[target_col].dtype if target_col in df.columns else object
+            result = pd.Series(None, index=df.index, dtype=target_dtype)
             for _, group in df.groupby(partition_cols, sort=False):
                 sorted_group = group.sort_values(order_cols, ascending=ascending)
                 lagged = sorted_group[target_col].shift(periods=offset)
@@ -3422,6 +3487,37 @@ class AdvancedSQLQueryEngine:
         target_col_expr = lead_func.this
         target_col = target_col_expr.name if hasattr(target_col_expr, "name") else str(target_col_expr)
 
+        # [FIX R15-B3] 处理内层聚合表达式: LEAD(MAX(Price)) 等
+        # 当内层是聚合函数(Max/Min/Sum/Avg/Count)时，target_col可能为空
+        # 需要通过select_alias_map反向查找对应的别名列
+        if not target_col or target_col not in df.columns:
+            # 尝试从表达式的字符串形式在alias_map中查找
+            expr_str = str(target_col_expr).strip()
+            if expr_str in (select_alias_map or {}):
+                alias_name = select_alias_map[expr_str]
+                if alias_name in df.columns:
+                    target_col = alias_name
+            # 如果还是找不到，尝试匹配包含聚合函数名的列
+            if target_col not in df.columns:
+                agg_funcs = {"Max", "Min", "Sum", "Avg", "Count"}
+                func_type = type(lead_func.this).__name__ if hasattr(lead_func, "this") else ""
+                if func_type in agg_funcs:
+                    # 查找select_alias_map中引用了此聚合的别名
+                    found = False
+                    for expr_key, alias_name in (select_alias_map or {}).items():
+                        if func_type.upper() in expr_key.upper() and alias_name in df.columns:
+                            target_col = alias_name
+                            found = True
+                            break
+                    # [FIX R15-B3b] 如果alias_map中也没有有用的映射，
+                    # 递归提取内层AST节点直到找到Column节点
+                    if not found:
+                        node = lead_func.this
+                        while hasattr(node, "this") and not isinstance(node, exp.Column):
+                            node = node.this
+                        if isinstance(node, exp.Column) and node.name and node.name in df.columns:
+                            target_col = node.name
+
         # 解析偏移量参数（默认为1）
         offset = 1
         if hasattr(lead_func, "args") and "offset" in lead_func.args:
@@ -3448,7 +3544,9 @@ class AdvancedSQLQueryEngine:
 
         # 分组计算LEAD
         if partition_cols:
-            result = pd.Series(None, index=df.index, dtype=float)
+            # [FIX R15-B2] 推断目标列的dtype，避免字符串列赋值到float Series报错
+            target_dtype = df[target_col].dtype if target_col in df.columns else object
+            result = pd.Series(None, index=df.index, dtype=target_dtype)
             for _, group in df.groupby(partition_cols, sort=False):
                 sorted_group = group.sort_values(order_cols, ascending=ascending)
                 led = sorted_group[target_col].shift(periods=-offset)
