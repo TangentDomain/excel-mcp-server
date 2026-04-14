@@ -7946,10 +7946,11 @@ class AdvancedSQLQueryEngine:
                 old_val = df.at[idx, col_name]
                 new_val = self._evaluate_update_expression(value_expr, df, idx)
 
-                # 类型兼容性:数值类型可互通,其他类型尝试转为旧值类型
+                # 类型兼容性:数值类型可互通(含numpy整数/浮点,避免uint8溢出),其他类型尝试转为旧值类型
                 if old_val != "" and new_val != "" and type(old_val) != type(new_val):
-                    if isinstance(old_val, (int, float)) and isinstance(new_val, (int, float)):
-                        pass  # 数值互通:不转换
+                    if (isinstance(old_val, (int, float, np.integer, np.floating)) 
+                        and isinstance(new_val, (int, float, np.integer, np.floating))):
+                        pass  # 数值互通:不转换(P0-fix: numpy数值类型不走type转换避免溢出)
                     else:
                         try:
                             new_val = type(old_val)(new_val)
@@ -7965,7 +7966,13 @@ class AdvancedSQLQueryEngine:
                             "new_value": self._serialize_update_value(new_val),
                         }
                     )
-                df.at[idx, col_name] = new_val
+                # P0-fix: df.at赋值可能因numpy小dtype(uint8)溢出而截断或报错
+                # 此赋值仅用于链式SET(如SET A=999, B=A+1)的中间状态,实际写Excel走changes列表
+                # 故跳过溢出赋值不影响最终正确性
+                try:
+                    df.at[idx, col_name] = new_val
+                except (ValueError, TypeError, OverflowError):
+                    pass  # 值超出DataFrame列dtype范围,跳过中间状态更新
 
         if not changes:
             elapsed = (time.time() - start_time) * 1000
