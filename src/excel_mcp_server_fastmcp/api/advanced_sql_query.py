@@ -2520,8 +2520,10 @@ class AdvancedSQLQueryEngine:
 
             # 尝试列名匹配(包括中文列名映射)
             if col_name not in df.columns:
-                # 搜索中文列名映射
-                for cn_name, en_name in self._cn_to_en_map.items():
+                # [FIX R16-B3] _cn_to_en_map 可能未初始化（UNION查询路径不经过表头解析）
+                # 使用 getattr 提供默认空字典避免 AttributeError
+                cn_to_en_map = getattr(self, '_cn_to_en_map', {})
+                for cn_name, en_name in cn_to_en_map.items():
                     if col_name == cn_name:
                         col_name = en_name
                         break
@@ -2561,11 +2563,15 @@ class AdvancedSQLQueryEngine:
         def _extract_selects(node):
             if isinstance(node, exp.Select):
                 return [node]
+            elif isinstance(node, exp.Subquery):
+                # [FIX R16-B2] (SELECT ...) UNION (SELECT ...) 中括号导致 sqlglot 解析为 Subquery
+                # 需要解包 Subquery 获取内部的 Select
+                return _extract_selects(node.this)
             elif isinstance(node, exp.Union):
                 selects = []
-                # this 可能是 Union(链式)或 Select
+                # this 可能是 Union(链式)、Select 或 Subquery
                 selects.extend(_extract_selects(node.this))
-                # expression 是右侧的 Select 或 Union
+                # expression 是右侧的 Select、Union 或 Subquery
                 selects.extend(_extract_selects(node.expression))
                 return selects
             return []
@@ -2827,7 +2833,18 @@ class AdvancedSQLQueryEngine:
         select_alias_map: dict | None = None,
     ) -> pd.Series:
         """计算单个窗口函数,返回结果Series"""
-        func_type = type(window_expr.this).__name__
+        # [FIX R16-B1] 解包 IgnoreNulls/RespectNulls 包装节点
+        # sqlglot 将 NTH_VALUE(x, 1) IGNORE NULLS 解析为 IgnoreNulls(NthValue(x, 1))
+        # 需要提取内部的实际窗口函数节点
+        actual_func = window_expr.this
+        while type(actual_func).__name__ in ("IgnoreNulls", "RespectNulls"):
+            actual_func = actual_func.this
+        func_type = type(actual_func).__name__
+
+        # 如果发生了解包，替换 window_expr.this 以便下游处理器正常工作
+        if actual_func is not window_expr.this:
+            window_expr = window_expr.copy()
+            window_expr.set("this", actual_func)
 
         # 支持的窗口函数类型
         _window_agg_funcs = {"Avg", "Sum", "Count", "Min", "Max"}
