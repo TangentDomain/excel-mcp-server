@@ -7948,8 +7948,7 @@ class AdvancedSQLQueryEngine:
 
                 # 类型兼容性:数值类型可互通(含numpy整数/浮点,避免uint8溢出),其他类型尝试转为旧值类型
                 if old_val != "" and new_val != "" and type(old_val) != type(new_val):
-                    if (isinstance(old_val, (int, float, np.integer, np.floating)) 
-                        and isinstance(new_val, (int, float, np.integer, np.floating))):
+                    if isinstance(old_val, (int, float, np.integer, np.floating)) and isinstance(new_val, (int, float, np.integer, np.floating)):
                         pass  # 数值互通:不转换(P0-fix: numpy数值类型不走type转换避免溢出)
                     else:
                         try:
