@@ -6320,7 +6320,7 @@ class AdvancedSQLQueryEngine:
           正确按所有GROUP BY列分组，而非仅按计算列分组
         - 确保所有GROUP BY列都包含在最终结果中
         """
-        
+
         group_by_columns = []
         group_clause = parsed_sql.args.get("group")
         if group_clause:
@@ -6465,7 +6465,6 @@ class AdvancedSQLQueryEngine:
         # 按照SQL SELECT表达式的顺序构建结果
         result_data = {}
         ordered_columns = []
-        
 
         # 按SELECT表达式顺序处理列
         for i, select_expr in enumerate(parsed_sql.expressions):
@@ -6476,8 +6475,6 @@ class AdvancedSQLQueryEngine:
                 continue
 
             ordered_columns.append(alias_name)
-
-
 
             # 处理聚合函数
             is_agg = self._is_aggregate_function(select_expr if not isinstance(select_expr, exp.Alias) else select_expr.this)
