@@ -1,1 +1,19 @@
-{"mcpServers": {"excel": {"type": "stdio", "command": "uv", "args": ["run", "--directory", ".", "--with", ".[dev]", "excel-mcp-server-fastmcp", "--stdio"]}}}
+{
+  "mcpServers": {
+    "excel": {
+      "type": "stdio",
+      "command": "uv",
+      "args": [
+        "run",
+        "--directory",
+        ".",
+        "excel-mcp-server-fastmcp",
+        "--stdio"
+      ],
+      "env": {
+        "PYTHONUNBUFFERED": "1",
+        "MCP_DEBUG": "1"
+      }
+    }
+  }
+}
