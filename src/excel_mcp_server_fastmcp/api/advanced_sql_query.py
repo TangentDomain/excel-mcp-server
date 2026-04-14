@@ -1192,6 +1192,7 @@ class AdvancedSQLQueryEngine:
                         engine="calamine",
                         header=1,
                         keep_default_na=False,
+                        na_values=[""],
                     )
                     # 注意:desc_map 在 _clean_dataframe 之后构建(列名可能被清洗)
                     # 先记录原始映射关系,后面清洗后再构建最终映射
@@ -1209,6 +1210,7 @@ class AdvancedSQLQueryEngine:
                         sheet_name=sheet,
                         engine="calamine",
                         keep_default_na=False,
+                        na_values=[""],
                     )
                     raw_desc_pairs = []
 
@@ -1324,6 +1326,46 @@ class AdvancedSQLQueryEngine:
             "CONSTRAINT",
         }
     )
+
+    def _inject_ctes_to_worksheets(
+        self,
+        parsed_sql: exp.Expression,
+        worksheets_data: dict[str, pd.DataFrame],
+    ) -> dict[str, pd.DataFrame]:
+        """
+        从已解析的SQL语句中提取CTE(WITH子句)，执行后注入到worksheets_data中。
+
+        支持UPDATE/DELETE语句中的CTE，使WHERE子句的子查询可以引用CTE定义的临时表。
+
+        Args:
+            parsed_sql: sqlglot解析后的语句(Update/Delete/Select等)
+            worksheets_data: 原始工作表数据
+
+        Returns:
+            包含CTE结果的工作表数据字典
+        """
+        # 兼容sqlglot不同版本: arg key可能是'with'或'with_'
+        with_clause = parsed_sql.args.get("with") or parsed_sql.args.get("with_")
+        if not with_clause:
+            return worksheets_data
+
+        # 检查是否为递归CTE（不支持）
+        if getattr(with_clause, "recursive", False):
+            raise ValueError("不支持递归CTE(WITH RECURSIVE).请改用普通CTE或子查询.")
+
+        # 复制worksheets_data避免修改原始数据，逐步添加CTE结果
+        cte_data = dict(worksheets_data)
+        for cte_expr in with_clause.expressions:
+            cte_name = cte_expr.alias
+            cte_query = cte_expr.this  # inner Select
+            try:
+                # 每个CTE在已有的cte_data上执行(支持CTE引用前面的CTE)
+                cte_result = self._execute_query(cte_query, cte_data)
+                cte_data[cte_name] = cte_result
+            except Exception as e:
+                raise ValueError(f"CTE '{cte_name}' 执行失败: {e}")
+
+        return cte_data
 
     def _preprocess_reserved_words(self, sql: str) -> str:
         """
@@ -2965,7 +3007,7 @@ class AdvancedSQLQueryEngine:
                 return pd.Series([non_null_count] * len(group), index=group.index)
 
         if partition_cols:
-            grouped = df.groupby(partition_cols, sort=False)
+            grouped = df.groupby(partition_cols, sort=False, dropna=False)
             result = grouped.apply(compute_count_in_group, include_groups=False)
             if isinstance(result.index, pd.MultiIndex):
                 result = result.droplevel(result.index.names[:-1])
@@ -2987,7 +3029,7 @@ class AdvancedSQLQueryEngine:
             sorted_df = df
 
         if partition_cols:
-            result = sorted_df.groupby(partition_cols, sort=False).cumcount() + 1
+            result = sorted_df.groupby(partition_cols, sort=False, dropna=False).cumcount() + 1
         else:
             result = pd.Series(range(1, len(sorted_df) + 1), index=sorted_df.index, dtype=int)
 
@@ -3000,7 +3042,7 @@ class AdvancedSQLQueryEngine:
 
         sorted_df = df.sort_values(order_cols, ascending=ascending)
         if partition_cols:
-            result = sorted_df.groupby(partition_cols, sort=False)[order_cols[0]].rank(method="min", ascending=ascending[0])
+            result = sorted_df.groupby(partition_cols, sort=False, dropna=False)[order_cols[0]].rank(method="min", ascending=ascending[0])
         else:
             result = sorted_df[order_cols[0]].rank(method="min", ascending=ascending[0])
         return result.reindex(df.index).astype("Int64")
@@ -4196,6 +4238,79 @@ class AdvancedSQLQueryEngine:
         """检查是否为标量数值函数(ROUND, ABS, FLOOR等)"""
         return isinstance(expr, self._SCALAR_NUM_FUNCS)
 
+    def _find_inner_aggregate(self, expr) -> Any:
+        """在表达式中查找内层聚合函数，用于处理 ROUND(AVG(col)) 等情况
+
+        递归搜索表达式树，返回找到的第一个 AggFunc 节点。
+        如果没有找到聚合函数，返回 None。
+        """
+        if isinstance(expr, exp.AggFunc):
+            return expr
+        # 递归检查子节点: this 和 expression (二元操作数)
+        for child_attr in ('this', 'expression'):
+            child = getattr(expr, child_attr, None)
+            if child is not None:
+                result = self._find_inner_aggregate(child)
+                if result is not None:
+                    return result
+        # 检查函数参数列表（如 ROUND 的第二个参数）
+        for arg_key in expr.args:
+            val = expr.args[arg_key]
+            if isinstance(val, list):
+                for item in val:
+                    if isinstance(item, exp.Expression):
+                        result = self._find_inner_aggregate(item)
+                        if result is not None:
+                            return result
+            elif isinstance(val, exp.Expression):
+                result = self._find_inner_aggregate(val)
+                if result is not None:
+                    return result
+        return None
+
+    def _apply_scalar_to_agg_result(self, scalar_expr, agg_series: pd.Series) -> pd.Series:
+        """对已计算的聚合结果应用标量数值函数
+
+        用于处理 ROUND(AVG(col)), ABS(SUM(col)) 等场景。
+        直接对聚合结果 Series 应用标量运算，避免 _expr_to_series 解析 Agg 节点失败。
+
+        Args:
+            scalar_expr: 标量函数表达式节点 (如 exp.Round)
+            agg_series: 已计算的聚合结果 Series
+
+        Returns:
+            应用标量函数后的 Series
+        """
+        import numpy as np
+        func_type = type(scalar_expr)
+
+        numeric_series = pd.to_numeric(agg_series, errors="coerce")
+
+        if func_type == exp.Round:
+            decimals_arg = scalar_expr.args.get("decimals")
+            decimals = int(self._literal_value(decimals_arg)) if decimals_arg is not None else 0
+            return numeric_series.round(decimals)
+        elif func_type == exp.Abs:
+            return numeric_series.abs()
+        elif func_type == exp.Ceil:
+            return np.ceil(numeric_series)
+        elif func_type == exp.Floor:
+            return np.floor(numeric_series)
+        elif func_type == exp.Sqrt:
+            return np.sqrt(numeric_series)
+        elif func_type == exp.Pow:
+            # POWER(base, exp) — 这里 base 是聚合结果
+            power_arg = scalar_expr.args.get("expression") or scalar_expr.args.get("this")
+            if power_arg is not None and isinstance(power_arg, (exp.Literal,)):
+                exp_val = float(self._literal_value(power_arg))
+                return np.power(numeric_series, exp_val)
+            else:
+                return numeric_series
+        else:
+            # 未知标量函数，原样返回
+            logger.warning("_apply_scalar_to_agg_result: 未知的标量函数类型 %s", func_type.__name__)
+            return agg_series
+
     def _evaluate_string_function(self, expr, df) -> pd.Series:
         """计算字符串函数,返回pd.Series"""
         func_type = type(expr)
@@ -4659,6 +4774,12 @@ class AdvancedSQLQueryEngine:
             join_side = str(join.side).upper() if join.side else None
             join_kind_name = str(join.kind).upper() if join.kind else None
             join_kind = self._JOIN_KIND_MAP.get((join_side, join_kind_name), "inner")
+
+            # Fix(R13): 逗号风格隐式 CROSS JOIN (FROM table1, table2)
+            # sqlglot 将逗号解析为无 kind 无 ON 的 Join 节点,应视为笛卡尔积
+            on_clause = join.args.get("on")
+            if not join_kind_name and not on_clause and not join_side:
+                join_kind = "cross"
 
             # 解析右表
             right_table_expr = join.this
@@ -5381,8 +5502,10 @@ class AdvancedSQLQueryEngine:
             try:
                 sub_result = self._execute_subquery(subquery, self._current_worksheets)
                 if len(sub_result.columns) > 0:
-                    # 确保子查询结果排除表头行（iloc[1:, 0]而不是iloc[:, 0]）
-                    sub_values = sub_result.iloc[1:, 0].dropna().tolist()
+                    # Fix(R13): _execute_subquery 返回的 DataFrame 不含表头行
+                    # columns 属性就是列名，数据从 iloc[0] 开始
+                    # 旧代码错误地用 iloc[1:, 0] 跳过了第一行数据
+                    sub_values = sub_result.iloc[:, 0].dropna().tolist()
                     values_str = ", ".join(repr(v) for v in sub_values)
                     return f"{prefix}{left}.isin([{values_str}])"
                 return f"{prefix}{left}.isin([])"
@@ -5700,8 +5823,35 @@ class AdvancedSQLQueryEngine:
 
             elif isinstance(condition, exp.In):
                 val = self._get_row_value(condition.this, row)
-                values = [self._get_row_value(e, row) for e in condition.expressions]
-                return val in values
+                # Fix(R13): 支持 IN (SELECT ...) 子查询形式
+                # sqlglot 将 IN (1,2,3) 和 IN (SELECT ...) 都解析为 In 节点
+                # 区分方式: expressions[0] 是否为 Subquery/Select
+                if condition.expressions and isinstance(condition.expressions[0], (exp.Subquery, exp.Select)):
+                    # IN 子查询: 执行子查询，检查值是否在结果集中
+                    try:
+                        if not (hasattr(self, "_current_worksheets") and self._current_worksheets):
+                            return False
+                        sub_result = self._execute_subquery(
+                            condition.expressions[0], self._current_worksheets
+                        )
+                        if sub_result.empty:
+                            return False
+                        sub_values = sub_result.iloc[:, 0].dropna().tolist()
+                        # 类型兼容比较（处理 int/float 混合）
+                        for sv in sub_values:
+                            try:
+                                if float(val) == float(sv):
+                                    return True
+                            except (TypeError, ValueError):
+                                if val == sv:
+                                    return True
+                        return False
+                    except Exception:
+                        return False
+                else:
+                    # IN 字面量列表: IN (1, 2, 3)
+                    values = [self._get_row_value(e, row) for e in condition.expressions]
+                    return val in values
 
             elif isinstance(condition, exp.Between):
                 val = self._get_row_value(condition.this, row)
@@ -6034,6 +6184,7 @@ class AdvancedSQLQueryEngine:
           正确按所有GROUP BY列分组，而非仅按计算列分组
         - 确保所有GROUP BY列都包含在最终结果中
         """
+        print(f"[DEBUG-ENTRY] _apply_group_by_aggregation called with {len(df)} rows")
         group_by_columns = []
         group_clause = parsed_sql.args.get("group")
         if group_clause:
@@ -6160,7 +6311,7 @@ class AdvancedSQLQueryEngine:
             # 确保group_by_columns中的列都存在
             valid_group_cols = [c for c in group_by_columns if c in df.columns]
             if valid_group_cols:
-                grouped = df.groupby(valid_group_cols, observed=True)
+                grouped = df.groupby(valid_group_cols, observed=True, dropna=False)
             else:
                 grouped = df.groupby(lambda x: 0)
         else:
@@ -6170,6 +6321,7 @@ class AdvancedSQLQueryEngine:
         # 按照SQL SELECT表达式的顺序构建结果
         result_data = {}
         ordered_columns = []
+        print(f"[DEBUG-GB] SELECT expressions count: {len(parsed_sql.expressions)}")
 
         # 按SELECT表达式顺序处理列
         for i, select_expr in enumerate(parsed_sql.expressions):
@@ -6180,6 +6332,7 @@ class AdvancedSQLQueryEngine:
                 continue
 
             ordered_columns.append(alias_name)
+            print(f"[DEBUG-GB] Processing[{i}] alias={alias_name}, orig_type={type(original_expr).__name__}")
 
             # 处理聚合函数
             is_agg = self._is_aggregate_function(select_expr if not isinstance(select_expr, exp.Alias) else select_expr.this)
@@ -6198,6 +6351,33 @@ class AdvancedSQLQueryEngine:
                         result_data[alias_name] = pd.Series([agg_result])
                     except:
                         result_data[alias_name] = pd.Series([None])
+            # 处理标量函数包裹聚合函数的情况 (如 ROUND(AVG(Price)), ABS(SUM(col)) 等)
+            elif self._is_scalar_num_function(original_expr):
+                # 检查内部是否包含聚合函数
+                inner_agg = self._find_inner_aggregate(original_expr)
+                if inner_agg is not None:
+                    # 先计算内层聚合
+                    try:
+                        agg_result = self._apply_aggregation_function(inner_agg, grouped, df)
+                        # 将聚合结果转为 Series 用于标量函数处理
+                        if isinstance(agg_result, (int, float, np.integer, np.floating)):
+                            agg_series = pd.Series([agg_result])
+                        elif isinstance(agg_result, pd.Series):
+                            agg_series = agg_result.reset_index(drop=True)
+                        else:
+                            agg_series = pd.Series([None])
+                        # 直接对聚合结果应用标量函数（避免 _expr_to_series 解析 Agg 节点失败）
+                        scalar_result = self._apply_scalar_to_agg_result(original_expr, agg_series)
+                        print(f"[DEBUG-ROUND] alias={alias_name}, agg_result={list(agg_result)}, scalar_result={list(scalar_result)}")
+                        result_data[alias_name] = scalar_result.reset_index(drop=True)
+                    except Exception as e:
+                        logger.warning("标量函数+聚合计算失败 %s: %s", alias_name, e)
+                        import traceback
+                        traceback.print_exc()
+                        result_data[alias_name] = pd.Series([None])
+                else:
+                    # 无内层聚合，按普通表达式处理（不应到达这里）
+                    result_data[alias_name] = pd.Series([None])
             # 处理CASE WHEN表达式(已预计算到df,直接从grouped取first)
             elif isinstance(original_expr, exp.Case):
                 result_data[alias_name] = grouped[alias_name].first().reset_index(drop=True)
@@ -6415,13 +6595,36 @@ class AdvancedSQLQueryEngine:
         if target_type is None:
             return inner_val  # 无目标类型则原样返回
 
-        type_name = str(target_type.this).upper() if hasattr(target_type, "this") else str(target_type).upper()
+        # sqlglot 的 DataType 节点: target_type.this 是类型表达式(如 TYPE.INT)
+        # 需要用 .sql() 或提取实际类型名; str(node) 会返回 "TYPE.INT" 带前缀
+        type_node = target_type.this if hasattr(target_type, "this") else target_type
+        if hasattr(type_node, "sql"):
+            # sqlglot DataType 的 .sql() 返回标准 SQL 类型名 (如 "INT", "VARCHAR")
+            type_name = type_node.sql().upper()
+        else:
+            type_name = str(type_node).upper()
+        # 去掉可能的 "TYPE." 前缀 (兼容不同 sqlglot 版本)
+        if type_name.startswith("TYPE."):
+            type_name = type_name[5:]
 
         # 3. 执行类型转换
 
         if type_name in ("INT", "INTEGER"):
             if isinstance(inner_val, pd.Series):
-                return pd.to_numeric(inner_val, errors="coerce").astype("Int64")
+                numeric = pd.to_numeric(inner_val, errors="coerce")
+                # SQL CAST FLOAT→INT 行为: 向零截断 (truncate toward zero)
+                # 不能直接用 .astype("Int64"), 因为非整数值(如 3.14)会抛 TypeError
+                import numpy as np
+                float_vals = np.asarray(numeric, dtype=float)
+                truncated = np.trunc(float_vals)  # 向零截断,匹配 SQL 标准
+                # 构造 Int64 Series (支持 NA)
+                result = []
+                for i in range(len(truncated)):
+                    if np.isnan(numeric.iloc[i]) if hasattr(numeric, 'iloc') else np.isnan(float_vals[i]):
+                        result.append(pd.NA)
+                    else:
+                        result.append(int(truncated[i]))
+                return pd.Series(result, dtype="Int64")
             return int(float(inner_val)) if inner_val is not None else None
 
         elif type_name in ("FLOAT", "DECIMAL", "REAL", "DOUBLE", "NUMBER"):
@@ -7583,7 +7786,8 @@ class AdvancedSQLQueryEngine:
                 return self._update_error(f"不支持的SET表达式: {set_item}")
 
         # 设置当前工作表数据供子查询使用（IN子查询可能需要）
-        self._current_worksheets = worksheets_data
+        # Fix(R13): 支持 WITH CTE 子句 — 提取CTE并执行，结果加入可用表
+        self._current_worksheets = self._inject_ctes_to_worksheets(parsed, worksheets_data)
 
         # 应用WHERE条件筛选（支持窗口函数预处理）
         where_clause = parsed.args.get("where")
@@ -7923,7 +8127,8 @@ class AdvancedSQLQueryEngine:
 
         # 加载数据
         worksheets_data = self._load_data_with_cache(file_path, sheet_name)
-        self._current_worksheets = worksheets_data
+        # Fix(R13): 支持 WITH CTE 子句 — 提取CTE并执行，结果加入可用表
+        self._current_worksheets = self._inject_ctes_to_worksheets(parsed, worksheets_data)
 
         # 匹配工作表
         matched_sheet = None
