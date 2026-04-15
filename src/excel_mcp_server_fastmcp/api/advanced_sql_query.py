@@ -4739,8 +4739,9 @@ class AdvancedSQLQueryEngine:
     def _apply_scalar_to_agg_result(self, scalar_expr, agg_series: pd.Series) -> pd.Series:
         """对已计算的聚合结果应用标量数值函数
 
-        用于处理 ROUND(AVG(col)), ABS(SUM(col)) 等场景。
+        用于处理 ROUND(AVG(col)), ABS(SUM(col)), ABS(ROUND(MIN(col))) 等场景。
         直接对聚合结果 Series 应用标量运算，避免 _expr_to_series 解析 Agg 节点失败。
+        支持递归嵌套标量函数（如 ABS(ROUND(MIN(value)))）。
 
         Args:
             scalar_expr: 标量函数表达式节点 (如 exp.Round)
@@ -4752,6 +4753,12 @@ class AdvancedSQLQueryEngine:
         import numpy as np
 
         func_type = type(scalar_expr)
+
+        # Fix(R47): 递归处理嵌套标量函数
+        # 例如 ABS(ROUND(MIN(value))) → 先对聚合结果应用 ROUND，再应用 ABS
+        inner_expr = scalar_expr.this
+        if self._is_scalar_num_function(inner_expr):
+            agg_series = self._apply_scalar_to_agg_result(inner_expr, agg_series)
 
         numeric_series = pd.to_numeric(agg_series, errors="coerce")
 
@@ -5148,6 +5155,12 @@ class AdvancedSQLQueryEngine:
                 right = self._expr_to_series(expr.expression, df).astype(str)
                 return left + right
             raise ValueError(f"不支持的表达式: {expr}。\n💡 MySQL方言中 || 表示逻辑OR,如需字符串拼接请使用 CONCAT() 函数。\n🔧 示例: SELECT CONCAT(name, '_v1') FROM table")
+
+        elif isinstance(expr, exp.Neg):
+            # 一元负号: -3.7, -column 等
+            inner = self._expr_to_series(expr.this, df)
+            numeric_inner = pd.to_numeric(inner, errors="coerce")
+            return -numeric_inner
 
         else:
             raise ValueError(
@@ -6733,6 +6746,15 @@ class AdvancedSQLQueryEngine:
             return None
 
         else:
+            # Fix(R47): 聚合函数节点(SUM/AVG/COUNT等) — 从row上下文中按SQL文本查找
+            # 用于CASE+聚合交互: CASE WHEN SUM(Amount) > 300 THEN ... 场景
+            if self._is_aggregate_function(expr):
+                agg_sql = expr.sql()
+                if agg_sql in row.index:
+                    return row.get(agg_sql)
+                for col in row.index:
+                    if col.replace(" ", "") == agg_sql.replace(" ", ""):
+                        return row.get(col)
             return None
 
     def _apply_group_by_aggregation(self, parsed_sql: exp.Expression, df) -> pd.DataFrame:
@@ -6785,6 +6807,9 @@ class AdvancedSQLQueryEngine:
             elif self._is_scalar_num_function(expr) and self._find_inner_aggregate(expr) is not None:
                 # 标量函数(ROUND/ABS/FLOOR/CEIL等)包裹聚合函数 → 视为聚合
                 # 在后续主循环中会走 _apply_scalar_to_agg_result 分支处理
+                aggregations[alias_name] = expr
+            # Fix(R47): CASE/COALESCE 内包含聚合函数时也视为聚合表达式
+            elif isinstance(expr, (exp.Case, exp.Coalesce)) and self._find_inner_aggregate(expr) is not None:
                 aggregations[alias_name] = expr
             elif hasattr(expr, "name") and expr.name not in group_by_columns:
                 # 如果是非聚合列且不在GROUP BY中,需要添加到GROUP BY
@@ -6871,12 +6896,17 @@ class AdvancedSQLQueryEngine:
                 return df
 
         # 预计算CASE WHEN/COALESCE/标量子查询表达式,添加到df副本,使grouped可访问
+        # Fix(R47): 跳过包含聚合函数的CASE/COALESCE — 它们需要在分组后求值
         df = df.copy()
         for alias_name, expr in select_exprs.items():
             if isinstance(expr, exp.Case) and alias_name not in df.columns:
-                df[alias_name] = self._evaluate_case_expression(expr, df)
+                # 检查CASE内是否包含聚合函数(如 CASE WHEN SUM(col) > x THEN ...)
+                if self._find_inner_aggregate(expr) is None:
+                    df[alias_name] = self._evaluate_case_expression(expr, df)
+                # else: 含聚合的CASE在分组后处理
             elif isinstance(expr, exp.Coalesce) and alias_name not in df.columns:
-                df[alias_name] = self._evaluate_coalesce_vectorized(expr, df)
+                if self._find_inner_aggregate(expr) is None:
+                    df[alias_name] = self._evaluate_coalesce_vectorized(expr, df)
             elif isinstance(expr, exp.Subquery) and alias_name not in df.columns:
                 try:
                     sub_result = self._execute_subquery(expr, self._current_worksheets)
@@ -6958,12 +6988,35 @@ class AdvancedSQLQueryEngine:
                 else:
                     # 无内层聚合，按普通表达式处理（不应到达这里）
                     result_data[alias_name] = pd.Series([None])
-            # 处理CASE WHEN表达式(已预计算到df,直接从grouped取first)
+            # 处理CASE WHEN表达式
             elif isinstance(original_expr, exp.Case):
-                result_data[alias_name] = grouped[alias_name].first().reset_index(drop=True)
-            # 处理COALESCE表达式(已预计算到df,直接从grouped取first)
+                if alias_name in df.columns:
+                    # 已预计算(无内层聚合的简单CASE),直接从grouped取first
+                    result_data[alias_name] = grouped[alias_name].first().reset_index(drop=True)
+                else:
+                    try:
+                        case_results = self._evaluate_case_with_aggregate(
+                            original_expr, grouped, df, result_data, group_by_columns
+                        )
+                        result_data[alias_name] = case_results
+                    except Exception as e:
+                        logger.warning("CASE+聚合计算失败 %s: %s", alias_name, e)
+                        result_data[alias_name] = pd.Series([None] * len(grouped))
+            # 处理COALESCE表达式
             elif isinstance(original_expr, exp.Coalesce):
-                result_data[alias_name] = grouped[alias_name].first().reset_index(drop=True)
+                if alias_name in df.columns:
+                    # 已预计算(无内层聚合的简单COALESCE)
+                    result_data[alias_name] = grouped[alias_name].first().reset_index(drop=True)
+                else:
+                    # Fix(R47): 含聚合函数的COALESCE(如 COALESCE(SUM(col), 0))
+                    try:
+                        coalesce_results = self._evaluate_coalesce_with_aggregate(
+                            original_expr, grouped, df, result_data, group_by_columns
+                        )
+                        result_data[alias_name] = coalesce_results
+                    except Exception as e:
+                        logger.warning("COALESCE+聚合计算失败 %s: %s", alias_name, e)
+                        result_data[alias_name] = pd.Series([None] * len(grouped))
             # 处理标量子查询(已预计算到df,直接从grouped取first)
             elif isinstance(original_expr, exp.Subquery):
                 result_data[alias_name] = grouped[alias_name].first().reset_index(drop=True)
@@ -7274,6 +7327,123 @@ class AdvancedSQLQueryEngine:
                 index=df.index,
             )
 
+    def _evaluate_case_with_aggregate(self, case_expr: exp.Case, grouped, df, result_data, group_by_columns) -> pd.Series:
+        """Fix(R47): 在分组后评估包含聚合函数的CASE WHEN表达式
+
+        处理如 CASE WHEN SUM(Amount) > 300 THEN 'Big' ELSE 'Small' END 的场景.
+        策略: 对每个分组构建一行聚合结果DataFrame,然后逐组评估CASE.
+        
+        关键: 需要先计算CASE内嵌的聚合函数值(这些聚合不在select_exprs中),
+        然后将它们注入到row_context中供条件评估使用.
+
+        Args:
+            case_expr: CASE表达式(内含聚合函数)
+            grouped: pandas GroupBy对象
+            df: 原始未分组DataFrame
+            result_data: 已计算的聚合结果字典 {alias_name: Series}
+            group_by_columns: GROUP BY列名列表
+
+        Returns:
+            pd.Series: 每组一个CASE结果值
+        """
+        import numpy as np
+        results = []
+        group_names = list(grouped.groups.keys())
+
+        # Fix(R47-b): 提取并计算CASE内嵌的聚合函数
+        inner_agg_expr = self._find_inner_aggregate(case_expr)
+        inner_agg_results = {}
+        if inner_agg_expr:
+            agg_sql = inner_agg_expr.sql()
+            # 使用 _apply_aggregation_function 计算内嵌聚合值(与主循环一致)
+            try:
+                agg_result = self._apply_aggregation_function(inner_agg_expr, grouped, df)
+                if isinstance(agg_result, pd.Series):
+                    inner_agg_results[agg_sql] = agg_result.reset_index(drop=True).tolist()
+                elif isinstance(agg_result, (int, float, np.integer, np.floating)):
+                    # 全表聚合返回单个值,复制到每组
+                    n_groups = len(group_names)
+                    inner_agg_results[agg_sql] = [agg_result] * n_groups
+                else:
+                    inner_agg_results[agg_sql] = [None] * len(group_names)
+            except Exception as e:
+                logger.warning("CASE+聚合计算失败 %s: %s", alias_name, e)
+                inner_agg_results[agg_sql] = [None] * len(group_names)
+
+        for i, group_name in enumerate(group_names):
+            if not isinstance(group_name, tuple):
+                group_key = (group_name,)
+            else:
+                group_key = group_name
+
+            # 构建该组的单行上下文: 包含GROUP BY列 + 已计算聚合结果 + 内嵌聚合结果
+            all_keys = list(group_by_columns) + list(result_data.keys()) + list(inner_agg_results.keys())
+            row_context = pd.Series(index=all_keys, dtype=object)
+
+            # 填充GROUP BY列值
+            for j, col in enumerate(group_by_columns):
+                if j < len(group_key):
+                    row_context[col] = group_key[j]
+
+            # 填充已计算的聚合结果
+            for alias_name, agg_series in result_data.items():
+                if i < len(agg_series):
+                    row_context[alias_name] = agg_series.iloc[i]
+
+            # 填充CASE内嵌的聚合结果(Fix(R47-b))
+            for agg_sql, agg_vals in inner_agg_results.items():
+                if i < len(agg_vals):
+                    row_context[agg_sql] = agg_vals[i]
+
+            # 用行级模式评估CASE表达式
+            case_result = self._evaluate_case_expression(case_expr, df, row=row_context)
+            results.append(case_result)
+
+        return pd.Series(results, index=range(len(group_names)))
+
+    def _evaluate_coalesce_with_aggregate(self, coalesce_expr: exp.Coalesce, grouped, df, result_data, group_by_columns) -> pd.Series:
+        """Fix(R47): 在分组后评估包含聚合函数的COALESCE表达式
+
+        处理如 COALESCE(SUM(col), 0) 的场景.
+        策略与 _evaluate_case_with_aggregate 相同: 逐组评估.
+
+        Args:
+            coalesce_expr: COALESCE表达式(内含聚合函数)
+            grouped: pandas GroupBy对象
+            df: 原始未分组DataFrame
+            result_data: 已计算的聚合结果字典
+            group_by_columns: GROUP BY列名列表
+
+        Returns:
+            pd.Series: 每组一个COALESCE结果值
+        """
+        import numpy as np
+        results = []
+        group_names = list(grouped.groups.keys())
+
+        for i, group_name in enumerate(group_names):
+            if not isinstance(group_name, tuple):
+                group_key = (group_name,)
+            else:
+                group_key = group_name
+
+            # 构建该组的单行上下文
+            row_context = pd.Series(index=list(group_by_columns) + list(result_data.keys()), dtype=object)
+
+            for j, col in enumerate(group_by_columns):
+                if j < len(group_key):
+                    row_context[col] = group_key[j]
+
+            for alias_name, agg_series in result_data.items():
+                if i < len(agg_series):
+                    row_context[alias_name] = agg_series.iloc[i]
+
+            # 逐行评估COALESCE
+            coalesce_result = self._evaluate_coalesce_for_row(coalesce_expr, row_context)
+            results.append(coalesce_result)
+
+        return pd.Series(results, index=range(len(group_names)))
+
     def _get_expression_value(self, expr: exp.Expression, row: pd.Series) -> Any:
         """获取表达式在指定行的值(委托给_get_row_value,两者功能完全重叠)"""
         return self._get_row_value(expr, row)
@@ -7318,24 +7488,24 @@ class AdvancedSQLQueryEngine:
             return None
 
     def _evaluate_coalesce_for_row(self, coalesce_expr: exp.Coalesce, row: pd.Series) -> Any:
-        """逐行评估COALESCE/IFNULL表达式,空字符串转为0"""
+        """逐行评估COALESCE/IFNULL表达式,空字符串视为NULL继续查找下一个参数"""
         # COALESCE结构: this=第一个参数, expressions=[后续参数]
         values = [coalesce_expr.this] + list(coalesce_expr.expressions)
         for val_expr in values:
             val = self._get_expression_value(val_expr, row)
-            # 跳过None/NaN,继续查找下一个参数
-            if val is not None and not (isinstance(val, float) and np.isnan(val)):
-                if val == "":
-                    return 0  # 空字符串转为0
+            # 跳过None/NaN/空字符串,继续查找下一个参数
+            if val is not None and not (isinstance(val, float) and np.isnan(val)) and val != "":
                 return val
-        return 0  # 所有参数都无效(None/NaN)时返回0
+        return 0  # 所有参数都无效(None/NaN/空)时返回0
 
     def _evaluate_coalesce_vectorized(self, coalesce_expr: exp.Coalesce, df) -> pd.Series:
-        """向量化评估COALESCE/IFNULL表达式(用于DataFrame),空字符串转为0
+        """向量化评估COALESCE/IFNULL表达式(用于DataFrame),空字符串视为NULL
 
         使用 pandas combine_first 实现真正的向量化操作,
         替代逐行 _evaluate_coalesce_for_row 循环.
         仅当所有参数为列引用或字面量时可向量化,否则回退逐行.
+        
+        Fix(R47): 支持 exp.Neg 等一元表达式作为COALESCE默认值(如 COALESCE(col, -1))
         """
         values = [coalesce_expr.this] + list(coalesce_expr.expressions)
         result = None
@@ -7344,12 +7514,25 @@ class AdvancedSQLQueryEngine:
         for val_expr in values:
             if isinstance(val_expr, exp.Column) and val_expr.name in df.columns:
                 series = df[val_expr.name].astype(object)
-                # 空字符串转为0(在NaN处理之前)
-                series = series.replace("", 0)
+                # 空字符串转为NaN,让combine_first正确识别为NULL
+                series = series.replace("", np.nan)
                 # None/NaN保持不变,用于combine_first处理
             elif isinstance(val_expr, exp.Literal):
                 v = self._parse_literal_value(val_expr)
                 series = pd.Series([v] * len(df), index=df.index, dtype=object)
+            elif isinstance(val_expr, exp.Neg):
+                # 处理负数字面量: COALESCE(col, -1) -> -1 是 Neg 节点
+                inner = val_expr.this
+                if isinstance(inner, exp.Literal):
+                    v = self._parse_literal_value(inner)
+                    series = pd.Series([-v] * len(df), index=df.index, dtype=object)
+                else:
+                    fallback = True
+                    break
+            elif isinstance(val_expr, (exp.Add, exp.Sub, exp.Mul, exp.Div)):
+                # 简单算术表达式作为常量值(如 COALESCE(col, 1+1))
+                fallback = True  # 暂时fallback,后续可优化为常量折叠
+                break
             else:
                 fallback = True
                 break
@@ -7430,6 +7613,22 @@ class AdvancedSQLQueryEngine:
             if isinstance(expr.this, exp.Distinct):
                 col_name = self._extract_agg_column(expr.this.expressions[0], "COUNT(DISTINCT)")
                 return grouped[col_name].nunique()
+
+            # Fix(R47): COUNT(CASE WHEN ...) / COUNT(COALESCE(...)) 等复杂表达式参数
+            if isinstance(expr.this, (exp.Case, exp.Coalesce)):
+                # 先在完整df上计算CASE/COALESCE表达式,然后对分组结果计数非空值
+                temp_col = f"_count_expr_{id(expr)}"
+                if temp_col not in df.columns:
+                    if isinstance(expr.this, exp.Case):
+                        expr_values = self._evaluate_case_expression(expr.this, df)
+                    else:
+                        expr_values = self._evaluate_coalesce_vectorized(expr.this, df)
+                    df[temp_col] = expr_values
+                # 对每个组统计非空值数量
+                def count_non_null(group):
+                    return group[temp_col].notna().sum()
+                return grouped.apply(count_non_null)
+
             col_name = self._extract_agg_column(expr.this, "COUNT")
             return grouped[col_name].count()
 
@@ -9321,6 +9520,51 @@ class AdvancedSQLQueryEngine:
                     return np.sqrt(f_val) if f_val >= 0 else None
             except (ValueError, TypeError):
                 return inner
+
+        elif isinstance(expr, (exp.Upper, exp.Lower, exp.Trim)):
+            # [FIX R47] UPDATE SET 字符串函数(UPPER/LOWER/TRIM)
+            inner = self._evaluate_update_expression(expr.this, df, row_idx)
+            if inner is None:
+                return None
+            s = str(inner)
+            if isinstance(expr, exp.Upper):
+                return s.upper()
+            elif isinstance(expr, exp.Lower):
+                return s.lower()
+            elif isinstance(expr, exp.Trim):
+                return s.strip()
+
+        elif isinstance(expr, (exp.Substring, exp.Left, exp.Right)):
+            # [FIX R47] UPDATE SET 子字符串函数(SUBSTRING/LEFT/RIGHT)
+            if isinstance(expr, exp.Substring):
+                val = self._evaluate_update_expression(expr.this, df, row_idx)
+                start = self._evaluate_update_expression(expr.args.get("start"), df, row_idx)
+                length = self._evaluate_update_expression(expr.args.get("length"), df, row_idx)
+                if val is None or start is None:
+                    return None
+                s = str(val)
+                st = int(start) - 1  # SQL is 1-indexed
+                ln = int(length) if length is not None else len(s)
+                return s[st:st + ln]
+            elif isinstance(expr, (exp.Left, exp.Right)):
+                val = self._evaluate_update_expression(expr.this, df, row_idx)
+                length_expr = expr.args.get("length") or expr.args.get("expression")
+                n = self._evaluate_update_expression(length_expr, df, row_idx)
+                if val is None or n is None:
+                    return None
+                s = str(val)
+                count = int(n)
+                if isinstance(expr, exp.Left):
+                    return s[:count]
+                else:
+                    return s[-count:] if count > 0 else ""
+
+        elif isinstance(expr, exp.Length):
+            # [FIX R47] UPDATE SET LENGTH() 函数
+            inner = self._evaluate_update_expression(expr.this, df, row_idx)
+            if inner is None:
+                return 0
+            return len(str(inner))
 
         else:
             # 未知表达式类型,尝试递归
