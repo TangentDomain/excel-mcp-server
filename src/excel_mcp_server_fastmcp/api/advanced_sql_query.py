@@ -6986,7 +6986,7 @@ class AdvancedSQLQueryEngine:
                     # 尝试转换为Series
                     try:
                         result_data[alias_name] = pd.Series([agg_result])
-                    except:
+                    except (ValueError, TypeError):
                         result_data[alias_name] = pd.Series([None])
             # 处理标量函数包裹聚合函数的情况 (如 ROUND(AVG(Price)), ABS(SUM(col)) 等)
             elif self._is_scalar_num_function(original_expr):
