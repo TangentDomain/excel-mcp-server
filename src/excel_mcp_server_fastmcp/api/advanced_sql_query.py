@@ -4172,9 +4172,33 @@ class AdvancedSQLQueryEngine:
             raise ValueError(f"无法提取整数值: {value}")
 
     def _check_has_aggregate_function(self, parsed_sql: exp.Expression) -> bool:
-        """检查SQL查询是否包含聚合函数"""
+        """检查SQL查询是否包含聚合函数
+
+        覆盖三种情况:
+        1. 直接聚合: SELECT AVG(col) FROM t
+        2. 标量函数包裹聚合: SELECT ROUND(AVG(col)), ABS(SUM(col)) FROM t
+        3. 别名包裹: SELECT ROUND(AVG(col)) AS alias FROM t
+
+        注意: 标量子查询中的聚合(如 SELECT (SELECT AVG(x) FROM t) FROM s)
+        不算作外层聚合，因为子查询内的聚合由 _execute_subquery 独立处理。
+        """
         for select_expr in parsed_sql.expressions:
+            # 解包别名: 获取实际表达式
+            inner_expr = select_expr.this if isinstance(select_expr, exp.Alias) else select_expr
+
+            # 跳过标量子查询: 子查询内聚合是自包含的，不触发外层聚合路径
+            # (SELECT AVG(x) FROM t) 由 _apply_select_expressions → Subquery 分支处理
+            if isinstance(inner_expr, exp.Subquery):
+                continue
+
+            # 情况1: 顶层是聚合函数(含别名包裹)
             if self._is_aggregate_function(select_expr):
+                return True
+            # 情况2: 标量函数(ROUND/ABS/CEIL/FLOOR/SQRT/POWER)包裹聚合函数
+            if self._is_scalar_num_function(inner_expr) and self._find_inner_aggregate(inner_expr) is not None:
+                return True
+            # 情况3: 其他表达式树中包含聚合函数(CASE WHEN AVG 等)
+            if self._find_inner_aggregate(select_expr) is not None:
                 return True
         return False
 
@@ -4653,6 +4677,9 @@ class AdvancedSQLQueryEngine:
         递归搜索表达式树，返回找到的第一个 AggFunc 节点。
         如果没有找到聚合函数，返回 None。
         """
+        # 类型守卫: 只处理 sqlglot 表达式节点,跳过字符串/数字等字面量
+        if not isinstance(expr, exp.Expression):
+            return None
         if isinstance(expr, exp.AggFunc):
             return expr
         # 递归检查子节点: this 和 expression (二元操作数)
