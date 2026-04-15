@@ -7449,6 +7449,18 @@ class AdvancedSQLQueryEngine:
                 df[temp_col] = self._evaluate_case_expression(expr_node, df)
             return temp_col
 
+        # 处理 COALESCE 表达式
+        elif isinstance(expr_node, exp.Coalesce):
+            if temp_col not in df.columns:
+                df[temp_col] = self._evaluate_coalesce_vectorized(expr_node, df)
+            return temp_col
+
+        # 处理 CAST 表达式
+        elif isinstance(expr_node, exp.Cast):
+            if temp_col not in df.columns:
+                df[temp_col] = self._evaluate_cast_expression(expr_node, df)
+            return temp_col
+
         else:
             raise ValueError(f"不支持的表达式类型: {type(expr_node)}")
 

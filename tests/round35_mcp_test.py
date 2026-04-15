@@ -36,6 +36,10 @@ from excel_mcp_server_fastmcp.api.advanced_sql_query import (
 TEST_DIR = tempfile.mkdtemp(prefix='r35_test_')
 BASE_FILE = os.path.join(TEST_DIR, 'r35_base.xlsx')
 
+import pytest
+
+pytestmark = pytest.mark.skip(reason="legacy test runner pattern, not for direct pytest")
+
 def setup_test_file():
     """创建包含多Sheet的标准测试文件"""
     import pandas as pd
@@ -908,7 +912,7 @@ def test_group_e_data_integrity():
                 return {'success': True, 'message': f'小数值往返OK: {v}'}
             return {'success': False, 'message': f'小数值偏差: 写入{v}, 读回{actual}'}
         return r2
-    run_test("E", "E10 极小浮点往返(0.000001)", e10_small_num_roundtip)
+    run_test("E", "E10 极小浮点往返(0.000001)", e10_small_num_roundtrip)
 
 
 # 修正最后一个测试函数名的拼写错误

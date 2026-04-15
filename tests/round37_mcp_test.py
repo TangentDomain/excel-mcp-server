@@ -127,6 +127,9 @@ def test_group_b():
     print("📋 B组: P0 第10轮回归（已知问题追踪 R10）")
     print("=" * 70)
 
+    # 确保基础测试文件存在
+    if not os.path.exists(BASE_FILE):
+        create_base_test_file()
     f = copy_test_file(BASE_FILE)
 
     # P0-2: SELECT分号注入
@@ -494,6 +497,10 @@ def test_group_d():
     print("\n" + "=" * 70)
     print("📋 D组: 已知问题快速回归")
     print("=" * 70)
+
+    # 确保基础测试文件存在
+    if not os.path.exists(BASE_FILE):
+        create_base_test_file()
 
     # D1: 并发多线程写入文件损坏
     print("\n--- D1: 并发多线程写入 ---")

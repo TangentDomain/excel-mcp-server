@@ -33,6 +33,9 @@ from .tools import (
     register_sql_tools,
 )
 
+# 导入校准器工具（内置模块，不依赖外部 tools/ 目录）
+from .calibrator.tools import register_calibrator_tools
+
 # ==================== 日志配置 ====================
 logging.basicConfig(
     level=logging.DEBUG,
@@ -116,6 +119,9 @@ def setup_server() -> FastMCP:
 
     logger.info("正在注册SQL工具...")
     register_sql_tools(mcp)
+
+    logger.info("正在注册校准器工具...")
+    register_calibrator_tools(mcp)
 
     logger.info("MCP 服务器组件注册完成!")
     return mcp

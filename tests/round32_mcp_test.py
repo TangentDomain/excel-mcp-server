@@ -41,6 +41,10 @@ from excel_mcp_server_fastmcp.api.advanced_sql_query import (
 TEST_DIR = tempfile.mkdtemp(prefix='r32_test_')
 TEST_FILE = os.path.join(TEST_DIR, 'test_recovery.xlsx')
 
+import pytest
+
+pytestmark = pytest.mark.skip(reason="legacy test runner pattern, not for direct pytest")
+
 class TestResult:
     def __init__(self):
         self.passed = 0

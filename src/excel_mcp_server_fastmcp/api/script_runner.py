@@ -4,10 +4,13 @@
 """
 
 import io
+import logging
 import traceback
 from contextlib import redirect_stdout
 from functools import partial
 from typing import Any
+
+logger = logging.getLogger(__name__)
 
 from .advanced_sql_query import (
     execute_advanced_delete_query,
@@ -19,11 +22,30 @@ from .excel_operations import ExcelOperations
 
 
 def _query_wrapper(file_path: str, sql: str) -> list:
-    """query快捷函数：自动提取data字段，节省token。"""
+    """query快捷函数：自动提取data字段，节省token。
+
+    Fix BUG-004: 失败时抛出RuntimeError而非静默返回错误字典，
+    避免用户代码把 {success: False, ...} 当成空数据处理。
+    正常空结果(有表头无数据行) 返回 [[col1, col2, ...]]。
+    """
     result = execute_advanced_sql_query(file_path, sql)
     if result.get("success"):
-        return result["data"]  # [[headers], [row1], ...]
-    return result  # 失败时返回完整信息用于排查
+        data = result["data"]  # [[headers], [row1], ...]
+        # 空结果诊断：正常空结果至少包含表头行
+        # 如果 data 为空列表，说明返回格式异常（可能是 include_headers=False 的边界情况）
+        if not data:
+            logger.warning(
+                f"query() 返回成功但 data 为空列表 sql={sql[:80]!r} "
+                f"keys={list(result.keys())}"
+            )
+            # 尝试从 query_info 中恢复列名
+            cols = result.get("query_info", {}).get("returned_columns", [])
+            if cols:
+                return [cols]
+        return data
+    # 失败时抛异常，让用户代码能 catch 或直接看到错误
+    error_msg = result.get("message", "未知错误")
+    raise RuntimeError(f"SQL查询失败: {error_msg}")
 
 
 def _safe_repr(value: Any, max_length: int = 2000) -> Any:

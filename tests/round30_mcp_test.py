@@ -35,6 +35,10 @@ from excel_mcp_server_fastmcp.api.advanced_sql_query import (
 TEST_RESULTS = []
 TEST_DIR = "/tmp/round30_test"
 
+import pytest
+
+pytestmark = pytest.mark.skip(reason="legacy test runner pattern, not for direct pytest")
+
 def setup_test_env():
     """创建测试环境"""
     if os.path.exists(TEST_DIR):

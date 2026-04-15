@@ -2386,7 +2386,7 @@ def excel_describe_table(file_path: str, sheet_name: str = None) -> dict[str, An
 
     try:
         # 使用 HeaderAnalyzer 统一检测双表头
-        from src.excel_mcp_server_fastmcp.api.header_analyzer import HeaderAnalyzer
+        from .api.header_analyzer import HeaderAnalyzer
 
         HeaderAnalyzer.invalidate(file_path)  # 确保读取最新数据（read_only 模式下可能需要）
         info = HeaderAnalyzer.analyze(file_path, sheet_name)

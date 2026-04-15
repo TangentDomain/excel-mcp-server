@@ -27,6 +27,10 @@ from excel_mcp_server_fastmcp.api.advanced_sql_query import (
 results = []
 start_time = time.time()
 
+import pytest
+
+pytestmark = pytest.mark.skip(reason="legacy test runner pattern, not for direct pytest")
+
 def test(name, category, passed, detail=""):
     """Record a test result."""
     status = "✅ PASS" if passed else "❌ FAIL"

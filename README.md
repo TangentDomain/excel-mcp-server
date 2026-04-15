@@ -374,6 +374,96 @@ GitHub Issues → 使用 Bug 报告模板
 
 ---
 
+## 🔬 SQL 校准器（开发调试工具）
+
+> **开发阶段专用**：将 Excel 导入 SQLite 后跑同一条 SQL，跟 `excel_query` 的返回结果做对比，定位 bug。
+
+### 📦 两种使用方式
+
+#### 方式 1：MCP 工具（AI Agent 调用）
+
+当 ExcelMCP 以 MCP 模式运行时，AI 可直接调用以下 4 个校准工具：
+
+| MCP 工具 | 功能 | 说明 |
+|---------|------|------|
+| `calibrate_import` | 导入 Excel → SQLite | 支持双表头拍平、多 Sheet、`_rowid_` 主键 |
+| `calibrate_query` | 执行 SQL 查询 | 返回格式化结果 + 耗时（毫秒） |
+| `calibrate_tables` | 列出所有表 | 显示表名和行数 |
+| `calibrate_schema` | 查看表结构 | 列名、类型、约束、主键 |
+
+**典型调试流程：**
+```
+1. calibrate_import("/data/宝箱掉落道具清单_v2.xlsx", "debug_db")
+2. calibrate_query("debug_db", "SELECT * FROM 宝箱掉落道具清单 WHERE 物品类型='符文'")
+3. 对比 excel_query 的结果 → 定位差异
+```
+
+#### 方式 2：CLI 命令行（开发者手动用）
+
+```bash
+# 导入 Excel 到 SQLite
+python -m excel_mcp_server_fastmcp.calibrate import  <xlsx路径> [数据库名]
+
+# 执行查询
+python -m excel_mcp_server_fastmcp.calibrate query   <数据库名> "<SQL>"
+
+# 列出所有表
+python -m excel_mcp_server_fastmcp.calibrate tables  [数据库名]
+
+# 查看表结构
+python -m excel_mcp_server_fastmcp.calibrate schema  <数据库名> <表名>
+```
+
+**完整示例：**
+```bash
+# 1. 导入测试文件
+python -m excel_mcp_server_fastmcp.calibrate import /tmp/excelmcp_bugs_report/宝箱掉落道具清单_v2.xlsx test_db
+python -m excel_mcp_server_fastmcp.calibrate import /tmp/excelmcp_bugs_report/ChestProp.xlsx test_db
+
+# 2. 查看有哪些表
+python -m excel_mcp_server_fastmcp.calibrate tables test_db
+
+# 3. 查看表结构
+python -m excel_mcp_server_fastmcp.calibrate schema test_db 宝箱掉落道具清单
+
+# 4. 执行查询
+python -m excel_mcp_server_fastmcp.calibrate query test_db "SELECT 物品类型, COUNT(*) FROM 宝箱掉落道具清单 GROUP BY 物品类型"
+```
+
+### ✨ 核心特性
+
+- **双表头智能拍平**：自动检测游戏配表常见的双层表头（中文分类 + 英文列名），智能合并为单层列名
+- **`_rowid_` 自增主键**：每张表自动添加 `_rowid_` INTEGER PRIMARY KEY，保证行唯一标识
+- **多 Sheet 支持**：一个 xlsx 的多个 Sheet 分别导入为独立的 SQLite 表
+- **类型自动推断**：INTEGER / REAL / TEXT 根据实际数据自动判断
+- **格式化输出**：表格对齐显示，支持 `tabulate` 或纯手工渲染
+- **执行耗时**：每次查询显示精确到毫秒的执行时间
+- **数据库目录**：默认 `/tmp/calibrator_data/`，按 `db_name.db` 命名
+
+### 🧩 Python API 直接调用
+
+```python
+from excel_mcp_server_fastmcp.calibrator.core import cmd_import, cmd_query, cmd_tables, cmd_schema
+
+# 导入
+result = cmd_import("/path/to/data.xlsx", "my_db")
+# result = {success, message, db_path, tables: [...], total_tables, total_rows}
+
+# 查询
+result = cmd_query("my_db", "SELECT * FROM table1 LIMIT 10")
+# result = {success, headers, rows, row_count, elapsed_ms, formatted}
+
+# 列表
+result = cmd_tables("my_db")
+# result = {success, tables: [{name, count}], formatted}
+
+# 结构
+result = cmd_schema("my_db", "table1")
+# result = {success, table_name, columns: [{cid,name,type,...}], formatted}
+```
+
+---
+
 ## 🤝 参与贡献
 
 ### 🌟 给个 Star 吧!
