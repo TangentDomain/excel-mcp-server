@@ -1454,6 +1454,7 @@ class AdvancedSQLQueryEngine:
         self,
         parsed_sql: exp.Expression,
         worksheets_data: dict[str, pd.DataFrame],
+        _cte_depth: int = 0,
     ) -> dict[str, pd.DataFrame]:
         """
         从已解析的SQL语句中提取CTE(WITH子句)，执行后注入到worksheets_data中。
@@ -1463,6 +1464,7 @@ class AdvancedSQLQueryEngine:
         Args:
             parsed_sql: sqlglot解析后的语句(Update/Delete/Select等)
             worksheets_data: 原始工作表数据
+            _cte_depth: CTE 嵌套深度（内部使用，防止无限递归）
 
         Returns:
             包含CTE结果的工作表数据字典
@@ -1476,6 +1478,13 @@ class AdvancedSQLQueryEngine:
         if getattr(with_clause, "recursive", False):
             raise ValueError("不支持递归CTE(WITH RECURSIVE).请改用普通CTE或子查询.")
 
+        # Fix(R4): CTE 深度检查 — 防止深层嵌套导致 StackOverflow
+        if _cte_depth >= self._MAX_CTE_DEPTH:
+            raise ValueError(
+                f"CTE 嵌套深度超过限制 ({self._MAX_CTE_DEPTH})。"
+                f"💡 请简化查询，减少 CTE 嵌套层数，或改用子查询替代多层 CTE。"
+            )
+
         # 复制worksheets_data避免修改原始数据，逐步添加CTE结果
         cte_data = dict(worksheets_data)
         for cte_expr in with_clause.expressions:
@@ -1483,7 +1492,8 @@ class AdvancedSQLQueryEngine:
             cte_query = cte_expr.this  # inner Select
             try:
                 # 每个CTE在已有的cte_data上执行(支持CTE引用前面的CTE)
-                cte_result = self._execute_query(cte_query, cte_data)
+                # 递归深度 +1
+                cte_result = self._execute_query(cte_query, cte_data, _cte_depth=_cte_depth + 1)
                 cte_data[cte_name] = cte_result
             except Exception as e:
                 raise ValueError(f"CTE '{cte_name}' 执行失败: {e}")
@@ -3962,11 +3972,15 @@ class AdvancedSQLQueryEngine:
 
         return result
 
+    # CTE 最大嵌套深度限制（防止恶意/意外深层递归导致 StackOverflow）
+    _MAX_CTE_DEPTH = 10
+
     def _execute_query(
         self,
         parsed_sql: exp.Expression,
         worksheets_data: dict[str, pd.DataFrame],
         limit: int | None = None,
+        _cte_depth: int = 0,
     ) -> pd.DataFrame:
         """
         执行解析后的SQL查询
@@ -3975,12 +3989,20 @@ class AdvancedSQLQueryEngine:
             parsed_sql: 解析后的SQL表达式
             worksheets_data: 工作表数据
             limit: 结果限制
+            _cte_depth: CTE 嵌套深度（内部使用，防止无限递归）
 
         Returns:
             pd.DataFrame: 查询结果
         """
         # 保存worksheets_data为实例变量,供子查询执行使用
         self._worksheets_data = worksheets_data
+
+        # Fix(R4): CTE 深度检查（放在入口处，无论当前 SQL 是否有 CTE 都拦截）
+        if _cte_depth >= self._MAX_CTE_DEPTH:
+            raise ValueError(
+                f"CTE 嵌套深度超过限制 ({self._MAX_CTE_DEPTH})。"
+                f"💡 请简化查询，减少 CTE 嵌套层数，或改用子查询替代多层 CTE。"
+            )
 
         # 处理CTE (WITH ... AS ...)
         # 兼容sqlglot不同版本:arg key可能是'with'或'with_'
@@ -3994,7 +4016,8 @@ class AdvancedSQLQueryEngine:
                 cte_query = cte_expr.this  # inner Select
                 try:
                     # 每个CTE在已有的cte_data上执行(支持CTE引用前面的CTE)
-                    cte_result = self._execute_query(cte_query, cte_data, limit=None)
+                    # 递归深度 +1
+                    cte_result = self._execute_query(cte_query, cte_data, limit=None, _cte_depth=_cte_depth + 1)
                     cte_data[cte_name] = cte_result
                 except Exception as e:
                     raise ValueError(f"CTE '{cte_name}' 执行失败: {e}")
@@ -5941,6 +5964,27 @@ class AdvancedSQLQueryEngine:
             except (ValueError, TypeError, OverflowError):
                 return expr.this
 
+    @staticmethod
+    def _escape_pandas_query_string(value: str) -> str:
+        """转义字符串值中的特殊字符，防止 pandas query() 注入。
+
+        pandas query() 使用 Python 表达式语法，字符串用单引号包裹。
+        需要转义的特殊字符：
+        - 单引号 ' → \\'  （防止提前闭合字符串字面量）
+        - 反斜杠 \\\\ → \\\\\\  （防止转义注入）
+
+        Args:
+            value: 原始字符串值
+
+        Returns:
+            转义后安全用于 pandas query() 的字符串
+        """
+        # 先转义反斜杠（必须先处理，否则后续转义会双重处理）
+        escaped = value.replace('\\', '\\\\')
+        # 再转义单引号
+        escaped = escaped.replace("'", "\\'")
+        return escaped
+
     def _in_to_pandas(self, in_expr: exp.In, df, negate: bool = False) -> str:
         """将IN/NOT IN条件转换为pandas表达式(支持子查询和值列表)
 
@@ -6011,6 +6055,8 @@ class AdvancedSQLQueryEngine:
             if isinstance(inner, exp.Like):
                 left = self._expression_to_column_reference(inner.this, df)
                 right = self._expression_to_value(inner.expression, df)
+                # 注意: _expression_to_value() 已对字符串中的特殊字符做了转义,
+                # 此处无需再次转义,直接将 LIKE 模式转为 regex 即可
                 regex = self._like_to_regex(right)
                 return f"~{left}.str.match('{regex}', case=False, na=False)"
             if isinstance(inner, exp.In):
@@ -6022,6 +6068,8 @@ class AdvancedSQLQueryEngine:
         elif isinstance(condition, exp.Like):
             left = self._expression_to_column_reference(condition.this, df)
             right = self._expression_to_value(condition.expression, df)
+            # 注意: _expression_to_value() 已对字符串中的特殊字符做了转义,
+            # 此处无需再次转义,直接将 LIKE 模式转为 regex 即可
             regex = self._like_to_regex(right)
             return f"{left}.str.match('{regex}', case=False, na=False)"
 
@@ -6175,7 +6223,9 @@ class AdvancedSQLQueryEngine:
             # 委托_parse_literal_value统一处理Literal->Python值转换
             parsed = self._parse_literal_value(expr)
             if isinstance(parsed, str):
-                return f"'{parsed}'"
+                # Fix(R7): 转义特殊字符，防止 pandas query() 字符串注入
+                escaped = self._escape_pandas_query_string(parsed)
+                return f"'{escaped}'"
             return parsed
 
         elif isinstance(expr, exp.Null):
@@ -6213,7 +6263,9 @@ class AdvancedSQLQueryEngine:
                     if isinstance(scalar_val, (int, float, np.integer, np.floating)):
                         return float(scalar_val)
                     if scalar_val is not None:
-                        return f"'{scalar_val}'"
+                        # Fix(R7): 转义标量子查询返回的字符串值
+                        escaped = self._escape_pandas_query_string(str(scalar_val))
+                        return f"'{escaped}'"
                 return None  # 空子查询返回 SQL NULL
             except Exception as e:
                 raise ValueError(f"标量子查询执行失败: {e}")
