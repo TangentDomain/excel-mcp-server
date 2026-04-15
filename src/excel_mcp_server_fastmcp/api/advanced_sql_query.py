@@ -847,10 +847,9 @@ class AdvancedSQLQueryEngine:
                 sql = self._preprocess_reserved_words(sql)
 
                 # Fix: P0-2 SELECT 分号多语句注入
-                # 安全检测: 禁止SQL中出现分号(多语句注入攻击向量)
-                # sqlglot.parse_one() 只返回第一条语句,但我们必须拒绝而非静默拆分执行
-                _stripped_for_check = sql.strip()
-                if ";" in _stripped_for_check and not _stripped_for_check.endswith(";"):
+                # 安全检测: 禁止SQL中出现外部分号(多语句注入攻击向量)
+                # 使用 _has_dangerous_semicolon() 跳过字符串字面量内的分号，避免误报
+                if self._has_dangerous_semicolon(sql):
                     # 包含中间分号 → 拒绝执行(安全策略: 不支持多语句)
                     return {
                         "success": False,
@@ -1606,6 +1605,71 @@ class AdvancedSQLQueryEngine:
             else:
                 i += 1
         return None
+
+    # Fix: P0-2/P0-4/P0-5/P0-6 分号检测误报修复
+    # 攻击向量: SELECT * FROM t; DROP TABLE t -- 分号分隔的多语句注入
+    # 误报场景: UPDATE t SET col='value;withsemicolon' WHERE id=1
+    #   简单的 ";" in sql 会误报字符串字面量内的分号
+    # 策略: 只在字符串字面量外部检测分号（与 _detect_dangerous_comments 一致）
+    @staticmethod
+    def _has_dangerous_semicolon(sql: str) -> bool:
+        """
+        检测SQL中是否存在危险的外部分号（多语句注入）。
+
+        跳过字符串字面量内部的单引号、双引号、反引号内容，
+        避免误报如 UPDATE t SET x='a;b' WHERE id=1 的情况。
+
+        Args:
+            sql: 原始SQL语句
+
+        Returns:
+            bool: 存在危险外部分号返回True，否则False
+        """
+        _stripped = sql.strip()
+        # 尾部允许有一个分号（SQL标准写法）
+        if _stripped.endswith(";"):
+            _stripped = _stripped[:-1].rstrip()
+
+        i = 0
+        n = len(_stripped)
+        while i < n:
+            ch = _stripped[i]
+            # 单引号字符串 - 跳过整个字符串（处理转义单引号 ''）
+            if ch == "'":
+                i += 1
+                while i < n:
+                    if _stripped[i] == "'" and i + 1 < n and _stripped[i + 1] == "'":
+                        i += 2  # 转义单引号 ''
+                    elif _stripped[i] == "'":
+                        i += 1  # 字符串结束
+                        break
+                    else:
+                        i += 1
+                continue
+            # 双引号字符串 - 跳过
+            elif ch == '"':
+                i += 1
+                while i < n and _stripped[i] != '"':
+                    if _stripped[i] == '\\':
+                        i += 1  # 跳过转义字符
+                    i += 1
+                if i < n:
+                    i += 1  # 跳过结束引号
+                continue
+            # 反引号标识符 - 跳过
+            elif ch == '`':
+                i += 1
+                while i < n and _stripped[i] != '`':
+                    i += 1
+                if i < n:
+                    i += 1
+                continue
+            # 检测外部分号 → 危险！
+            elif ch == ';':
+                return True
+            else:
+                i += 1
+        return False
 
     def _execute_multi_statement(
         self,
@@ -8061,8 +8125,7 @@ class AdvancedSQLQueryEngine:
         sql = re.sub(r"\x1b\[[0-9;]*[a-zA-Z]", "", sql)
 
         # Fix: P0-4 UPDATE 分号多语句注入
-        _stripped_for_check = sql.strip()
-        if ";" in _stripped_for_check and not _stripped_for_check.endswith(";"):
+        if self._has_dangerous_semicolon(sql):
             return self._update_error("SQL语法错误: 不支持分号分隔的多语句执行(安全限制).💡 请将每条SQL语句分开执行")
 
         # Fix: P0-7 UPDATE 注释符注入防御
@@ -8311,8 +8374,7 @@ class AdvancedSQLQueryEngine:
         sql = re.sub(r"\x1b\[[0-9;]*[a-zA-Z]", "", sql)
 
         # Fix: P0-5 INSERT 分号多语句注入
-        _stripped_for_check = sql.strip()
-        if ";" in _stripped_for_check and not _stripped_for_check.endswith(";"):
+        if self._has_dangerous_semicolon(sql):
             return {"success": False, "message": "SQL语法错误: 不支持分号分隔的多语句执行(安全限制).💡 请将每条SQL语句分开执行"}
 
         # Fix: P0-7 INSERT 注释符注入防御
@@ -8511,8 +8573,7 @@ class AdvancedSQLQueryEngine:
         sql = re.sub(r"\x1b\[[0-9;]*[a-zA-Z]", "", sql)
 
         # Fix: P0-6 DELETE 分号多语句注入
-        _stripped_for_check = sql.strip()
-        if ";" in _stripped_for_check and not _stripped_for_check.endswith(";"):
+        if self._has_dangerous_semicolon(sql):
             return {"success": False, "message": "SQL语法错误: 不支持分号分隔的多语句执行(安全限制).💡 请将每条SQL语句分开执行"}
 
         # Fix: P0-7 DELETE 注释符注入防御
