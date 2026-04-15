@@ -2612,6 +2612,9 @@ class AdvancedSQLQueryEngine:
         """从表达式中提取字面值(委托_parse_literal_value统一处理)"""
         if isinstance(expr, exp.Literal):
             return self._parse_literal_value(expr)
+        if isinstance(expr, exp.Boolean):
+            # SQL布尔字面量(TRUE/FALSE) → int(1/0)
+            return int(expr.this)
         return None
 
     def _generate_having_empty_suggestion(self, having_expr, df_before_having) -> str:
@@ -4378,6 +4381,11 @@ class AdvancedSQLQueryEngine:
                     val = self._parse_literal_value(original_expr)
                     result_data[alias_name] = pd.Series([val] * len(df), index=df.index)
 
+                elif isinstance(original_expr, exp.Boolean):
+                    # SQL布尔字面量(TRUE/FALSE) → int(1/0)，与Excel存储格式一致
+                    val = int(original_expr.this)
+                    result_data[alias_name] = pd.Series([val] * len(df), index=df.index)
+
                 elif isinstance(original_expr, exp.Subquery):
                     # 标量子查询(如 SELECT (SELECT MAX(col) FROM t))
                     try:
@@ -4530,7 +4538,8 @@ class AdvancedSQLQueryEngine:
             exp.Any,
             exp.Anonymous,
             exp.Round,  # 标量数值函数
-            exp.Cast,  # 类型转换函数 (SQL标准)
+            # Fix(R46): exp.Cast 已从此列表移除
+            # CAST 现在在 _sql_condition_to_pandas 中通过预计算临时列支持,无需走逐行过滤
         }
     )
 
@@ -5909,9 +5918,24 @@ class AdvancedSQLQueryEngine:
 
         if condition_str:
             try:
-                return df.query(condition_str)
+                result_df = df.query(condition_str)
+                # Fix(R46): 清理 WHERE 子句中 CAST/函数预计算产生的临时列
+                tmp_cols = getattr(df, '_tmp_columns', [])
+                for tc in tmp_cols:
+                    if tc in df.columns:
+                        del df[tc]
+                if hasattr(df, '_tmp_columns'):
+                    delattr(df, '_tmp_columns')
+                return result_df
             except Exception:
                 # 如果查询失败,尝试逐行过滤
+                # 同时清理可能已添加的临时列
+                tmp_cols = getattr(df, '_tmp_columns', [])
+                for tc in tmp_cols:
+                    if tc in df.columns:
+                        del df[tc]
+                if hasattr(df, '_tmp_columns'):
+                    delattr(df, '_tmp_columns')
                 return self._apply_row_filter(where_clause.this, df)
 
         logger.warning("WHERE条件转换为pandas表达式失败,回退到逐行过滤: %s", where_expr)
@@ -6022,16 +6046,50 @@ class AdvancedSQLQueryEngine:
         """将SQL条件转换为pandas查询字符串"""
         op_type = type(condition)
         if op_type in self._PANDAS_OPS:
-            left = self._expression_to_column_reference(condition.left, df)
-            right = self._expression_to_value(condition.right, df)
+            # Fix(R46): 支持左边为 CAST/函数等非列表达式
+            # 原代码仅支持 exp.Column，导致 CAST(col AS FLOAT) > 6 等表达式失败
+            left_expr = condition.left
+            if isinstance(left_expr, exp.Column):
+                # 普通列引用: 走原有快速路径
+                left = self._expression_to_column_reference(left_expr, df)
+                right = self._expression_to_value(condition.right, df)
 
-            # SQL标准: 任何与NULL的比较都返回UNKNOWN(在WHERE中视为FALSE)
-            # 例如: WHERE column = NULL  应该返回空结果
-            if right is None:
-                # 返回一个总是为False的表达式
-                return "False"
+                # SQL标准: 任何与NULL的比较都返回UNKNOWN(在WHERE中视为FALSE)
+                if right is None:
+                    return "False"
 
-            return f"{left} {self._PANDAS_OPS[op_type]} {right}"
+                return f"{left} {self._PANDAS_OPS[op_type]} {right}"
+            else:
+                # 非列表达式(CAST/函数/嵌套表达式): 预计算为临时列
+                import hashlib
+                expr_hash = hashlib.md5(str(left_expr).encode()).hexdigest()[:8]
+                temp_col = f"_cast_tmp_{expr_hash}"
+
+                try:
+                    # 使用向量化求值: CAST走_evaluate_cast_expression, 函数走_process_select_expression
+                    if isinstance(left_expr, exp.Cast):
+                        df[temp_col] = self._evaluate_cast_expression(left_expr, df)
+                    else:
+                        # 其他表达式: 通过 _expr_to_series 或 _process_select_expression
+                        df[temp_col] = self._expr_to_series(left_expr, df)
+
+                    right = self._expression_to_value(condition.right, df)
+                    if right is None:
+                        del df[temp_col]
+                        return "False"
+
+                    query_str = f"`{temp_col}` {self._PANDAS_OPS[op_type]} {right}"
+                    # 注意: 不在此处删除临时列,因为query()是惰性求值
+                    # 调用方(_apply_where_conditions)需要在查询完成后清理
+                    # 为简化实现: 将临时列名标记到df上,由调用方清理
+                    if not hasattr(df, '_tmp_columns'):
+                        df._tmp_columns = []
+                    df._tmp_columns.append(temp_col)
+                    return query_str
+                except Exception as e:
+                    if temp_col in df.columns:
+                        del df[temp_col]
+                    raise ValueError(f"WHERE子句中复杂表达式求值失败 ({left_expr}): {e}")
 
         elif isinstance(condition, exp.And):
             left = self._sql_condition_to_pandas(condition.left, df)
@@ -6093,6 +6151,11 @@ class AdvancedSQLQueryEngine:
             low = self._expression_to_value(condition.args["low"], df)
             high = self._expression_to_value(condition.args["high"], df)
             return f"({left} >= {low}) & ({left} <= {high})"
+
+        elif isinstance(condition, exp.Boolean):
+            # SQL布尔字面量(TRUE/FALSE)作为WHERE条件
+            # 注意: pandas query() 中 True/False 会被解释为列名，需用恒真/恒假表达式
+            return "index == index" if condition.this else "index != index"
 
         else:
             raise ValueError(f"不支持的条件类型: {type(condition)}")
