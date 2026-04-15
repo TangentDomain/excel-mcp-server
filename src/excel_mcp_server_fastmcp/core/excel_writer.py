@@ -30,6 +30,40 @@ from ..utils.validators import ExcelValidator
 logger = logging.getLogger(__name__)
 
 
+# Fix: P2-4 极端浮点值导致文件损坏 — 单元格值清理函数
+def _sanitize_cell_value(value: Any) -> Any:
+    """清理单元格值,防止极端浮点值导致xlsx文件损坏.
+
+    处理以下情况:
+    - NaN → None(Excel空值)
+    - Inf/-Inf → None(Excel空值)
+    - 超出 ±1e308 的浮点值 → 截断到边界值
+    - 其他类型 → 原样返回
+
+    Args:
+        value: 待写入的单元格值
+
+    Returns:
+        清理后的安全值
+    """
+    if value is None:
+        return None
+
+    # 仅处理浮点类型(含numpy浮点)
+    if isinstance(value, (float,)):
+        import numpy as np
+        if np.isnan(value) or math.isinf(value):
+            logger.warning(f"P2-4: 清理极端浮点值 {value} → None (NaN/Inf)")
+            return None
+        # 超出IEEE 754 double范围的值
+        if abs(value) > 1e308:
+            clamped = 1e308 if value > 0 else -1e308
+            logger.warning(f"P2-4: 截断超范围浮点值 {value} → {clamped}")
+            return clamped
+
+    return value
+
+
 class ExcelWriter:
     """Excel文件写入器"""
 
@@ -513,6 +547,9 @@ class ExcelWriter:
                     continue
 
                 old_value = cell.value
+
+                # Fix: P2-4 极端浮点值导致文件损坏 — 写入前校验并清理NaN/Inf/超范围值
+                value = _sanitize_cell_value(value)
 
                 # 处理复杂数据类型
                 try:

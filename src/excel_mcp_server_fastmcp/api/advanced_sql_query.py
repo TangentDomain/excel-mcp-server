@@ -24,11 +24,13 @@ import difflib
 import io
 import json
 import logging
+import math
 import operator
 import os
 import re
 import shutil
 import tempfile
+import threading
 import time
 from collections.abc import Generator
 from contextlib import contextmanager
@@ -582,6 +584,34 @@ def _safe_float_comparison(left, right, op):
         return False
 
 
+# Fix: P2-4 极端浮点值导致文件损坏 — 浮点值清理函数(SQL引擎用)
+def _sanitize_float_for_excel(value: Any) -> Any:
+    """清理浮点值,防止NaN/Inf/超范围值导致xlsx文件损坏.
+
+    Args:
+        value: 待清理的值
+
+    Returns:
+        清理后的安全值: NaN/Inf→None, 超范围→截断, 其他→原样
+    """
+    if value is None:
+        return None
+
+    # 处理numpy浮点和Python浮点
+    if isinstance(value, (float, np.floating)):
+        try:
+            f_val = float(value)
+            if np.isnan(f_val) or math.isinf(f_val):
+                return None
+            # 截断超IEEE 754范围的值
+            if abs(f_val) > 1e308:
+                return 1e308 if f_val > 0 else -1e308
+        except (ValueError, TypeError, OverflowError):
+            pass
+
+    return value
+
+
 class AdvancedSQLQueryEngine:
     """高级SQL查询引擎,支持完整的SQL语法"""
 
@@ -599,6 +629,11 @@ class AdvancedSQLQueryEngine:
         # 列名映射缓存:{file_path: {原始列名: 清洗列名}}
         # 与_df_cache同步,避免缓存命中时_original_to_clean_cols为空
         self._col_map_cache = {}
+
+        # Fix: P1-concurrent — 每个文件的线程级写锁,防止多线程并发写入导致xlsx损坏
+        # fcntl.flock是进程级锁,同进程内多线程共享FD表无法互斥;threading.Lock提供线程级互斥
+        self._write_locks: dict[str, threading.Lock] = {}
+        self._write_locks_global = threading.Lock()  # 保护_write_locks字典本身的并发访问
 
         # 性能优化:查询结果缓存 {hash(sql): (result_df, file_mtime)}
         self._query_result_cache = {}
@@ -811,19 +846,21 @@ class AdvancedSQLQueryEngine:
                 # 解决 Key/Value/Status 等常见列名导致 sqlglot ParseError 的问题
                 sql = self._preprocess_reserved_words(sql)
 
-                # 多语句SQL检测与处理：分号分隔的多个语句逐条执行，合并结果
-                # sqlglot.parse_one() 只返回第一条语句，需要手动拆分
+                # Fix: P0-2 SELECT 分号多语句注入
+                # 安全检测: 禁止SQL中出现分号(多语句注入攻击向量)
+                # sqlglot.parse_one() 只返回第一条语句,但我们必须拒绝而非静默拆分执行
                 _stripped_for_check = sql.strip()
                 if ";" in _stripped_for_check and not _stripped_for_check.endswith(";"):
-                    # 包含中间分号 → 多语句（排除尾部分号的常见写法）
-                    return self._execute_multi_statement(
-                        sql,
-                        file_path,
-                        worksheets_data,
-                        include_headers,
-                        output_format,
-                        limit,
-                    )
+                    # 包含中间分号 → 拒绝执行(安全策略: 不支持多语句)
+                    return {
+                        "success": False,
+                        "message": "SQL语法错误: 不支持分号分隔的多语句执行(安全限制).💡 请将每条SQL语句分开执行",
+                        "data": [],
+                        "query_info": {
+                            "error_type": "multi_statement_rejected",
+                            "reason": "semicolon_injection_blocked",
+                        },
+                    }
 
                 parsed_sql = sqlglot.parse_one(sql, dialect="mysql")
 
@@ -1246,12 +1283,20 @@ class AdvancedSQLQueryEngine:
         Returns:
             pd.DataFrame: 清理后的DataFrame
         """
-        # 删除完全为空的行和列
+        # 删除完全为空的行
         df = df.dropna(how="all")
         # Fix(R11): 空表(0行)时,pandas的dropna(axis=1, how='all')会误删所有列
         # 因为0行DataFrame中每列都算"全NA"。仅在有数据行时才清理全空列。
+        # Fix: P2-formula 公式列保留 — 公式单元格无缓存值时全部为NaN,
+        #   dropna(axis=1, how='all') 会误删公式列。先记录原始列名，删除后恢复被误删的列。
         if len(df) > 0:
+            original_cols = list(df.columns)
             df = df.dropna(axis=1, how="all")
+            # 恢复被误删的公式列（有表头但数据全为NaN的列，如含公式的列）
+            dropped_cols = [c for c in original_cols if c not in df.columns]
+            if dropped_cols:
+                for col in dropped_cols:
+                    df[col] = None  # 恢复为None(NaN)，保持列结构完整
 
         # 重置索引
         df = df.reset_index(drop=True)
@@ -1293,22 +1338,52 @@ class AdvancedSQLQueryEngine:
 
     def _preprocess_dpipe_to_concat(self, sql: str) -> str:
         """
-        预处理SQL中的 || 字符串拼接操作符
+        预处理SQL中的 || 字符串拼接操作符，转为 CONCAT() 函数调用。
 
-        注意: 此方法保留作为扩展点,当前不做实际转换。
-        MySQL 方言将 || 解析为逻辑 OR,实际的 || → 拼接转换
-        在 _process_select_expression 中通过 _is_likely_dpipe_concatenation() 启发式检测实现。
+        策略：使用 PostgreSQL 方言解析（原生支持 || 为字符串拼接），
+        然后将生成的 DPipe/Concat 节点以 MySQL 方言输出。
+        sqlglot 在跨方言转换时会自动将 PG 的 || 转为 MySQL 的 CONCAT()。
 
-        如需启用预处理转换(替代启发式检测),可在此方法中实现 || → CONCAT() 的正则替换。
+        Fix: P2-1 || 字符串拼接不支持
 
         Args:
             sql: 原始SQL查询语句
 
         Returns:
-            str: 原始SQL语句(未修改)
+            str: 转换后的SQL语句
         """
-        # 当前不进行预处理转换,由 _process_select_expression 中的运行时检测处理
-        return sql
+        # Fix: P2-1 使用 PostgreSQL 方言解析（|| 原生为字符串拼接）
+        # 然后转换为 MySQL 方言输出（自动变为 CONCAT）
+        import sqlglot
+        from sqlglot import exp as sg_exp
+        from sqlglot.dialects.mysql import MySQL
+
+        try:
+            # 用 PostgreSQL 方言解析（|| = 字符串拼接，非逻辑 OR）
+            parsed = sqlglot.parse_one(sql, dialect="postgres")
+        except Exception:
+            # 解析失败，返回原始 SQL（不阻塞其他错误提示）
+            return sql
+
+        # 检查是否真的包含 DPipe 或 Concat 节点（即原 SQL 有 ||）
+        has_dpipe = False
+        def _check_dpipe(node):
+            nonlocal has_dpipe
+            if isinstance(node, (sg_exp.DPipe, sg_exp.Concat)):
+                has_dpipe = True
+            return node
+        parsed.transform(_check_dpipe)
+
+        if not has_dpipe:
+            # 没有 || 操作符，返回原 SQL（避免不必要的方言转换副作用）
+            return sql
+
+        try:
+            # 转换为 MySQL 方言输出（DPipe → CONCAT）
+            result_sql = parsed.sql(dialect="mysql")
+            return result_sql
+        except Exception:
+            return sql
 
     # MySQL 保留字中常被用作 Excel 列名的关键字集合（精简版）
     # 这些字在 MySQL 方言中作为未引用标识符会导致 sqlglot 解析失败
@@ -1467,6 +1542,71 @@ class AdvancedSQLQueryEngine:
 
         return "".join(result)
 
+    # Fix: P0-7 注释符注入防御 — 检测写操作中的危险注释符
+    # 攻击向量: UPDATE sheet SET x=0 WHERE id=1 -- AND safe=1
+    #   --> sqlglot 将 -- 后内容作为注释丢弃，WHERE 条件被截断，导致全表篡改
+    # 策略: 在写操作(UPDATE/DELETE/INSERT)入口处拒绝 -- 和 # 行注释
+    #   /* */ 内联注释由 sqlglot 正确处理，不截断后续SQL，故放行
+    #   SELECT 为只读操作，尾随注释无安全风险，不在此次拦截范围内
+    @staticmethod
+    def _detect_dangerous_comments(sql: str) -> str | None:
+        """
+        检测SQL中的危险注释符（-- 和 #）。
+
+        只在字符串字面量外部检测，避免误报如 SELECT '--not-a-comment' 的情况。
+        返回错误信息字符串（检测到危险注释）或 None（安全）。
+
+        Args:
+            sql: 原始SQL语句
+
+        Returns:
+            str: 检测到危险注释时的错误描述
+            None: SQL安全，无危险注释
+        """
+        i = 0
+        n = len(sql)
+        while i < n:
+            ch = sql[i]
+            # 单引号字符串 - 跳过整个字符串（处理转义单引号 ''）
+            if ch == "'":
+                i += 1
+                while i < n:
+                    if sql[i] == "'" and i + 1 < n and sql[i + 1] == "'":
+                        i += 2  # 转义单引号 ''
+                    elif sql[i] == "'":
+                        i += 1  # 字符串结束
+                        break
+                    else:
+                        i += 1
+                continue
+            # 双引号字符串 - 跳过
+            elif ch == '"':
+                i += 1
+                while i < n and sql[i] != '"':
+                    if sql[i] == '\\':
+                        i += 1  # 跳过转义字符
+                    i += 1
+                if i < n:
+                    i += 1  # 跳过结束引号
+                continue
+            # 反引号标识符 - 跳过
+            elif ch == '`':
+                i += 1
+                while i < n and sql[i] != '`':
+                    i += 1
+                if i < n:
+                    i += 1
+                continue
+            # 检测行注释: -- （双横线）
+            elif ch == '-' and i + 1 < n and sql[i + 1] == '-':
+                return "SQL语句包含注释符(--)，可能截断WHERE条件导致非预期修改(安全限制).💡 请移除注释符后重试"
+            # 检测行注释: # （MySQL风格）
+            elif ch == '#':
+                return "SQL语句包含注释符(#)，可能截断WHERE条件导致非预期修改(安全限制).💡 请移除注释符后重试"
+            else:
+                i += 1
+        return None
+
     def _execute_multi_statement(
         self,
         sql: str,
@@ -1496,13 +1636,10 @@ class AdvancedSQLQueryEngine:
         import time
 
         _start = time.time()
-        all_results = []  # 所有 SELECT 查询的结果行
-        all_columns = []  # 所有 SELECT 查询的列名
-        affected_total = 0  # 写入操作影响的总行数
-        statements_executed = 0
-        errors = []
 
-        # 智能拆分：按分号分割，但尊重字符串内的分号（单引号/双引号内的不算）
+        # Fix: P0-2 分号多语句注入防御（纵深防御）
+        # 即使各入口已拦截，此函数内部也应拒绝多语句执行
+        # 智能检测：按分号分割（尊重字符串内分号），若产生多条语句则拒绝
         raw_parts = []
         current = []
         in_single_quote = False
@@ -1522,8 +1659,30 @@ class AdvancedSQLQueryEngine:
         if current:
             raw_parts.append("".join(current))
 
-        # 过滤空语句并逐条执行
         statements = [s.strip() for s in raw_parts if s.strip()]
+
+        # 安全策略: 禁止多语句执行（覆盖 P0-2/P0-4/P0-5/P0-6）
+        if len(statements) > 1:
+            return {
+                "success": False,
+                "message": "SQL语法错误: 不支持分号分隔的多语句执行(安全限制).💡 请将每条SQL语句分开执行",
+                "data": [],
+                "columns": None,
+                "row_count": 0,
+                "query_info": {
+                    "error_type": "multi_statement_rejected",
+                    "reason": "semicolon_injection_blocked",
+                    "statement_count": len(statements),
+                    "execution_time_ms": round((time.time() - _start) * 1000, 1),
+                },
+            }
+
+        # 单语句情况：正常走后续流程（保留原有逻辑兼容性）
+        all_results = []  # 所有 SELECT 查询的结果行
+        all_columns = []  # 所有 SELECT 查询的列名
+        affected_total = 0  # 写入操作影响的总行数
+        statements_executed = 0
+        errors = []
         for idx, stmt in enumerate(statements):
             try:
                 # 根据语句类型路由到对应的执行方法
@@ -7670,6 +7829,103 @@ class AdvancedSQLQueryEngine:
             result["execution_time_ms"] = round(elapsed_ms, 1)
         return result
 
+    # Fix: P2-type-check — 列值类型校验,防止字符串写入数值列等类型不匹配问题
+    def _get_column_type_category(self, df: pd.DataFrame, col_name: str) -> str:
+        """检测列的数据类型类别,用于写入时的类型校验.
+
+        Returns:
+            'numeric' — 数值型(int/float),只接受可转为数字的值
+            'string'  — 字符串/混合型,接受任意值
+            'empty'   — 空列(无数据或全为空),接受任意值(无法推断类型)
+        """
+        if col_name not in df.columns:
+            return "empty"
+
+        series = df[col_name]
+        # 排除空值后采样
+        non_null = series.dropna()
+        if len(non_null) == 0:
+            return "empty"
+
+        # 检查pandas dtype是否为数值类型
+        if pd.api.types.is_numeric_dtype(series.dtype) and not pd.api.types.is_bool_dtype(series.dtype):
+            # 额外检查: 确保非空值确实都是数值(防止object dtype中混入字符串)
+            sample = non_null.head(50)
+            numeric_count = sum(
+                1 for v in sample
+                if isinstance(v, (int, float, np.integer, np.floating)) and not (isinstance(v, float) and np.isnan(v))
+            )
+            if numeric_count == len(sample):
+                return "numeric"
+
+        return "string"
+
+    def _validate_value_type(self, value: Any, df: pd.DataFrame, col_name: str) -> str | None:
+        """校验值是否与目标列的数据类型兼容.
+
+        Args:
+            value: 待写入的值
+            df: 目标DataFrame
+            col_name: 目标列名
+
+        Returns:
+            None 表示校验通过,否则返回错误信息字符串
+        """
+        # 空值/None 始终允许(表示清空或NULL)
+        if value is None or value == "":
+            return None
+
+        col_type = self._get_column_type_category(df, col_name)
+
+        # 空列无法推断类型,放行
+        if col_type == "empty":
+            return None
+
+        # 字符串列接受任意值(Excel本身是弱类型的)
+        if col_type == "string":
+            return None
+
+        # 数值型列: 检查值是否能转为数字
+        if col_type == "numeric":
+            # 数值类型直接放行
+            if isinstance(value, (int, float, np.integer, np.floating)):
+                # Fix: P2-4 极端浮点值导致文件损坏 — 校验NaN/Inf/超出Excel范围的值
+                try:
+                    f_val = float(value)
+                    if np.isnan(f_val) or math.isinf(f_val):
+                        return (
+                            f"数值校验失败: 列 '{col_name}' 不支持 NaN 或无穷大(Inf/-Inf)值. "
+                            f"💡 Excel无法表示这些特殊浮点值,请使用有限数值或NULL."
+                        )
+                    # Excel 实际支持的浮点范围约为 ±1e308(IEEE 754 double),
+                    # 但超过 ±1e15 的整数精度会丢失,超过 ±1e308 会溢出.
+                    # 此处设置安全阈值: 绝对值不超过 1e308
+                    if abs(f_val) > 1e308:
+                        return (
+                            f"数值校验失败: 列 '{col_name}' 的值 {f_val} 超出Excel支持的数值范围(±1e308). "
+                            f"💡 请使用更小的数值."
+                        )
+                except (ValueError, TypeError, OverflowError):
+                    pass
+                return None
+            # 字符串尝试转数字
+            if isinstance(value, str):
+                try:
+                    float(value)
+                    return None  # 字符串内容是有效数字,放行(如 "123")
+                except (ValueError, TypeError):
+                    return (
+                        f"类型不匹配: 列 '{col_name}' 是数值型,但写入了字符串 '{value}'. "
+                        f"💡 数值列只能写入数字或数字格式的字符串."
+                    )
+            # 其他类型(如list/dict等)拒绝
+            return (
+                f"类型不匹配: 列 '{col_name}' 是数值型,但写入了 {type(value).__name__} 类型的值. "
+                f"💡 数值列只能写入数字或数字格式的字符串."
+            )
+
+        return None
+
     def _verify_streaming_write(self, file_path: str, sheet_name: str, changes: list, en_to_cn_map: dict = None) -> dict[str, Any]:
         """验证流式写入是否实际生效
 
@@ -7804,8 +8060,23 @@ class AdvancedSQLQueryEngine:
         # 清理ANSI转义序列(终端粘贴可能带入的不可见字符)
         sql = re.sub(r"\x1b\[[0-9;]*[a-zA-Z]", "", sql)
 
+        # Fix: P0-4 UPDATE 分号多语句注入
+        _stripped_for_check = sql.strip()
+        if ";" in _stripped_for_check and not _stripped_for_check.endswith(";"):
+            return self._update_error("SQL语法错误: 不支持分号分隔的多语句执行(安全限制).💡 请将每条SQL语句分开执行")
+
+        # Fix: P0-7 UPDATE 注释符注入防御
+        # -- 和 # 可截断WHERE条件导致全表篡改，必须在解析前拦截
+        _comment_err = self._detect_dangerous_comments(sql)
+        if _comment_err:
+            return self._update_error(_comment_err)
+
         # 预处理: 自动为 MySQL 保留字标识符添加反引号
         sql = self._preprocess_reserved_words(sql)
+
+        # Fix: P2-1 预处理: 将 || 字符串拼接操作符转为 CONCAT()
+        # 因为 MySQL 方言将 || 解析为逻辑 OR，需要提前转换
+        sql = self._preprocess_dpipe_to_concat(sql)
 
         # 解析UPDATE语句
         # 中文列名替换(与SELECT查询保持一致)
@@ -7946,6 +8217,11 @@ class AdvancedSQLQueryEngine:
                 old_val = df.at[idx, col_name]
                 new_val = self._evaluate_update_expression(value_expr, df, idx)
 
+                # Fix: P2-type-check — 写入前校验值类型是否与目标列匹配
+                type_err = self._validate_value_type(new_val, df, col_name)
+                if type_err:
+                    return self._update_error(type_err)
+
                 # 类型兼容性:数值类型可互通(含numpy整数/浮点,避免uint8溢出),其他类型尝试转为旧值类型
                 if old_val != "" and new_val != "" and type(old_val) != type(new_val):
                     if isinstance(old_val, (int, float, np.integer, np.floating)) and isinstance(new_val, (int, float, np.integer, np.floating)):
@@ -8033,6 +8309,17 @@ class AdvancedSQLQueryEngine:
             return {"success": False, "message": "SQLGLOT未安装"}
 
         sql = re.sub(r"\x1b\[[0-9;]*[a-zA-Z]", "", sql)
+
+        # Fix: P0-5 INSERT 分号多语句注入
+        _stripped_for_check = sql.strip()
+        if ";" in _stripped_for_check and not _stripped_for_check.endswith(";"):
+            return {"success": False, "message": "SQL语法错误: 不支持分号分隔的多语句执行(安全限制).💡 请将每条SQL语句分开执行"}
+
+        # Fix: P0-7 INSERT 注释符注入防御
+        # -- 和 # 可截断VALUES/SELECT子句导致非预期插入，必须在解析前拦截
+        _comment_err = AdvancedSQLQueryEngine._detect_dangerous_comments(sql)
+        if _comment_err:
+            return {"success": False, "message": _comment_err}
 
         # 预处理: 自动为 MySQL 保留字标识符添加反引号
         sql = self._preprocess_reserved_words(sql)
@@ -8129,7 +8416,12 @@ class AdvancedSQLQueryEngine:
             for i, val_expr in enumerate(tuple_expr.expressions):
                 if i >= len(col_names):
                     break
-                row[col_names[i]] = self._eval_insert_value(val_expr)
+                val = self._eval_insert_value(val_expr)
+                # Fix: P2-type-check — INSERT写入前校验值类型是否与目标列匹配
+                type_err = self._validate_value_type(val, df, col_names[i])
+                if type_err:
+                    return {"success": False, "message": type_err, "affected_rows": 0}
+                row[col_names[i]] = val
             rows.append(row)
 
         if not rows:
@@ -8148,24 +8440,26 @@ class AdvancedSQLQueryEngine:
 
         # 写入Excel
         try:
-            from .excel_operations import ExcelOperations
+            # Fix: P1-concurrent — 线程级写锁保护INSERT操作
+            with self._get_write_lock(file_path):
+                from .excel_operations import ExcelOperations
 
-            result = ExcelOperations.batch_insert_rows(file_path, matched_sheet, rows, streaming=True)
-            elapsed = (time.time() - start_time) * 1000
-            if result.get("success"):
-                return {
-                    "success": True,
-                    "message": f"成功插入 {len(rows)} 行到 {matched_sheet}",
-                    "affected_rows": len(rows),
-                    "execution_time_ms": round(elapsed, 1),
-                }
-            else:
-                return {
-                    "success": False,
-                    "message": f"写入失败: {result.get('message', '')}",
-                    "affected_rows": 0,
-                    "execution_time_ms": round(elapsed, 1),
-                }
+                result = ExcelOperations.batch_insert_rows(file_path, matched_sheet, rows, streaming=True)
+                elapsed = (time.time() - start_time) * 1000
+                if result.get("success"):
+                    return {
+                        "success": True,
+                        "message": f"成功插入 {len(rows)} 行到 {matched_sheet}",
+                        "affected_rows": len(rows),
+                        "execution_time_ms": round(elapsed, 1),
+                    }
+                else:
+                    return {
+                        "success": False,
+                        "message": f"写入失败: {result.get('message', '')}",
+                        "affected_rows": 0,
+                        "execution_time_ms": round(elapsed, 1),
+                    }
         except Exception as e:
             elapsed = (time.time() - start_time) * 1000
             return {
@@ -8215,6 +8509,17 @@ class AdvancedSQLQueryEngine:
             return {"success": False, "message": "SQLGLOT未安装"}
 
         sql = re.sub(r"\x1b\[[0-9;]*[a-zA-Z]", "", sql)
+
+        # Fix: P0-6 DELETE 分号多语句注入
+        _stripped_for_check = sql.strip()
+        if ";" in _stripped_for_check and not _stripped_for_check.endswith(";"):
+            return {"success": False, "message": "SQL语法错误: 不支持分号分隔的多语句执行(安全限制).💡 请将每条SQL语句分开执行"}
+
+        # Fix: P0-7 DELETE 注释符注入防御
+        # -- 和 # 可截断WHERE条件导致全表删除，必须在解析前拦截
+        _comment_err = AdvancedSQLQueryEngine._detect_dangerous_comments(sql)
+        if _comment_err:
+            return {"success": False, "message": _comment_err}
 
         # 预处理: 自动为 MySQL 保留字标识符添加反引号
         sql = self._preprocess_reserved_words(sql)
@@ -8303,24 +8608,26 @@ class AdvancedSQLQueryEngine:
 
         # 写入Excel
         try:
-            from .excel_operations import ExcelOperations
+            # Fix: P1-concurrent — 线程级写锁保护DELETE操作
+            with self._get_write_lock(file_path):
+                from .excel_operations import ExcelOperations
 
-            result = ExcelOperations.batch_delete_rows(file_path, matched_sheet, excel_row_numbers, streaming=True)
-            elapsed = (time.time() - start_time) * 1000
-            if result.get("success"):
-                return {
-                    "success": True,
-                    "message": f"成功删除 {len(excel_row_numbers)} 行",
-                    "affected_rows": len(excel_row_numbers),
-                    "execution_time_ms": round(elapsed, 1),
-                }
-            else:
-                return {
-                    "success": False,
-                    "message": f"删除失败: {result.get('message', '')}",
-                    "affected_rows": 0,
-                    "execution_time_ms": round(elapsed, 1),
-                }
+                result = ExcelOperations.batch_delete_rows(file_path, matched_sheet, excel_row_numbers, streaming=True)
+                elapsed = (time.time() - start_time) * 1000
+                if result.get("success"):
+                    return {
+                        "success": True,
+                        "message": f"成功删除 {len(excel_row_numbers)} 行",
+                        "affected_rows": len(excel_row_numbers),
+                        "execution_time_ms": round(elapsed, 1),
+                    }
+                else:
+                    return {
+                        "success": False,
+                        "message": f"删除失败: {result.get('message', '')}",
+                        "affected_rows": 0,
+                        "execution_time_ms": round(elapsed, 1),
+                    }
         except Exception as e:
             elapsed = (time.time() - start_time) * 1000
             return {
@@ -8344,165 +8651,171 @@ class AdvancedSQLQueryEngine:
         """
         backup_path = None
         try:
-            with self._file_lock(file_path):
-                backup_path = tempfile.mktemp(suffix=".xlsx.bak")
-                shutil.copy2(file_path, backup_path)
+            # Fix: P1-concurrent — 线程级写锁(外层) + fcntl进程级锁(内层),双重保护
+            with self._get_write_lock(file_path):
+                with self._file_lock(file_path):
+                    backup_path = tempfile.mktemp(suffix=".xlsx.bak")
+                    shutil.copy2(file_path, backup_path)
 
-                # 决策:使用流式写入的条件
-                file_size = os.path.getsize(file_path)
-                use_streaming = (
-                    affected_rows >= STREAMING_WRITE_MIN_ROWS  # 影响行数>=阈值
-                    or len(changes) >= STREAMING_WRITE_MIN_CHANGES  # 修改单元格数>=阈值
-                    or file_size > STREAMING_WRITE_MIN_FILE_SIZE_MB * 1024 * 1024  # 文件大小>阈值
-                )
+                    # 决策:使用流式写入的条件
+                    file_size = os.path.getsize(file_path)
+                    use_streaming = (
+                        affected_rows >= STREAMING_WRITE_MIN_ROWS  # 影响行数>=阈值
+                        or len(changes) >= STREAMING_WRITE_MIN_CHANGES  # 修改单元格数>=阈值
+                        or file_size > STREAMING_WRITE_MIN_FILE_SIZE_MB * 1024 * 1024  # 文件大小>阈值
+                    )
 
-                if use_streaming and StreamingWriter.is_available():
-                    # 使用流式写入(高性能路径)
-                    # col_map: {Excel表头(中文): 列索引(1-based)}
-                    # change['column']: 英文列名(来自pandas DataFrame)
-                    # 需要通过英→中映射翻译列名
+                    if use_streaming and StreamingWriter.is_available():
+                        # 使用流式写入(高性能路径)
+                        # col_map: {Excel表头(中文): 列索引(1-based)}
+                        # change['column']: 英文列名(来自pandas DataFrame)
+                        # 需要通过英→中映射翻译列名
 
-                    # 构建英→中列名映射
-                    en_to_cn_map = {}
-                    header_desc = getattr(self, "_header_descriptions", {})
-                    desc_for_sheet = header_desc.get(sheet_name, {})
-                    for en_col, cn_desc in desc_for_sheet.items():
-                        en_to_cn_map[en_col] = cn_desc
+                        # 构建英→中列名映射
+                        en_to_cn_map = {}
+                        header_desc = getattr(self, "_header_descriptions", {})
+                        desc_for_sheet = header_desc.get(sheet_name, {})
+                        for en_col, cn_desc in desc_for_sheet.items():
+                            en_to_cn_map[en_col] = cn_desc
 
-                    def modify_fn(rows, header_row, col_map):
-                        """修改函数:应用UPDATE变更到行数据"""
-                        modified_rows = [row[:] for row in rows]
-                        failed_cols = set()
-                        matched_count = 0
+                        def modify_fn(rows, header_row, col_map):
+                            """修改函数:应用UPDATE变更到行数据"""
+                            modified_rows = [row[:] for row in rows]
+                            failed_cols = set()
+                            matched_count = 0
 
-                        for change in changes:
-                            col_name = change["column"]
-                            col_idx = None
+                            for change in changes:
+                                col_name = change["column"]
+                                col_idx = None
 
-                            # 策略1: 精确匹配
-                            if col_name in col_map:
-                                col_idx = col_map[col_name]
-                            else:
-                                # 策略2: 英→中映射
-                                cn_name = en_to_cn_map.get(col_name)
-                                if cn_name and cn_name in col_map:
-                                    col_idx = col_map[cn_name]
+                                # 策略1: 精确匹配
+                                if col_name in col_map:
+                                    col_idx = col_map[col_name]
                                 else:
-                                    # 策略3: strip+大小写不敏感
-                                    col_stripped = str(col_name).strip().lower()
-                                    for k, v in col_map.items():
-                                        if str(k).strip().lower() == col_stripped:
-                                            col_idx = v
-                                            break
+                                    # 策略2: 英→中映射
+                                    cn_name = en_to_cn_map.get(col_name)
+                                    if cn_name and cn_name in col_map:
+                                        col_idx = col_map[cn_name]
+                                    else:
+                                        # 策略3: strip+大小写不敏感
+                                        col_stripped = str(col_name).strip().lower()
+                                        for k, v in col_map.items():
+                                            if str(k).strip().lower() == col_stripped:
+                                                col_idx = v
+                                                break
 
-                            if col_idx is None:
-                                failed_cols.add(col_name)
-                                continue
+                                if col_idx is None:
+                                    failed_cols.add(col_name)
+                                    continue
 
-                            matched_count += 1
-                            list_idx = change["row"] - 1
-                            if 0 <= list_idx < len(modified_rows):
-                                row = modified_rows[list_idx]
-                                while len(row) < col_idx:
-                                    row.append("")
-                                row[col_idx - 1] = change["new_value"]
+                                matched_count += 1
+                                list_idx = change["row"] - 1
+                                if 0 <= list_idx < len(modified_rows):
+                                    row = modified_rows[list_idx]
+                                    while len(row) < col_idx:
+                                        row.append("")
+                                    # Fix: P2-4 极端浮点值导致文件损坏 — 流式写入前清理值
+                                    new_val = _sanitize_float_for_excel(change["new_value"])
+                                    row[col_idx - 1] = new_val
 
-                        return (
-                            True,
-                            f"流式写入完成, 匹配{matched_count}列, 失败{len(failed_cols)}列",
-                            modified_rows,
-                            {
-                                "columns_matched": matched_count,
-                                "columns_failed": list(failed_cols),
-                            },
-                        )
+                            return (
+                                True,
+                                f"流式写入完成, 匹配{matched_count}列, 失败{len(failed_cols)}列",
+                                modified_rows,
+                                {
+                                    "columns_matched": matched_count,
+                                    "columns_failed": list(failed_cols),
+                                },
+                            )
 
-                    success, message, meta = StreamingWriter._copy_modify_write(file_path, sheet_name, modify_fn, preserve_col_widths=True)
+                        success, message, meta = StreamingWriter._copy_modify_write(file_path, sheet_name, modify_fn, preserve_col_widths=True)
 
-                    # P0: 如果流式写入列名全部匹配失败，立即降级到传统写入
-                    if success and meta.get("columns_matched", 0) == 0:
-                        logger.warning(f"流式写入列名全部匹配失败，降级到传统写入。失败列: {meta.get('columns_failed', [])}")
-                        success = False
-                        message = f"列名匹配全部失败，降级到传统写入: {meta.get('columns_failed', [])}"
+                        # P0: 如果流式写入列名全部匹配失败，立即降级到传统写入
+                        if success and meta.get("columns_matched", 0) == 0:
+                            logger.warning(f"流式写入列名全部匹配失败，降级到传统写入。失败列: {meta.get('columns_failed', [])}")
+                            success = False
+                            message = f"列名匹配全部失败，降级到传统写入: {meta.get('columns_failed', [])}"
 
-                    if success:
-                        # 流式写入后验证实际写入
-                        write_verified = False
-                        verify_result = self._verify_streaming_write(file_path, sheet_name, changes, en_to_cn_map)
-                        write_verified = verify_result["verified"]
-                        unverified = verify_result["unverified"]
+                        if success:
+                            # 流式写入后验证实际写入
+                            write_verified = False
+                            verify_result = self._verify_streaming_write(file_path, sheet_name, changes, en_to_cn_map)
+                            write_verified = verify_result["verified"]
+                            unverified = verify_result["unverified"]
 
-                        if not write_verified and len(unverified) == len(changes):
-                            # 所有change都没生效，回滚
-                            if backup_path and os.path.exists(backup_path):
-                                shutil.copy2(backup_path, file_path)
-                                os.remove(backup_path)
+                            if not write_verified and len(unverified) == len(changes):
+                                # 所有change都没生效，回滚
+                                if backup_path and os.path.exists(backup_path):
+                                    shutil.copy2(backup_path, file_path)
+                                    os.remove(backup_path)
+                                self._df_cache.pop(file_path, None)
+                                failed_cols_info = meta.get("columns_failed", [])
+                                extra_hint = f"（列名匹配失败: {failed_cols_info}）" if failed_cols_info else ""
+                                elapsed = (time.time() - start_time) * 1000
+                                return {
+                                    "success": False,
+                                    "message": f"写入验证失败：{len(changes)}个修改均未生效，已自动回滚{extra_hint}",
+                                    "affected_rows": 0,
+                                    "changes": changes,
+                                    "error_code": "WRITE_VERIFICATION_FAILED",
+                                    "execution_time_ms": round(elapsed, 1),
+                                }
+
                             self._df_cache.pop(file_path, None)
-                            failed_cols_info = meta.get("columns_failed", [])
-                            extra_hint = f"（列名匹配失败: {failed_cols_info}）" if failed_cols_info else ""
                             elapsed = (time.time() - start_time) * 1000
-                            return {
-                                "success": False,
-                                "message": f"写入验证失败：{len(changes)}个修改均未生效，已自动回滚{extra_hint}",
-                                "affected_rows": 0,
+                            result = {
+                                "success": True,
+                                "message": f"流式更新 {len(changes)} 个单元格({affected_rows} 行)",
+                                "affected_rows": affected_rows,
                                 "changes": changes,
-                                "error_code": "WRITE_VERIFICATION_FAILED",
                                 "execution_time_ms": round(elapsed, 1),
+                                "method": "streaming",
+                                "verification": {
+                                    "verified": write_verified,
+                                    "columns_matched": meta.get("columns_matched", len(changes)),
+                                    "columns_failed": meta.get("columns_failed", []),
+                                },
                             }
+                            if not write_verified and unverified:
+                                result["message"] += f" (警告: {len(unverified)}/{len(changes)}个修改验证失败)"
+                            return result
+                        else:
+                            # 流式写入失败,降级到传统方式
+                            logger.warning(f"流式写入失败,降级到传统方式: {message}")
 
-                        self._df_cache.pop(file_path, None)
-                        elapsed = (time.time() - start_time) * 1000
-                        result = {
-                            "success": True,
-                            "message": f"流式更新 {len(changes)} 个单元格({affected_rows} 行)",
-                            "affected_rows": affected_rows,
-                            "changes": changes,
-                            "execution_time_ms": round(elapsed, 1),
-                            "method": "streaming",
-                            "verification": {
-                                "verified": write_verified,
-                                "columns_matched": meta.get("columns_matched", len(changes)),
-                                "columns_failed": meta.get("columns_failed", []),
-                            },
-                        }
-                        if not write_verified and unverified:
-                            result["message"] += f" (警告: {len(unverified)}/{len(changes)}个修改验证失败)"
-                        return result
-                    else:
-                        # 流式写入失败,降级到传统方式
-                        logger.warning(f"流式写入失败,降级到传统方式: {message}")
+                    # 传统写入方式(兼容性路径)
+                    header_row_offset = 0
+                    header_desc = getattr(self, "_header_descriptions", {})
+                    if header_desc.get(sheet_name, {}):
+                        header_row_offset = 1
 
-                # 传统写入方式(兼容性路径)
-                header_row_offset = 0
-                header_desc = getattr(self, "_header_descriptions", {})
-                if header_desc.get(sheet_name, {}):
-                    header_row_offset = 1
+                    wb = openpyxl.load_workbook(file_path)
+                    ws = wb[sheet_name]
 
-                wb = openpyxl.load_workbook(file_path)
-                ws = wb[sheet_name]
+                    for change in changes:
+                        excel_row = change["row"] + header_row_offset
+                        col_idx = list(df.columns).index(change["column"]) + 1
+                        # Fix: P2-4 极端浮点值导致文件损坏 — 传统写入前清理值
+                        safe_value = _sanitize_float_for_excel(change["new_value"])
+                        ws.cell(row=excel_row, column=col_idx, value=safe_value)
 
-                for change in changes:
-                    excel_row = change["row"] + header_row_offset
-                    col_idx = list(df.columns).index(change["column"]) + 1
-                    ws.cell(row=excel_row, column=col_idx, value=change["new_value"])
+                    wb.save(file_path)
+                    wb.close()
 
-                wb.save(file_path)
-                wb.close()
+                    if backup_path and os.path.exists(backup_path):
+                        os.remove(backup_path)
 
-                if backup_path and os.path.exists(backup_path):
-                    os.remove(backup_path)
+                    self._df_cache.pop(file_path, None)
 
-                self._df_cache.pop(file_path, None)
-
-                elapsed = (time.time() - start_time) * 1000
-                return {
-                    "success": True,
-                    "message": f"成功更新 {len(changes)} 个单元格({affected_rows} 行)",
-                    "affected_rows": affected_rows,
-                    "changes": changes,
-                    "execution_time_ms": round(elapsed, 1),
-                    "method": "traditional",
-                }
+                    elapsed = (time.time() - start_time) * 1000
+                    return {
+                        "success": True,
+                        "message": f"成功更新 {len(changes)} 个单元格({affected_rows} 行)",
+                        "affected_rows": affected_rows,
+                        "changes": changes,
+                        "execution_time_ms": round(elapsed, 1),
+                        "method": "traditional",
+                    }
         except Exception:
             if backup_path and os.path.exists(backup_path):
                 try:
@@ -8511,6 +8824,18 @@ class AdvancedSQLQueryEngine:
                 except Exception:
                     pass
             raise  # 重新抛出让调用方处理
+
+    # Fix: P1-concurrent — 线程级写锁上下文管理器(按文件路径隔离)
+    @contextmanager
+    def _get_write_lock(self, file_path: str) -> Generator[None, None, None]:
+        """获取指定文件的线程级写锁,确保同文件并发写入互斥"""
+        # 获取或创建该文件的锁(线程安全)
+        with self._write_locks_global:
+            if file_path not in self._write_locks:
+                self._write_locks[file_path] = threading.Lock()
+            lock = self._write_locks[file_path]
+        with lock:
+            yield
 
     @contextmanager
     def _file_lock(self, file_path: str) -> Generator[None, None, None]:
@@ -8538,13 +8863,14 @@ class AdvancedSQLQueryEngine:
                     pass
                 lock_fd.close()
 
+    # Fix: P2-float-precision 移除强制round(x,2),保留完整浮点精度
     def _serialize_value(self, val: Any) -> Any:
         """智能序列化值:数值保持数值类型,None/NaN转None,numpy->Python原生
 
-        浮点数舍入策略:
-        - 整数值(如 25.0) → int(25)
-        - 常规值(>= 0.01 或 <= -0.01) → 保留2位小数
-        - 极小值(< 0.01 且 > 0) → 保留有效精度(最多10位小数),避免 0.000001 被截断为 0
+        浮点数处理策略 (v2 — 保留完整精度):
+        - 整数值(如 25.0, 25.000001) → int(25)
+        - 所有其他浮点值 → 原样返回 float,不做任何舍入
+          (用户如需舍入应使用 SQL ROUND() 函数显式控制)
         """
         if val is None or (isinstance(val, float) and np.isnan(val)):
             return None
@@ -8554,22 +8880,18 @@ class AdvancedSQLQueryEngine:
             f = float(val)
             if np.isnan(f):
                 return None
-            # 整数值直接返回int
+            # 整数值(含浮点误差范围内的近整数)返回int
             if f == int(f):
                 return int(f)
-            # 自适应舍入:较小值保留更多小数位(游戏配置常见概率/掉落率/加成比)
-            if abs(f) < 0.1 and f != 0:
-                return round(f, 10)
-            return round(f, 2)
+            # Fix: P2-float-precision 不再强制 round(x,2),保留原始精度
+            return f
         if isinstance(val, float):
             if np.isnan(val):
                 return None
             if val == int(val):
                 return int(val)
-            # 自适应舍入:较小值保留更多小数位
-            if abs(val) < 0.1 and val != 0:
-                return round(val, 10)
-            return round(val, 2)
+            # Fix: P2-float-precision 不再强制 round(x,2),保留原始精度
+            return val
         return val
 
     def _serialize_update_value(self, val: Any) -> Any:
@@ -8654,6 +8976,32 @@ class AdvancedSQLQueryEngine:
             if expr.expressions:
                 return self._evaluate_update_expression(expr.expressions[-1], df, row_idx)
             return None
+
+        # Fix: P2-1 — 支持 CONCAT() 和 || 字符串拼接操作符在 UPDATE SET 中使用
+        elif isinstance(expr, exp.Concat):
+            # CONCAT(a, b, c, ...) — 由 || 转换而来或用户直接使用
+            parts = []
+            for arg in expr.expressions:
+                val = self._evaluate_update_expression(arg, df, row_idx)
+                parts.append(str(val) if val is not None else '')
+            return ''.join(parts)
+        elif isinstance(expr, exp.DPipe):
+            # || 直接被 sqlglot 识别为 DPipe(如 PostgreSQL 方言)
+            left = self._evaluate_update_expression(expr.this, df, row_idx)
+            right = self._evaluate_update_expression(expr.expression, df, row_idx)
+            return (str(left) if left is not None else '') + (str(right) if right is not None else '')
+        elif isinstance(expr, exp.Or):
+            # Fix: P2-1 — MySQL 方言下 || 被解析为 OR,启发式检测字符串拼接
+            if self._is_likely_dpipe_concatenation(expr):
+                left = self._evaluate_update_expression(expr.this, df, row_idx)
+                right = self._evaluate_update_expression(expr.expression, df, row_idx)
+                return (str(left) if left is not None else '') + (str(right) if right is not None else '')
+            else:
+                raise ValueError(
+                    f"不支持的表达式: {expr}。\n"
+                    f"💡 MySQL方言中 || 表示逻辑OR,如需字符串拼接请使用 CONCAT() 函数。\n"
+                    f"🔧 示例: UPDATE table SET col = CONCAT(col, '_suffix') WHERE ..."
+                )
 
         elif isinstance(expr, (exp.Abs, exp.Ceil, exp.Floor, exp.Sqrt)):
             # [FIX R10-B2] UPDATE SET 标量数学函数(ABS/CEIL/FLOOR/SQRT)
