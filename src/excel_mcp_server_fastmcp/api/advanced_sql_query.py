@@ -5896,9 +5896,28 @@ class AdvancedSQLQueryEngine:
 
     @staticmethod
     def _like_to_regex(value_str: str) -> str:
-        """将SQL LIKE模式转换为pandas regex模式(%->.*  _->.)"""
+        """将SQL LIKE模式转换为pandas regex模式(%->.*  _->.)
+
+        安全加固(R42): 先保护 SQL 通配符,再转义正则元字符,防止 ReDoS 和注入.
+        策略: 先用占位符替换 % 和 _, re.escape 后再还原为正则等价形式.
+        """
+        import re as _re
         pattern = str(value_str).strip("'\"")
-        return pattern.replace("%", ".*").replace("_", ".")
+        # 防止超长模式导致 ReDoS
+        if len(pattern) > 256:
+            raise ValueError(f"LIKE 模式过长({len(pattern)}字符), 最大支持256字符")
+        # 第一步: 用占位符保护 SQL 通配符 (% 和 _)
+        placeholder_pct = "\x00PCT\x00"
+        placeholder_und = "\x00UND\x00"
+        protected = pattern.replace("%", placeholder_pct).replace("_", placeholder_und)
+        # 第二步: 转义所有正则元字符(此时 % _ 已被保护)
+        escaped = _re.escape(protected)
+        # 第三步: 将占位符还原为正则等价形式
+        # 注意: re.escape 会转义占位符中的不可打印字符,所以搜索转义后的形式
+        escaped_escaped_pct = _re.escape(placeholder_pct)
+        escaped_escaped_und = _re.escape(placeholder_und)
+        regex = escaped.replace(escaped_escaped_pct, ".*").replace(escaped_escaped_und, ".")
+        return regex
 
     @staticmethod
     def _parse_literal_value(expr: exp.Literal) -> Any:
@@ -6184,6 +6203,8 @@ class AdvancedSQLQueryEngine:
 
             子查询结果应返回单行单列的标量值.
             修复: 直接从 DataFrame 提取标量值,不再假设有标题行.
+
+            安全加固(R42): 空结果返回 None(SQL NULL)而非 "0",避免错误比较.
             """
             try:
                 sub_result = self._execute_subquery(expr, self._current_worksheets)
@@ -6193,7 +6214,7 @@ class AdvancedSQLQueryEngine:
                         return float(scalar_val)
                     if scalar_val is not None:
                         return f"'{scalar_val}'"
-                return "0"
+                return None  # 空子查询返回 SQL NULL
             except Exception as e:
                 raise ValueError(f"标量子查询执行失败: {e}")
 
@@ -7467,7 +7488,9 @@ class AdvancedSQLQueryEngine:
         elif isinstance(expr_node, exp.Div):
             left_col = self._evaluate_expression(expr_node.this, df)
             right_col = self._evaluate_expression(expr_node.expression, df)
-            df[temp_col] = pd.to_numeric(df[left_col], errors="coerce") / pd.to_numeric(df[right_col], errors="coerce")
+            result = pd.to_numeric(df[left_col], errors="coerce") / pd.to_numeric(df[right_col], errors="coerce")
+            # 安全加固(R42): 除零产生的 inf/-inf 转为 None(SQL NULL),符合 SQL 标准
+            df[temp_col] = result.replace([np.inf, -np.inf], None)
 
         # 处理 CASE WHEN 表达式
         elif isinstance(expr_node, exp.Case):
@@ -9018,31 +9041,41 @@ class AdvancedSQLQueryEngine:
 
     # Fix: P2-float-precision 移除强制round(x,2),保留完整浮点精度
     def _serialize_value(self, val: Any) -> Any:
-        """智能序列化值:数值保持数值类型,None/NaN转None,numpy->Python原生
+        """智能序列化值:数值保持数值类型,None/NaN/inf转None,numpy->Python原生
 
         浮点数处理策略 (v2 — 保留完整精度):
         - 整数值(如 25.0, 25.000001) → int(25)
         - 所有其他浮点值 → 原样返回 float,不做任何舍入
           (用户如需舍入应使用 SQL ROUND() 函数显式控制)
+
+        安全加固(R42): inf/-inf 视为无效值转None,防止 OverflowError 崩溃.
         """
-        if val is None or (isinstance(val, float) and np.isnan(val)):
+        if val is None:
+            return None
+        if isinstance(val, float) and (np.isnan(val) or np.isinf(val)):
             return None
         if isinstance(val, (np.integer,)):
             return int(val)
         if isinstance(val, (np.floating,)):
             f = float(val)
-            if np.isnan(f):
+            if np.isnan(f) or np.isinf(f):
                 return None
             # 整数值(含浮点误差范围内的近整数)返回int
-            if f == int(f):
-                return int(f)
+            try:
+                if f == int(f):
+                    return int(f)
+            except (OverflowError, ValueError):
+                pass  # inf 等极端值已在上面拦截,此处为防御性编程
             # Fix: P2-float-precision 不再强制 round(x,2),保留原始精度
             return f
         if isinstance(val, float):
-            if np.isnan(val):
+            if np.isnan(val) or np.isinf(val):
                 return None
-            if val == int(val):
-                return int(val)
+            try:
+                if val == int(val):
+                    return int(val)
+            except (OverflowError, ValueError):
+                pass
             # Fix: P2-float-precision 不再强制 round(x,2),保留原始精度
             return val
         return val
