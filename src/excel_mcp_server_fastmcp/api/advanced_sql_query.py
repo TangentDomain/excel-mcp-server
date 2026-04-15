@@ -6890,9 +6890,7 @@ class AdvancedSQLQueryEngine:
                         result_data[alias_name] = scalar_result.reset_index(drop=True)
                     except Exception as e:
                         logger.warning("标量函数+聚合计算失败 %s: %s", alias_name, e)
-                        import traceback
-
-                        traceback.print_exc()
+                        logger.debug("标量函数+聚合计算详细错误: %s", e, exc_info=True)
                         result_data[alias_name] = pd.Series([None])
                 else:
                     # 无内层聚合，按普通表达式处理（不应到达这里）
