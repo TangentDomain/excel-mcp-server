@@ -6073,18 +6073,44 @@ class AdvancedSQLQueryEngine:
 
                 return f"{left} {self._PANDAS_OPS[op_type]} {right}"
             else:
-                # 非列表达式(CAST/函数/嵌套表达式): 预计算为临时列
+                # 非列表达式(CAST/函数/嵌套表达式/HAVING聚合): 预计算为临时列
+                # R48-fix: HAVING 聚合函数(COUNT/SUM/AVG 等)需映射到已计算的别名列
+                resolved_left = left_expr
+                if isinstance(left_expr, exp.AggFunc) and hasattr(self, '_having_agg_alias_map'):
+                    agg_sql = left_expr.sql()
+                    if agg_sql in self._having_agg_alias_map:
+                        alias_col = self._having_agg_alias_map[agg_sql]
+                        if alias_col in df.columns:
+                            # 将聚合函数替换为对应的列引用
+                            from sqlglot import exp as sg_exp
+                            resolved_left = sg_exp.Column(this=sg_exp.Identifier(this=alias_col))
+
                 import hashlib
-                expr_hash = hashlib.md5(str(left_expr).encode()).hexdigest()[:8]
+                expr_hash = hashlib.md5(str(resolved_left).encode()).hexdigest()[:8]
                 temp_col = f"_cast_tmp_{expr_hash}"
 
                 try:
                     # 使用向量化求值: CAST走_evaluate_cast_expression, 函数走_process_select_expression
-                    if isinstance(left_expr, exp.Cast):
-                        df[temp_col] = self._evaluate_cast_expression(left_expr, df)
+                    if isinstance(resolved_left, exp.Cast):
+                        df[temp_col] = self._evaluate_cast_expression(resolved_left, df)
+                    elif isinstance(resolved_left, exp.Column):
+                        # R48: 聚合函数已解析为列引用 → 直接取列值
+                        # 注意: _expression_to_column_reference 返回带反引号的名称(给query用的)
+                        # 此处需要原始列名用于 df[col] 访问
+                        col_name_raw = resolved_left.this.this if hasattr(resolved_left, 'this') and hasattr(resolved_left.this, 'this') else str(resolved_left)
+                        if col_name_raw in df.columns:
+                            df[temp_col] = df[col_name_raw]
+                        else:
+                            # 回退: 尝试大小写不敏感匹配
+                            for c in df.columns:
+                                if c.lower() == col_name_raw.lower():
+                                    df[temp_col] = df[c]
+                                    break
+                            else:
+                                raise ValueError(f"列 '{col_name_raw}' 不存在于 DataFrame 中")
                     else:
                         # 其他表达式: 通过 _expr_to_series 或 _process_select_expression
-                        df[temp_col] = self._expr_to_series(left_expr, df)
+                        df[temp_col] = self._expr_to_series(resolved_left, df)
 
                     right = self._expression_to_value(condition.right, df)
                     if right is None:
@@ -7899,6 +7925,11 @@ class AdvancedSQLQueryEngine:
             if temp_col in result_df.columns:
                 del result_df[temp_col]
 
+        # R48-fix: 清理 _sql_condition_to_pandas 创建的 _cast_tmp_* 临时列
+        cast_tmp_cols = [c for c in result_df.columns if c.startswith('_cast_tmp_')]
+        for col in cast_tmp_cols:
+            del result_df[col]
+
         return result_df
 
         logger.warning("HAVING条件转换为pandas表达式失败,回退到逐行过滤: %s", having_clause.this)
@@ -9361,9 +9392,25 @@ class AdvancedSQLQueryEngine:
           (用户如需舍入应使用 SQL ROUND() 函数显式控制)
 
         安全加固(R42): inf/-inf 视为无效值转None,防止 OverflowError 崩溃.
+        R48-fix: 新增 Decimal 类型支持,避免 JSON 序列化失败.
         """
         if val is None:
             return None
+        # R48: Decimal 类型处理 — 转为 float/int 以保证 JSON 安全
+        try:
+            from decimal import Decimal as _Decimal, InvalidOperation
+            if isinstance(val, _Decimal):
+                if val.is_nan():
+                    return None
+                if val.is_infinite():
+                    return None
+                # 整数 Decimal → int
+                if val == int(val):
+                    return int(val)
+                # 非整数 Decimal → float（保留精度）
+                return float(val)
+        except (ImportError, InvalidOperation, ValueError, OverflowError):
+            pass
         if isinstance(val, float) and (np.isnan(val) or np.isinf(val)):
             return None
         if isinstance(val, (np.integer,)):
