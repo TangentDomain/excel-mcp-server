@@ -414,12 +414,28 @@ def _parse_error_hint(err_str: str, sql: str) -> str:
         hint = "SQL中的单引号数量为奇数,可能有未闭合的引号.字符串值需要用单引号包裹,如 '值'."
         return hint
 
-    # === 中文标点混用 ===
-    cn_punctuation = {",": ",", "(": "(", ")": ")", ":": ":", ";": ";"}
+    # === 中文标点混用（全角 CJK 标点 → 半角 ASCII） ===
+    cn_punctuation = {
+        "\uff0c": ",",   # fullwidth comma → ASCII comma
+        "\uff08": "(",   # fullwidth left paren → ASCII (
+        "\uff09": ")",   # fullwidth right paren → ASCII )
+        "\uff1a": ":",   # fullwidth colon → ASCII :
+        "\uff1b": ";",   # fullwidth semicolon → ASCII ;
+    }
     for cn, en in cn_punctuation.items():
         if cn in sql:
             hint = f'SQL中使用了中文标点"{cn}",应改为英文标点"{en}".'
             return hint
+
+    # === 跨文件引用语法 [file.xlsx].Sheet 检测 ===
+    # SQL Server / Access 风格的跨文件引用语法不被支持
+    # 应使用 @'path' 语法进行跨文件查询
+    cross_file_bracket = re.search(r"\[[^\]]+\.xlsx?\]\.\w+", sql, re.IGNORECASE)
+    if cross_file_bracket:
+        matched = cross_file_bracket.group(0)
+        hint = (f'检测到跨文件引用语法 "{matched}",当前版本不支持 SQL Server 风格的 [文件名.xlsx].表名 语法。'
+                f'请使用 @\'path\' 语法进行跨文件查询，例如: FROM 表名@\'/path/to/file.xlsx\' alias')
+        return hint
 
     # === Excel函数名误用 ===
     excel_funcs = {
@@ -635,6 +651,11 @@ class AdvancedSQLQueryEngine:
         self._write_locks: dict[str, threading.Lock] = {}
         self._write_locks_global = threading.Lock()  # 保护_write_locks字典本身的并发访问
 
+        # Fix: BUG-004 — 查询级可重入锁,防止并发查询(如excel_query + run_python内的query())
+        # 污染共享可变状态(_original_to_clean_cols, _current_file_path, _parsed_sql等)
+        # 使用RLock允许同一线程嵌套调用(如run_python内query→引擎内部再查询)
+        self._query_lock = threading.RLock()
+
         # 性能优化:查询结果缓存 {hash(sql): (result_df, file_mtime)}
         self._query_result_cache = {}
         self._max_query_cache_size = MAX_QUERY_CACHE_SIZE  # 最大查询缓存数,防止内存泄漏
@@ -667,6 +688,9 @@ class AdvancedSQLQueryEngine:
         SQL标准规定未引用的标识符(identifier)是不区分大小写的。
         例如 SELECT rate FROM ... 应能匹配列名 'Rate'、'RATE'、'rate' 等。
 
+        同时支持游戏配表常见的 Name(备注) 短名前缀匹配：
+        当列名为 ChestPropID(宝箱PropID) 时，用户用 ChestPropID 也能匹配到。
+
         Args:
             col_name: 用户SQL中使用的列名
             df: 目标DataFrame
@@ -680,6 +704,13 @@ class AdvancedSQLQueryEngine:
         col_lower = col_name.lower()
         for c in df.columns:
             if c.lower() == col_lower:
+                return c
+        # BUG-003 fix: 支持 Name(备注) 格式的短名前缀匹配
+        # 游戏配表常见格式：ChestPropID(宝箱PropID) → 允许用 ChestPropID 访问
+        for c in df.columns:
+            c_lower = c.lower()
+            # 匹配模式：col_name 是某个列名的括号前部分（如 "chestpropid" 匹配 "chestpropid(宝箱propid)"）
+            if c_lower.startswith(col_lower + "("):
                 return c
         return None
 
@@ -753,6 +784,24 @@ class AdvancedSQLQueryEngine:
                     - json_output: JSON格式输出（output_format=json时）
                     - csv_output: CSV格式输出（output_format=csv时）
         """
+        # Fix: BUG-004 — 查询级锁保护,防止并发调用(如excel_query + run_python的query())
+        # 互相污染 _original_to_clean_cols / _current_file_path / _parsed_sql 等共享状态
+        # RLock允许同线程嵌套(run_python→query()→引擎内部跨表JOIN再查询同引擎)
+        with self._query_lock:
+            return self._execute_sql_query_locked(
+                file_path, sql, sheet_name, limit, include_headers, output_format
+            )
+
+    def _execute_sql_query_locked(
+        self,
+        file_path: str,
+        sql: str,
+        sheet_name: str | None = None,
+        limit: int | None = None,
+        include_headers: bool = True,
+        output_format: str = "table",
+    ) -> dict[str, Any]:
+        """execute_sql_query 的核心逻辑(已在_query_lock保护内)"""
         try:
             # 验证文件存在性
             if not os.path.exists(file_path):
@@ -6566,9 +6615,13 @@ class AdvancedSQLQueryEngine:
             alias_name, original_expr = self._extract_select_alias(select_expr, i)
             select_exprs[alias_name] = original_expr
 
-        # 检查聚合函数
+        # 检查聚合函数（包括标量函数包裹聚合的情况，如 ROUND(AVG(col))）
         for alias_name, expr in select_exprs.items():
             if self._is_aggregate_function(expr):
+                aggregations[alias_name] = expr
+            elif self._is_scalar_num_function(expr) and self._find_inner_aggregate(expr) is not None:
+                # 标量函数(ROUND/ABS/FLOOR/CEIL等)包裹聚合函数 → 视为聚合
+                # 在后续主循环中会走 _apply_scalar_to_agg_result 分支处理
                 aggregations[alias_name] = expr
             elif hasattr(expr, "name") and expr.name not in group_by_columns:
                 # 如果是非聚合列且不在GROUP BY中,需要添加到GROUP BY
