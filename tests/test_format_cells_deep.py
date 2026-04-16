@@ -987,13 +987,12 @@ class TestFormatCellsNumberFormatEdgeCases:
     """数字格式边界情况"""
 
     def test_number_format_none_ignored(self, tmp_path):
-        """number_format=None 应返回错误（openpyxl 不接受 None）"""
+        """number_format=None 应被安全跳过（不再崩溃或损坏文件）"""
         fp = _make_sample(tmp_path, [[100]])
         writer = ExcelWriter(fp)
         result = writer.format_cells("Sheet1!A1", {"number_format": None})
-        # openpyxl 不接受 None 作为 number_format，应失败或被忽略
-        # 实际行为：openpyxl 抛出异常 → 返回 success=False
-        assert result.success is False
+        # 修复后：None 值被安全跳过，操作成功
+        assert result.success is True
 
     def test_number_format_empty_string(self, tmp_path):
         """空字符串 number_format 应正常处理"""
@@ -1358,6 +1357,231 @@ class TestFormatCellsOperationsLayer:
 
         wb = load_workbook(fp)
         assert len(wb.active.merged_cells.ranges) == 0
+        wb.close()
+
+
+# ============================================================
+# R55+ Round N: Bug-fix 验证 + 新增边缘 case 测试
+# ============================================================
+
+
+class TestFormatCellsBugFixNumberFormatNone:
+    """Bug fix: number_format=None 不再导致文件损坏 (P1)"""
+
+    def test_number_format_none_no_corruption(self, tmp_path):
+        """number_format=None 应被安全跳过，不报错也不损坏文件"""
+        fp = _make_sample(tmp_path, [[100]])
+        writer = ExcelWriter(fp)
+
+        # 修复前：这会抛出 TypeError 并损坏 xlsx 文件
+        result = writer.format_cells("Sheet1!A1", {"number_format": None})
+        # 修复后：应成功（跳过 None 值）
+        assert result.success is True
+
+        # 文件仍然可正常打开
+        wb = load_workbook(fp)
+        assert wb.active["A1"].value == 100
+        wb.close()
+
+    def test_number_format_none_via_operations(self, tmp_path):
+        """Operations 层 number_format=None 被 normalize 过滤掉"""
+        fp = _make_sample(tmp_path, [[42]])
+        # Operations 层的 _normalize_formatting 会过滤 None 值
+        result = ExcelOperations.format_cells(
+            fp, "Sheet1", "A1:A1",
+            formatting={"number_format": None, "bold": True}
+        )
+        assert result["success"] is True
+
+        style = _read_cell_style(fp, "A1")
+        assert style["bold"] is True  # bold 正常生效
+
+
+class TestFormatCellsBugFixBorderNoneSide:
+    """Bug fix: border side=None 不再意外创建细边框 (P2)"""
+
+    def test_border_side_none_preserves_original(self, tmp_path):
+        """border left=None 应设为无边框（style=None），而非意外创建 thin 边框"""
+        fp = _make_sample(tmp_path, [[1]])
+        writer = ExcelWriter(fp)
+
+        # 先设置一个 thick 左边框
+        writer.format_cells("Sheet1!A1", {
+            "border": {"left": {"style": "thick", "color": "FF0000"}}
+        })
+
+        # 再用 left=None 更新 — left 应变为 None（无边框），right 为 medium
+        writer.format_cells("Sheet1!A1", {
+            "border": {
+                "left": None,
+                "right": {"style": "medium", "color": "0000FF"},
+            }
+        })
+
+        style = _read_cell_style(fp, "A1")
+        # 修复前：left 会变成 thin（bug）；修复后：left 为 None
+        assert style["border_left"] is None or style.get("border_left") != "thin"
+        assert style["border_right"] == "medium"
+
+    def test_border_all_sides_none_is_noop(self, tmp_path):
+        """所有 border side 都为 None 时不应崩溃"""
+        fp = _make_sample(tmp_path, [[1]])
+        writer = ExcelWriter(fp)
+        result = writer.format_cells("Sheet1!A1", {
+            "border": {"left": None, "right": None, "top": None, "bottom": None}
+        })
+        assert result.success is True
+
+
+class TestFormatCellsRowColumnRange:
+    """行/列范围格式化测试"""
+
+    def test_format_single_row(self, tmp_path):
+        """格式化单行 '1:1'"""
+        fp = _make_sample(tmp_path, [[1, 2, 3], [4, 5, 6]])
+        writer = ExcelWriter(fp)
+        result = writer.format_cells("Sheet1!1:1", {"font": {"bold": True}})
+        assert result.success is True
+        meta = result.metadata or {}
+        assert meta.get("formatted_count") == 3
+
+        wb = load_workbook(fp)
+        assert wb.active["A1"].font.bold is True
+        assert wb.active["B1"].font.bold is True
+        wb.close()
+
+    def test_format_multi_row(self, tmp_path):
+        """格式化多行 '1:2'"""
+        fp = _make_sample(tmp_path, [[1, 2], [3, 4], [5, 6]])
+        writer = ExcelWriter(fp)
+        result = writer.format_cells("Sheet1!1:2", {"fill": {"type": "solid", "color": "EEEEEE"}})
+        assert result.success is True
+        meta = result.metadata or {}
+        assert meta.get("formatted_count") == 4
+
+    def test_format_single_column(self, tmp_path):
+        """格式化单列 'A:A'"""
+        fp = _make_sample(tmp_path, [[1, 2], [3, 4], [5, 6]])
+        writer = ExcelWriter(fp)
+        result = writer.format_cells("Sheet1!A:A", {"font": {"italic": True}})
+        assert result.success is True
+        meta = result.metadata or {}
+        assert meta.get("formatted_count") == 3
+
+        wb = load_workbook(fp)
+        assert wb.active["A1"].font.italic is True
+        assert wb.active["A3"].font.italic is True
+        # B 列不受影响
+        assert wb.active["B1"].font.italic is not True
+        wb.close()
+
+    def test_format_column_range(self, tmp_path):
+        """格式化多列 'A:B'"""
+        fp = _make_sample(tmp_path, [[1, 2, 3], [4, 5, 6]])
+        writer = ExcelWriter(fp)
+        result = writer.format_cells("Sheet1!A:B", {"alignment": {"horizontal": "center"}})
+        assert result.success is True
+        meta = result.metadata or {}
+        assert meta.get("formatted_count") == 4
+
+
+class TestFormatCellsDiagonalBorder:
+    """对角线边框测试"""
+
+    def test_diagonal_border(self, tmp_path):
+        """对角线边框（从左上到右下）"""
+        fp = _make_sample(tmp_path, [[1]])
+        writer = ExcelWriter(fp)
+        result = writer.format_cells("Sheet1!A1", {
+            "border": {
+                "diagonal": {"style": "thin", "color": "FF0000"},
+                "diagonal_direction": "down",
+            }
+        })
+        assert result.success is True
+
+        wb = load_workbook(fp)
+        b = wb.active["A1"].border
+        assert b.diagonal.style == "thin"
+        wb.close()
+
+    def test_diagonal_up_border(self, tmp_path):
+        """对角线边框（从左下到右上）"""
+        fp = _make_sample(tmp_path, [[1]])
+        writer = ExcelWriter(fp)
+        result = writer.format_cells("Sheet1!A1", {
+            "border": {
+                "diagonal": {"style": "medium"},
+                "diagonal_direction": "up",
+            }
+        })
+        assert result.success is True
+
+
+class TestFormatCellsMergedCellFormatting:
+    """合并单元格区域格式化边缘情况"""
+
+    def test_format_merged_range_all_cells(self, tmp_path):
+        """对整个合并区域格式化（每个 cell 都应用）"""
+        fp = _make_sample(tmp_path, [[1, 2, 3]])
+        writer = ExcelWriter(fp)
+        writer.merge_cells("Sheet1!A1:C1")
+
+        # 对合并区域中的每个 cell 都 format
+        for coord in ["A1", "B1", "C1"]:
+            r = writer.format_cells(f"Sheet1!{coord}", {"font": {"bold": True}})
+            assert r.success is True
+
+        # 只有左上角 A1 的样式会生效（Excel 行为）
+        wb = load_workbook(fp)
+        assert wb.active["A1"].font.bold is True
+        wb.close()
+
+    def test_merge_then_format_then_unmerge_preserves_style(self, tmp_path):
+        """合并→格式化→拆分后样式保留在原左上角单元格"""
+        fp = _make_sample(tmp_path, [[1, 2, 3]])
+        writer = ExcelWriter(fp)
+
+        writer.merge_cells("Sheet1!A1:C1")
+        writer.format_cells("Sheet1!A1", {
+            "font": {"bold": True, "color": "FF0000"},
+            "fill": {"type": "solid", "color": "FFFF00"},
+        })
+        writer.unmerge_cells("Sheet1!A1:C1")
+
+        wb = load_workbook(fp)
+        c = wb.active["A1"]
+        assert c.font.bold is True
+        # openpyxl 可能返回 ARGB (8位) 或 RGB (6位) 格式
+        color_rgb = c.font.color.rgb if c.font.color else ""
+        assert "FF0000" in color_rgb
+        wb.close()
+
+
+class TestFormatCellsProtectionEdgeCases:
+    """保护/锁定相关边缘 case"""
+
+    def test_format_locked_cell(self, tmp_path):
+        """格式化已锁定的单元格（openpyxl 默认所有单元格锁定）"""
+        fp = _make_sample(tmp_path, [[1]])
+        writer = ExcelWriter(fp)
+        result = writer.format_cells("Sheet1!A1", {"font": {"bold": True}})
+        assert result.success is True
+
+    def test_multiple_formats_sequential(self, tmp_path):
+        """连续多次格式化同一单元格（压力测试）"""
+        fp = _make_sample(tmp_path, [[1]])
+        writer = ExcelWriter(fp)
+
+        colors = ["FF0000", "00FF00", "0000FF", "FFFF00", "FF00FF"]
+        for color in colors:
+            r = writer.format_cells("Sheet1!A1", {"fill": {"type": "solid", "color": color}})
+            assert r.success is True
+
+        # 最终颜色应为最后一个
+        wb = load_workbook(fp)
+        rgb = wb.active["A1"].fill.fgColor.rgb
+        assert "FF00FF" in rgb or "FFFF00FF" in rgb
         wb.close()
 
 

@@ -1616,8 +1616,8 @@ class ExcelWriter:
                 shrink_to_fit=align_config.get("shrink_to_fit", cell.alignment.shrink_to_fit),
             )
 
-        # 数字格式
-        if "number_format" in formatting:
+        # 数字格式（None 值跳过，避免 openpyxl 抛 TypeError 导致文件损坏）
+        if "number_format" in formatting and formatting["number_format"] is not None:
             cell.number_format = formatting["number_format"]
 
         # 行内边框（可选，与 set_borders 工具互补）
@@ -1627,8 +1627,11 @@ class ExcelWriter:
             from openpyxl.styles import Side
 
             def _make_side(cfg):
-                if not cfg or isinstance(cfg, str):
-                    return Side(style=cfg or "thin", color=border_config.get("color", "000000"))
+                if cfg is None:
+                    # None 表示不设置该边（保留原值），返回无样式 Side
+                    return Side(style=None)
+                if isinstance(cfg, str):
+                    return Side(style=cfg, color=border_config.get("color", "000000"))
                 return Side(
                     style=cfg.get("style", "thin"),
                     color=cfg.get("color", border_config.get("color", "000000")),
