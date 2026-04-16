@@ -984,7 +984,7 @@ class AdvancedSQLQueryEngine:
                     msg += f"\n🔧 建议修复SQL: {suggested_fix}"
                 return {"success": False, "message": msg, "data": [], "query_info": qi}
             except ParseError as e:
-                err_str = str(e)
+                err_str = self._sanitize_error_message(str(e))
                 hint = _parse_error_hint(err_str, sql)
                 qi = {"error_type": "syntax_error", "details": err_str, "hint": hint}
                 return {
@@ -994,7 +994,7 @@ class AdvancedSQLQueryEngine:
                     "query_info": qi,
                 }
             except UnsupportedError as e:
-                err_detail = str(e)
+                err_detail = self._sanitize_error_message(str(e))
                 # 为不支持的SQL功能提供替代建议
                 hint = _unsupported_error_hint(err_detail)
                 qi = {
@@ -1009,7 +1009,7 @@ class AdvancedSQLQueryEngine:
                     "query_info": qi,
                 }
             except ValueError as e:
-                err_str = str(e)
+                err_str = self._sanitize_error_message(str(e))
                 # 对常见ValueError生成智能修复建议
                 hint = _generate_value_error_hint(err_str)
                 error_code = _classify_value_error(err_str)
@@ -9818,16 +9818,17 @@ def execute_advanced_sql_query(
     except ImportError as e:
         return {
             "success": False,
-            "message": f"SQLGlot未安装,无法使用高级SQL功能: {str(e)}",
+            "message": f"SQLGlot未安装,无法使用高级SQL功能: {AdvancedSQLQueryEngine._sanitize_error_message(str(e))}",
             "data": [],
             "query_info": {"error_type": "missing_dependency", "dependency": "sqlglot"},
         }
     except Exception as e:
+        _safe_msg = AdvancedSQLQueryEngine._sanitize_error_message(str(e))
         return {
             "success": False,
-            "message": f"高级SQL查询失败: {str(e)}",
+            "message": f"高级SQL查询失败: {_safe_msg}",
             "data": [],
-            "query_info": {"error_type": "engine_error", "details": str(e)},
+            "query_info": {"error_type": "engine_error", "details": _safe_msg},
         }
 
 
@@ -9855,18 +9856,19 @@ def execute_advanced_update_query(file_path: str, sql: str, sheet_name: str | No
     except ImportError as e:
         return {
             "success": False,
-            "message": f"SQLGLOT未安装,无法使用UPDATE功能: {str(e)}",
+            "message": f"SQLGlot未安装,无法使用UPDATE功能: {AdvancedSQLQueryEngine._sanitize_error_message(str(e))}",
             "affected_rows": 0,
             "changes": [],
             "query_info": {"error_type": "missing_dependency", "dependency": "sqlglot"},
         }
     except Exception as e:
+        _safe_msg = AdvancedSQLQueryEngine._sanitize_error_message(str(e))
         return {
             "success": False,
-            "message": f"UPDATE执行失败: {str(e)}",
+            "message": f"UPDATE执行失败: {_safe_msg}",
             "affected_rows": 0,
             "changes": [],
-            "query_info": {"error_type": "engine_error", "details": str(e)},
+            "query_info": {"error_type": "engine_error", "details": _safe_msg},
         }
 
 
