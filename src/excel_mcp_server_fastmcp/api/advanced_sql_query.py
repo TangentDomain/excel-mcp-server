@@ -2933,7 +2933,14 @@ class AdvancedSQLQueryEngine:
         # 以第一个 SELECT 的列名为基准,统一列名
         base_columns = list(result_dfs[0].columns)
         aligned_dfs = []
-        for df in result_dfs:
+        for i, df in enumerate(result_dfs):
+            # Fix(R56): UNION 要求每个 SELECT 返回相同数量的列
+            if len(df.columns) != len(base_columns):
+                raise ValueError(
+                    f"UNION 第{i+1}个SELECT的列数({len(df.columns)}) "
+                    f"与第一个({len(base_columns)})不同。"
+                    f"SQL标准要求UNION的每个SELECT返回相同数量的列"
+                )
             aligned = df.reindex(columns=base_columns)
             aligned_dfs.append(aligned)
 
@@ -6350,7 +6357,12 @@ class AdvancedSQLQueryEngine:
                     # columns 属性就是列名，数据从 iloc[0] 开始
                     # 旧代码错误地用 iloc[1:, 0] 跳过了第一行数据
                     sub_values = sub_result.iloc[:, 0].dropna().tolist()
-                    values_str = ", ".join(repr(v) for v in sub_values)
+                    # Fix(R56): 使用 set 去重 + 类型感知格式化，避免大结果集 O(n×m)
+                    unique_values = list(set(sub_values))
+                    values_str = ", ".join(
+                        f"'{v}'" if isinstance(v, str) else str(v)
+                        for v in unique_values
+                    )
                     return f"{prefix}{left}.isin([{values_str}])"
                 return f"{prefix}{left}.isin([])"
             except Exception as e:
@@ -6735,7 +6747,8 @@ class AdvancedSQLQueryEngine:
                     if sub_result.empty:
                         cache[sub_key] = []
                     else:
-                        cache[sub_key] = sub_result.iloc[:, 0].dropna().tolist()
+                        # Fix(R56): 缓存为 set 以支持 O(1) 查找
+                        cache[sub_key] = set(sub_result.iloc[:, 0].dropna().tolist())
                 except Exception:
                     cache[sub_key] = []
         return cache
@@ -6817,14 +6830,14 @@ class AdvancedSQLQueryEngine:
 
                     if not sub_values:
                         return False
-                    # 类型兼容比较（处理 int/float 混合）
-                    for sv in sub_values:
-                        try:
-                            if float(val) == float(sv):
-                                return True
-                        except (TypeError, ValueError):
-                            if val == sv:
-                                return True
+                    # Fix(R56): 使用 set 进行 O(1) hash lookup 替代 O(n) 线性扫描
+                    sub_values_set = set(sub_values)
+                    try:
+                        if float(val) in {float(sv) for sv in sub_values_set}:
+                            return True
+                    except (TypeError, ValueError):
+                        if val in sub_values_set:
+                            return True
                     return False
                 else:
                     # IN 字面量列表: IN (1, 2, 3)
@@ -7640,14 +7653,30 @@ class AdvancedSQLQueryEngine:
         inner = cast_expr.this
 
         if row is not None:
-            # 单行模式: 用于 WHERE 逐行过滤
-            inner_val = self._evaluate_condition_for_row(inner, row) if hasattr(inner, "key") or isinstance(inner, exp.Binary) else self._literal_value(inner)
+            # 单行模式: 用于 WHERE/HAVING 逐行过滤
             if isinstance(inner, exp.Column):
                 col_name = inner.name
                 if col_name in row.index:
                     inner_val = row[col_name]
                 else:
                     raise ValueError(f"CAST: 列 '{col_name}' 不存在.可用列: {list(row.index)}")
+            elif isinstance(inner, exp.AggFunc):
+                # Fix(R56): HAVING CAST(AGG(..)) — 聚合函数通过别名映射解析
+                agg_sql = inner.sql()
+                alias_map = getattr(self, '_having_agg_alias_map', {})
+                resolved = alias_map.get(agg_sql)
+                if resolved and resolved in row.index:
+                    inner_val = row[resolved]
+                else:
+                    raise ValueError(f"CAST: 聚合函数 '{agg_sql}' 无法解析.可用列: {list(row.index)}, 映射: {alias_map}")
+            elif hasattr(inner, "key") or isinstance(inner, exp.Binary):
+                inner_val = self._evaluate_condition_for_row(inner, row)
+            else:
+                # 字面量或其他简单表达式
+                try:
+                    inner_val = self._literal_value(inner)
+                except (AttributeError, TypeError):
+                    inner_val = self._get_row_value(inner, row) if hasattr(self, '_get_row_value') else None
         else:
             # 向量化模式: 用于 SELECT 列计算
             if isinstance(inner, exp.Column):
@@ -7658,9 +7687,28 @@ class AdvancedSQLQueryEngine:
                     raise ValueError(f"CAST: 列 '{col_name}' 不存在.可用列: {list(df.columns)}")
             elif isinstance(inner, exp.Literal):
                 inner_val = self._parse_literal_value(inner)
+            elif isinstance(inner, exp.AggFunc):
+                # Fix(R56): 向量化模式中 CAST 内的聚合函数通过别名映射解析
+                agg_sql = inner.sql()
+                alias_map = getattr(self, '_having_agg_alias_map', {})
+                resolved = alias_map.get(agg_sql)
+                if resolved and resolved in df.columns:
+                    inner_val = df[resolved]
+                else:
+                    raise ValueError(f"CAST: 聚合函数 '{agg_sql}' 无法解析.可用列: {list(df.columns)}, 映射: {alias_map}")
             else:
-                # 嵌套表达式: 递归求值
-                inner_val = self._process_select_expression(inner, df)
+                # 嵌套表达式: 尝试递归转换为 pandas 表达式
+                try:
+                    cond_str = self._sql_condition_to_pandas(inner, df)
+                    inner_val = df.eval(cond_str)
+                except Exception:
+                    # 最后尝试: 查找是否有匹配的别名
+                    inner_str = str(inner)
+                    matched = [c for c in df.columns if c == inner_str or c.endswith('_' + inner_str)]
+                    if len(matched) == 1:
+                        inner_val = df[matched[0]]
+                    else:
+                        raise ValueError(f"CAST: 无法求值嵌套表达式 ({inner}).可用列: {list(df.columns)}")
 
         # 2. 获取目标类型
         target_type = cast_expr.args.get("to")
@@ -8284,6 +8332,10 @@ class AdvancedSQLQueryEngine:
         having_clause = parsed_sql.args.get("having")
         if not having_clause:
             return df
+
+        # Fix(R56): 初始化 _pending_tmp_cols，确保 HAVING 路径中 CAST/复杂表达式
+        # 产生的临时列能被正确追踪和清理（WHERE路径在 _apply_where_clause 中初始化）
+        self._pending_tmp_cols = []
 
         # 构建聚合表达式->SELECT别名的映射(HAVING COUNT(*) > 1 需要找到 cnt 列)
         self._having_agg_alias_map = {}

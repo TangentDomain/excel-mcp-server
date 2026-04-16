@@ -167,17 +167,18 @@ class TestUnionEdgeCases:
         assert len(rows) == 4  # 只有法师的4个
 
     def test_union_different_columns(self, engine):
-        """两侧 SELECT 不同列数，以第一侧为准"""
+        """两侧 SELECT 不同列数应报错（R56修复：防止静默截断数据）"""
         sql = """
         SELECT skill_name, damage FROM 技能配置 WHERE 技能类型='法师'
         UNION ALL
         SELECT skill_name FROM 技能配置 WHERE 技能类型='战士'
         """
         result = engine.execute_sql_query(TEST_FILE, sql)
-        assert result['success'] is True
-        rows = _data_rows(result)
-        # 法师4 + 战士2 = 6行数据
-        assert len(rows) == 6
+        # R56: 不同列数UNION应返回错误而非静默截断
+        assert result['success'] is False
+        msg = result.get('message', '')
+        assert '列数' in msg or 'column' in msg.lower() or 'UNION' in msg, \
+            f"错误信息不明确: {msg}"
 
     def test_union_with_aggregation(self, engine):
         """UNION 中包含聚合查询"""
