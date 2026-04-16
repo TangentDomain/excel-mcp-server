@@ -7984,8 +7984,11 @@ class AdvancedSQLQueryEngine:
             results = [self._evaluate_coalesce_for_row(coalesce_expr, df.iloc[i]) for i in range(len(df))]
             return pd.Series(results, index=df.index)
 
-        # 所有参数都无效时返回0
-        return result.fillna(0)
+        # Fix(R45-03): 不再无条件fillna(0)，保留SQL标准的NULL语义
+        # combine_first已正确处理了NULL替换：当首个非NULL参数值存在时使用该值，
+        # 当所有参数均为NULL时保留NaN（符合SQL标准COALESCE行为）
+        # 旧代码result.fillna(0)会导致负数fallback值（如-1）在特定类型转换场景下被错误替换为0
+        return result
 
     def _generate_aggregate_alias(self, expr: exp.Expression) -> str:
         """为无别名的聚合函数生成有意义的列名
@@ -9263,7 +9266,8 @@ class AdvancedSQLQueryEngine:
                     return self._update_error(type_err)
 
                 # 类型兼容性:数值类型可互通(含numpy整数/浮点,避免uint8溢出),其他类型尝试转为旧值类型
-                if old_val != "" and new_val != "" and type(old_val) != type(new_val):
+                # [FIX R54] NULL/None 值跳过类型强制转换 — 避免 None 被旧值类型转换(如 int(None) 异常后 fallback 到 0)
+                if new_val is not None and old_val != "" and new_val != "" and type(old_val) != type(new_val):
                     if isinstance(old_val, (int, float, np.integer, np.floating)) and isinstance(new_val, (int, float, np.integer, np.floating)):
                         pass  # 数值互通:不转换(P0-fix: numpy数值类型不走type转换避免溢出)
                     else:
@@ -9854,7 +9858,20 @@ class AdvancedSQLQueryEngine:
                         col_idx = list(df.columns).index(change["column"]) + 1
                         # Fix: P2-4 极端浮点值导致文件损坏 — 传统写入前清理值
                         safe_value = _sanitize_float_for_excel(change["new_value"])
-                        ws.cell(row=excel_row, column=col_idx, value=safe_value)
+                        # [FIX R54] NULL 值需要特殊处理 — openpyxl 对已赋值的数值单元格设 None 可能不生效
+                        # 通过重建 cell 或显式清除来确保 NULL 写入
+                        if safe_value is None:
+                            target_cell = ws.cell(row=excel_row, column=col_idx)
+                            # 方法1: 直接设为 None (大部分情况生效)
+                            target_cell.value = None
+                            # 方法2: 强制清除 data_type 确保保存为空
+                            try:
+                                target_cell.data_type = 's'  # 先转为字符串类型
+                                target_cell.value = None
+                            except Exception:
+                                pass
+                        else:
+                            ws.cell(row=excel_row, column=col_idx, value=safe_value)
 
                     wb.save(file_path)
                     wb.close()
@@ -10093,13 +10110,15 @@ class AdvancedSQLQueryEngine:
 
         elif isinstance(expr, exp.Coalesce):
             # [FIX R10-B2] UPDATE SET COALESCE(v1, v2, ...) — 返回第一个非NULL/非空值
-            for arg in expr.expressions:
+            # [FIX R45-04] sqlglot Coalesce: expr.this=first arg, expr.expressions=rest
+            all_args = [expr.this] + list(expr.expressions)
+            for arg in all_args:
                 val = self._evaluate_update_expression(arg, df, row_idx, depth + 1)
                 if val is not None and val != "" and not (isinstance(val, float) and np.isnan(val)):
                     return val
             # 所有参数都为 NULL/空，返回最后一个参数的值(可能为None)
-            if expr.expressions:
-                return self._evaluate_update_expression(expr.expressions[-1], df, row_idx, depth + 1)
+            if all_args:
+                return self._evaluate_update_expression(all_args[-1], df, row_idx, depth + 1)
             return None
 
         # Fix: P2-1 — 支持 CONCAT() 和 || 字符串拼接操作符在 UPDATE SET 中使用
@@ -10192,6 +10211,161 @@ class AdvancedSQLQueryEngine:
             if inner is None:
                 return 0
             return len(str(inner))
+
+        elif isinstance(expr, exp.Pow):
+            # [FIX R45-04] UPDATE SET POWER(base, exponent)
+            # sqlglot Pow structure: this=base, expression=exponent (NOT 'exp'!)
+            base = self._evaluate_update_expression(expr.this, df, row_idx, depth + 1)
+            exp_arg = expr.args.get("expression") or expr.args.get("exp")
+            exponent = self._evaluate_update_expression(exp_arg, df, row_idx, depth + 1) if exp_arg is not None else None
+            try:
+                base_n = float(base) if base is not None else None
+                exp_n = float(exponent) if exponent is not None else None
+                if base_n is None or exp_n is None:
+                    return None
+                result = np.power(base_n, exp_n)
+                return int(result) if result == int(result) else result
+            except (ValueError, TypeError):
+                return base
+
+        elif isinstance(expr, exp.Mod):
+            # [FIX R45-04] UPDATE SET modulo (a % b)
+            left = self._evaluate_update_expression(expr.this, df, row_idx, depth + 1)
+            right = self._evaluate_update_expression(expr.expression, df, row_idx, depth + 1)
+            try:
+                left_n = float(left) if not isinstance(left, (int, float)) else left
+                right_n = float(right) if not isinstance(right, (int, float)) else right
+                if right_n == 0:
+                    return None
+                result = left_n % right_n
+                if isinstance(left, (int, np.integer)) and isinstance(right, (int, np.integer)):
+                    return int(result)
+                return result
+            except (ValueError, TypeError):
+                return ""
+
+        elif isinstance(expr, exp.Replace):
+            # [FIX R45-04] UPDATE SET REPLACE(str, search, replacement)
+            val = self._evaluate_update_expression(expr.this, df, row_idx, depth + 1)
+            old_str = self._evaluate_update_expression(expr.args.get("expression"), df, row_idx, depth + 1)
+            new_str = self._evaluate_update_expression(expr.args.get("replacement"), df, row_idx, depth + 1)
+            if val is None:
+                return None
+            s = str(val)
+            old_s = str(old_str) if old_str is not None else ""
+            new_s = str(new_str) if new_str is not None else ""
+            return s.replace(old_s, new_s)
+
+        elif isinstance(expr, exp.Nullif):
+            # [FIX R45-04] UPDATE SET NULLIF(a, b) — returns NULL if a == b, else a
+            val_a = self._evaluate_update_expression(expr.this, df, row_idx, depth + 1)
+            val_b = self._evaluate_update_expression(expr.expression, df, row_idx, depth + 1)
+            if val_a is None or val_b is None:
+                return val_a
+            # Compare values (handle numeric/string comparison)
+            try:
+                if float(val_a) == float(val_b):
+                    return None
+            except (ValueError, TypeError):
+                if str(val_a) == str(val_b):
+                    return None
+            return val_a
+
+        elif isinstance(expr, exp.Cast):
+            # [FIX R45-04] UPDATE SET CAST(expr AS type)
+            inner = self._evaluate_update_expression(expr.this, df, row_idx, depth + 1)
+            if inner is None:
+                return None
+            target_type = expr.args.get("to")
+            if target_type is None:
+                return inner
+            # sqlglot DataType: this is a Type enum (e.g. Type.BIGINT), use sql() for name
+            if hasattr(target_type, "sql"):
+                type_name = target_type.sql().upper()
+            elif hasattr(target_type, "this"):
+                val = target_type.this
+                # Handle enum (Type.BIGINT -> 'BIGINT') and string values
+                type_name = str(val).upper() if not isinstance(val, str) else val.upper()
+            else:
+                type_name = str(target_type).upper()
+            try:
+                if type_name in ("SIGNED", "INTEGER", "INT", "TINYINT", "SMALLINT", "BIGINT"):
+                    return int(float(inner))
+                elif type_name in ("UNSIGNED", "DECIMAL", "NUMERIC", "FLOAT", "DOUBLE", "REAL"):
+                    return float(inner)
+                elif type_name in ("CHAR", "VARCHAR", "TEXT", "STRING"):
+                    return str(inner)
+                else:
+                    # Unknown type — return as-is
+                    return inner
+            except (ValueError, TypeError):
+                return inner
+
+        elif isinstance(expr, exp.If):
+            # [FIX R45-04] UPDATE SET IF(condition, true_value, false_value) — MySQL-specific
+            cond = self._evaluate_update_expression(expr.this, df, row_idx, depth + 1)
+            # Evaluate condition: non-zero/non-empty/True = truthy
+            is_truthy = False
+            if cond is not None and cond != "" and cond != 0 and cond != False:
+                if isinstance(cond, str):
+                    is_truthy = cond.upper() not in ("FALSE", "0", "")
+                else:
+                    is_truthy = True
+            if is_truthy:
+                true_expr = expr.args.get("true")
+                if true_expr is not None:
+                    return self._evaluate_update_expression(true_expr, df, row_idx, depth + 1)
+                return None
+            else:
+                false_expr = expr.args.get("false")
+                if false_expr is not None:
+                    return self._evaluate_update_expression(false_expr, df, row_idx, depth + 1)
+                return None
+
+        elif isinstance(expr, (exp.EQ, exp.NEQ, exp.GT, exp.GTE, exp.LT, exp.LTE)):
+            # [FIX R45-04] UPDATE SET 比较运算符(=, <>, >, >=, <, <=) — 用于 IF/CASE WHEN 条件
+            left = self._evaluate_update_expression(expr.this, df, row_idx, depth + 1)
+            right = self._evaluate_update_expression(expr.expression, df, row_idx, depth + 1)
+            if left is None or right is None:
+                return False
+            try:
+                if isinstance(left, str) and isinstance(right, (int, float)):
+                    left_num = float(left) if '.' in str(left) else int(left)
+                    left = type(right)(left_num)
+                elif isinstance(right, str) and isinstance(left, (int, float)):
+                    right_num = float(right) if '.' in str(right) else int(right)
+                    right = type(left)(right_num)
+                elif isinstance(left, str) and isinstance(right, str):
+                    pass
+                else:
+                    left, right = float(left), float(right)
+            except (ValueError, TypeError):
+                pass
+            if isinstance(expr, exp.EQ):
+                return left == right
+            elif isinstance(expr, exp.NEQ):
+                return left != right
+            elif isinstance(expr, exp.GT):
+                return left > right
+            elif isinstance(expr, exp.GTE):
+                return left >= right
+            elif isinstance(expr, exp.LT):
+                return left < right
+            elif isinstance(expr, exp.LTE):
+                return left <= right
+
+        elif isinstance(expr, exp.And):
+            # [FIX R45-04] UPDATE SET 逻辑 AND — 用于复合条件
+            left = self._evaluate_update_expression(expr.this, df, row_idx, depth + 1)
+            right = self._evaluate_update_expression(expr.expression, df, row_idx, depth + 1)
+            return bool(left) and bool(right)
+
+        elif isinstance(expr, exp.Not):
+            # [FIX R45-04] UPDATE SET 逻辑 NOT
+            val = self._evaluate_update_expression(expr.this, df, row_idx, depth + 1)
+            if val is None:
+                return None
+            return not val
 
         else:
             # Fix(P1-05): 递归深度保护，防止无限递归导致栈溢出
