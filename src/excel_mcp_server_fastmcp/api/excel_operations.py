@@ -1597,7 +1597,10 @@ class ExcelOperations:
             elif key in flat_to_align and value is not None:
                 align_attrs[flat_to_align[key]] = value
             elif key == "bg_color" and value is not None:
-                nested["fill"] = {"color": str(value)}
+                # 合并到已有 fill 配置（而非覆盖 fill_type/gradient_colors 等字段）
+                if "fill" not in nested:
+                    nested["fill"] = {}
+                nested["fill"]["color"] = str(value)
             elif key == "number_format" and value is not None:
                 nested["number_format"] = str(value)
             elif key == "fill_type" and value is not None:

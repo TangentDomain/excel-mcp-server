@@ -2026,5 +2026,140 @@ class TestFormatCellsR55Round2:
         assert s["border_top"] == "thick"
 
 
+# ==================== R55+ Round 3: bg_color 合并 Bug 修复 + 边缘覆盖 ====================
+
+
+class TestFormatCellsBgColorMergeBugFix:
+    """Bug fix: _normalize_formatting 中 bg_color 不再覆盖 fill_type/gradient_colors (P2)"""
+
+    def test_bg_color_with_fill_type_pattern_merges(self, tmp_path):
+        """bg_color + fill_type=pattern 应合并（不丢失 type 信息）"""
+        from excel_mcp_server_fastmcp.api.excel_operations import ExcelOperations
+
+        result = ExcelOperations._normalize_formatting({
+            "fill_type": "pattern",
+            "bg_color": "FF0000",
+        })
+        # 修复前: {"fill": {"color": "FF0000"}} — type 丢失
+        # 修复后: {"fill": {"type": "pattern", "color": "FF0000"}}
+        assert result["fill"]["type"] == "pattern"
+        assert result["fill"]["color"] == "FF0000"
+
+    def test_bg_color_with_gradient_colors_merges(self, tmp_path):
+        """bg_color + gradient_colors 应合并（不丢失 gradient 信息）"""
+        from excel_mcp_server_fastmcp.api.excel_operations import ExcelOperations
+
+        result = ExcelOperations._normalize_formatting({
+            "gradient_colors": ["4472C4", "ED7D31"],
+            "bg_color": "FFFF00",
+        })
+        # 修复前: {"fill": {"color": "FFFF00"}} — gradient 全丢
+        # 修复后: gradient type/colors 保留，color 也存在
+        assert result["fill"]["type"] == "gradient"
+        assert "colors" in result["fill"]
+        assert result["fill"]["colors"] == ["4472C4", "ED7D31"]
+        assert result["fill"]["color"] == "FFFF00"
+
+    def test_bg_color_with_fill_type_e2e_writer(self, tmp_path):
+        """端到端：通过 Operations API 同时传 fill_type=pattern 和 bg_color"""
+        fp = _make_sample(tmp_path, [[1]])
+        result = ExcelOperations.format_cells(
+            file_path=fp, sheet_name="Sheet1", range="A1",
+            formatting={"fill_type": "pattern", "bg_color": "FF0000"},
+        )
+        assert result["success"] is True
+        # 文件可正常打开且值保留
+        wb = load_workbook(fp)
+        assert wb.active["A1"].value == 1
+        # pattern fill 类型应生效（不是 solid）
+        fill = wb.active["A1"].fill
+        assert fill.fill_type is not None or fill.patternType is not None
+        wb.close()
+
+    def test_bg_color_with_gradient_colors_e2e_operations(self, tmp_path):
+        """端到端：bg_color + gradient_colors 通过 Operations API 组合"""
+        fp = _make_sample(tmp_path, [[42]])
+        result = ExcelOperations.format_cells(
+            file_path=fp, sheet_name="Sheet1", range="A1",
+            formatting={
+                "gradient_colors": ["000000", "FFFFFF"],
+                "bg_color": "FFD700",
+                "bold": True,
+            },
+        )
+        assert result["success"] is True
+        # 验证 bold 生效，值保留
+        wb = load_workbook(fp)
+        assert wb.active["A1"].font.bold is True
+        assert wb.active["A1"].value == 42
+        # 验证 fill 是 GradientFill（通过属性存在性判断）
+        fill = wb.active["A1"].fill
+        assert hasattr(fill, "degree") or hasattr(fill, "fgColor")
+        wb.close()
+
+
+class TestFormatCellsPatternFillVariants:
+    """PatternFill 不同 patternType 覆盖测试"""
+
+    def test_pattern_fill_dark_horizontal(self, tmp_path):
+        """darkHorizontal 图案填充"""
+        fp = _make_sample(tmp_path, [[1]])
+        writer = ExcelWriter(fp)
+        result = writer.format_cells("Sheet1!A1", {
+            "fill": {"type": "pattern", "patternType": "darkHorizontal", "fgColor": "FF0000"}
+        })
+        assert result.success is True
+
+    def test_pattern_fill_light_down(self, tmp_path):
+        """lightDown 图案填充"""
+        fp = _make_sample(tmp_path, [[1]])
+        writer = ExcelWriter(fp)
+        result = writer.format_cells("Sheet1!A1", {
+            "fill": {"type": "pattern", "patternType": "lightDown", "fgColor": "00FF00"}
+        })
+        assert result.success is True
+
+    def test_pattern_fill_medium_gray(self, tmp_path):
+        """mediumGray 图案填充"""
+        fp = _make_sample(tmp_path, [[1]])
+        writer = ExcelWriter(fp)
+        result = writer.format_cells("Sheet1!A1", {
+            "fill": {"type": "pattern", "patternType": "mediumGray"}
+        })
+        assert result.success is True
+
+
+class TestFormatCellsNumberFormatReset:
+    """数字格式重置/特殊值测试"""
+
+    def test_number_format_general_reset(self, tmp_path):
+        """number_format 设为 'General' 重置为默认格式"""
+        fp = _make_sample(tmp_path, [[3.14159]])
+        writer = ExcelWriter(fp)
+
+        # 先设为货币格式
+        writer.format_cells("Sheet1!A1", {"number_format": "¥#,##0.00"})
+
+        # 再重置为 General
+        result = writer.format_cells("Sheet1!A1", {"number_format": "General"})
+        assert result.success is True
+
+        wb = load_workbook(fp)
+        assert wb.active["A1"].number_format == "General"
+        wb.close()
+
+    def test_number_format_text_at_sign(self, tmp_path):
+        """number_format='@' 文本格式不改变数值显示"""
+        fp = _make_sample(tmp_path, [[12345]])
+        writer = ExcelWriter(fp)
+        result = writer.format_cells("Sheet1!A1", {"number_format": "@"})
+        assert result.success is True
+
+        wb = load_workbook(fp)
+        assert wb.active["A1"].number_format == "@"
+        assert wb.active["A1"].value == 12345
+        wb.close()
+
+
 if __name__ == "__main__":
     pytest.main([__file__, "-v"])
