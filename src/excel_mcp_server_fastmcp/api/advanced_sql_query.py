@@ -20,12 +20,15 @@
 """
 
 import csv
+import datetime
 import difflib
 import io
 import json
 import logging
 import math
 import operator
+import gzip
+import hashlib
 import os
 import re
 import shutil
@@ -34,6 +37,7 @@ import threading
 import time
 from collections.abc import Generator
 from contextlib import contextmanager
+from decimal import Decimal, InvalidOperation
 from typing import Any
 
 import numpy as np
@@ -541,7 +545,7 @@ def _generate_value_error_suggested_fix(err_str: str, sql: str) -> str:
     """根据ValueError内容生成具体的修复SQL建议(如果可能)."""
     # 列不存在:尝试提取建议的列名并替换
     if "列 '" in err_str and "你是否想用" in err_str:
-        import re
+        # re already imported at top level
 
         # 提取建议的列名
         suggestion_match = re.search(r"你是否想用:\s*(.+?)\?", err_str)
@@ -554,7 +558,7 @@ def _generate_value_error_suggested_fix(err_str: str, sql: str) -> str:
                 return sql.replace(wrong_col, suggested_col)
     # 表不存在:尝试提取建议的表名
     if "表 '" in err_str and "你是否想用" in err_str:
-        import re
+        # re already imported at top level
 
         suggestion_match = re.search(r"你是否想用:\s*(.+?)\?", err_str)
         if suggestion_match:
@@ -716,7 +720,7 @@ class AdvancedSQLQueryEngine:
 
     def _get_query_cache_key(self, sql: str, file_path: str, sheet_name: str | None = None) -> str:
         """生成查询缓存键"""
-        import hashlib
+        # hashlib already imported at top level
 
         cache_data = f"{sql}|{file_path}|{sheet_name or ''}"
         return hashlib.md5(cache_data.encode()).hexdigest()
@@ -1422,8 +1426,8 @@ class AdvancedSQLQueryEngine:
         """
         # Fix: P2-1 使用 PostgreSQL 方言解析（|| 原生为字符串拼接）
         # 然后转换为 MySQL 方言输出（自动变为 CONCAT）
-        import sqlglot
-        from sqlglot import exp as sg_exp
+        # sqlglot already imported at top level
+        # exp already imported at top level
         from sqlglot.dialects.mysql import MySQL
 
         try:
@@ -1437,7 +1441,7 @@ class AdvancedSQLQueryEngine:
         has_dpipe = False
         def _check_dpipe(node):
             nonlocal has_dpipe
-            if isinstance(node, (sg_exp.DPipe, sg_exp.Concat)):
+            if isinstance(node, (exp.DPipe, exp.Concat)):
                 has_dpipe = True
             return node
         parsed.transform(_check_dpipe)
@@ -1776,7 +1780,7 @@ class AdvancedSQLQueryEngine:
         Returns:
             dict: 合并后的结果，格式与单条查询一致
         """
-        import time
+        # time already imported at top level
 
         _start = time.time()
 
@@ -1924,10 +1928,10 @@ class AdvancedSQLQueryEngine:
         limit: int,
     ) -> dict:
         """执行单条 SELECT 语句（供多语句调用）。"""
-        import time
+        # time already imported at top level
 
-        import sqlglot
-        from sqlglot import exp as sg_exp
+        # sqlglot already imported at top level
+        # exp already imported at top level
 
         _query_start = time.time()
 
@@ -1947,16 +1951,16 @@ class AdvancedSQLQueryEngine:
             }
 
         try:
-            if isinstance(parsed_sql, sg_exp.Union):
+            if isinstance(parsed_sql, exp.Union):
                 result_data = self._execute_union(parsed_sql, worksheets_data, limit)
-            elif isinstance(parsed_sql, (sg_exp.Except, sg_exp.Intersect)):
+            elif isinstance(parsed_sql, (exp.Except, exp.Intersect)):
                 result_data = self._execute_except_intersect(parsed_sql, worksheets_data, limit)
             else:
                 result_data = self._execute_query(parsed_sql, worksheets_data, limit)
 
             _query_elapsed = (time.time() - _query_start) * 1000
 
-            has_group_by = not isinstance(parsed_sql, (sg_exp.Union, sg_exp.Except, sg_exp.Intersect)) and parsed_sql.args.get("group") is not None
+            has_group_by = not isinstance(parsed_sql, (exp.Union, exp.Except, exp.Intersect)) and parsed_sql.args.get("group") is not None
             has_having = parsed_sql.args.get("having") is not None
 
             result = self._format_query_result(
@@ -1997,32 +2001,32 @@ class AdvancedSQLQueryEngine:
         Returns:
             bool: True 表示这可能是字符串拼接, False 表示是真正的逻辑 OR
         """
-        from sqlglot import exp as sg_exp
+        # exp already imported at top level
 
         left = or_expr.this
         right = or_expr.expression
 
         # 如果任一边是布尔比较/逻辑运算,则认为是真正的 OR
         bool_types = (
-            sg_exp.EQ,
-            sg_exp.NEQ,
-            sg_exp.GT,
-            sg_exp.GTE,
-            sg_exp.LT,
-            sg_exp.LTE,
-            sg_exp.In,
-            sg_exp.Like,
-            sg_exp.ILike,
-            sg_exp.Between,
-            sg_exp.Is,
-            sg_exp.Null,
-            sg_exp.Not,
-            sg_exp.And,
-            sg_exp.Or,  # 嵌套逻辑运算
-            sg_exp.Exists,
-            sg_exp.Any,
-            sg_exp.All,
-            sg_exp.Boolean,  # TRUE/FALSE 字面量
+            exp.EQ,
+            exp.NEQ,
+            exp.GT,
+            exp.GTE,
+            exp.LT,
+            exp.LTE,
+            exp.In,
+            exp.Like,
+            exp.ILike,
+            exp.Between,
+            exp.Is,
+            exp.Null,
+            exp.Not,
+            exp.And,
+            exp.Or,  # 嵌套逻辑运算
+            exp.Exists,
+            exp.Any,
+            exp.All,
+            exp.Boolean,  # TRUE/FALSE 字面量
         )
 
         def _contains_bool_type(expr):
@@ -2041,25 +2045,25 @@ class AdvancedSQLQueryEngine:
 
         # 检查两边是否都是"值类"表达式(列引用、字面量、函数调用等)
         value_types = (
-            sg_exp.Column,
-            sg_exp.Literal,
-            sg_exp.Cast,
-            sg_exp.Upper,
-            sg_exp.Lower,
-            sg_exp.Trim,
-            sg_exp.Length,
-            sg_exp.Concat,
-            sg_exp.Replace,
-            sg_exp.Substring,
-            sg_exp.Anonymous,
-            sg_exp.Add,
-            sg_exp.Sub,
-            sg_exp.Mul,
-            sg_exp.Div,  # 算术表达式也是值
-            sg_exp.Coalesce,
-            sg_exp.Nullif,
-            sg_exp.Round,
-            sg_exp.Case,
+            exp.Column,
+            exp.Literal,
+            exp.Cast,
+            exp.Upper,
+            exp.Lower,
+            exp.Trim,
+            exp.Length,
+            exp.Concat,
+            exp.Replace,
+            exp.Substring,
+            exp.Anonymous,
+            exp.Add,
+            exp.Sub,
+            exp.Mul,
+            exp.Div,  # 算术表达式也是值
+            exp.Coalesce,
+            exp.Nullif,
+            exp.Round,
+            exp.Case,
         )
 
         def _is_value_expr(expr):
@@ -2105,15 +2109,15 @@ class AdvancedSQLQueryEngine:
             return sql
 
         try:
-            import sqlglot
-            from sqlglot import exp as sg_exp
+            # sqlglot already imported at top level
+            # exp already imported at top level
 
             parsed = sqlglot.parse_one(sql, dialect="mysql")
             if parsed is None:
                 return self._fallback_preprocess(sql, changed_cols)
 
             # 在SELECT表达式中替换:双引号字符串 -> 列引用
-            select = parsed.find(sg_exp.Select)
+            select = parsed.find(exp.Select)
             if select:
                 new_exprs = []
                 for e in select.expressions:
@@ -2121,7 +2125,7 @@ class AdvancedSQLQueryEngine:
                 select.set("expressions", new_exprs)
 
             # 在ORDER BY中替换
-            order = parsed.find(sg_exp.Order)
+            order = parsed.find(exp.Order)
             if order:
                 new_ordered = []
                 for o in order.expressions:
@@ -2129,7 +2133,7 @@ class AdvancedSQLQueryEngine:
                 order.set("expressions", new_ordered)
 
             # 在GROUP BY中替换
-            group = parsed.find(sg_exp.Group)
+            group = parsed.find(exp.Group)
             if group:
                 new_group = []
                 for g in group.expressions:
@@ -2137,12 +2141,12 @@ class AdvancedSQLQueryEngine:
                 group.set("expressions", new_group)
 
             # 在HAVING中替换
-            having = parsed.find(sg_exp.Having)
+            having = parsed.find(exp.Having)
             if having:
                 self._replace_having_literals(having.this, changed_cols)
 
             # 在WHERE子句中:只替换比较操作左侧的字面量(列引用位置)
-            where = parsed.find(sg_exp.Where)
+            where = parsed.find(exp.Where)
             if where:
                 self._replace_where_left_literals(where.this, changed_cols)
 
@@ -2164,12 +2168,12 @@ class AdvancedSQLQueryEngine:
         Returns:
             替换后的节点(列引用或原始节点)
         """
-        from sqlglot import exp as sg_exp
+        # exp already imported at top level
 
-        if isinstance(node, sg_exp.Literal) and node.is_string:
+        if isinstance(node, exp.Literal) and node.is_string:
             lit_val = node.this
             if lit_val in changed_cols:
-                return sg_exp.Column(this=sg_exp.Identifier(this=changed_cols[lit_val]))
+                return exp.Column(this=exp.Identifier(this=changed_cols[lit_val]))
         return node
 
     def _replace_where_left_literals(self, node, changed_cols):
@@ -2183,31 +2187,31 @@ class AdvancedSQLQueryEngine:
             node: WHERE子句的AST节点
             changed_cols: 原始列名到清洗列名的映射
         """
-        from sqlglot import exp as sg_exp
+        # exp already imported at top level
 
         comparison_types = (
-            sg_exp.EQ,
-            sg_exp.NEQ,
-            sg_exp.GT,
-            sg_exp.GTE,
-            sg_exp.LT,
-            sg_exp.LTE,
+            exp.EQ,
+            exp.NEQ,
+            exp.GT,
+            exp.GTE,
+            exp.LT,
+            exp.LTE,
         )
 
         if isinstance(node, comparison_types):
-            if isinstance(node.this, sg_exp.Literal) and node.this.is_string:
+            if isinstance(node.this, exp.Literal) and node.this.is_string:
                 lit_val = node.this.this
                 if lit_val in changed_cols:
                     node.set(
                         "this",
-                        sg_exp.Column(this=sg_exp.Identifier(this=changed_cols[lit_val])),
+                        exp.Column(this=exp.Identifier(this=changed_cols[lit_val])),
                     )
-        elif isinstance(node, (sg_exp.And, sg_exp.Or)):
+        elif isinstance(node, (exp.And, exp.Or)):
             self._replace_where_left_literals(node.this, changed_cols)
             self._replace_where_left_literals(node.expression, changed_cols)
-        elif isinstance(node, sg_exp.Paren):
+        elif isinstance(node, exp.Paren):
             self._replace_where_left_literals(node.this, changed_cols)
-        elif isinstance(node, sg_exp.Not):
+        elif isinstance(node, exp.Not):
             self._replace_where_left_literals(node.this, changed_cols)
 
     def _replace_having_literals(self, node, changed_cols):
@@ -2218,21 +2222,21 @@ class AdvancedSQLQueryEngine:
             node: HAVING子句的AST节点
             changed_cols: 原始列名到清洗列名的映射
         """
-        from sqlglot import exp as sg_exp
+        # exp already imported at top level
 
         comparison_types = (
-            sg_exp.EQ,
-            sg_exp.NEQ,
-            sg_exp.GT,
-            sg_exp.GTE,
-            sg_exp.LT,
-            sg_exp.LTE,
+            exp.EQ,
+            exp.NEQ,
+            exp.GT,
+            exp.GTE,
+            exp.LT,
+            exp.LTE,
         )
 
         if isinstance(node, comparison_types):
             # HAVING两侧都可能是列引用(HAVING "Player Name" > 100)
             node.this = self._literal_to_column(node.this, changed_cols)
-        elif isinstance(node, (sg_exp.And, sg_exp.Or)):
+        elif isinstance(node, (exp.And, exp.Or)):
             self._replace_having_literals(node.this, changed_cols)
             self._replace_having_literals(node.expression, changed_cols)
 
@@ -3486,9 +3490,9 @@ class AdvancedSQLQueryEngine:
                         break
                     # 从聚合函数表达式中提取内部列名进行匹配
                     # 例如 orig_expr='SUM(s.Quantity)', expr_str='S.QUANTITY'
-                    import re as _re
+                    # re already imported at top level as _re
 
-                    agg_match = _re.match(r"(AVG|SUM|COUNT|MAX|MIN)\s*\(\s*(.+?)\s*\)$", ou)
+                    agg_match = re.match(r"(AVG|SUM|COUNT|MAX|MIN)\s*\(\s*(.+?)\s*\)$", ou)
                     if agg_match:
                         agg_inner = agg_match.group(2).strip()
                         if agg_inner == expr_str or agg_inner.endswith(expr_str) or expr_str.endswith(agg_inner):
@@ -4794,7 +4798,7 @@ class AdvancedSQLQueryEngine:
         Returns:
             应用标量函数后的 Series
         """
-        import numpy as np
+        # numpy already imported at top level
 
         func_type = type(scalar_expr)
 
@@ -4941,7 +4945,7 @@ class AdvancedSQLQueryEngine:
         支持: ROUND, ABS, CEIL, FLOOR, SQRT, POWER
         """
         func_type = type(expr)
-        import numpy as np
+        # numpy already imported at top level
 
         # 提取基础参数
         val_series = self._expr_to_series(expr.this, df)
@@ -5038,7 +5042,7 @@ class AdvancedSQLQueryEngine:
         支持: ROUND, ABS, CEIL, FLOOR, SQRT, POWER
         """
         func_type = type(expr)
-        import numpy as np
+        # numpy already imported at top level
 
         val = self._get_row_value(expr.this, row)
         if val is None:
@@ -5974,32 +5978,34 @@ class AdvancedSQLQueryEngine:
             return self._apply_row_filter(where_expr, df)
 
         # 将SQLGlot表达式转换为pandas查询条件
+        # Fix(R52): 使用实例级临时列追踪，避免 df._tmp_columns 触发 pandas UserWarning
+        self._pending_tmp_cols = []
         condition_str = self._sql_condition_to_pandas(where_expr, df)
 
         if condition_str:
             try:
                 result_df = df.query(condition_str)
-                # Fix(R46): 清理 WHERE 子句中 CAST/函数预计算产生的临时列
-                tmp_cols = getattr(df, '_tmp_columns', [])
-                for tc in tmp_cols:
-                    if tc in df.columns:
-                        del df[tc]
-                if hasattr(df, '_tmp_columns'):
-                    delattr(df, '_tmp_columns')
+                # Fix(R46/R52): 清理 WHERE 子句中 CAST/函数预计算产生的临时列
+                # 使用 .copy() 确保 result_df 不受后续 del 操作影响（防止 view 问题）
+                result_df = result_df.copy()
+                self._cleanup_tmp_columns(df)
                 return result_df
             except Exception:
                 # 如果查询失败,尝试逐行过滤
                 # 同时清理可能已添加的临时列
-                tmp_cols = getattr(df, '_tmp_columns', [])
-                for tc in tmp_cols:
-                    if tc in df.columns:
-                        del df[tc]
-                if hasattr(df, '_tmp_columns'):
-                    delattr(df, '_tmp_columns')
+                self._cleanup_tmp_columns(df)
                 return self._apply_row_filter(where_clause.this, df)
 
         logger.warning("WHERE条件转换为pandas表达式失败,回退到逐行过滤: %s", where_expr)
         return self._apply_row_filter(where_expr, df)
+
+    def _cleanup_tmp_columns(self, df):
+        """清理WHERE处理过程中添加的临时列 (R52 refactor)"""
+        tmp_cols = getattr(self, '_pending_tmp_cols', [])
+        for tc in tmp_cols:
+            if tc in df.columns:
+                del df[tc]
+        self._pending_tmp_cols = []
 
     @staticmethod
     def _like_to_regex(value_str: str) -> str:
@@ -6008,7 +6014,7 @@ class AdvancedSQLQueryEngine:
         安全加固(R42): 先保护 SQL 通配符,再转义正则元字符,防止 ReDoS 和注入.
         策略: 先用占位符替换 % 和 _, re.escape 后再还原为正则等价形式.
         """
-        import re as _re
+        # re already imported at top level as _re
         pattern = str(value_str).strip("'\"")
         # 防止超长模式导致 ReDoS
         if len(pattern) > 256:
@@ -6018,11 +6024,11 @@ class AdvancedSQLQueryEngine:
         placeholder_und = "\x00UND\x00"
         protected = pattern.replace("%", placeholder_pct).replace("_", placeholder_und)
         # 第二步: 转义所有正则元字符(此时 % _ 已被保护)
-        escaped = _re.escape(protected)
+        escaped = re.escape(protected)
         # 第三步: 将占位符还原为正则等价形式
         # 注意: re.escape 会转义占位符中的不可打印字符,所以搜索转义后的形式
-        escaped_escaped_pct = _re.escape(placeholder_pct)
-        escaped_escaped_und = _re.escape(placeholder_und)
+        escaped_escaped_pct = re.escape(placeholder_pct)
+        escaped_escaped_und = re.escape(placeholder_und)
         regex = escaped.replace(escaped_escaped_pct, ".*").replace(escaped_escaped_und, ".")
         return regex
 
@@ -6182,10 +6188,10 @@ class AdvancedSQLQueryEngine:
                         alias_col = self._having_agg_alias_map[agg_sql]
                         if alias_col in df.columns:
                             # 将聚合函数替换为对应的列引用
-                            from sqlglot import exp as sg_exp
-                            resolved_left = sg_exp.Column(this=sg_exp.Identifier(this=alias_col))
+                            # exp already imported at top level
+                            resolved_left = exp.Column(this=exp.Identifier(this=alias_col))
 
-                import hashlib
+                # hashlib already imported at top level
                 expr_hash = hashlib.md5(str(resolved_left).encode()).hexdigest()[:8]
                 temp_col = f"_cast_tmp_{expr_hash}"
 
@@ -6218,12 +6224,10 @@ class AdvancedSQLQueryEngine:
                         return "False"
 
                     query_str = f"`{temp_col}` {self._PANDAS_OPS[op_type]} {right}"
-                    # 注意: 不在此处删除临时列,因为query()是惰性求值
-                    # 调用方(_apply_where_conditions)需要在查询完成后清理
-                    # 为简化实现: 将临时列名标记到df上,由调用方清理
-                    if not hasattr(df, '_tmp_columns'):
-                        df._tmp_columns = []
-                    df._tmp_columns.append(temp_col)
+                    # R52: 使用实例级 _pending_tmp_cols 追踪临时列（避免 pandas UserWarning）
+                    # 不在此处删除临时列,因为query()是惰性求值
+                    # 调用方(_apply_where_clause)会在查询完成后通过 _cleanup_tmp_columns 清理
+                    getattr(self, '_pending_tmp_cols', []).append(temp_col)
                     return query_str
                 except Exception as e:
                     if temp_col in df.columns:
@@ -7434,7 +7438,7 @@ class AdvancedSQLQueryEngine:
                 numeric = pd.to_numeric(inner_val, errors="coerce")
                 # SQL CAST FLOAT→INT 行为: 向零截断 (truncate toward zero)
                 # 不能直接用 .astype("Int64"), 因为非整数值(如 3.14)会抛 TypeError
-                import numpy as np
+                # numpy already imported at top level
 
                 float_vals = np.asarray(numeric, dtype=float)
                 # R48-fix P2-05: 将 inf/-inf 替换为 NaN,后续统一处理为 pd.NA
@@ -7542,7 +7546,7 @@ class AdvancedSQLQueryEngine:
         Returns:
             pd.Series: 每组一个CASE结果值
         """
-        import numpy as np
+        # numpy already imported at top level
         results = []
         group_names = list(grouped.groups.keys())
 
@@ -7613,7 +7617,7 @@ class AdvancedSQLQueryEngine:
         Returns:
             pd.Series: 每组一个COALESCE结果值
         """
-        import numpy as np
+        # numpy already imported at top level
         results = []
         group_names = list(grouped.groups.keys())
 
@@ -8304,10 +8308,9 @@ class AdvancedSQLQueryEngine:
                     if has_numbers and has_strings and total_count > 0:
                         # 超过50%为数值时使用智能排序：数值按数值排，非数值排末尾
                         if num_count / total_count > 0.5:
-                            import pandas as _pd
                             temp_col_name = f"_temp_sort_{col}"
                             # 尝试转为数值，失败者保留原值用于末尾排序
-                            numeric_vals = _pd.to_numeric(col_data, errors='coerce')
+                            numeric_vals = pd.to_numeric(col_data, errors='coerce')
                             # 排序键：数值用其值，非数值用 inf（排到末尾）
                             df[temp_col_name] = numeric_vals.fillna(float('inf'))
                             sort_columns = [temp_col_name if c == col else c for c in sort_columns]
@@ -9702,22 +9705,20 @@ class AdvancedSQLQueryEngine:
         if val is None:
             return None
         # R48-fix P0-01: datetime/timedelta/pd.Timestamp → ISO格式字符串
-        import datetime as _datetime
-        if isinstance(val, (_datetime.datetime, _datetime.date)):
+        if isinstance(val, (datetime.datetime, datetime.date)):
             return val.isoformat()
-        if isinstance(val, _datetime.timedelta):
+        if isinstance(val, datetime.timedelta):
             return str(val)
         try:
-            if isinstance(val, __import__("pandas").Timestamp):
+            if isinstance(val, pd.Timestamp):
                 return val.isoformat()
-            if isinstance(val, __import__("pandas").Timedelta):
+            if isinstance(val, pd.Timedelta):
                 return str(val)
         except (ImportError, AttributeError):
             pass
         # R48: Decimal 类型处理 — 转为 float/int 以保证 JSON 安全
         try:
-            from decimal import Decimal as _Decimal, InvalidOperation
-            if isinstance(val, _Decimal):
+            if isinstance(val, Decimal):
                 if val.is_nan():
                     return None
                 if val.is_infinite():
