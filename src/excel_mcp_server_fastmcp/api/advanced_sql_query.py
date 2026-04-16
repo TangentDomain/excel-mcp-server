@@ -4600,13 +4600,20 @@ class AdvancedSQLQueryEngine:
     }
 
     # JOIN类型分发表:(side, kind) -> how
+    # [FIX R55-BUG-04] sqlglot 将 "FULL OUTER JOIN" 解析为 side=FULL, kind=OUTER
+    # 将 "LEFT OUTER JOIN" 解析为 side=LEFT, kind=OUTER
+    # 原表只有 (side, None) 和 (None, kind) 条目，无法匹配 (side, OUTER) 组合
+    # 导致 FULL/LEFT/RIGHT OUTER JOIN 全部 fallback 到默认值 "inner"
     _JOIN_KIND_MAP = {
         ("LEFT", None): "left",
         (None, "LEFT"): "left",
+        ("LEFT", "OUTER"): "left",
         ("RIGHT", None): "right",
         (None, "RIGHT"): "right",
+        ("RIGHT", "OUTER"): "right",
         ("FULL", None): "outer",
         (None, "FULL"): "outer",
+        ("FULL", "OUTER"): "outer",
         ("INNER", None): "inner",
         (None, "INNER"): "inner",
         (None, "CROSS"): "cross",
@@ -5427,17 +5434,13 @@ class AdvancedSQLQueryEngine:
             right_on_col = None
             actual_right_on = None
 
-            # 性能优化:为大数据集创建索引(如果JOIN列存在且数据量大)
-            if on_clause and total_memory_mb > 10:  # 大于10MB的数据集使用索引优化
-                # 提前解析ON条件来决定是否需要索引
-                left_on_col, right_on_col, _non_equi = self._parse_join_on_condition(on_clause, left_table, right_table, right_alias)
-
-                # 非等值连接不需要索引优化
-                if not _non_equi and left_on_col:
-                    if left_on_col in result_df.columns:
-                        result_df = result_df.set_index(left_on_col, inplace=False)
-                    if right_on_col and right_on_col in right_df.columns:
-                        right_df = right_df.set_index(right_on_col, inplace=False)
+            # [FIX R55-BUG-01] 移除有缺陷的 set_index 索引优化
+            # 原代码在 total_memory_mb > 10 时对 JOIN key 列执行 set_index(),
+            # 将该列从 .columns 移至 index，导致后续 L5456 的列存在性检查
+            # 和 L5572 的 merge(left_on=...) 均因找不到列而报 KeyError。
+            # pandas merge 内部已使用 hash join 算法优化，此 set_index 优化
+            # 不仅冗余且引入回归 bug，故整体移除。
+            # 保留 total_memory_mb 变量供其他逻辑使用（如非等值连接策略选择）
 
             if join_kind == "cross":
                 # CROSS JOIN: 笛卡尔积,不需要ON条件
@@ -6979,11 +6982,18 @@ class AdvancedSQLQueryEngine:
             if should_substitute:
                 val = row.get(col_name)
                 if val is not None:
+                    # [FIX R55-BUG-03] SQL 标准转义：单引号 → 双单引号
+                    # 避免 repr() 对含引号字符串(如 O'Brien)产生转义反斜杠
+                    # 导致 sqlglot 解析失败后静默返回 False
+                    if isinstance(val, str):
+                        safe_val = "'" + val.replace("'", "''") + "'"
+                    else:
+                        safe_val = repr(val)
                     if table_part:
-                        inner_sql = inner_sql.replace(f"{table_part}.{col_name}", repr(val), 1)
+                        inner_sql = inner_sql.replace(f"{table_part}.{col_name}", safe_val, 1)
                     else:
                         pattern = r"\b" + re.escape(col_name) + r"\b"
-                        inner_sql = re.sub(pattern, repr(val), inner_sql, count=1)
+                        inner_sql = re.sub(pattern, safe_val, inner_sql, count=1)
 
         try:
             parsed_inner = sqlglot.parse_one(inner_sql)
@@ -8351,10 +8361,10 @@ class AdvancedSQLQueryEngine:
         for col in having_agg_cols:
             del result_df[col]
 
+        # [FIX R55-BUG-02] 移除不可达的死代码
+        # 原代码: return result_df 后的 logger.warning + _apply_row_filter 回退路径永远不可达
+        # query() 异常已被 L8332 的 except 捕获，此处 return 是正确行为
         return result_df
-
-        logger.warning("HAVING条件转换为pandas表达式失败,回退到逐行过滤: %s", having_clause.this)
-        return self._apply_row_filter(having_clause.this, df)
 
     def _extract_agg_funcs_from_expr(self, expr: exp.Expression) -> list[exp.Expression]:
         """递归提取表达式中的所有聚合函数"""
