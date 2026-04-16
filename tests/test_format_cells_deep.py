@@ -1070,11 +1070,13 @@ class TestFormatCellsAlignmentEdgeCases:
         writer = ExcelWriter(fp)
 
         # openpyxl text_rotation: 0-180 为标准角度，255 表示垂直文字
-        for angle in [0, 45, 90, 180, 255]:
+        # 注意：代码会自动 clamp 超范围值到 [0, 180]，负值取绝对值
+        expected_angles = {0: 0, 45: 45, 90: 90, 180: 180, 255: 180}
+        for angle, expected in expected_angles.items():
             r = writer.format_cells("Sheet1!A1", {"alignment": {"text_rotation": angle}})
             assert r.success is True
             style = _read_cell_style(fp, "A1")
-            assert style["text_rotation"] == angle
+            assert style["text_rotation"] == expected
 
 
 class TestFormatCellsBorderEdgeCases:
@@ -1736,14 +1738,15 @@ class TestFormatCellsR55Round2:
             s = _read_cell_style(fp, ref)
             assert s["text_rotation"] == rot, f"expected {rot}, got {s['text_rotation']}"
 
-    def test_text_rotation_negative_rejected(self, tmp_path):
-        """text_rotation 负值应被 openpyxl 拒绝（验证边界行为）"""
+    def test_text_rotation_negative_normalized(self, tmp_path):
+        """text_rotation 负值应被自动归一化为正值（-90 → 90）"""
         fp = _make_sample(tmp_path, [[1]])
         writer = ExcelWriter(fp)
         result = writer.format_cells("Sheet1!A1", {"alignment": {"text_rotation": -90}})
-        # openpyxl 不接受负值，应失败
-        assert result.success is False
-        assert "Value must be one of" in str(result.error)
+        # 代码现在自动将负值转为正数（取绝对值），应成功
+        assert result.success is True
+        style = _read_cell_style(fp, "A1")
+        assert style["text_rotation"] == 90  # openpyxl 归一化后的值
 
     def test_text_rotation_45_degrees(self, tmp_path):
         """text_rotation=45 常用角度"""

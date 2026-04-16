@@ -1607,11 +1607,25 @@ class ExcelWriter:
         # 对齐方式（含换行、旋转、缩进、自动换行）
         if "alignment" in formatting and formatting["alignment"] is not None:
             align_config = formatting["alignment"]
+
+            # text_rotation 校准：openpyxl 仅支持 0~180 整数
+            # 负值取绝对值（-90 → 90 表示垂直文本），超范围值 clamp 到 [0, 180]
+            _text_rot = align_config.get("text_rotation")
+            if _text_rot is not None:
+                try:
+                    _text_rot = int(_text_rot)
+                    if _text_rot < 0:
+                        _text_rot = abs(_text_rot)
+                    elif _text_rot > 180:
+                        _text_rot = 180
+                except (ValueError, TypeError):
+                    _text_rot = 0
+
             cell.alignment = Alignment(
                 horizontal=align_config.get("horizontal", cell.alignment.horizontal),
                 vertical=align_config.get("vertical", cell.alignment.vertical),
                 wrap_text=align_config.get("wrap_text", cell.alignment.wrap_text),
-                text_rotation=align_config.get("text_rotation", cell.alignment.text_rotation),
+                text_rotation=_text_rot if _text_rot is not None else cell.alignment.text_rotation,
                 indent=align_config.get("indent", cell.alignment.indent),
                 shrink_to_fit=align_config.get("shrink_to_fit", cell.alignment.shrink_to_fit),
             )
