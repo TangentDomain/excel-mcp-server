@@ -5541,9 +5541,33 @@ class AdvancedSQLQueryEngine:
                 for old_col, new_col in temp_col_mapping.items():
                     result_df = result_df.rename(columns={new_col: old_col})
             elif non_equi_cond is not None:
-                # 非等值连接: cross join + row filter
-                result_df = result_df.merge(right_df_renamed, how="cross")
-                result_df = self._apply_row_filter(non_equi_cond, result_df)
+                # [R53优化] 非等值连接: 检查是否有可用的等值join key + 额外过滤器
+                pending_filters = getattr(self, '_pending_join_filters', None)
+                if left_on_col and right_on_col and pending_filters:
+                    # 复合条件路径：先等值JOIN（快速pandas merge），再对缩小后的结果集施加非等值过滤
+                    # 这比 cross join + filter 快几个数量级
+                    result_df = result_df.merge(
+                        right_df_renamed,
+                        left_on=left_on_col,
+                        right_on=actual_right_on,
+                        how=join_kind,
+                    )
+                    # 对等值JOIN结果施加额外的非等值过滤条件
+                    for filter_cond in pending_filters:
+                        result_df = self._apply_row_filter(filter_cond, result_df)
+                    self._pending_join_filters = None  # 清理
+                else:
+                    # [R53优化] 纯非等值连接: 尝试排序归并优化
+                    sorted_result = self._try_sorted_non_equi_join(
+                        result_df, right_df_renamed, non_equi_cond,
+                        left_table, right_table, right_alias, join_kind,
+                    )
+                    if sorted_result is not None:
+                        result_df = sorted_result
+                    else:
+                        # 回退到 cross join + row filter
+                        result_df = result_df.merge(right_df_renamed, how="cross")
+                        result_df = self._apply_row_filter(non_equi_cond, result_df)
             else:
                 result_df = result_df.merge(
                     right_df_renamed,
@@ -5559,12 +5583,172 @@ class AdvancedSQLQueryEngine:
 
         return result_df
 
+    def _try_sorted_non_equi_join(self, left_df, right_df, non_equi_cond,
+                                   left_table, right_table, right_alias, join_kind):
+        """
+        [R53优化] 对基于排序的非等值连接使用归并算法，避免 O(n*m) 的笛卡尔积。
+
+        支持的单条件模式（两侧都是简单列引用）：
+          a.col < b.col, a.col <= b.col, a.col > b.col, a.col >= b.col
+
+        算法：双指针归并，O(n log n + m log m + n + m)
+        不支持时返回 None，调用方回退到 cross+filter。
+        """
+        # 仅支持单条件比较（GT/GTE/LT/LTE/NEQ）
+        if not isinstance(non_equi_cond, (exp.GT, exp.GTE, exp.LT, exp.LTE)):
+            return None  # NEQ 或复合条件不适用
+
+        left_expr = non_equi_cond.left
+        right_expr = non_equi_cond.right
+
+        # 两边都必须是简单列引用
+        if not (isinstance(left_expr, exp.Column) and isinstance(right_expr, exp.Column)):
+            return None
+
+        left_col_name = left_expr.name
+        right_col_name = right_expr.name
+        left_tbl = getattr(left_expr, 'table', None)
+        right_tbl = getattr(right_expr, 'table', None)
+
+        # 确定左右列归属
+        if left_tbl:
+            resolved_left_tbl = self._table_aliases.get(left_tbl, left_tbl)
+            if resolved_left_tbl == right_table or left_tbl == right_alias:
+                # 左表达式实际引用右表列 → 交换
+                left_col_name, right_col_name = right_col_name, left_col_name
+                # 翻转比较符
+                op_type = type(non_equi_cond)
+                op_map = {exp.LT: exp.GT, exp.GT: exp.LT, exp.LTE: exp.GTE, exp.GTE: exp.LTE}
+                non_equi_cond = op_map.get(op_type, op_type)(this=non_equi_cond.this, 
+                                                              expression=non_equi_cond.expression,
+                                                              comments=non_equi_cond.comments)
+        elif right_tbl:
+            resolved_right_tbl = self._table_aliases.get(right_tbl, right_tbl)
+            if resolved_right_tbl == left_table:
+                # 右表达式引用左表列 → 交换
+                left_col_name, right_col_name = right_col_name, left_col_name
+                op_type = type(non_equi_cond)
+                op_map = {exp.LT: exp.GT, exp.GT: exp.LT, exp.LTE: exp.GTE, exp.GTE: exp.LTE}
+                non_equi_cond = op_map.get(op_type, op_type)(this=non_equi_cond.this,
+                                                              expression=non_equi_cond.expression,
+                                                              comments=non_equi_cond.comments)
+
+        # 验证列存在（右表可能已被重命名为 alias.col 格式）
+        _right_col_candidates = [right_col_name]
+        if right_col_name not in right_df.columns:
+            # 尝试别名前缀格式（_apply_join_clause 中 right_df_renamed 的命名规则）
+            _right_col_candidates.append(f"{right_alias}.{right_col_name}")
+        _actual_right_col = None
+        for rc in _right_col_candidates:
+            if rc in right_df.columns:
+                _actual_right_col = rc
+                break
+
+        if left_col_name not in left_df.columns or _actual_right_col is None:
+            return None
+
+        # 提取排序列数据
+        left_keys = left_df[left_col_name].values
+        right_keys = right_df[_actual_right_col].values
+
+        # 数值/日期类型才能排序比较 — 统一转 float64 避免类型混用
+        import numpy as np
+        try:
+            left_keys = pd.to_numeric(left_keys, errors='coerce').astype(np.float64)
+            right_keys = pd.to_numeric(right_keys, errors='coerce').astype(np.float64)
+            # NaN 值无法参与排序比较，回退
+            if np.any(np.isnan(left_keys)) or np.any(np.isnan(right_keys)):
+                return None
+        except (ValueError, TypeError):
+            return None
+
+        # 排序索引
+        left_order = np.argsort(left_keys, kind='mergesort')
+        right_order = np.argsort(right_keys, kind='mergesort')
+
+        left_sorted = left_keys[left_order]
+        right_sorted = right_keys[right_order]
+
+        # 根据比较符确定匹配逻辑
+        op_type = type(non_equi_cond)
+
+        # 收集匹配的 (left_idx, right_idx) 对
+        matched_pairs = []
+        r = 0  # 右指针
+
+        if op_type == exp.LT:  # left < right
+            # 对于每个左值，找所有右值 > 左值
+            for i in range(len(left_sorted)):
+                val = left_sorted[i]
+                # 移动 r 到第一个 > val 的位置
+                while r < len(right_sorted) and not (right_sorted[r] > val):
+                    r += 1
+                # 从 r 到末尾都满足
+                for j in range(r, len(right_sorted)):
+                    matched_pairs.append((left_order[i], right_order[j]))
+
+        elif op_type == exp.LTE:  # left <= right
+            for i in range(len(left_sorted)):
+                val = left_sorted[i]
+                while r < len(right_sorted) and right_sorted[r] < val:
+                    r += 1
+                for j in range(r, len(right_sorted)):
+                    matched_pairs.append((left_order[i], right_order[j]))
+
+        elif op_type == exp.GT:  # left > right
+            # 反向：对于每个左值，找所有右值 < 左值
+            for i in range(len(left_sorted)):
+                val = left_sorted[i]
+                while r < len(right_sorted) and right_sorted[r] < val:
+                    r += 1
+                # 0..r-1 都满足 < val
+                for j in range(r):
+                    matched_pairs.append((left_order[i], right_order[j]))
+
+        elif op_type == exp.GTE:  # left >= right
+            # 左值 >= 右值：推进 r 到第一个 > val 的位置，则 [0, r) 都满足 <= val
+            for i in range(len(left_sorted)):
+                val = left_sorted[i]
+                while r < len(right_sorted) and right_sorted[r] <= val:
+                    r += 1
+                for j in range(r):
+                    matched_pairs.append((left_order[i], right_order[j]))
+
+        if not matched_pairs:
+            # 空 JOIN 结果：返回左表结构（0行）
+            return pd.DataFrame(columns=list(left_df.columns) + list(right_df.columns))
+
+        # 构建结果 DataFrame（避免笛卡尔积）
+        left_indices = [p[0] for p in matched_pairs]
+        right_indices = [p[1] for p in matched_pairs]
+
+        left_part = left_df.iloc[left_indices].reset_index(drop=True)
+        right_part = right_df.iloc[right_indices].reset_index(drop=True)
+        result = pd.concat([left_part, right_part], axis=1)
+
+        # LEFT JOIN: 补充左表未匹配行
+        if join_kind in ("left", "outer"):
+            matched_left = set(left_indices)
+            unmatched_left = [i for i in range(len(left_df)) if i not in matched_left]
+            if unmatched_left:
+                left_unmatched = left_df.iloc[unmatched_left].reset_index(drop=True)
+                right_null = pd.DataFrame([[None] * len(right_df.columns)] * len(unmatched_left),
+                                          columns=right_df.columns)
+                result = pd.concat([
+                    result,
+                    pd.concat([left_unmatched, right_null], axis=1),
+                ], ignore_index=True)
+
+        return result
+
     def _parse_join_on_condition(self, on_clause, left_table: str, right_table: str, right_alias: str):
         """
         解析JOIN ON条件
 
         等值连接返回 (left_col, right_col, None)
         非等值连接返回 (None, None, on_clause)
+        [R53优化] 复合AND条件返回 (left_col, right_col, [extra_conditions])
+                  支持等值+非等值混合条件，先做equi-join再filter
         """
         # 非等值连接: 返回条件用于cross+filter
         if isinstance(on_clause, (exp.GT, exp.GTE, exp.LT, exp.LTE, exp.NEQ)):
@@ -5574,12 +5758,36 @@ class AdvancedSQLQueryEngine:
             left_expr = on_clause.left
             right_expr = on_clause.right
         elif isinstance(on_clause, exp.And):
-            for child in on_clause.find_all(exp.EQ):
-                left_expr = child.left
-                right_expr = child.right
-                break
+            # [R53] 增强版：从AND中提取所有条件
+            # 分离等值条件和非等值条件
+            eq_conditions = list(on_clause.find_all(exp.EQ))
+            non_eq_conditions = []
+            # 遍历AND的直接子节点（不递归进嵌套AND）
+            for child in (on_clause.left, on_clause.right):
+                if isinstance(child, (exp.GT, exp.GTE, exp.LT, exp.LTE, exp.NEQ)):
+                    non_eq_conditions.append(child)
+                elif isinstance(child, exp.And):
+                    # 嵌套AND：递归提取
+                    for sub_child in child.find_all((exp.GT, exp.GTE, exp.LT, exp.LTE, exp.NEQ)):
+                        non_eq_conditions.append(sub_child)
+
+            if not eq_conditions:
+                # 没有等值条件，全部是非等值
+                if len(non_eq_conditions) == 1:
+                    return (None, None, non_eq_conditions[0])
+                else:
+                    # 多个非等值条件：保留原始AND节点给_apply_row_filter
+                    return (None, None, on_clause)
+
+            # 取第一个等值条件作为join key
+            left_expr = eq_conditions[0].left
+            right_expr = eq_conditions[0].right
+
+            # 如果有额外的非等值条件，暂存到实例变量供后续使用
+            if non_eq_conditions:
+                self._pending_join_filters = non_eq_conditions
             else:
-                raise ValueError("JOIN ON多条件暂不支持。建议拆分为多个单条件JOIN或使用子查询")
+                self._pending_join_filters = None
         else:
             raise ValueError("JOIN ON条件格式不支持,请使用等值连接: ON a.id = b.id")
 
@@ -7284,11 +7492,11 @@ class AdvancedSQLQueryEngine:
         # R48-fix: 计算 HAVING 聚合临时列(_having_agg_*)并加入结果 DataFrame
         # 这些列在 _apply_group_by_aggregation 中注册但不是 SELECT 表达式,
         # 需要在 grouped 对象仍可用时(聚合后、返回前)计算正确值
+        # R53-fix: 同时将 _having_agg_* 列加入 ordered_columns，确保它们出现在
+        # 最终 DataFrame 中（否则 _apply_having_clause 找不到这些列）
         import sys as _sys
-        _sys.stderr.write(f'[R48-DEBUG] having_aggregations=bool({bool(having_aggregations)}), grouped_in_dir={"grouped" in dir()}, n_agg={len(having_aggregations)}\n')
         if having_aggregations and 'grouped' in dir() and grouped is not None:
             for temp_alias, agg_func in having_aggregations.items():
-                _sys.stderr.write(f'[R48-DEBUG] Processing {temp_alias}: {type(agg_func).__name__}, in_result_data={temp_alias in result_data}\n')
                 if temp_alias not in result_data:
                     try:
                         agg_result = self._apply_aggregation_function(agg_func, grouped, df)
@@ -7296,6 +7504,9 @@ class AdvancedSQLQueryEngine:
                             result_data[temp_alias] = agg_result.reset_index(drop=True)
                         else:
                             result_data[temp_alias] = pd.Series([agg_result])
+                        # R53-fix: 确保HAVING临时列包含在最终DataFrame中
+                        if temp_alias not in ordered_columns:
+                            ordered_columns.append(temp_alias)
                     except Exception:
                         result_data[temp_alias] = pd.Series([None] * len(grouped) if group_by_columns else [None])
 
@@ -8131,6 +8342,12 @@ class AdvancedSQLQueryEngine:
         for col in cast_tmp_cols:
             del result_df[col]
 
+        # R53-fix: 清理 _having_agg_* 临时列（由 _apply_group_by_aggregation 计算，
+        # 仅用于 HAVING 条件评估，不应出现在最终 SELECT 结果中）
+        having_agg_cols = [c for c in result_df.columns if c.startswith('_having_agg_')]
+        for col in having_agg_cols:
+            del result_df[col]
+
         return result_df
 
         logger.warning("HAVING条件转换为pandas表达式失败,回退到逐行过滤: %s", having_clause.this)
@@ -8297,6 +8514,19 @@ class AdvancedSQLQueryEngine:
                 resolved_name = self._resolve_order_column(col_name, df, select_aliases)
             if resolved_name is None and qualified and qualified in df.columns:
                 resolved_name = qualified
+
+            # [FIX R53] ORDER BY 聚合函数表达式匹配 SELECT 别名
+            # 例: SELECT COUNT(*) as cnt ... ORDER BY COUNT(*)
+            # col_expr.name 对 Count(*) 返回 "*" 无法匹配,需要按表达式SQL字符串匹配
+            if resolved_name is None and select_aliases and not isinstance(col_expr, exp.Column):
+                expr_sql = str(col_expr).strip()
+                for alias_name, alias_expr in select_aliases.items():
+                    if str(alias_expr).strip() == expr_sql:
+                        # 找到匹配的别名,在 DataFrame 中查找该别名对应的列
+                        alias_col = self._find_column_name(alias_name, df)
+                        if alias_col:
+                            resolved_name = alias_col
+                            break
 
             # 函数表达式: ORDER BY UPPER(col), LENGTH(col), COALESCE(col, 0) 等
             if resolved_name is None and not isinstance(col_expr, exp.Column):
