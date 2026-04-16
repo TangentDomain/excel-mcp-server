@@ -4157,6 +4157,11 @@ class AdvancedSQLQueryEngine:
 
         # 应用OFFSET(在LIMIT之前)
         offset_value = self._extract_int_value(parsed_sql.args.get("offset"))
+        # R48-fix: SELECT DISTINCT 必须在 LIMIT/OFFSET 之前应用(SQL标准执行顺序)
+        # 原代码先LIMIT再DISTINCT,导致重复行在LIMIT范围外时被错误排除
+        if parsed_sql.args.get("distinct"):
+            base_df = base_df.drop_duplicates()
+
         if offset_value is not None:
             base_df = base_df.iloc[offset_value:]
 
@@ -4166,10 +4171,6 @@ class AdvancedSQLQueryEngine:
             base_df = base_df.head(limit_value)
         elif limit:
             base_df = base_df.head(limit)
-
-        # 应用SELECT DISTINCT去重
-        if parsed_sql.args.get("distinct"):
-            base_df = base_df.drop_duplicates()
 
         return base_df
 
@@ -5611,8 +5612,11 @@ class AdvancedSQLQueryEngine:
                 break
 
         all_rows = []
-        for i, row in left_df.iterrows():
-            lateral_df = lateral_results[i]
+        # R48-fix P0-03: 使用 enumerate 替代 iterrows 索引,避免 DataFrame 索引不连续时 list 越界
+        for pos, (i, row) in enumerate(left_df.iterrows()):
+            if pos >= len(lateral_results):
+                break  # lateral_results 长度不足,安全终止
+            lateral_df = lateral_results[pos]
             if lateral_df is not None and len(lateral_df) > 0:
                 for _, lr in lateral_df.iterrows():
                     combined = dict(row)
@@ -6052,7 +6056,21 @@ class AdvancedSQLQueryEngine:
 
         # 值列表模式
         values = [self._expression_to_value(v, df) for v in in_expr.expressions]
-        values_str = ", ".join(str(v) for v in values)
+        # R48-fix: SQL标准规定 NULL IN (...) 结果为UNKNOWN(WHERE中视为FALSE)
+        # 过滤掉None值,避免pandas isin([None])产生语义错误匹配
+        values = [v for v in values if v is not None]
+        if not values:
+            # IN (NULL,NULL,...): 无可匹配值 → 空集; NOT IN (NULL,...): SQL标准全UNKNOWN→空集
+            return "index != index"
+        # R48-fix: 正确处理pandas query中的类型格式
+        # 整数/浮点数直接用str; 字符串需要单引号包裹
+        formatted = []
+        for v in values:
+            if isinstance(v, str):
+                formatted.append(f"'{v}'")
+            else:
+                formatted.append(str(v))
+        values_str = ", ".join(formatted)
         return f"{prefix}{left}.isin([{values_str}])"
 
     def _sql_condition_to_pandas(self, condition: exp.Expression, df) -> str:
@@ -6189,6 +6207,9 @@ class AdvancedSQLQueryEngine:
             left = self._expression_to_column_reference(condition.this, df)
             low = self._expression_to_value(condition.args["low"], df)
             high = self._expression_to_value(condition.args["high"], df)
+            # R48-fix: NULL in BETWEEN → SQL标准规定 NULL比较结果为UNKNOWN, WHERE中视为FALSE
+            if low is None or high is None:
+                return "index != index"
             return f"({left} >= {low}) & ({left} <= {high})"
 
         elif isinstance(condition, exp.Boolean):
@@ -7114,6 +7135,24 @@ class AdvancedSQLQueryEngine:
                 if col not in ordered_columns:
                     ordered_columns.append(col)
 
+        # R48-fix: 计算 HAVING 聚合临时列(_having_agg_*)并加入结果 DataFrame
+        # 这些列在 _apply_group_by_aggregation 中注册但不是 SELECT 表达式,
+        # 需要在 grouped 对象仍可用时(聚合后、返回前)计算正确值
+        import sys as _sys
+        _sys.stderr.write(f'[R48-DEBUG] having_aggregations=bool({bool(having_aggregations)}), grouped_in_dir={"grouped" in dir()}, n_agg={len(having_aggregations)}\n')
+        if having_aggregations and 'grouped' in dir() and grouped is not None:
+            for temp_alias, agg_func in having_aggregations.items():
+                _sys.stderr.write(f'[R48-DEBUG] Processing {temp_alias}: {type(agg_func).__name__}, in_result_data={temp_alias in result_data}\n')
+                if temp_alias not in result_data:
+                    try:
+                        agg_result = self._apply_aggregation_function(agg_func, grouped, df)
+                        if isinstance(agg_result, pd.Series):
+                            result_data[temp_alias] = agg_result.reset_index(drop=True)
+                        else:
+                            result_data[temp_alias] = pd.Series([agg_result])
+                    except Exception:
+                        result_data[temp_alias] = pd.Series([None] * len(grouped) if group_by_columns else [None])
+
         # 组合结果,保持列顺序
         try:
             result_df = pd.DataFrame(result_data, columns=ordered_columns).reset_index(drop=True)
@@ -7283,6 +7322,9 @@ class AdvancedSQLQueryEngine:
                 import numpy as np
 
                 float_vals = np.asarray(numeric, dtype=float)
+                # R48-fix P2-05: 将 inf/-inf 替换为 NaN,后续统一处理为 pd.NA
+                # np.trunc(inf)=inf, int(inf) 会抛 OverflowError
+                float_vals = np.where(np.isinf(float_vals), np.nan, float_vals)
                 truncated = np.trunc(float_vals)  # 向零截断,匹配 SQL 标准
                 # 构造 Int64 Series (支持 NA)
                 result = []
@@ -7301,14 +7343,27 @@ class AdvancedSQLQueryEngine:
 
         elif type_name in ("VARCHAR", "TEXT", "STRING", "CHAR", "NVARCHAR"):
             if isinstance(inner_val, pd.Series):
-                return inner_val.astype(str).replace("nan", "").replace("<NA>", "")
+                # R48-fix P1-02: 先处理NA再做str转换,避免字面量"nan"/"<NA>"被误清空
+                result = inner_val.astype(str)
+                na_mask = inner_val.isna()
+                if na_mask.any():
+                    result = result.copy()
+                    result[na_mask] = ""
+                return result
             return str(inner_val) if inner_val is not None else ""
 
         elif type_name in ("BOOLEAN", "BOOL"):
             if isinstance(inner_val, pd.Series):
-                return inner_val.astype(bool).astype(int)
+                # R48-fix P1-01: SQL标准要求 CAST(NULL AS BOOLEAN) 返回 NULL, 不是 0
+                # pandas 中 pd.NA.astype(bool) → False → 0, 违反SQL语义
+                result = inner_val.copy()
+                mask = inner_val.notna()
+                if mask.any():
+                    result[mask] = inner_val[mask].astype(bool).astype(int)
+                result[~mask] = pd.NA
+                return result
             if inner_val is None:
-                return 0
+                return None  # SQL标准: CAST(NULL AS BOOL) → NULL
             return 1 if bool(inner_val) else 0
 
         else:
@@ -8947,6 +9002,16 @@ class AdvancedSQLQueryEngine:
         if not rows:
             return {"success": False, "message": "没有数据可插入"}
 
+        # Fix(P1-04): INSERT 批量大小限制，防止意外的大批量插入导致性能问题
+        _MAX_INSERT_BATCH_SIZE = 5000
+        if len(rows) > _MAX_INSERT_BATCH_SIZE:
+            return {
+                "success": False,
+                "message": f"INSERT 批量插入行数({len(rows)})超过限制({_MAX_INSERT_BATCH_SIZE})。"
+                           f"请分批插入，每批不超过 {_MAX_INSERT_BATCH_SIZE} 行",
+                "affected_rows": 0,
+            }
+
         if dry_run:
             elapsed = (time.time() - start_time) * 1000
             return {
@@ -9393,9 +9458,23 @@ class AdvancedSQLQueryEngine:
 
         安全加固(R42): inf/-inf 视为无效值转None,防止 OverflowError 崩溃.
         R48-fix: 新增 Decimal 类型支持,避免 JSON 序列化失败.
+        R48-fix: 新增 datetime/timedelta 类型支持,避免 JSON 序列化崩溃(P0-01).
         """
         if val is None:
             return None
+        # R48-fix P0-01: datetime/timedelta/pd.Timestamp → ISO格式字符串
+        import datetime as _datetime
+        if isinstance(val, (_datetime.datetime, _datetime.date)):
+            return val.isoformat()
+        if isinstance(val, _datetime.timedelta):
+            return str(val)
+        try:
+            if isinstance(val, __import__("pandas").Timestamp):
+                return val.isoformat()
+            if isinstance(val, __import__("pandas").Timedelta):
+                return str(val)
+        except (ImportError, AttributeError):
+            pass
         # R48: Decimal 类型处理 — 转为 float/int 以保证 JSON 安全
         try:
             from decimal import Decimal as _Decimal, InvalidOperation
@@ -9443,7 +9522,8 @@ class AdvancedSQLQueryEngine:
         """将值序列化为JSON安全类型(numpy->Python原生)-- 委托给_serialize_value"""
         return self._serialize_value(val)
 
-    def _evaluate_update_expression(self, expr: exp.Expression, df: pd.DataFrame, row_idx: int) -> Any:
+    def _evaluate_update_expression(self, expr: exp.Expression, df: pd.DataFrame, row_idx: int,
+                                    depth: int = 0) -> Any:
         """
         评估UPDATE SET表达式,支持常量,列引用和算术运算
 
@@ -9451,6 +9531,7 @@ class AdvancedSQLQueryEngine:
             expr: SQL表达式
             df: DataFrame
             row_idx: 行索引
+            depth: Fix(P1-05): 当前递归深度，防止无限递归
 
         Returns:
             计算后的值
@@ -9469,15 +9550,15 @@ class AdvancedSQLQueryEngine:
             return ""
 
         elif isinstance(expr, exp.Neg):
-            inner = self._evaluate_update_expression(expr.this, df, row_idx)
+            inner = self._evaluate_update_expression(expr.this, df, row_idx, depth + 1)
             try:
                 return -float(inner)
             except (ValueError, TypeError):
                 return inner
 
         elif isinstance(expr, (exp.Add, exp.Sub, exp.Mul, exp.Div)):
-            left = self._evaluate_update_expression(expr.left, df, row_idx)
-            right = self._evaluate_update_expression(expr.right, df, row_idx)
+            left = self._evaluate_update_expression(expr.left, df, row_idx, depth + 1)
+            right = self._evaluate_update_expression(expr.right, df, row_idx, depth + 1)
             try:
                 left_n = float(left) if not isinstance(left, (int, float)) else left
                 right_n = float(right) if not isinstance(right, (int, float)) else right
@@ -9493,7 +9574,7 @@ class AdvancedSQLQueryEngine:
 
         elif isinstance(expr, exp.Round):
             # UPDATE SET ROUND(column, decimals)
-            inner = self._evaluate_update_expression(expr.this, df, row_idx)
+            inner = self._evaluate_update_expression(expr.this, df, row_idx, depth + 1)
             decimals_arg = expr.args.get("decimals")
             decimals = int(self._literal_value(decimals_arg)) if decimals_arg is not None else 0
             try:
@@ -9508,18 +9589,20 @@ class AdvancedSQLQueryEngine:
             try:
                 return self._evaluate_case_expression(expr, None, row=df.iloc[row_idx])
             except Exception as e:
-                logger.warning(f"UPDATE CASE WHEN 求值失败: {e}, 返回原始值")
-                return df.at[row_idx, "Price"] if "Price" in df.columns else None
+                logger.warning(f"UPDATE CASE WHEN 求值失败: {e}")
+                # R48-fix P0-02: 不再硬编码"Price"列名回退(会导致非Price表数据丢失为None)
+                # 改为抛出异常,由外层UPDATE统一错误处理
+                raise ValueError(f"UPDATE CASE WHEN 求值失败: {e}")
 
         elif isinstance(expr, exp.Coalesce):
             # [FIX R10-B2] UPDATE SET COALESCE(v1, v2, ...) — 返回第一个非NULL/非空值
             for arg in expr.expressions:
-                val = self._evaluate_update_expression(arg, df, row_idx)
+                val = self._evaluate_update_expression(arg, df, row_idx, depth + 1)
                 if val is not None and val != "" and not (isinstance(val, float) and np.isnan(val)):
                     return val
             # 所有参数都为 NULL/空，返回最后一个参数的值(可能为None)
             if expr.expressions:
-                return self._evaluate_update_expression(expr.expressions[-1], df, row_idx)
+                return self._evaluate_update_expression(expr.expressions[-1], df, row_idx, depth + 1)
             return None
 
         # Fix: P2-1 — 支持 CONCAT() 和 || 字符串拼接操作符在 UPDATE SET 中使用
@@ -9527,19 +9610,19 @@ class AdvancedSQLQueryEngine:
             # CONCAT(a, b, c, ...) — 由 || 转换而来或用户直接使用
             parts = []
             for arg in expr.expressions:
-                val = self._evaluate_update_expression(arg, df, row_idx)
+                val = self._evaluate_update_expression(arg, df, row_idx, depth + 1)
                 parts.append(str(val) if val is not None else '')
             return ''.join(parts)
         elif isinstance(expr, exp.DPipe):
             # || 直接被 sqlglot 识别为 DPipe(如 PostgreSQL 方言)
-            left = self._evaluate_update_expression(expr.this, df, row_idx)
-            right = self._evaluate_update_expression(expr.expression, df, row_idx)
+            left = self._evaluate_update_expression(expr.this, df, row_idx, depth + 1)
+            right = self._evaluate_update_expression(expr.expression, df, row_idx, depth + 1)
             return (str(left) if left is not None else '') + (str(right) if right is not None else '')
         elif isinstance(expr, exp.Or):
             # Fix: P2-1 — MySQL 方言下 || 被解析为 OR,启发式检测字符串拼接
             if self._is_likely_dpipe_concatenation(expr):
-                left = self._evaluate_update_expression(expr.this, df, row_idx)
-                right = self._evaluate_update_expression(expr.expression, df, row_idx)
+                left = self._evaluate_update_expression(expr.this, df, row_idx, depth + 1)
+                right = self._evaluate_update_expression(expr.expression, df, row_idx, depth + 1)
                 return (str(left) if left is not None else '') + (str(right) if right is not None else '')
             else:
                 raise ValueError(
@@ -9550,7 +9633,7 @@ class AdvancedSQLQueryEngine:
 
         elif isinstance(expr, (exp.Abs, exp.Ceil, exp.Floor, exp.Sqrt)):
             # [FIX R10-B2] UPDATE SET 标量数学函数(ABS/CEIL/FLOOR/SQRT)
-            inner = self._evaluate_update_expression(expr.this, df, row_idx)
+            inner = self._evaluate_update_expression(expr.this, df, row_idx, depth + 1)
             try:
                 f_val = float(inner) if inner is not None else None
                 if f_val is None:
@@ -9570,7 +9653,7 @@ class AdvancedSQLQueryEngine:
 
         elif isinstance(expr, (exp.Upper, exp.Lower, exp.Trim)):
             # [FIX R47] UPDATE SET 字符串函数(UPPER/LOWER/TRIM)
-            inner = self._evaluate_update_expression(expr.this, df, row_idx)
+            inner = self._evaluate_update_expression(expr.this, df, row_idx, depth + 1)
             if inner is None:
                 return None
             s = str(inner)
@@ -9584,9 +9667,9 @@ class AdvancedSQLQueryEngine:
         elif isinstance(expr, (exp.Substring, exp.Left, exp.Right)):
             # [FIX R47] UPDATE SET 子字符串函数(SUBSTRING/LEFT/RIGHT)
             if isinstance(expr, exp.Substring):
-                val = self._evaluate_update_expression(expr.this, df, row_idx)
-                start = self._evaluate_update_expression(expr.args.get("start"), df, row_idx)
-                length = self._evaluate_update_expression(expr.args.get("length"), df, row_idx)
+                val = self._evaluate_update_expression(expr.this, df, row_idx, depth + 1)
+                start = self._evaluate_update_expression(expr.args.get("start"), df, row_idx, depth + 1)
+                length = self._evaluate_update_expression(expr.args.get("length"), df, row_idx, depth + 1)
                 if val is None or start is None:
                     return None
                 s = str(val)
@@ -9594,9 +9677,9 @@ class AdvancedSQLQueryEngine:
                 ln = int(length) if length is not None else len(s)
                 return s[st:st + ln]
             elif isinstance(expr, (exp.Left, exp.Right)):
-                val = self._evaluate_update_expression(expr.this, df, row_idx)
+                val = self._evaluate_update_expression(expr.this, df, row_idx, depth + 1)
                 length_expr = expr.args.get("length") or expr.args.get("expression")
-                n = self._evaluate_update_expression(length_expr, df, row_idx)
+                n = self._evaluate_update_expression(length_expr, df, row_idx, depth + 1)
                 if val is None or n is None:
                     return None
                 s = str(val)
@@ -9608,15 +9691,20 @@ class AdvancedSQLQueryEngine:
 
         elif isinstance(expr, exp.Length):
             # [FIX R47] UPDATE SET LENGTH() 函数
-            inner = self._evaluate_update_expression(expr.this, df, row_idx)
+            inner = self._evaluate_update_expression(expr.this, df, row_idx, depth + 1)
             if inner is None:
                 return 0
             return len(str(inner))
 
         else:
-            # 未知表达式类型,尝试递归
+            # Fix(P1-05): 递归深度保护，防止无限递归导致栈溢出
+            _MAX_RECURSION_DEPTH = 20
+            if depth >= _MAX_RECURSION_DEPTH:
+                logger.warning(f"_evaluate_update_expression 递归深度({depth})超过限制({_MAX_RECURSION_DEPTH})，中止求值")
+                return None
+            # 未知表达式类型,尝试递归(带深度计数)
             if hasattr(expr, "this"):
-                return self._evaluate_update_expression(expr.this, df, row_idx)
+                return self._evaluate_update_expression(expr.this, df, row_idx, depth + 1)
             return ""
 
 

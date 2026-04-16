@@ -1429,6 +1429,7 @@ class ExcelOperations:
                         logger.warning(f"流式批量删除行失败，降级到openpyxl: {message}")
 
             # openpyxl 降级路径：合并相邻行号为连续区间，逐区间删除
+            # Fix(P1-03): 必须从大到小(逆序)处理区间，避免先删小行号导致后续行号偏移
             from excel_mcp_server_fastmcp.core.excel_writer import ExcelWriter
 
             writer = ExcelWriter(file_path)
@@ -1446,6 +1447,9 @@ class ExcelOperations:
                     start = r
                     prev = r
             ranges.append((start, prev - start + 1))
+
+            # 逆序排列：从最大行号开始删除，避免行号偏移
+            ranges.sort(reverse=True)
 
             total_deleted = 0
             for range_start, range_count in ranges:
