@@ -1591,16 +1591,31 @@ class ExcelOperations:
             "shrink_to_fit": "shrink_to_fit",
         }
 
+        def _clean_color(val):
+            """清理颜色值：去除 # 前缀，统一为纯 HEX 字符串"""
+            s = str(val).strip()
+            if s.startswith("#"):
+                s = s[1:]
+            return s
+
         for key, value in formatting.items():
             if key in flat_to_font and value is not None:
-                font_attrs[flat_to_font[key]] = value
+                # font_color 需要清理 # 前缀
+                if flat_to_font[key] == "color":
+                    font_attrs[flat_to_font[key]] = _clean_color(value)
+                else:
+                    font_attrs[flat_to_font[key]] = value
             elif key in flat_to_align and value is not None:
-                align_attrs[flat_to_align[key]] = value
+                # vertical_alignment: "middle" 是 Excel UI 常用值，openpyxl 用 "center"
+                if flat_to_align[key] == "vertical" and str(value).lower() == "middle":
+                    align_attrs["vertical"] = "center"
+                else:
+                    align_attrs[flat_to_align[key]] = value
             elif key == "bg_color" and value is not None:
                 # 合并到已有 fill 配置（而非覆盖 fill_type/gradient_colors 等字段）
                 if "fill" not in nested:
                     nested["fill"] = {}
-                nested["fill"]["color"] = str(value)
+                nested["fill"]["color"] = _clean_color(value)
             elif key == "number_format" and value is not None:
                 nested["number_format"] = str(value)
             elif key == "fill_type" and value is not None:
