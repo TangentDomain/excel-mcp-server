@@ -1663,8 +1663,8 @@ class ExcelOperations:
                     }
                 else:
                     nested["border"] = value
-            else:
-                # 未知键直接透传（保持向后兼容）
+            elif value is not None:
+                # 未知非None键直接透传（保持向后兼容），None值跳过避免污染嵌套格式
                 nested[key] = value
 
         if font_attrs:
