@@ -1085,9 +1085,14 @@ class AdvancedSQLQueryEngine:
 
             ref_path = os.path.normpath(ref_path)
 
-            # 验证文件存在
+            # 安全检查: 防止路径遍历攻击 (../)
+            primary_dir_norm = os.path.normpath(primary_dir)
+            if not ref_path.startswith(primary_dir_norm + os.sep) and ref_path != primary_dir_norm:
+                raise ValueError("跨文件引用的路径不允许访问主文件目录之外的文件")
+
+            # 验证文件存在(错误信息不泄露完整路径)
             if not os.path.exists(ref_path):
-                raise ValueError(f"跨文件引用的文件不存在: {ref_path}.请检查路径是否正确(支持绝对路径和相对于主文件的相对路径)")
+                raise ValueError(f"跨文件引用的文件不存在: {os.path.basename(ref_path)}.请检查文件名是否正确")
 
             # 加载文件(带缓存,避免重复加载)
             if ref_path not in loaded_files:
@@ -4179,22 +4184,36 @@ class AdvancedSQLQueryEngine:
             # 应用SELECT表达式(裁剪列,计算字段,别名)
             base_df = self._apply_select_expressions(parsed_sql, base_df)
 
-        # 应用OFFSET(在LIMIT之前)
+        # R51-opt: LIMIT/OFFSET 优化 — 合并操作 + 早返回 + 边界检查
         offset_value = self._extract_int_value(parsed_sql.args.get("offset"))
         # R48-fix: SELECT DISTINCT 必须在 LIMIT/OFFSET 之前应用(SQL标准执行顺序)
-        # 原代码先LIMIT再DISTINCT,导致重复行在LIMIT范围外时被错误排除
         if parsed_sql.args.get("distinct"):
             base_df = base_df.drop_duplicates()
 
-        if offset_value is not None:
-            base_df = base_df.iloc[offset_value:]
-
-        # 应用LIMIT
         limit_value = self._extract_int_value(parsed_sql.args.get("limit"))
-        if limit_value is not None:
+        if limit is not None and limit_value is None:
+            limit_value = limit
+
+        # 早返回: LIMIT 0 → 空结果（跳过后续切片）
+        if limit_value is not None and limit_value <= 0:
+            return base_df.iloc[0:0]
+
+        # 归一化 OFFSET（负值视为 0）
+        if offset_value is not None and offset_value < 0:
+            offset_value = 0
+
+        # 合并 OFFSET+LIMIT 为单次 iloc 操作（避免中间 DataFrame）
+        if offset_value is not None and offset_value > 0:
+            if limit_value is not None and limit_value > 0:
+                # OFFSET + LIMIT 合并: iloc[offset:offset+limit]
+                end_idx = offset_value + limit_value
+                base_df = base_df.iloc[offset_value:end_idx]
+            else:
+                # 仅 OFFSET
+                base_df = base_df.iloc[offset_value:]
+        elif limit_value is not None and limit_value > 0:
+            # 仅 LIMIT
             base_df = base_df.head(limit_value)
-        elif limit:
-            base_df = base_df.head(limit)
 
         return base_df
 
@@ -6468,12 +6487,35 @@ class AdvancedSQLQueryEngine:
                 f"\n🔧 不支持算术运算(如 A+B>10)，建议用子查询: SELECT * FROM (SELECT ..., (A+B) as t FROM tbl) WHERE t>10"
             )
 
+    def _pre_cache_in_subqueries(self, condition: exp.Expression) -> dict:
+        """预执行条件树中所有 IN 子查询并缓存结果，避免逐行重复执行"""
+        cache = {}
+        if not (hasattr(self, "_current_worksheets") and self._current_worksheets):
+            return cache
+
+        # 递归查找所有 In 节点
+        in_nodes = list(condition.find_all(exp.In))
+        for in_node in in_nodes:
+            if in_node.expressions and isinstance(in_node.expressions[0], (exp.Subquery, exp.Select)):
+                sub_key = id(in_node)
+                try:
+                    sub_result = self._execute_subquery(in_node.expressions[0], self._current_worksheets)
+                    if sub_result.empty:
+                        cache[sub_key] = []
+                    else:
+                        cache[sub_key] = sub_result.iloc[:, 0].dropna().tolist()
+                except Exception:
+                    cache[sub_key] = []
+        return cache
+
     def _apply_row_filter(self, condition: exp.Expression, df) -> pd.DataFrame:
         """逐行应用过滤条件(备用方案),使用apply替代iterrows提升性能"""
-        mask = df.apply(lambda row: self._evaluate_condition_for_row(condition, row), axis=1)
+        # Fix: 预执行所有IN子查询并缓存结果，避免逐行重复执行
+        in_subquery_cache = self._pre_cache_in_subqueries(condition)
+        mask = df.apply(lambda row: self._evaluate_condition_for_row(condition, row, in_subquery_cache), axis=1)
         return df[mask]
 
-    def _evaluate_condition_for_row(self, condition: exp.Expression, row: pd.Series) -> bool:
+    def _evaluate_condition_for_row(self, condition: exp.Expression, row: pd.Series, in_subquery_cache: dict = None) -> bool:
         """为单行评估条件"""
         try:
             op_type = type(condition)
@@ -6523,25 +6565,35 @@ class AdvancedSQLQueryEngine:
                 # sqlglot 将 IN (1,2,3) 和 IN (SELECT ...) 都解析为 In 节点
                 # 区分方式: expressions[0] 是否为 Subquery/Select
                 if condition.expressions and isinstance(condition.expressions[0], (exp.Subquery, exp.Select)):
-                    # IN 子查询: 执行子查询，检查值是否在结果集中
-                    try:
-                        if not (hasattr(self, "_current_worksheets") and self._current_worksheets):
-                            return False
-                        sub_result = self._execute_subquery(condition.expressions[0], self._current_worksheets)
-                        if sub_result.empty:
-                            return False
-                        sub_values = sub_result.iloc[:, 0].dropna().tolist()
-                        # 类型兼容比较（处理 int/float 混合）
-                        for sv in sub_values:
-                            try:
-                                if float(val) == float(sv):
-                                    return True
-                            except (TypeError, ValueError):
-                                if val == sv:
-                                    return True
+                    # IN 子查询: 优先使用缓存，避免逐行重复执行
+                    sub_key = id(condition)
+                    if in_subquery_cache and sub_key in in_subquery_cache:
+                        sub_values = in_subquery_cache[sub_key]
+                    else:
+                        try:
+                            if not (hasattr(self, "_current_worksheets") and self._current_worksheets):
+                                return False
+                            sub_result = self._execute_subquery(condition.expressions[0], self._current_worksheets)
+                            if sub_result.empty:
+                                sub_values = []
+                            else:
+                                sub_values = sub_result.iloc[:, 0].dropna().tolist()
+                        except Exception:
+                            sub_values = []
+                        if in_subquery_cache is not None:
+                            in_subquery_cache[sub_key] = sub_values
+
+                    if not sub_values:
                         return False
-                    except Exception:
-                        return False
+                    # 类型兼容比较（处理 int/float 混合）
+                    for sv in sub_values:
+                        try:
+                            if float(val) == float(sv):
+                                return True
+                        except (TypeError, ValueError):
+                            if val == sv:
+                                return True
+                    return False
                 else:
                     # IN 字面量列表: IN (1, 2, 3)
                     values = [self._get_row_value(e, row) for e in condition.expressions]
@@ -8228,31 +8280,51 @@ class AdvancedSQLQueryEngine:
 
         if sort_columns:
             # Handle mixed data types in ORDER BY columns
+            # Fix: 智能混合类型排序 — 优先数值排序，非数值值排末尾
+            temp_sort_cols = []
             for col in sort_columns:
                 if col in df.columns:
-                    # Check if column has mixed data types (numbers and strings)
                     col_data = df[col]
                     has_numbers = False
                     has_strings = False
+                    num_count = 0
+                    total_count = 0
 
                     for val in col_data.dropna():
-                        if isinstance(val, (int, float)):
+                        if isinstance(val, (int, float)) and not isinstance(val, bool):
                             has_numbers = True
+                            num_count += 1
                         elif isinstance(val, str):
                             has_strings = True
+                        total_count += 1
 
                         if has_numbers and has_strings:
-                            # Mixed types - convert to string for consistent sorting
-                            df[f"_temp_sort_{col}"] = col_data.astype(str)
-                            sort_columns = [f"_temp_sort_{c}" if c == col else c for c in sort_columns]
                             break
+
+                    if has_numbers and has_strings and total_count > 0:
+                        # 超过50%为数值时使用智能排序：数值按数值排，非数值排末尾
+                        if num_count / total_count > 0.5:
+                            import pandas as _pd
+                            temp_col_name = f"_temp_sort_{col}"
+                            # 尝试转为数值，失败者保留原值用于末尾排序
+                            numeric_vals = _pd.to_numeric(col_data, errors='coerce')
+                            # 排序键：数值用其值，非数值用 inf（排到末尾）
+                            df[temp_col_name] = numeric_vals.fillna(float('inf'))
+                            sort_columns = [temp_col_name if c == col else c for c in sort_columns]
+                            temp_sort_cols.append(temp_col_name)
+                        else:
+                            # 字符串为主，回退到字符串排序
+                            temp_col_name = f"_temp_str_{col}"
+                            df[temp_col_name] = col_data.astype(str)
+                            sort_columns = [temp_col_name if c == col else c for c in sort_columns]
+                            temp_sort_cols.append(temp_col_name)
 
             sorted_df = df.sort_values(by=sort_columns, ascending=ascending)
 
             # Clean up temporary columns
-            for col in list(sort_columns):
-                if col.startswith("_temp_sort_"):
-                    sorted_df.drop(columns=[col], inplace=True)
+            for tc in temp_sort_cols:
+                if tc in sorted_df.columns:
+                    sorted_df.drop(columns=[tc], inplace=True)
 
             return sorted_df
 
@@ -8419,31 +8491,60 @@ class AdvancedSQLQueryEngine:
         return result
 
     def _infer_data_types(self, df) -> dict[str, str]:
-        """推断列的数据类型"""
+        """
+        推断列的数据类型
+        R51-opt: 增加布尔类型检测 + 采样优化 + 混合类型处理
+        """
         data_types = {}
 
         for col in df.columns:
             series = df[col]
+            non_null = series.dropna()
 
-            # 检查是否为数值类型
-            numeric_series = pd.to_numeric(series, errors="coerce")
-            if not numeric_series.isna().all():
-                if (numeric_series % 1 == 0).all():
-                    data_types[col] = "integer"
-                else:
-                    data_types[col] = "float"
+            if len(non_null) == 0:
+                data_types[col] = "string"
                 continue
 
-            # 检查是否为日期类型
-            try:
-                # 先检查是否明显是日期格式
-                sample_values = series.dropna().head(5)
-                is_likely_date = False
-                for val in sample_values:
-                    if isinstance(val, str) and any(x in str(val) for x in ["-", "/", ":", "年", "月", "日"]):
-                        is_likely_date = True
-                        break
+            # R51-opt: 先用小样本快速判断类型（避免全量 to_numeric）
+            sample = non_null.head(10)
 
+            # R51-new: 布尔类型检测（True/False, Yes/No, 1/0 模式）
+            if self._is_boolean_column(sample):
+                data_types[col] = "boolean"
+                continue
+
+            # 数值类型检测（先用样本，确认后再全量转换）
+            try:
+                sample_numeric = pd.to_numeric(sample, errors="coerce")
+                sample_valid = sample_numeric.notna().sum()
+                if sample_valid == len(sample):
+                    # 样本全为数值 → 全量确认
+                    full_numeric = pd.to_numeric(series, errors="coerce")
+                    if not full_numeric.isna().all():
+                        if (full_numeric.dropna() % 1 == 0).all():
+                            data_types[col] = "integer"
+                        else:
+                            data_types[col] = "float"
+                        continue
+                elif sample_valid > len(sample) * 0.8:
+                    # >80% 为数值 → 混合类型，仍尝试数值优先
+                    full_numeric = pd.to_numeric(series, errors="coerce")
+                    na_ratio = full_numeric.isna().mean()
+                    if na_ratio < 0.5:  # 少于一半非数值
+                        if (full_numeric.dropna() % 1 == 0).all():
+                            data_types[col] = "integer"
+                        else:
+                            data_types[col] = "float"
+                        continue
+            except Exception:
+                pass
+
+            # 日期类型检测
+            try:
+                is_likely_date = any(
+                    isinstance(val, str) and any(x in str(val) for x in ["-", "/", ":", "年", "月", "日"])
+                    for val in sample
+                )
                 if is_likely_date:
                     converted = pd.to_datetime(series, errors="coerce", format="mixed")
                     if not converted.isna().all():
@@ -8456,6 +8557,47 @@ class AdvancedSQLQueryEngine:
             data_types[col] = "string"
 
         return data_types
+
+    @staticmethod
+    def _is_boolean_column(sample_series) -> bool:
+        """检测列是否为布尔类型（True/False, Yes/No, 1/0 等模式）
+
+        Args:
+            sample_series: 已去空的样本 Series
+
+        Returns:
+            bool: 是否为布尔类型
+        """
+        if len(sample_series) == 0:
+            return False
+
+        unique_vals = set()
+        for v in sample_series:
+            if isinstance(v, bool):
+                unique_vals.add(v)
+            elif isinstance(v, str):
+                v_lower = v.lower().strip()
+                if v_lower in ("true", "false", "yes", "no", "y", "n", "1", "0"):
+                    unique_vals.add(v_lower)
+                else:
+                    return False  # 非布尔字符串 → 不是布尔列
+            elif isinstance(v, (int, float)) and not isinstance(v, bool):
+                if v in (0, 1):
+                    unique_vals.add(v)
+                else:
+                    return False  # 非 0/1 数值 → 不是布尔列
+            else:
+                return False
+
+        # 布尔列特征: 只有 True/False 或 Yes/No 或 0/1 两类值
+        bool_groups = [
+            {"true", "false"},
+            {"yes", "no"},
+            {"y", "n"},
+            {0, 1},
+            {True, False},
+        ]
+        return any(unique_vals <= bg for bg in bool_groups) and len(unique_vals) >= 2
 
     def _update_error(self, message: str, elapsed_ms: float = 0) -> dict[str, Any]:
         """构造UPDATE操作的统一错误响应"""
@@ -8487,16 +8629,15 @@ class AdvancedSQLQueryEngine:
         if len(non_null) == 0:
             return "empty"
 
-        # 检查pandas dtype是否为数值类型
-        if pd.api.types.is_numeric_dtype(series.dtype) and not pd.api.types.is_bool_dtype(series.dtype):
-            # 额外检查: 确保非空值确实都是数值(防止object dtype中混入字符串)
-            sample = non_null.head(50)
-            numeric_count = sum(
-                1 for v in sample
-                if isinstance(v, (int, float, np.integer, np.floating)) and not (isinstance(v, float) and np.isnan(v))
-            )
-            if numeric_count == len(sample):
-                return "numeric"
+        # R51-opt: 采样量从50降至20（统计显著性足够，减少开销）
+        # 不再限制 pd.api.types.is_numeric_dtype，统一走采样检测（兼容 object 型数值列）
+        sample = non_null.head(20)
+        numeric_count = sum(
+            1 for v in sample
+            if isinstance(v, (int, float, np.integer, np.floating)) and not (isinstance(v, float) and np.isnan(v))
+        )
+        if numeric_count == len(sample):
+            return "numeric"
 
         return "string"
 
@@ -9060,6 +9201,14 @@ class AdvancedSQLQueryEngine:
                 if type_err:
                     return {"success": False, "message": type_err, "affected_rows": 0}
                 row[col_names[i]] = val
+            # Fix: 检查VALUES值数量与列数量是否匹配，防止静默截断导致数据不完整
+            if len(row) != len(col_names):
+                return {
+                    "success": False,
+                    "message": f"VALUES 值数量({len(row)})与列数量({len(col_names)})不匹配。"
+                               f"请确保每个 VALUES 元组包含 {len(col_names)} 个值",
+                    "affected_rows": 0,
+                }
             rows.append(row)
 
         if not rows:
@@ -9136,7 +9285,8 @@ class AdvancedSQLQueryEngine:
             inner = self._eval_insert_value(val_expr.this)
             return -inner if isinstance(inner, (int, float)) else inner
         elif isinstance(val_expr, exp.Column):
-            return val_expr.name
+            # Fix: VALUES 中不支持列引用，返回明确错误而非静默插入列名字符串
+            raise ValueError(f"VALUES 中不支持列引用 '{val_expr.name}'。请使用字面量值（如 'value' 或 123）")
         else:
             return str(val_expr)
 
@@ -9486,13 +9636,39 @@ class AdvancedSQLQueryEngine:
 
     @contextmanager
     def _file_lock(self, file_path: str) -> Generator[None, None, None]:
-        """文件锁上下文管理器(Linux fcntl,其他平台优雅降级)"""
+        """文件锁上下文管理器(Linux fcntl,其他平台优雅降级)
+
+        Fix: 检测并清理孤儿锁文件（进程被强杀后残留的 .lock 文件）
+        """
         lock_fd = None
         try:
             try:
                 import fcntl
 
-                lock_fd = open(file_path + ".lock", "w", encoding="utf-8")
+                lock_path = file_path + ".lock"
+                # 检测孤儿锁文件：如果存在且持有者进程已死，自动清理
+                if os.path.exists(lock_path):
+                    try:
+                        with open(lock_path, "r") as lf:
+                            pid_str = lf.read().strip()
+                        if pid_str:
+                            old_pid = int(pid_str)
+                            # 检查进程是否存活
+                            os.kill(old_pid, 0)
+                            # 进程仍存活，正常等待 flock
+                    except (ValueError, ProcessLookupError):
+                        # PID 无效或进程已死，清理孤儿锁
+                        try:
+                            os.remove(lock_path)
+                        except OSError:
+                            pass
+                    except OSError:
+                        pass
+
+                lock_fd = open(lock_path, "w", encoding="utf-8")
+                # 写入当前 PID，用于后续孤儿检测
+                lock_fd.write(str(os.getpid()))
+                lock_fd.flush()
                 fcntl.flock(lock_fd, fcntl.LOCK_EX)
             except (ImportError, OSError):
                 lock_fd = None
