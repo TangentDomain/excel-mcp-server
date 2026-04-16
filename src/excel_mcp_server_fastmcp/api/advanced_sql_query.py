@@ -1214,6 +1214,13 @@ class AdvancedSQLQueryEngine:
         self._header_descriptions = {}  # {sheet_name: {field_name: description}}
 
         try:
+            # P3-01: 大文件内存优化 - 文件大小预检
+            file_size_mb = os.path.getsize(file_path) / (1024 * 1024)
+            if file_size_mb > 50:
+                logger.warning(f"大文件加载警告: {file_path} ({file_size_mb:.1f}MB), 内存占用可能较高")
+            elif file_size_mb > 10:
+                logger.info(f"加载较大文件: {file_path} ({file_size_mb:.1f}MB)")
+
             # 性能优化:用calamine替代openpyxl读取(Rust引擎,速度提升10-50倍)
             # calamine一次性读取所有sheet数据,无需二次打开文件
             from python_calamine import CalamineWorkbook
@@ -2259,6 +2266,7 @@ class AdvancedSQLQueryEngine:
 
         对数值列进行降级(int64->int32/int16/int8, float64->float32),
         对高基数字符串列不做转换(避免转换开销),对低基数字符串列转为category.
+        P3-01增强: 低基数object列自动转category,大幅减少字符串内存占用.
 
         Args:
             df: 原始DataFrame
@@ -2272,7 +2280,15 @@ class AdvancedSQLQueryEngine:
             col_type = df[col].dtype
 
             if col_type == "object":
-                pass  # 保持 object 类型,避免 category 导致 UPDATE 写入新值时报错
+                # P3-01: 低基数字符串列转为category类型
+                # 条件: 非空值基数/总行数 < 0.3 (即重复值多), 且行数 > 100 (小表无意义)
+                n_unique = df[col].nunique()
+                n_total = len(df)
+                if n_total > 100 and n_unique > 0 and n_unique / n_total < 0.3:
+                    try:
+                        df[col] = df[col].astype("category")
+                    except (TypeError, ValueError):
+                        pass  # 转换失败则保持原类型
             elif col_type in ["int64", "int32"]:
                 # 整数列降级
                 col_min = df[col].min()
