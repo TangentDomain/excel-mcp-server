@@ -39,6 +39,9 @@ class RangeParser:
             sheet_name = None
             cell_range = range_expr
 
+        # 去除绝对引用符号 $（$A$1 → A1，Excel 绝对引用标记，不影响实际地址）
+        cell_range = cell_range.replace("$", "")
+
         # 检测范围类型
         range_type = cls._detect_range_type(cell_range)
 
