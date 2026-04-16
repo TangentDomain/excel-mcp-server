@@ -1557,7 +1557,7 @@ class ExcelWriter:
             None
         """
         # 字体格式
-        if "font" in formatting:
+        if "font" in formatting and formatting["font"] is not None:
             font_config = formatting["font"]
             # 处理 underline 值：支持 'single'/'double'/'singleAccounting'/'doubleAccounting'/True/False
             _underline = font_config.get("underline", None)
@@ -1577,7 +1577,7 @@ class ExcelWriter:
             )
 
         # 背景颜色 / 填充
-        if "fill" in formatting:
+        if "fill" in formatting and formatting["fill"] is not None:
             fill_config = formatting["fill"]
             _fill_type = fill_config.get("type", "solid").lower()
             if _fill_type == "solid":
@@ -1605,7 +1605,7 @@ class ExcelWriter:
                 )
 
         # 对齐方式（含换行、旋转、缩进、自动换行）
-        if "alignment" in formatting:
+        if "alignment" in formatting and formatting["alignment"] is not None:
             align_config = formatting["alignment"]
             cell.alignment = Alignment(
                 horizontal=align_config.get("horizontal", cell.alignment.horizontal),
@@ -1621,7 +1621,7 @@ class ExcelWriter:
             cell.number_format = formatting["number_format"]
 
         # 行内边框（可选，与 set_borders 工具互补）
-        if "border" in formatting:
+        if "border" in formatting and formatting["border"] is not None:
             border_config = formatting["border"]
             from openpyxl.styles import Border as Bdr
             from openpyxl.styles import Side
