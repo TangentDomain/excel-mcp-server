@@ -1585,5 +1585,446 @@ class TestFormatCellsProtectionEdgeCases:
         wb.close()
 
 
+# ==================== R55+ Round 2: 新增边缘/组合测试 ====================
+
+
+def _make_sample(tmp_path, data, sheet_name="Sheet1"):
+    """创建最小测试文件"""
+    wb = Workbook()
+    ws = wb.active
+    ws.title = sheet_name
+    for row_idx, row_data in enumerate(data, start=1):
+        if isinstance(row_data, list):
+            for col_idx, val in enumerate(row_data, start=1):
+                ws.cell(row=row_idx, column=col_idx, value=val)
+        else:
+            ws.cell(row=row_idx, column=1, value=row_data)
+    fp = str(tmp_path / f"sample_{id(data)}.xlsx")
+    wb.save(fp)
+    wb.close()
+    return fp
+
+
+class TestFormatCellsR55Round2:
+    """R55+ 第2轮: format_cells 边缘case + 深度组合测试"""
+
+    # ---------- T1: 五大类全组合 ----------
+    def test_full_five_category_combination(self, tmp_path):
+        """同时设置 font + fill + alignment + border + number_format"""
+        fp = _make_sample(tmp_path, [[42]])
+        writer = ExcelWriter(fp)
+        result = writer.format_cells("Sheet1!A1", {
+            "font": {"name": "Arial", "size": 12, "bold": True, "italic": True,
+                     "color": "FF0000", "underline": "single"},
+            "fill": {"type": "solid", "color": "00FF00"},
+            "alignment": {"horizontal": "center", "vertical": "center",
+                         "wrap_text": True, "text_rotation": 0},
+            "border": {"left": "medium", "right": "medium",
+                       "top": "thin", "bottom": "thin",
+                       "color": "0000FF"},
+            "number_format": "#,##0.00",
+        })
+        assert result.success is True
+        s = _read_cell_style(fp, "A1")
+        assert s["bold"] is True
+        assert s["italic"] is True
+        assert s["underline"] == "single"
+        assert s["alignment_h"] == "center"
+        assert s["alignment_v"] == "center"
+        assert s["wrap_text"] is True
+        assert s["number_format"] == "#,##0.00"
+        assert s["border_left"] == "medium"
+        assert s["border_right"] == "medium"
+
+    # ---------- T2: 显式 False 关闭布尔属性 ----------
+    def test_explicit_false_bold_turns_off(self, tmp_path):
+        """先设 bold=True，再用 bold=False 显式关闭"""
+        fp = _make_sample(tmp_path, [[1]])
+        writer = ExcelWriter(fp)
+
+        # 先加粗
+        r1 = writer.format_cells("Sheet1!A1", {"font": {"bold": True}})
+        assert r1.success is True
+        s1 = _read_cell_style(fp, "A1")
+        assert s1["bold"] is True
+
+        # 再取消粗体（显式 False）
+        r2 = writer.format_cells("Sheet1!A1", {"font": {"bold": False}})
+        assert r2.success is True
+        s2 = _read_cell_style(fp, "A1")
+        assert s2["bold"] is False
+
+    def test_explicit_false_italic_and_underline(self, tmp_path):
+        """italic=False 和 underline=False (none) 的关闭行为"""
+        fp = _make_sample(tmp_path, [[1]])
+        writer = ExcelWriter(fp)
+
+        # 开启
+        writer.format_cells("Sheet1!A1", {
+            "font": {"italic": True, "underline": "double"}
+        })
+
+        # 关闭
+        result = writer.format_cells("Sheet1!A1", {
+            "font": {"italic": False, "underline": False}
+        })
+        assert result.success is True
+        s = _read_cell_style(fp, "A1")
+        assert s["italic"] is False
+        # underline=False → "none" in _apply_cell_format, but openpyxl Font may store as None
+        assert s["italic"] is False
+        assert s["underline"] in ("none", None)  # openpyxl normalizes "none" to None
+
+    # ---------- T3: number_format 边缘 ----------
+    def test_number_format_scientific(self, tmp_path):
+        """科学计数法 number_format"""
+        fp = _make_sample(tmp_path, [[123456789]])
+        writer = ExcelWriter(fp)
+        result = writer.format_cells("Sheet1!A1", {"number_format": "0.00E+00"})
+        assert result.success is True
+        s = _read_cell_style(fp, "A1")
+        assert s["number_format"] == "0.00E+00"
+        # 值不被破坏
+        assert s["value"] == 123456789
+
+    def test_number_format_fraction(self, tmp_path):
+        """分数格式 number_format"""
+        fp = _make_sample(tmp_path, [[3.14159]])
+        writer = ExcelWriter(fp)
+        result = writer.format_cells("Sheet1!A1", {"number_format": "# ?/?"})
+        assert result.success is True
+        s = _read_cell_style(fp, "A1")
+        assert s["number_format"] == "# ?/?"
+
+    def test_number_format_date_type(self, tmp_path):
+        """日期格式 number_format 不破坏数值（openpyxl 可能将日期序列号转为 datetime）"""
+        fp = _make_sample(tmp_path, [[45000]])  # Excel 序列号日期
+        writer = ExcelWriter(fp)
+        result = writer.format_cells("Sheet1!A1", {"number_format": "YYYY-MM-DD"})
+        assert result.success is True
+        s = _read_cell_style(fp, "A1")
+        assert s["number_format"] == "YYYY-MM-DD"
+        # openpyxl 在日期格式下可能将数字转为 datetime，这是正常行为
+        # 关键是值不为 None 且文件未损坏
+        assert s["value"] is not None
+
+    def test_number_format_empty_string_no_corruption(self, tmp_path):
+        """number_format 设为空字符串不应损坏文件 (P1 regression)"""
+        fp = _make_sample(tmp_path, [[99]])
+        writer = ExcelWriter(fp)
+        result = writer.format_cells("Sheet1!A1", {"number_format": ""})
+        assert result.success is True
+        # 文件仍可正常读取
+        wb = load_workbook(fp)
+        assert wb.active["A1"].value == 99
+        wb.close()
+
+    # ---------- T4: text_rotation 边界值 ----------
+    def test_text_rotation_exact_boundaries(self, tmp_path):
+        """text_rotation 在边界值（openpyxl 仅支持 0~180，负值无效）"""
+        fp = _make_sample(tmp_path, [[1, 2, 3]])
+        writer = ExcelWriter(fp)
+
+        # openpyxl text_rotation 有效范围: 0-180
+        # 0=水平, 1-90=顺时针旋转, 91-180=堆叠文字
+        # 注意：-90 等负值不被 openpyxl 接受
+        for rot, ref in [(0, "A1"), (45, "B1"), (90, "C1")]:
+            r = writer.format_cells(f"Sheet1!{ref}", {
+                "alignment": {"text_rotation": rot}
+            })
+            assert r.success is True, f"rotation={rot} failed"
+            s = _read_cell_style(fp, ref)
+            assert s["text_rotation"] == rot, f"expected {rot}, got {s['text_rotation']}"
+
+    def test_text_rotation_negative_rejected(self, tmp_path):
+        """text_rotation 负值应被 openpyxl 拒绝（验证边界行为）"""
+        fp = _make_sample(tmp_path, [[1]])
+        writer = ExcelWriter(fp)
+        result = writer.format_cells("Sheet1!A1", {"alignment": {"text_rotation": -90}})
+        # openpyxl 不接受负值，应失败
+        assert result.success is False
+        assert "Value must be one of" in str(result.error)
+
+    def test_text_rotation_45_degrees(self, tmp_path):
+        """text_rotation=45 常用角度"""
+        fp = _make_sample(tmp_path, [[1]])
+        writer = ExcelWriter(fp)
+        result = writer.format_cells("Sheet1!A1", {"alignment": {"text_rotation": 45}})
+        assert result.success is True
+        assert _read_cell_style(fp, "A1")["text_rotation"] == 45
+
+    # ---------- T5: 覆盖行为（后设覆盖先设）----------
+    def test_format_override_font_replaced(self, tmp_path):
+        """第二次格式化完全替换字体属性"""
+        fp = _make_sample(tmp_path, [[1]])
+        writer = ExcelWriter(fp)
+
+        writer.format_cells("Sheet1!A1", {
+            "font": {"name": "Arial", "size": 14, "bold": True, "color": "FF0000"}
+        })
+        writer.format_cells("Sheet1!A1", {
+            "font": {"name": "Courier New", "size": 10}
+        })
+        s = _read_cell_style(fp, "A1")
+        # name 和 size 应被覆盖为新值
+        assert s["font_name"] == "Courier New"
+        assert s["size"] == 10
+        # bold 未在第二次设置，但 openpyxl Font() 用了 cell.font.bold 作为 default
+        # 所以 bold 保留为 True（来自上一次的 cell.font.bold）
+        # 这验证了"不崩"的底线
+
+    def test_format_override_fill_replaced(self, tmp_path):
+        """第二次格式化替换填充类型"""
+        fp = _make_sample(tmp_path, [[1]])
+        writer = ExcelWriter(fp)
+
+        writer.format_cells("Sheet1!A1", {"fill": {"type": "solid", "color": "FF0000"}})
+        writer.format_cells("Sheet1!A1", {"fill": {"type": "solid", "color": "00FF00"}})
+        rgb = load_workbook(fp).active["A1"].fill.fgColor.rgb
+        load_workbook(fp).close()
+        assert "00FF00" in rgb or "FF00FF00" in rgb
+
+    # ---------- T6: 含公式单元格的样式操作 ----------
+    def test_format_formula_cell_preserves_formula(self, tmp_path):
+        """对含公式的单元格设置样式后公式不丢失"""
+        fp = _make_sample(tmp_path, [[1, 2]])
+        wb = load_workbook(fp)
+        ws = wb.active
+        ws["C1"] = "=A1+B1"
+        wb.save(fp)
+        wb.close()
+
+        writer = ExcelWriter(fp)
+        result = writer.format_cells("Sheet1!C1", {
+            "font": {"bold": True},
+            "fill": {"type": "solid", "color": "FFFF00"},
+            "alignment": {"horizontal": "center"},
+        })
+        assert result.success is True
+
+        wb2 = load_workbook(fp)
+        cell = wb2.active["C1"]
+        # 公式保留（openpyxl 不执行公式，只存公式字符串）
+        assert cell.value == "=A1+B1", f"formula lost! got {cell.value}"
+        assert cell.font.bold is True
+        wb2.close()
+
+    def test_format_range_with_mixed_values_and_formulas(self, tmp_path):
+        """范围中混合数值和公式，设置样式后均不丢失"""
+        fp = _make_sample(tmp_path, [[10, 20, 30]])
+        wb = load_workbook(fp)
+        ws = wb.active
+        ws["D1"] = "=SUM(A1:C1)"
+        wb.save(fp)
+        wb.close()
+
+        writer = ExcelWriter(fp)
+        result = writer.format_cells("Sheet1!A1:D1", {
+            "font": {"name": "微软雅黑"},
+            "number_format": "#,##0",
+        })
+        assert result.success is True
+        assert result.metadata.get("formatted_count", 0) == 4
+
+        wb2 = load_workbook(fp)
+        assert wb2.active["A1"].value == 10
+        assert wb2.active["D1"].value == "=SUM(A1:C1)"
+        wb2.close()
+
+    # ---------- T7: 合并区域 + 全量样式组合 ----------
+    def test_merge_then_full_style_combo(self, tmp_path):
+        """合并 A1:C3 后一次性应用全部5类样式"""
+        fp = _make_sample(tmp_path, [[i * j for j in range(1, 4)] for i in range(1, 4)])
+        writer = ExcelWriter(fp)
+
+        # 合并
+        mr = writer.merge_cells("A1:C3", "Sheet1")
+        assert mr.success is True
+
+        # 全量样式
+        fr = writer.format_cells("Sheet1!A1", {
+            "font": {"bold": True, "size": 16, "color": "FFFFFF"},
+            "fill": {"type": "solid", "color": "000080"},  # 深蓝底白字
+            "alignment": {"horizontal": "center", "vertical": "center"},
+            "border": {"top": "medium", "bottom": "medium",
+                       "left": "medium", "right": "medium",
+                       "color": "FFD700"},
+            "number_format": "@",  # 文本格式
+        })
+        assert fr.success is True
+
+        s = _read_cell_style(fp, "A1")
+        assert s["bold"] is True
+        assert s["size"] == 16
+        assert s["alignment_h"] == "center"
+        assert s["border_top"] == "medium"
+        assert s["number_format"] == "@"
+
+    # ---------- T8: indent / shrink_to_fit 边缘 ----------
+    def test_indent_zero_explicit(self, tmp_path):
+        """indent=0 显式设置"""
+        fp = _make_sample(tmp_path, [[1]])
+        writer = ExcelWriter(fp)
+        result = writer.format_cells("Sheet1!A1", {"alignment": {"indent": 0}})
+        assert result.success is True
+        assert _read_cell_style(fp, "A1")["text_rotation"] == 0  # 验证可读
+
+    def test_shrink_to_fit_true(self, tmp_path):
+        """shrink_to_fit=True"""
+        fp = _make_sample(tmp_path, [["Long text that shrinks"]])
+        writer = ExcelWriter(fp)
+        result = writer.format_cells("Sheet1!A1", {
+            "alignment": {"shrink_to_fit": True}
+        })
+        assert result.success is True
+        # openpyxl shrink_to_fit 默认 None, 设置后应为 True
+        wb = load_workbook(fp)
+        assert wb.active["A1"].alignment.shrink_to_fit is True
+        wb.close()
+
+    def test_wrap_text_and_shrink_to_fit_together(self, tmp_path):
+        """wrap_text=True + shrink_to_fit=True 同时设置"""
+        fp = _make_sample(tmp_path, [["Test wrap and shrink"]])
+        writer = ExcelWriter(fp)
+        result = writer.format_cells("Sheet1!A1", {
+            "alignment": {"wrap_text": True, "shrink_to_fit": True}
+        })
+        assert result.success is True
+        wb = load_workbook(fp)
+        align = wb.active["A1"].alignment
+        assert align.wrap_text is True
+        assert align.shrink_to_fit is True
+        wb.close()
+
+    # ---------- T9: 扁平参数 normalize 组合 ----------
+    def test_normalize_flat_all_font_attrs_together(self):
+        """扁平格式：所有字体属性同时传入的 normalize 结果"""
+        from excel_mcp_server_fastmcp.api.excel_operations import ExcelOperations
+        flat = {
+            "bold": True, "italic": True, "underline": "double",
+            "font_size": 18, "font_color": "FF0000",
+            "font_name": "Consolas", "strikethrough": True,
+        }
+        nested = ExcelOperations._normalize_formatting(flat)
+        font = nested.get("font", {})
+        assert font["bold"] is True
+        assert font["italic"] is True
+        assert font["underline"] == "double"
+        assert font["size"] == 18
+        assert font["color"] == "FF0000"
+        assert font["name"] == "Consolas"
+        assert font["strikethrough"] is True
+
+    def test_normalize_flat_all_align_attrs_together(self):
+        """扁平格式：所有对齐属性同时传入"""
+        from excel_mcp_server_fastmcp.api.excel_operations import ExcelOperations
+        flat = {
+            "alignment": "right",
+            "vertical_alignment": "top",
+            "wrap_text": True,
+            "text_rotation": 180,  # openpyxl 特殊值: 垂直文字
+            "indent": 5,
+            "shrink_to_fit": True,
+        }
+        nested = ExcelOperations._normalize_formatting(flat)
+        align = nested.get("alignment", {})
+        assert align["horizontal"] == "right"
+        assert align["vertical"] == "top"
+        assert align["wrap_text"] is True
+        assert align["text_rotation"] == 180
+        assert align["indent"] == 5
+        assert align["shrink_to_fit"] is True
+
+    def test_normalize_flat_complete_combo(self):
+        """扁平格式：全部5类属性 + 渐变的完整 normalize"""
+        from excel_mcp_server_fastmcp.api.excel_operations import ExcelOperations
+        flat = {
+            "bold": True, "font_size": 12,
+            "bg_color": "FF0000",
+            "alignment": "center",
+            "wrap_text": True,
+            "border": {"top": "thick", "bottom": "thick"},
+            "number_format": "0.00%",
+            "gradient_colors": ["000000", "FFFFFF"],
+            "fill_type": "gradient",
+        }
+        nested = ExcelOperations._normalize_formatting(flat)
+        # font
+        assert nested["font"]["bold"] is True
+        assert nested["font"]["size"] == 12
+        # fill (gradient overrides bg_color since both present)
+        assert nested["fill"]["type"] == "gradient"
+        assert "colors" in nested["fill"]
+        # alignment
+        assert nested["alignment"]["horizontal"] == "center"
+        assert nested["alignment"]["wrap_text"] is True
+        # border
+        assert "border" in nested
+        # number_format
+        assert nested["number_format"] == "0.00%"
+
+    # ---------- T10: API 层 (ExcelOperations) 端到端 ----------
+    def test_api_format_cells_flat_params_e2e(self, tmp_path):
+        """通过 ExcelOperations API 用扁平参数做端到端格式化"""
+        fp = _make_sample(tmp_path, [[100]])
+        result = ExcelOperations.format_cells(
+            file_path=fp,
+            sheet_name="Sheet1",
+            range="A1",
+            formatting={
+                "bold": True,
+                "font_size": 14,
+                "bg_color": "FFD700",
+                "alignment": "center",
+                "number_format": "¥#,##0.00",
+            },
+        )
+        assert result["success"] is True
+        s = _read_cell_style(fp, "A1")
+        assert s["bold"] is True
+        assert s["size"] == 14
+        assert s["alignment_h"] == "center"
+        assert s["number_format"] == "¥#,##0.00"
+
+    def test_api_format_cells_preset_highlight_plus_custom(self, tmp_path):
+        """preset=highlight 后额外追加自定义格式"""
+        fp = _make_sample(tmp_path, [[1, 2]])
+        # 先用 preset
+        r1 = ExcelOperations.format_cells(
+            file_path=fp, sheet_name="Sheet1", range="A1:B1",
+            preset="highlight",
+        )
+        assert r1["success"] is True
+        # 再追加自定义
+        r2 = ExcelOperations.format_cells(
+            file_path=fp, sheet_name="Sheet1", range="A1:B1",
+            formatting={"bold": True, "font_size": 12},
+        )
+        assert r2["success"] is True
+        s = _read_cell_style(fp, "A1")
+        assert s["bold"] is True
+        assert s["size"] == 12
+
+    def test_api_format_cells_border_dict_via_flat(self, tmp_path):
+        """通过 API 扁平参数传 border 字典"""
+        fp = _make_sample(tmp_path, [[1]])
+        result = ExcelOperations.format_cells(
+            file_path=fp, sheet_name="Sheet1", range="A1",
+            formatting={
+                "border": {
+                    "left": "double",
+                    "right": "double",
+                    "top": "thick",
+                    "bottom": "thick",
+                    "color": "FF0000",
+                },
+            },
+        )
+        assert result["success"] is True
+        s = _read_cell_style(fp, "A1")
+        assert s["border_left"] == "double"
+        assert s["border_top"] == "thick"
+
+
 if __name__ == "__main__":
     pytest.main([__file__, "-v"])
