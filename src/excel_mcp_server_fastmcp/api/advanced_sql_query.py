@@ -1024,19 +1024,21 @@ class AdvancedSQLQueryEngine:
                     msg += f"\n🔧 建议修复SQL: {suggested_fix}"
                 return {"success": False, "message": msg, "data": [], "query_info": qi}
             except Exception as e:
+                raw_msg = str(e)
                 return {
                     "success": False,
-                    "message": f"SQL执行错误: {str(e)}",
+                    "message": f"SQL执行错误: {self._sanitize_error_message(raw_msg)}",
                     "data": [],
-                    "query_info": {"error_type": "execution_error", "details": str(e)},
+                    "query_info": {"error_type": "execution_error", "details": self._sanitize_error_message(raw_msg)},
                 }
 
         except Exception as e:
+            raw_msg = str(e)
             return {
                 "success": False,
-                "message": f"查询引擎错误: {str(e)}",
+                "message": f"查询引擎错误: {self._sanitize_error_message(raw_msg)}",
                 "data": [],
-                "query_info": {"error_type": "engine_error", "details": str(e)},
+                "query_info": {"error_type": "engine_error", "details": self._sanitize_error_message(raw_msg)},
             }
 
     def _resolve_cross_file_references(
@@ -1360,8 +1362,14 @@ class AdvancedSQLQueryEngine:
                 except Exception:
                     pass
 
-            # 清理特殊字符,但保持中文和括号(Excel列名如"刷新时间(小时)")
-            clean_col = re.sub(r"[^\w\u4e00-\u9fff\s()]", "_", clean_col)
+            # 清理特殊字符,但保持多语言文字和括号(Excel列名如"刷新时间(小时)")
+            # 支持范围: ASCII word chars + CJK中文 + 日文(平假名/片假名) + 韩文 + 拉丁语补充 + 括号 + 空格
+            # Emoji 和其他 Unicode 符号也保留（pandas/openpyxl 均支持）
+            clean_col = re.sub(
+                r"[^\w\u4e00-\u9fff\u3040-\u309f\u30a0-\u30ff\uac00-\ud7af"
+                r"\u00c0-\u024f\u1e00-\u1eff\s()\U0001f300-\U0001f9ff]",
+                "_", clean_col
+            )
             clean_col = re.sub(r"\s+", "_", clean_col)
 
             # 确保列名不为空且不以数字开头
@@ -1864,7 +1872,7 @@ class AdvancedSQLQueryEngine:
                         errors.append(f"语句{idx + 1}: {result.get('message', '未知错误')[:80]}")
 
             except Exception as e:
-                errors.append(f"语句{idx + 1}异常: {str(e)[:100]}")
+                errors.append(f"语句{idx + 1}异常: {self._sanitize_error_message(str(e))[:100]}")
 
         _elapsed = (time.time() - _start) * 1000
 
@@ -2335,7 +2343,7 @@ class AdvancedSQLQueryEngine:
             return {"valid": True}
 
         except Exception as e:
-            return {"valid": False, "error": f"SQL验证失败: {str(e)}"}
+            return {"valid": False, "error": f"SQL验证失败: {self._sanitize_error_message(str(e))}"}
 
     def _replace_cn_columns_in_sql(self, sql: str, worksheets_data: dict[str, pd.DataFrame]) -> str:
         """
@@ -4444,7 +4452,7 @@ class AdvancedSQLQueryEngine:
                     result_data[alias_name] = df[original_expr.name]
                     ordered_columns.append(alias_name)
                 else:
-                    raise ValueError(f"处理SELECT表达式失败: {e}")
+                    raise ValueError(f"处理SELECT表达式失败: {self._sanitize_error_message(str(e))}")
 
         # 构建结果DataFrame,保持SELECT顺序
         if result_data:
@@ -5291,7 +5299,7 @@ class AdvancedSQLQueryEngine:
                 except Exception as e:
                     raise StructuredSQLError(
                         "join_error",
-                        f"JOIN右表子查询执行失败: {e}",
+                        f"JOIN右表子查询执行失败: {self._sanitize_error_message(str(e))}",
                         hint="请检查JOIN右表子查询的SQL语法.",
                     )
                 # Skip normal table lookup - go directly to column rename and merge
@@ -6025,6 +6033,45 @@ class AdvancedSQLQueryEngine:
         # 再转义单引号
         escaped = escaped.replace("'", "\\'")
         return escaped
+
+    @staticmethod
+    def _sanitize_error_message(error_msg: str) -> str:
+        """清理异常消息中的敏感内部信息（文件路径、栈帧等）。
+
+        防止通过错误消息泄露服务器内部路径、模块结构等信息。
+        保留用户可理解的错误描述，移除绝对路径。
+
+        Args:
+            error_msg: 原始异常消息
+
+        Returns:
+            清理后的安全消息
+        """
+        if not error_msg:
+            return error_msg
+
+        sanitized = error_msg
+        # 移除常见绝对路径模式 (Unix)
+        # 匹配 /root/, /home/, /usr/, /opt/, /app/, /var/, /etc/ 开头的路径
+        path_pattern = r'(?:(?:^|(?<=[^a-zA-Z0-9_./-]))(?:/?(?:root|home|usr|opt|app|var|etc|tmp|src|lib|local|workspace|project|build|dist|\.hermes|\.cache)[/][^\s,"\']{0,300}))'
+        sanitized = re.sub(path_pattern, '<path>', sanitized)
+
+        # 移除 Python 模块路径格式 (package.module.function)
+        # 如 "excel_mcp_server_fastmcp.api.advanced_sql_query.method_name"
+        module_path_pattern = r'[a-z_][a-z0-9_]*(?:\.[a-z_][a-z0-9_]*){2,}(?:\.[A-Z][a-zA-Z]*)?'
+        # 只替换看起来像完整模块路径的（至少3段且含已知前缀）
+        known_prefixes = ('excel_mcp', 'sqlglot', 'pandas', 'numpy', 'openpyxl', 'calamine')
+        def _replace_module_path(m):
+            text = m.group(0)
+            if any(text.startswith(p) for p in known_prefixes):
+                return '<module>'
+            return text
+        sanitized = re.sub(module_path_pattern, _replace_module_path, sanitized)
+
+        # 移除行号引用 "line XXX" 或 ":line XXX"
+        sanitized = re.sub(r':?\s*line\s+\d+', ':<line>', sanitized)
+
+        return sanitized
 
     def _in_to_pandas(self, in_expr: exp.In, df, negate: bool = False) -> str:
         """将IN/NOT IN条件转换为pandas表达式(支持子查询和值列表)
