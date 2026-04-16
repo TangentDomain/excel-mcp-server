@@ -1533,6 +1533,20 @@ class ExcelOperations:
             return cls._format_error_result(error_msg)
 
     @staticmethod
+    def _deep_merge(base: dict, override: dict) -> dict:
+        """深度合并两个字典，override 的值优先。
+
+        对于嵌套字典，递归合并；对于非字典值，override 直接覆盖。
+        """
+        result = base.copy()
+        for key, value in override.items():
+            if key in result and isinstance(result[key], dict) and isinstance(value, dict):
+                result[key] = ExcelOperations._deep_merge(result[key], value)
+            else:
+                result[key] = value
+        return result
+
+    @staticmethod
     def _normalize_formatting(formatting: dict | None) -> dict:
         """将LLM友好的扁平格式转换为Writer层需要的嵌套格式。
 
@@ -1638,6 +1652,17 @@ class ExcelOperations:
                     nested["border"] = {"style": value}
                 else:
                     nested["border"] = value
+            elif key == "border_style" and value is not None:
+                # border_style 简写：字符串值应用到四边
+                if isinstance(value, str):
+                    nested["border"] = {
+                        "top": value,
+                        "bottom": value,
+                        "left": value,
+                        "right": value,
+                    }
+                else:
+                    nested["border"] = value
             else:
                 # 未知键直接透传（保持向后兼容）
                 nested[key] = value
@@ -1676,7 +1701,7 @@ class ExcelOperations:
 
         try:
             writer = ExcelWriter(file_path)
-            # 处理预设格式
+            # 处理预设格式（与用户 formatting 深度合并，用户值优先）
             if preset:
                 preset_formats = {
                     "title": {
@@ -1691,7 +1716,13 @@ class ExcelOperations:
                     "highlight": {"fill": {"color": "FFFF00"}},
                     "currency": {"number_format": "¥#,##0.00"},
                 }
-                formatting = preset_formats.get(preset, formatting or {})
+                _preset_fmt = preset_formats.get(preset, {})
+                if _preset_fmt and isinstance(formatting, dict):
+                    # 先将用户扁平格式转为嵌套格式，再深度合并（用户值优先）
+                    _normalized_user = cls._normalize_formatting(formatting)
+                    formatting = cls._deep_merge(_preset_fmt, _normalized_user)
+                else:
+                    formatting = _preset_fmt or (formatting or {})
 
             # 扁平格式 → 嵌套格式转换（LLM友好API用扁平格式，Writer层需要嵌套格式）
             # 扁平: {"bold": True, "alignment": "center", "bg_color": "FF0"}

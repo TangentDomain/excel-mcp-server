@@ -1592,8 +1592,12 @@ class ExcelWriter:
 
                 _colors = fill_config.get("colors", ["FFFFFF", "D9D9D9"])
                 _n = len(_colors)
+                # openpyxl GradientFill 仅支持 linear/path，radial 映射为 path
+                _grad_type = fill_config.get("gradient_type", "linear")
+                if _grad_type == "radial":
+                    _grad_type = "path"
                 cell.fill = GradientFill(
-                    type=fill_config.get("gradient_type", "linear"),
+                    type=_grad_type,
                     degree=fill_config.get("degree", 0),
                     stop=[Stop(color=Clr(c), position=i / (_n - 1) if _n > 1 else 0) for i, c in enumerate(_colors)],
                 )
