@@ -5130,6 +5130,10 @@ class AdvancedSQLQueryEngine:
             return pd.Series([val] * len(df), index=df.index)
         elif isinstance(expr, (exp.Add, exp.Sub, exp.Mul, exp.Div)):
             return self._evaluate_math_expression(expr, df)
+        elif isinstance(expr, exp.Neg):
+            # Fix(R52-P3-EDGE-01): 快速路径支持负数字面量
+            inner = self._expr_to_series(expr.this, df)
+            return -inner
         elif isinstance(expr, exp.DPipe):
             # || 字符串拼接操作符 (SQL标准/PostgreSQL风格)
             left = self._expr_to_series(expr.this, df).astype(str)
@@ -6484,6 +6488,19 @@ class AdvancedSQLQueryEngine:
             inner_expr = expr.this
             return self._expression_to_value(inner_expr, df)
 
+        elif isinstance(expr, exp.Neg):
+            # Fix(R52-P3-EDGE-01): 支持负数字面量（如 IN (1, -1, 2)）
+            inner_val = self._expression_to_value(expr.this, df)
+            if isinstance(inner_val, str):
+                # 字符串形式的负数（来自列引用等）
+                try:
+                    return -float(inner_val) if '.' in inner_val else -int(inner_val)
+                except (ValueError, TypeError):
+                    return f"(-{inner_val})"
+            elif isinstance(inner_val, (int, float)):
+                return -inner_val
+            return None
+
         else:
             raise ValueError(
                 f"不支持的表达式类型: {type(expr).__name__}。"
@@ -6854,6 +6871,16 @@ class AdvancedSQLQueryEngine:
 
         elif isinstance(expr, (exp.Add, exp.Sub, exp.Mul, exp.Div)):
             return self._evaluate_math_for_row(expr, row)
+
+        elif isinstance(expr, exp.Neg):
+            # Fix(R52-P3-EDGE-01): 支持负数字面量（如 WHERE col = -1）
+            inner = self._get_row_value(expr.this, row)
+            if inner is None:
+                return None
+            try:
+                return -inner
+            except (TypeError, ValueError):
+                return None
 
         elif self._is_string_function(expr):
             return self._evaluate_string_function_for_row(expr, row)
