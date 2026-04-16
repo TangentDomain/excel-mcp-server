@@ -15,7 +15,7 @@ from pathlib import Path
 
 project_root = Path(__file__).parent.parent
 sys.path.insert(0, str(project_root))
-from src.excel_mcp_server_fastmcp.api.advanced_sql_query import AdvancedSQLQueryEngine
+from excel_mcp_server_fastmcp.api.advanced_sql_query import AdvancedSQLQueryEngine
 
 
 @pytest.fixture

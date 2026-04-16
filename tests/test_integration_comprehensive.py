@@ -14,7 +14,7 @@ from pathlib import Path
 from openpyxl import Workbook
 from openpyxl.utils import get_column_letter
 
-from src.excel_mcp_server_fastmcp.api.excel_operations import ExcelOperations
+from excel_mcp_server_fastmcp.api.excel_operations import ExcelOperations
 
 
 class TestIntegrationComprehensive:

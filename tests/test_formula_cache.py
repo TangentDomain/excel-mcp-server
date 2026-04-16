@@ -14,7 +14,7 @@ import os
 from unittest.mock import patch, MagicMock
 from openpyxl import Workbook
 
-from src.excel_mcp_server_fastmcp.utils.formula_cache import (
+from excel_mcp_server_fastmcp.utils.formula_cache import (
     FormulaCalculationCache,
     CacheEntry,
     WorkbookCache,

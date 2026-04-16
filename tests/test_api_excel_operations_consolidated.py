@@ -29,8 +29,8 @@ project_root = Path(__file__).parent.parent
 sys.path.insert(0, str(project_root))
 
 # 导入被测试的模块
-from src.excel_mcp_server_fastmcp.api.excel_operations import ExcelOperations
-from src.excel_mcp_server_fastmcp.models.types import OperationResult
+from excel_mcp_server_fastmcp.api.excel_operations import ExcelOperations
+from excel_mcp_server_fastmcp.models.types import OperationResult
 
 class TestExcelOperationsBasic:
     """基础ExcelOperations API测试 - 原test_api_excel_operations.py"""
@@ -247,7 +247,7 @@ class TestExcelOperationsBasic:
     def test_memory_error(self, test_excel_file):
         """测试内存不足的情况"""
         # 模拟文件读取时内存不足
-        with unittest.mock.patch('src.excel_mcp_server_fastmcp.core.excel_reader.ExcelReader.get_range', side_effect=MemoryError("Memory error")):
+        with unittest.mock.patch('excel_mcp_server_fastmcp.core.excel_reader.ExcelReader.get_range', side_effect=MemoryError("Memory error")):
             result = ExcelOperations.get_range(test_excel_file, "TestSheet!A1:B1")
             assert result['success'] is False
 

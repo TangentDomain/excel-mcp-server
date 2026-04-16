@@ -10,14 +10,14 @@ import os
 from unittest.mock import patch, MagicMock
 from datetime import datetime
 
-from src.excel_mcp_server_fastmcp.server import (
+from excel_mcp_server_fastmcp.server import (
     OperationLogger,
     excel_create_backup,
     excel_restore_backup,
     excel_list_backups,
 )
-from src.excel_mcp_server_fastmcp.utils.validators import ExcelValidator, DataValidationError
-from src.excel_mcp_server_fastmcp.api.excel_operations import ExcelOperations
+from excel_mcp_server_fastmcp.utils.validators import ExcelValidator, DataValidationError
+from excel_mcp_server_fastmcp.api.excel_operations import ExcelOperations
 
 class TestOperationLogger:
     """测试操作日志记录器"""

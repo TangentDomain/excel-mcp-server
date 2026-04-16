@@ -10,7 +10,7 @@ Tests for previously untested tools:
 
 import pytest
 import os
-from src.excel_mcp_server_fastmcp.server import (
+from excel_mcp_server_fastmcp.server import (
     excel_compare_files,
     excel_compare_sheets,
     excel_export_to_csv,
