@@ -30,7 +30,7 @@ from excel_mcp_server_fastmcp.api.advanced_sql_query import (
 # ============================================================
 # 测试结果记录
 # ============================================================
-class TestResult:
+class _TestResult:
     def __init__(self):
         self.results = []
         self.passed = 0
@@ -51,7 +51,7 @@ class TestResult:
         print(f"\n  📊 小计: {self.passed}/{total} ({rate:.1f}%)")
         return self.passed, self.failed
 
-tr = TestResult()
+tr = _TestResult()
 
 # ============================================================
 # 准备测试文件

@@ -191,7 +191,7 @@ def build_test_file():
 # ============================================================
 
 
-class TestResult:
+class _TestResult:
     def __init__(
         self,
         name,
@@ -306,49 +306,49 @@ def run_tests(tests, file_path):
 def get_group_a():
     """数据分析视角：补齐窗口函数家族"""
     return [
-        TestResult(
+        _TestResult(
             "A1: FIRST_VALUE 每个稀有度最贵装备",
             "窗口函数",
             "SELECT DISTINCT Category, FIRST_VALUE(Name) OVER (PARTITION BY Category ORDER BY Price DESC) as TopItem FROM 装备",
             expected_check=lambda r: len(r.get("data", [])) >= 4 and all("TopItem" in str(d) for d in r["data"]),
         ),
-        TestResult(
+        _TestResult(
             "A2: LAST_VALUE 每个类别最便宜装备",
             "窗口函数",
             "SELECT ID, Name, Category, Price, LAST_VALUE(Name) OVER (PARTITION BY Category ORDER BY Price ROWS BETWEEN UNBOUNDED PRECEDING AND UNBOUNDED FOLLOWING) as Cheapest FROM 装备 ORDER BY Category LIMIT 10",
             expected_check=lambda r: r["success"] and len(r.get("data", [])) > 0,
         ),
-        TestResult(
+        _TestResult(
             "A3: NTILE 将装备按价格分4桶",
             "窗口函数",
             "SELECT ID, Name, Price, NTILE(4) OVER (ORDER BY Price) as PriceQuartile FROM 装备 ORDER BY Price LIMIT 15",
             expected_check=lambda r: r["success"] and len(r.get("data", [])) >= 14,
         ),
-        TestResult(
+        _TestResult(
             "A4: NTILE PARTITION BY 类别内分桶",
             "窗口函数",
             "SELECT ID, Name, Category, Price, NTILE(3) OVER (PARTITION BY Category ORDER BY Price) as CatQuartile FROM 装备 ORDER BY Category, Price LIMIT 15",
             expected_check=lambda r: r["success"] and len(r.get("data", [])) >= 14,
         ),
-        TestResult(
+        _TestResult(
             "A5: PERCENT_RANK 价格百分位排名",
             "窗口函数",
             "SELECT ID, Name, Price, ROUND(PERCENT_RANK() OVER (ORDER BY Price), 4) as PctRank FROM 装备 ORDER BY Price LIMIT 10",
             expected_check=lambda r: r["success"] and len(r.get("data", [])) >= 9,
         ),
-        TestResult(
+        _TestResult(
             "A6: PERCENT_RANK PARTITION BY 类别内百分位",
             "窗口函数",
             "SELECT ID, Name, Category, Price, ROUND(PERCENT_RANK() OVER (PARTITION BY Category ORDER BY Price), 4) as CatPctRank FROM 装备 WHERE Category IN ('Weapon', 'Armor') ORDER BY Category, Price LIMIT 12",
             expected_check=lambda r: r["success"] and len(r.get("data", [])) >= 11,
         ),
-        TestResult(
+        _TestResult(
             "A7: CUME_DIST 累积分布",
             "窗口函数",
             "SELECT ID, Name, Price, ROUND(CUME_DIST() OVER (ORDER BY Price), 4) as CumDist FROM 装备 ORDER BY Price LIMIT 8",
             expected_check=lambda r: r["success"] and len(r.get("data", [])) >= 7,
         ),
-        TestResult(
+        _TestResult(
             "A8: NTH_VALUE 取每组第N个值",
             "窗口函数",
             "SELECT ID, Name, Category, Price, NTH_VALUE(Name, 2) OVER (PARTITION BY Category ORDER BY Price ROWS BETWEEN UNBOUNDED PRECEDING AND UNBOUNDED FOLLOWING) as SecondInCat FROM 装备 WHERE Category IN ('Weapon', 'Accessory') ORDER BY Category, Price LIMIT 10",
@@ -365,37 +365,37 @@ def get_group_a():
 def get_group_b():
     """数据分析视角：去重+排序联合操作"""
     return [
-        TestResult(
+        _TestResult(
             "B1: DISTINCT 基础去重稀有度列表",
             "DISTINCT",
             "SELECT DISTINCT Rarity FROM 装备 ORDER BY Rarity",
             expected_check=lambda r: r["success"] and len(r.get("data", [])) == 4,
         ),
-        TestResult(
+        _TestResult(
             "B2: DISTINCT 多列去重",
             "DISTINCT",
             "SELECT DISTINCT Rarity, Category FROM 装备 ORDER BY Rarity, Category",
             expected_check=lambda r: r["success"] and len(r.get("data", [])) >= 8,
         ),
-        TestResult(
+        _TestResult(
             "B3: DISTINCT COUNT 去重计数",
             "DISTINCT",
             "SELECT COUNT(DISTINCT Category) as UniqueCategories FROM 装备",
             expected_check=lambda r: r["success"] and len(r.get("data", [])) > 0,
         ),
-        TestResult(
+        _TestResult(
             "B4: DISTINCT ON (PostgreSQL风格) — 兼容性测试",
             "DISTINCT",
             "SELECT DISTINCT ON (Rarity) Rarity, Name, Price FROM 装备 ORDER BY Rarity, Price DESC",
             expected_error=True,  # 可能不支持，这是PG特有语法
         ),
-        TestResult(
+        _TestResult(
             "B5: GROUP BY + HAVING 去重后筛选",
             "聚合",
             "SELECT Category, COUNT(*) as cnt, AVG(Price) as AvgPrice FROM 装备 GROUP BY Category HAVING COUNT(*) >= 5 ORDER BY AvgPrice DESC",
             expected_check=lambda r: r["success"] and len(r.get("data", [])) > 0,
         ),
-        TestResult(
+        _TestResult(
             "B6: 子查询中DISTINCT",
             "子查询",
             "SELECT * FROM (SELECT DISTINCT Category FROM 装备) t ORDER BY Category",
@@ -412,51 +412,51 @@ def get_group_b():
 def get_group_c(file_path):
     """游戏策划视角：双行表头是游戏配置表常见格式"""
     return [
-        TestResult(
+        _TestResult(
             "C1: 双行表头基础查询",
             "双行表头",
             "SELECT ID, Name, BaseAtk, Price FROM `双行表头` LIMIT 5",
             expected_check=lambda r: r["success"] and len(r.get("data", [])) > 0,
         ),
-        TestResult(
+        _TestResult(
             "C2: 双行表头 WHERE 条件",
             "双行表头",
             "SELECT * FROM `双行表头` WHERE Category = 'Weapon'",
             expected_check=lambda r: r["success"] and len(r.get("data", [])) > 0,
         ),
-        TestResult(
+        _TestResult(
             "C3: 双行表头 ORDER BY 排序",
             "双行表头",
             "SELECT ID, Name, Price FROM `双行表头` ORDER BY Price DESC LIMIT 5",
             expected_check=lambda r: r["success"] and len(r.get("data", [])) > 0,
         ),
-        TestResult(
+        _TestResult(
             "C4: 双行表头 GROUP BY 聚合",
             "双行表头",
             "SELECT Category, COUNT(*) as cnt, AVG(BaseAtk) as AvgAtk, MAX(Price) as MaxPrice FROM `双行表头` GROUP BY Category",
             expected_check=lambda r: r["success"] and len(r.get("data", [])) > 0,
         ),
-        TestResult(
+        _TestResult(
             "C5: 双行表头 UPDATE 写入",
             "双行表头",
             "UPDATE `双行表头` SET Price = Price * 1.1 WHERE Category = 'Weapon'",
             is_update=True,
             expected_check=lambda r: r["success"],
         ),
-        TestResult(
+        _TestResult(
             "C6: 双行表头 UPDATE 后回读验证",
             "双行表头",
             "SELECT ID, Name, Price FROM `双行表头` WHERE Category = 'Weapon' ORDER BY ID LIMIT 3",
             expected_check=lambda r: r["success"] and len(r.get("data", [])) > 0,
         ),
-        TestResult(
+        _TestResult(
             "C7: 双行表头 INSERT 新行",
             "双行表头",
             "INSERT INTO `双行表头` (ID, Name, BaseAtk, AtkBonus, Price, Rarity, Category) VALUES (999, 'Test_DoubleHeader', 100, 10.5, 999.99, 'Epic', 'Weapon')",
             is_insert=True,
             expected_check=lambda r: r["success"],
         ),
-        TestResult(
+        _TestResult(
             "C8: 双行表头 INSERT 后回读验证",
             "双行表头",
             "SELECT * FROM `双行表头` WHERE ID = 999",
@@ -473,66 +473,66 @@ def get_group_c(file_path):
 def get_group_d():
     """运营/策划视角：数值精度问题深入测试"""
     return [
-        TestResult(
+        _TestResult(
             "D1: UPDATE 写入高精度小数 PI",
             "UPDATE精度",
             "UPDATE 装备 SET Price = 3.14159265358979323846 WHERE ID = 3",
             is_update=True,
             expected_check=lambda r: r["success"],
         ),
-        TestResult(
+        _TestResult(
             "D1-验证: 回读PI精度",
             "UPDATE精度",
             "SELECT ID, Price FROM 装备 WHERE ID = 3",
             expected_check=lambda r: r["success"] and len(r.get("data", [])) == 1,
         ),
-        TestResult(
+        _TestResult(
             "D2: UPDATE 写入极大浮点数",
             "UPDATE精度",
             "UPDATE 装备 SET Price = 999999999.123456789 WHERE ID = 4",
             is_update=True,
             expected_check=lambda r: r["success"],
         ),
-        TestResult(
+        _TestResult(
             "D2-验证: 回读极大数精度",
             "UPDATE精度",
             "SELECT ID, Price FROM 装备 WHERE ID = 4",
             expected_check=lambda r: r["success"] and len(r.get("data", [])) == 1,
         ),
-        TestResult(
+        _TestResult(
             "D3: UPDATE 写入极小小数",
             "UPDATE精度",
             "UPDATE 装备 SET DropRate = 0.000001 WHERE ID = 1",
             is_update=True,
             expected_check=lambda r: r["success"],
         ),
-        TestResult(
+        _TestResult(
             "D3-验证: 回读极小小数",
             "UPDATE精度",
             "SELECT ID, DropRate FROM 装备 WHERE ID = 1",
             expected_check=lambda r: r["success"] and len(r.get("data", [])) == 1,
         ),
-        TestResult(
+        _TestResult(
             "D4: UPDATE 数学表达式计算精度",
             "UPDATE精度",
             "UPDATE 装备 SET Price = ROUND(Price * 1.15 + 0.01, 4) WHERE Rarity = 'Epic' AND ID <= 10",
             is_update=True,
             expected_check=lambda r: r["success"],
         ),
-        TestResult(
+        _TestResult(
             "D4-验证: 表达式计算结果回读",
             "UPDATE精度",
             "SELECT ID, Name, Price FROM 装备 WHERE Rarity = 'Epic' AND ID <= 10 ORDER BY ID",
             expected_check=lambda r: r["success"] and len(r.get("data", [])) > 0,
         ),
-        TestResult(
+        _TestResult(
             "D5: UPDATE 负数写入和回读",
             "UPDATE精度",
             "UPDATE 装备 SET Price = -999.123456789 WHERE ID = 2",
             is_update=True,
             expected_check=lambda r: r["success"],
         ),
-        TestResult(
+        _TestResult(
             "D5-验证: 负数精度回读",
             "UPDATE精度",
             "SELECT ID, Price FROM 装备 WHERE ID = 2",
@@ -549,50 +549,50 @@ def get_group_d():
 def get_group_e(large_file_path):
     """QA视角：性能基准测试"""
     return [
-        TestResult(
+        _TestResult(
             "E1: 全表 SELECT * 10000行",
             "性能",
             "SELECT * FROM 大表",
             expected_check=lambda r: r["success"] and len(r.get("data", [])) == 10000,
         ),
-        TestResult(
+        _TestResult(
             "E2: WHERE 条件筛选 10000行",
             "性能",
             "SELECT * FROM 大表 WHERE Category = 'A' AND Status = 'Active'",
             expected_check=lambda r: r["success"],
         ),
-        TestResult(
+        _TestResult(
             "E3: ORDER BY 排序 10000行",
             "性能",
             "SELECT * FROM 大表 ORDER BY Value3 DESC LIMIT 500",
             expected_check=lambda r: r["success"] and len(r.get("data", [])) == 500,
         ),
-        TestResult(
+        _TestResult(
             "E4: GROUP BY 聚合 10000行",
             "性能",
             "SELECT Category, Status, COUNT(*) as cnt, AVG(Score) as AvgScore, SUM(Value1) as SumV1 FROM 大表 GROUP BY Category, Status ORDER BY cnt DESC",
             expected_check=lambda r: r["success"] and len(r.get("data", [])) > 0,
         ),
-        TestResult(
+        _TestResult(
             "E5: 窗口函数 RANK 10000行",
             "性能",
             "SELECT ID, Score, RANK() OVER (ORDER BY Score DESC) as Rank FROM 大表 ORDER BY Score DESC LIMIT 20",
             expected_check=lambda r: r["success"] and len(r.get("data", [])) == 20,
         ),
-        TestResult(
+        _TestResult(
             "E6: UPDATE 批量修改 10000行",
             "性能",
             "UPDATE 大表 SET Value1 = Value1 * 1.05 WHERE Category = 'B'",
             is_update=True,
             expected_check=lambda r: r["success"],
         ),
-        TestResult(
+        _TestResult(
             "E7: LIKE 模糊搜索 10000行",
             "性能",
             "SELECT * FROM 大表 WHERE Name LIKE '%Row_5%' LIMIT 100",
             expected_check=lambda r: r["success"],
         ),
-        TestResult(
+        _TestResult(
             "E8: CASE WHEN 分类统计 10000行",
             "性能",
             "SELECT Category, CASE WHEN AVG(Score) > 50 THEN 'High' ELSE 'Low' END as Level, COUNT(*) as cnt FROM 大表 GROUP BY CASE WHEN AVG(Score) > 50 THEN 'High' ELSE 'Low' END, Category ORDER BY Category LIMIT 10",
@@ -609,85 +609,85 @@ def get_group_e(large_file_path):
 def get_group_f():
     """QA视角：边缘场景压力测试"""
     return [
-        TestResult(
+        _TestResult(
             "F1: INSERT 含单引号和双引号的文本",
             "边缘写入",
             "INSERT INTO 装备 (ID, Name, BaseAtk, AtkBonus, Price, Rarity, Category, DropRate) VALUES (600, \"O'Brien's_\"Sword\"\", 50, 5.0, 199.99, 'Rare', 'Weapon', 0.5)",
             is_insert=True,
             expected_check=lambda r: r["success"],
         ),
-        TestResult(
+        _TestResult(
             "F1-验证: 特殊字符回读",
             "边缘写入",
             "SELECT ID, Name FROM 装备 WHERE ID = 600",
             expected_check=lambda r: r["success"] and len(r.get("data", [])) == 1,
         ),
-        TestResult(
+        _TestResult(
             "F2: INSERT 含中文和特殊符号的文本",
             "边缘写入",
             "INSERT INTO 装备 (ID, Name, BaseAtk, AtkBonus, Price, Rarity, Category, DropRate) VALUES (601, '火元素·龙之剑★超极品！@#$%', 999, 99.9, 8888.88, 'Legendary', 'Weapon', 0.001)",
             is_insert=True,
             expected_check=lambda r: r["success"],
         ),
-        TestResult(
+        _TestResult(
             "F2-验证: 中文特殊符号回读",
             "边缘写入",
             "SELECT ID, Name FROM 装备 WHERE ID = 601",
             expected_check=lambda r: r["success"] and len(r.get("data", [])) == 1,
         ),
-        TestResult(
+        _TestResult(
             "F3: UPDATE 使用 COALESCE 处理 NULL",
             "边缘写入",
             "UPDATE 装备 SET Price = COALESCE(NULL, 100.0) WHERE ID = 1",
             is_update=True,
             expected_check=lambda r: r["success"],
         ),
-        TestResult(
+        _TestResult(
             "F3-验证: COALESCE 结果回读",
             "边缘写入",
             "SELECT ID, Price FROM 装备 WHERE ID = 1",
             expected_check=lambda r: r["success"] and len(r.get("data", [])) == 1,
         ),
-        TestResult(
+        _TestResult(
             "F4: DELETE 删除刚插入的测试数据",
             "边缘写入",
             "DELETE FROM 装备 WHERE ID IN (600, 601)",
             is_delete=True,
             expected_check=lambda r: r["success"],
         ),
-        TestResult(
+        _TestResult(
             "F4-验证: 确认删除成功",
             "边缘写入",
             "SELECT COUNT(*) as remaining FROM 装备 WHERE ID IN (600, 601)",
             expected_check=lambda r: r["success"] and len(r.get("data", [])) > 0,
         ),
-        TestResult(
+        _TestResult(
             "F5: INSERT 超长文本字段 (>200字符)",
             "边缘写入",
             "INSERT INTO 装备 (ID, Name, BaseAtk, AtkBonus, Price, Rarity, Category, DropRate) VALUES (602, '" + "A" * 250 + "', 1, 1.0, 1.0, 'Common', 'Consumable', 1.0)",
             is_insert=True,
             expected_check=lambda r: r["success"],
         ),
-        TestResult(
+        _TestResult(
             "F5-验证: 超长文本回读完整性",
             "边缘写入",
             "SELECT ID, LENGTH(Name) as NameLen FROM 装备 WHERE ID = 602",
             expected_check=lambda r: r["success"] and len(r.get("data", [])) == 1,
         ),
-        TestResult(
+        _TestResult(
             "F6: UPDATE 多条件复合 WHERE + 数学表达式",
             "边缘写入",
             "UPDATE 装备 SET Price = ABS(Price) + CEIL(AtkBonus) * FLOOR(BaseAtk / 10) WHERE Rarity IN ('Rare', 'Epic') AND Category = 'Weapon' AND ID < 20",
             is_update=True,
             expected_check=lambda r: r["success"],
         ),
-        TestResult(
+        _TestResult(
             "F6-验证: 复合表达式结果",
             "边缘写入",
             "SELECT ID, Name, Price FROM 装备 WHERE Rarity IN ('Rare', 'Epic') AND Category = 'Weapon' AND ID < 20 ORDER BY ID",
             expected_check=lambda r: r["success"] and len(r.get("data", [])) > 0,
         ),
-        TestResult(
+        _TestResult(
             "F7: 清理所有测试插入数据",
             "边缘写入",
             "DELETE FROM 装备 WHERE ID >= 600",

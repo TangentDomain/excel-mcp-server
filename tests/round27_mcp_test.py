@@ -99,7 +99,7 @@ def create_test_files():
 # ============================================================
 # 测试框架
 # ============================================================
-class TestResult:
+class _TestResult:
     def __init__(self):
         self.results = []
         self.start_time = time.time()
@@ -129,7 +129,7 @@ class TestResult:
         return {'total': total, 'passed': passed, 'failed': failed, 'elapsed': elapsed}
 
 
-tr = TestResult()
+tr = _TestResult()
 
 
 # ============================================================

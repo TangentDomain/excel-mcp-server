@@ -45,7 +45,7 @@ import pytest
 
 pytestmark = pytest.mark.skip(reason="legacy test runner pattern, not for direct pytest")
 
-class TestResult:
+class _TestResult:
     def __init__(self):
         self.passed = 0
         self.failed = 0
@@ -689,7 +689,7 @@ def main():
     print(f"测试目录: {TEST_DIR}")
     print("=" * 70)
     
-    tr = TestResult()
+    tr = _TestResult()
     
     try:
         test_group_a_p0_regression(tr)

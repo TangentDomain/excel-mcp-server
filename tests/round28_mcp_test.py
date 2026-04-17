@@ -89,7 +89,7 @@ def create_formula_file():
     return TEST_FILE_FORMULA
 
 
-class TestResult:
+class _TestResult:
     def __init__(self):
         self.results = []
         self.passed = 0
@@ -605,7 +605,7 @@ def main():
     print("   主题: UPDATE/INSERT/DELETE深度 + CASE WHEN复杂式 + 公式单元格 + P0回归")
     print("=" * 70)
     
-    tr = TestResult()
+    tr = _TestResult()
     
     try:
         # A组: UPDATE深度

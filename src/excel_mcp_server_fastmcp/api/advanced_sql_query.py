@@ -7357,7 +7357,11 @@ class AdvancedSQLQueryEngine:
             # 确保group_by_columns中的列都存在
             valid_group_cols = [c for c in group_by_columns if c in df.columns]
             if valid_group_cols:
-                grouped = df.groupby(valid_group_cols, observed=True, dropna=False)
+                # Fix(R58): 单列groupby传字符串避免Pandas4Warning(未来版本groups keys将从scalar变为tuple)
+                if len(valid_group_cols) == 1:
+                    grouped = df.groupby(valid_group_cols[0], observed=True, dropna=False)
+                else:
+                    grouped = df.groupby(valid_group_cols, observed=True, dropna=False)
             else:
                 grouped = df.groupby(lambda x: 0)
         else:

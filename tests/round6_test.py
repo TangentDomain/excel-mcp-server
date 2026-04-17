@@ -137,7 +137,7 @@ def create_test_data():
 # ============================================================
 
 
-class TestResult:
+class _TestResult:
     def __init__(self):
         self.results = []
 
@@ -181,7 +181,7 @@ class TestResult:
         }
 
 
-tr = TestResult()
+tr = _TestResult()
 
 
 def run_select(sql):
