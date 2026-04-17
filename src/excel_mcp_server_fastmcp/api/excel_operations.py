@@ -1606,10 +1606,13 @@ class ExcelOperations:
         }
 
         def _clean_color(val):
-            """清理颜色值：去除 # 前缀，统一为纯 HEX 字符串"""
+            """清理颜色值：去除 # 前缀，统一为纯 HEX 字符串，3位HEX扩展为6位"""
             s = str(val).strip()
             if s.startswith("#"):
                 s = s[1:]
+            # 3位HEX缩写扩展：F00 → FF0000, ABC → AABBCC
+            if len(s) == 3 and all(c in "0123456789abcdefABCDEF" for c in s):
+                s = f"{s[0]}{s[0]}{s[1]}{s[1]}{s[2]}{s[2]}"
             return s
 
         for key, value in formatting.items():

@@ -553,7 +553,7 @@ class TestFormatCellsDeep:
     def test_normalize_flat_bg_color(self):
         """扁平 bg_color → 嵌套 fill.color"""
         result = ExcelOperations._normalize_formatting({"bg_color": "FF0"})
-        assert result == {"fill": {"color": "FF0"}}
+        assert result == {"fill": {"color": "FFFF00"}}
 
     def test_normalize_flat_alignment(self):
         """扁平 alignment: "center" → nested alignment.horizontal: "center\""""

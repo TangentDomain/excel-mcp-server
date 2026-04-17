@@ -537,7 +537,7 @@ class TestFormatCellsR65:
             "bg_color": "FF0",
         })
         assert result["font"]["bold"] is True
-        assert result["fill"]["color"] == "FF0"
+        assert result["fill"]["color"] == "FFFF00"
         assert result["magic_flag"] is True
 
     # ---------- 14. 多次幂等性 ----------

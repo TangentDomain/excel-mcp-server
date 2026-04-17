@@ -397,14 +397,18 @@ class TestFormatCellsR61:
 
     # ---------- 10. 3位 HEX 颜色简写 ----------
 
-    def test_color_3digit_hex_shorthand_rejected(self, tmp_path):
-        """3 位 HEX 颜色简写如 'F00' 应被拒绝（openpyxl 要求 aRGB 8位）"""
+    def test_color_3digit_hex_shorthand_expanded(self, tmp_path):
+        """3 位 HEX 颜色简写如 'F00' 应自动扩展为 6 位（F00→FF0000）"""
+        # 先验证 _normalize_formatting 层的扩展行为
+        norm = ExcelOperations._normalize_formatting({"font_color": "F00", "bg_color": "0F0"})
+        assert norm["font"]["color"] == "FF0000", f"font_color应为FF0000, 实际{norm['font'].get('color')}"
+        assert norm["fill"]["color"] == "00FF00", f"bg_color应为00FF00, 实际{norm['fill'].get('color')}"
+        # 再验证端到端：format_cells 成功应用
         fp = str(tmp_path / "color3digit.xlsx")
         _create_test_xlsx(fp)
         result = ExcelOperations.format_cells(fp, "Sheet1", "A1",
             formatting={"font_color": "F00", "bg_color": "0F0"})
-        # openpyxl 要求 aRGB hex 值（6或8位），3位简写不被接受
-        assert result["success"] is False, "3位 HEX 颜色应被拒绝"
+        assert result["success"] is True, f"3位HEX应被接受: {result}"
 
     # ---------- 11. bold=False / italic=False 显式关闭 ----------
 
