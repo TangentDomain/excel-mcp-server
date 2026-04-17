@@ -523,6 +523,7 @@ class TestB5_CaseWhen:
         print(f"B5-CASE: {detail}")
         assert match, f"CASE WHEN 结果不一致: {detail}"
 
+    @pytest.mark.filterwarnings("ignore::pytest.PytestUnraisableExceptionWarning")
     def test_b5_case_with_aggregation(self, large_skills_db):
         """CASE WHEN + GROUP BY 组合（使用字符串兼容条件）"""
         db_path, xlsx_path = large_skills_db
@@ -571,6 +572,7 @@ class TestB6_DualHeaderQueries:
         print(f"B6-DUALHDR: {detail}")
         assert match, f"双表头查询不一致: {detail}"
 
+    @pytest.mark.filterwarnings("ignore::pytest.PytestUnraisableExceptionWarning")
     def test_b6_dual_header_agg(self, join_test_db):
         """双表头表聚合查询"""
         db_path, xlsx_path = join_test_db

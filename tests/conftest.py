@@ -93,8 +93,11 @@ def temp_dir():
     finally:
         # Ensure all Excel file handles are closed by forcing garbage collection
         import gc
+        import warnings
 
-        gc.collect()
+        with warnings.catch_warnings():
+            warnings.filterwarnings("ignore", category=ResourceWarning)
+            gc.collect()
         safe_rmtree(temp_path)
 
 
