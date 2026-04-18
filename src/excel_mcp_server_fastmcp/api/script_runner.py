@@ -5,6 +5,8 @@
 
 import io
 import logging
+import signal
+import threading
 import traceback
 from contextlib import redirect_stdout
 from functools import partial
@@ -19,6 +21,16 @@ from .advanced_sql_query import (
     execute_advanced_update_query,
 )
 from .excel_operations import ExcelOperations
+
+
+class ScriptTimeoutError(Exception):
+    """脚本执行超时异常。"""
+    pass
+
+
+def _timeout_handler(signum, frame):
+    """信号处理函数：超时时抛出 ScriptTimeoutError。"""
+    raise ScriptTimeoutError(f"脚本执行超过时间限制 ({signum})")
 
 
 def _query_wrapper(file_path: str, sql: str) -> list:
@@ -96,8 +108,13 @@ def execute_python_script(
             "ExcelOperations": ExcelOperations,
         }
 
-        # 执行代码
+        # 执行代码（带超时控制）
         with redirect_stdout(stdout_buf):
+            # 设置信号超时（仅主线程支持 signal.alarm）
+            is_main_thread = threading.current_thread() is threading.main_thread()
+            if is_main_thread:
+                old_handler = signal.signal(signal.SIGALRM, _timeout_handler)
+                signal.alarm(timeout)
             try:
                 compiled = compile(code, "<user_script>", "eval")
                 result_value = eval(compiled, user_globals)
@@ -105,6 +122,11 @@ def execute_python_script(
                 compiled = compile(code, "<user_script>", "exec")
                 exec(compiled, user_globals)
                 result_value = user_globals.get("result", None)
+            finally:
+                if is_main_thread:
+                    # 取消超时信号，恢复原处理函数
+                    signal.alarm(0)
+                    signal.signal(signal.SIGALRM, old_handler)
 
         return {
             "success": True,

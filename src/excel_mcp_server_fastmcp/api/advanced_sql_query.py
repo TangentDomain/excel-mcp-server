@@ -7876,7 +7876,7 @@ class AdvancedSQLQueryEngine:
                 else:
                     inner_agg_results[agg_sql] = [None] * len(group_names)
             except Exception as e:
-                logger.warning("CASE+聚合计算失败 %s: %s", alias_name, e)
+                logger.warning("CASE+聚合计算失败 %s: %s", agg_sql, e)
                 inner_agg_results[agg_sql] = [None] * len(group_names)
 
         for i, group_name in enumerate(group_names):
@@ -10381,7 +10381,7 @@ class AdvancedSQLQueryEngine:
             cond = self._evaluate_update_expression(expr.this, df, row_idx, depth + 1)
             # Evaluate condition: non-zero/non-empty/True = truthy
             is_truthy = False
-            if cond is not None and cond != "" and cond != 0 and cond != False:
+            if cond is not None and cond != "" and cond != 0 and cond is not False:
                 if isinstance(cond, str):
                     is_truthy = cond.upper() not in ("FALSE", "0", "")
                 else:
