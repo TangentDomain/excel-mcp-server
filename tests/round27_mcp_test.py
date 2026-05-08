@@ -9,9 +9,11 @@ import os
 import time
 import tempfile
 import traceback
+from pathlib import Path
 
-sys.path.insert(0, '/root/workspace/excel-mcp-server/src')
-os.chdir('/root/workspace/excel-mcp-server')
+REPO_ROOT = Path(__file__).resolve().parents[1]
+sys.path.insert(0, str(REPO_ROOT / 'src'))
+os.chdir(REPO_ROOT)
 
 from openpyxl import Workbook
 import random

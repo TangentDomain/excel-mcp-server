@@ -18,9 +18,11 @@ import tempfile
 import shutil
 import traceback
 
-# 确保能导入项目模块
-sys.path.insert(0, '/root/workspace/excel-mcp-server/src')
-sys.path.insert(0, '/root/workspace/excel-mcp-server')
+from pathlib import Path
+
+REPO_ROOT = Path(__file__).resolve().parents[1]
+sys.path.insert(0, str(REPO_ROOT / "src"))
+sys.path.insert(0, str(REPO_ROOT))
 
 from excel_mcp_server_fastmcp.api.advanced_sql_query import (
     execute_advanced_sql_query,
@@ -33,7 +35,7 @@ from excel_mcp_server_fastmcp.api.advanced_sql_query import (
 # 测试基础设施
 # ============================================================
 TEST_RESULTS = []
-TEST_DIR = "/tmp/round30_test"
+TEST_DIR = os.path.join(tempfile.gettempdir(), "round30_test")
 
 import pytest
 

@@ -14,13 +14,15 @@ Round 34 MCP 接口实测 - 边界组合测试 + 类型边界深度测试
 import sys
 import os
 import tempfile
-import subprocess
 import json
 import time
 import traceback
+import shutil
+from pathlib import Path
 
-sys.path.insert(0, '/root/workspace/excel-mcp-server/src')
-sys.path.insert(0, '/root/workspace/excel-mcp-server')
+REPO_ROOT = Path(__file__).resolve().parents[1]
+sys.path.insert(0, str(REPO_ROOT / 'src'))
+sys.path.insert(0, str(REPO_ROOT))
 
 from excel_mcp_server_fastmcp.api.advanced_sql_query import (
     execute_advanced_sql_query,
@@ -32,8 +34,8 @@ from excel_mcp_server_fastmcp.api.advanced_sql_query import (
 # ============================================================
 # 测试数据准备
 # ============================================================
-TEST_DIR = tempfile.mkdtemp(prefix='r34_test_')
-BASE_FILE = os.path.join(TEST_DIR, 'r34_base.xlsx')
+TEST_DIR = Path(tempfile.mkdtemp(prefix='r34_test_'))
+BASE_FILE = TEST_DIR / 'r34_base.xlsx'
 
 def setup_test_file():
     """创建包含多Sheet的测试文件"""

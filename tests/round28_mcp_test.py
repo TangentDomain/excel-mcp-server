@@ -10,9 +10,11 @@ import tempfile
 import shutil
 import random
 import numpy as np
+from pathlib import Path
 
 # 添加 src 到路径
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', 'src'))
+REPO_ROOT = Path(__file__).resolve().parents[1]
+sys.path.insert(0, str(REPO_ROOT / "src"))
 
 from openpyxl import Workbook
 from excel_mcp_server_fastmcp.api.advanced_sql_query import (

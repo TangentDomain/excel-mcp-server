@@ -3,14 +3,11 @@ Round 30 MCP 接口实测 - 修复版(移除inf值) - 边界组合+P0回归
 =====================================================================
 修复: 移除float('inf')/float('-inf')导致的文件加载失败
 """
-import sys
 import os
+import sys
 import tempfile
 import shutil
-
-sys.path.insert(0, '/root/workspace/excel-mcp-server/src')
-sys.path.insert(0, '/root/workspace/excel-mcp-server')
-
+from pathlib import Path
 from excel_mcp_server_fastmcp.api.advanced_sql_query import (
     execute_advanced_sql_query,
     execute_advanced_update_query,
@@ -19,7 +16,7 @@ from excel_mcp_server_fastmcp.api.advanced_sql_query import (
 )
 
 TEST_RESULTS = []
-TEST_DIR = "/tmp/round30_test_v2"
+TEST_DIR = os.path.join(tempfile.gettempdir(), "round30_test_v2")
 
 def record(name, sql, expected, actual, status, detail=""):
     TEST_RESULTS.append({"name": name, "sql": sql, "expected": expected, 

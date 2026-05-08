@@ -2,11 +2,12 @@
 """诊断 Round 8 假失败用例"""
 
 import sys
+from pathlib import Path
 
-sys.path.insert(0, "/root/workspace/excel-mcp-server/src")
+REPO_ROOT = Path(__file__).resolve().parents[1]
+sys.path.insert(0, str(REPO_ROOT / "src"))
 import os
 import tempfile
-
 from openpyxl import Workbook
 
 from excel_mcp_server_fastmcp.api.advanced_sql_query import execute_advanced_sql_query
@@ -19,7 +20,7 @@ ws.append([1, "Item-1", 100, 10.5, 500.0, "Common", "Weapon"])
 ws.append([999, "NULL测试装", None, None, None, None, None])
 ws.append([1000, "A" * 500, 1, 1.0, 1.0, "Common", "Weapon"])
 
-tmpfile = tempfile.mktemp(suffix=".xlsx")
+tmpfile = str(Path(tempfile.gettempdir()) / "r8_diagnose.xlsx")
 wb.save(tmpfile)
 
 tests = [

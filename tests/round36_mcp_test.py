@@ -14,16 +14,16 @@ Round 36 MCP 接口实测 - 并发安全深度测试 + P0第9轮回归验证
 import sys
 import os
 import tempfile
-import subprocess
-import json
 import time
 import traceback
 import shutil
+from pathlib import Path
 import threading
 import concurrent.futures
 
-sys.path.insert(0, '/root/workspace/excel-mcp-server/src')
-sys.path.insert(0, '/root/workspace/excel-mcp-server')
+REPO_ROOT = Path(__file__).resolve().parents[1]
+sys.path.insert(0, str(REPO_ROOT / 'src'))
+sys.path.insert(0, str(REPO_ROOT))
 
 from excel_mcp_server_fastmcp.api.advanced_sql_query import (
     execute_advanced_sql_query,
@@ -35,8 +35,8 @@ from excel_mcp_server_fastmcp.api.advanced_sql_query import (
 # ============================================================
 # 测试数据准备
 # ============================================================
-TEST_DIR = tempfile.mkdtemp(prefix='r36_test_')
-BASE_FILE = os.path.join(TEST_DIR, 'r36_base.xlsx')
+TEST_DIR = Path(tempfile.mkdtemp(prefix='r36_test_'))
+BASE_FILE = TEST_DIR / 'r36_base.xlsx'
 
 def setup_test_file():
     """创建包含多Sheet的标准测试文件"""

@@ -16,9 +16,11 @@ import tempfile
 import random
 import string
 
-# 添加项目路径
-sys.path.insert(0, '/root/workspace/excel-mcp-server/src')
-sys.path.insert(0, '/root/workspace/excel-mcp-server')
+from pathlib import Path
+
+REPO_ROOT = Path(__file__).resolve().parents[1]
+sys.path.insert(0, str(REPO_ROOT / "src"))
+sys.path.insert(0, str(REPO_ROOT))
 
 from excel_mcp_server_fastmcp.api.advanced_sql_query import (
     execute_advanced_sql_query,
@@ -56,9 +58,9 @@ tr = _TestResult()
 # ============================================================
 # 准备测试文件
 # ============================================================
-TEST_FILE = "/tmp/r33_test.xlsx"
-TEST_FILE_LARGE = "/tmp/r33_test_large.xlsx"
-TEST_FILE_WIDE = "/tmp/r33_test_wide.xlsx"
+TEST_FILE = str(Path(tempfile.gettempdir()) / "r33_test.xlsx")
+TEST_FILE_LARGE = str(Path(tempfile.gettempdir()) / "r33_test_large.xlsx")
+TEST_FILE_WIDE = str(Path(tempfile.gettempdir()) / "r33_test_wide.xlsx")
 
 import pandas as pd
 from openpyxl import Workbook

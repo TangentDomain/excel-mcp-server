@@ -21,11 +21,12 @@ import tempfile
 import shutil
 import traceback
 from datetime import datetime
+from pathlib import Path
 
 # 确保能导入项目模块
-sys.path.insert(0, '/root/workspace/excel-mcp-server/src')
-os.chdir('/root/workspace/excel-mcp-server')
-
+REPO_ROOT = Path(__file__).resolve().parents[1]
+sys.path.insert(0, str(REPO_ROOT / 'src'))
+os.chdir(REPO_ROOT)
 from openpyxl import Workbook
 import pandas as pd
 

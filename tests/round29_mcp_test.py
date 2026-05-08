@@ -12,10 +12,12 @@ import sys
 import os
 import tempfile
 import shutil
+from pathlib import Path
 
-# 确保能导入项目模块
-sys.path.insert(0, '/root/workspace/excel-mcp-server/src')
-sys.path.insert(0, '/root/workspace/excel-mcp-server')
+# 确保能导入项目模块（跨平台：动态获取项目根目录）
+REPO_ROOT = Path(__file__).resolve().parents[1]
+sys.path.insert(0, str(REPO_ROOT / 'src'))
+sys.path.insert(0, str(REPO_ROOT))
 
 from excel_mcp_server_fastmcp.api.advanced_sql_query import (
     execute_advanced_sql_query,
@@ -28,13 +30,13 @@ from excel_mcp_server_fastmcp.api.advanced_sql_query import (
 # 测试基础设施
 # ============================================================
 TEST_RESULTS = []
-TEST_DIR = "/tmp/round29_test"
+TEST_DIR = Path(tempfile.gettempdir()) / 'round29_test'
 
 def setup_test_env():
     """创建测试环境"""
-    if os.path.exists(TEST_DIR):
+    if TEST_DIR.exists():
         shutil.rmtree(TEST_DIR)
-    os.makedirs(TEST_DIR, exist_ok=True)
+    TEST_DIR.mkdir(parents=True, exist_ok=True)
 
 def record(name, sql, expected, actual, status, detail=""):
     """记录测试结果"""

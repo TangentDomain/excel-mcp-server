@@ -13,8 +13,8 @@ import shutil
 import random
 import string
 
-# Add src to path
-sys.path.insert(0, '/root/workspace/excel-mcp-server/src')
+REPO_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+sys.path.insert(0, os.path.join(REPO_ROOT, 'src'))
 
 from excel_mcp_server_fastmcp.api.advanced_sql_query import (
     execute_advanced_sql_query,

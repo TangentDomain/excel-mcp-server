@@ -1,7 +1,10 @@
 #!/usr/bin/env python3
 """Debug script for Round 26 failures analysis"""
 import sys
-sys.path.insert(0, '/root/workspace/excel-mcp-server/src')
+from pathlib import Path
+
+REPO_ROOT = Path(__file__).resolve().parents[1]
+sys.path.insert(0, str(REPO_ROOT / "src"))
 import tempfile, os, random, shutil
 from openpyxl import Workbook
 from excel_mcp_server_fastmcp.api.advanced_sql_query import execute_advanced_sql_query

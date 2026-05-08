@@ -15,9 +15,11 @@ import os
 import shutil
 import tempfile
 import traceback
+from pathlib import Path
 
 # 添加项目路径
-sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+REPO_ROOT = Path(__file__).resolve().parents[1]
+sys.path.insert(0, str(REPO_ROOT))
 
 from openpyxl import Workbook
 from excel_mcp_server_fastmcp.api.advanced_sql_query import (

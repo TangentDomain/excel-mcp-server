@@ -7,7 +7,7 @@ Round 31 MCP 接口实测脚本
   3. SQL注入新向量探索 (UNION-based, stack queries, encoding tricks)
   4. 已知P0问题回归验证
 
-执行方式: cd /root/workspace/excel-mcp-server && source venv/bin/activate && python tests/round31_mcp_test.py
+执行方式: python tests/round31_mcp_test.py
 """
 
 import sys
