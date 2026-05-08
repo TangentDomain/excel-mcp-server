@@ -6,7 +6,8 @@ import subprocess
 import json
 import os
 import sys
-
+import tempfile
+from pathlib import Path
 def run_mcp_command(tool_name, params):
     """Run MCP command and return result"""
     try:
@@ -51,7 +52,7 @@ def test_api_issues():
     print("\n1. Testing read_data_from_excel range query...")
     
     # Create test file
-    test_file = "/tmp/test_range.xlsx"
+    test_file = str(Path(tempfile.gettempdir()) / "test_range.xlsx")
     write_data = [
         ["Name", "Age", "City"],
         ["Alice", "25", "New York"],

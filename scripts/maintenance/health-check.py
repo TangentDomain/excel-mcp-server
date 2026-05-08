@@ -25,6 +25,7 @@ import re
 import glob
 import json
 import shutil
+import subprocess
 from pathlib import Path
 from typing import List, Dict, Tuple, Set
 from datetime import datetime
@@ -195,7 +196,14 @@ class ProjectHealthChecker:
         
         try:
             # 检查是否有feature分支
-            result = os.popen("git branch | grep feature/").read().strip()
+            result = subprocess.run(
+                ["git", "branch", "--list", "feature/*"],
+                capture_output=True,
+                text=True,
+                encoding="utf-8",
+                cwd=self.project_root,
+                check=False,
+            ).stdout.strip()
             if result:
                 branches = result.split('\n')
                 issues.append({
@@ -206,7 +214,14 @@ class ProjectHealthChecker:
                 })
             
             # 检查是否有worktree
-            result = os.popen("git worktree list").read().strip()
+            result = subprocess.run(
+                ["git", "worktree", "list"],
+                capture_output=True,
+                text=True,
+                encoding="utf-8",
+                cwd=self.project_root,
+                check=False,
+            ).stdout.strip()
             if result and "wt-" in result:
                 lines = result.split('\n')
                 wt_paths = [line for line in lines if "wt-" in line]

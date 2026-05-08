@@ -463,6 +463,6 @@ if __name__ == "__main__":
     print(markdown)
 
     # 保存到文件
-    with open("round273_results.md", "w") as f:
+    with open("round273_results.md", "w", encoding="utf-8") as f:
         f.write(markdown)
     print("\n已保存到 round273_results.md")

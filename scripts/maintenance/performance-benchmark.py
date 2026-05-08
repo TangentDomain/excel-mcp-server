@@ -17,9 +17,11 @@ import tempfile
 import time
 import traceback
 from datetime import datetime
+from pathlib import Path
 
 # 确保可以导入项目模块
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
+REPO_ROOT = Path(__file__).resolve().parents[2]
+sys.path.insert(0, str(REPO_ROOT))
 
 try:
     import psutil

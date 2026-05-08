@@ -320,7 +320,7 @@ def test_T332():
         result = excel_export_to_csv(path, csv_path)
         assert result.get('success'), f"Export CSV failed: {result}"
         assert os.path.exists(csv_path), "CSV file not created"
-        with open(csv_path, 'r') as f:
+        with open(csv_path, 'r', encoding='utf-8') as f:
             content = f.read()
         assert "Alice" in content and "Beijing" in content, "Data missing from CSV"
         return "CSV export verified with correct content"

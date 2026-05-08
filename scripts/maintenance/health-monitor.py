@@ -78,7 +78,7 @@ class ProjectHealthMonitor:
             for test_file in test_files:
                 file_path = self.project_dir / test_file
                 if file_path.exists():
-                    lines = len(file_path.read_text().splitlines())
+                    lines = len(file_path.read_text(encoding='utf-8').splitlines())
                     if lines > 1000:
                         metrics["large_test_files"].append({"file": test_file, "lines": lines})
             
@@ -87,7 +87,7 @@ class ProjectHealthMonitor:
             for test_file in test_files:
                 file_path = self.project_dir / test_file
                 if file_path.exists():
-                    content = file_path.read_text()[:1000]  # 只看前1000字符
+                    content = file_path.read_text(encoding='utf-8')[:1000]  # 只看前1000字符
                     test_contents.setdefault(content, []).append(test_file)
             
             for content, files in test_contents.items():
@@ -116,7 +116,7 @@ class ProjectHealthMonitor:
             for req_file in req_files:
                 file_path = self.project_dir / req_file
                 if file_path.exists():
-                    content = file_path.read_text()
+                    content = file_path.read_text(encoding='utf-8')
                     # 如果文件很小且内容简单，建议删除
                     if len(content) < 2000 and "def test_" in content.count("def test_") == 1:
                         metrics["cleanup_suggestions"].append(f"删除小文件: {req_file}")
@@ -166,7 +166,7 @@ class ProjectHealthMonitor:
         # 读取pyproject.toml
         pyproject_path = self.project_dir / "pyproject.toml"
         if pyproject_path.exists():
-            content = pyproject_path.read_text()
+            content = pyproject_path.read_text(encoding='utf-8')
             
             # 检查dependencies
             dep_pattern = r'dependencies\s*=\s*\[(.*?)\]'

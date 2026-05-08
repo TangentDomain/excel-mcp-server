@@ -45,7 +45,7 @@ def should_use_r1_warn(project):
         
         # 分析最近30轮的R1结果（扩大采样范围）
         recent_r1_fails = []
-        with open(hist_file, 'r') as f:
+        with open(hist_file, 'r', encoding='utf-8') as f:
             for line in f:
                 try:
                     record = json.loads(line.strip())
@@ -150,7 +150,7 @@ def check_round_success(project, target_round):
         if not os.path.exists(hist_file):
             return False
         
-        with open(hist_file, 'r') as f:
+        with open(hist_file, 'r', encoding='utf-8') as f:
             for line in f:
                 try:
                     record = json.loads(line.strip())
@@ -170,7 +170,8 @@ def get_current_round(project):
         if not os.path.exists(now_file):
             return 0
         
-        content = open(now_file).read()
+        with open(now_file, encoding='utf-8') as f:
+            content = f.read()
         # 匹配 "轮次：第X轮" 或类似格式
         import re
         match = re.search(r'轮次[：:]\s*第?(\d+)轮', content)
@@ -248,7 +249,7 @@ def record_false_positive_pattern(project, pattern_data):
         # 读取现有模式
         existing_patterns = []
         if os.path.exists(pattern_file):
-            with open(pattern_file, 'r') as f:
+            with open(pattern_file, 'r', encoding='utf-8') as f:
                 existing_patterns = json.load(f)
         
         # 添加新模式
@@ -266,7 +267,7 @@ def record_false_positive_pattern(project, pattern_data):
         # 保持最近50条记录
         unique_patterns = unique_patterns[-50:]
         
-        with open(pattern_file, 'w') as f:
+        with open(pattern_file, 'w', encoding='utf-8') as f:
             json.dump(unique_patterns, f, ensure_ascii=False, indent=2)
             
     except Exception:
@@ -284,7 +285,7 @@ def should_use_r4_relaxed(project):
         
         # 分析最近10轮的R4结果
         recent_r4_results = []
-        with open(hist_file, 'r') as f:
+        with open(hist_file, 'r', encoding='utf-8') as f:
             for line in f:
                 try:
                     record = json.loads(line.strip())
@@ -323,7 +324,8 @@ def check_critical_steps(project):
         f = os.path.join(project, f".step-{step}.done")
         if os.path.exists(f):
             try:
-                ts = open(f).read().strip()
+                with open(f, encoding='utf-8') as step_file:
+                    ts = step_file.read().strip()
                 existing_steps[step] = int(ts)
                 details.append(f"{step}✅ (t={ts})")
             except:
@@ -438,7 +440,8 @@ def check_progress(project):
     if not os.path.exists(pf):
         return {"status": "FAIL", "critical": False, "details": ["进度文件不存在"], "fix_suggestion": "创建 .claude-progress.md"}
     
-    content = open(pf).read()
+    with open(pf, encoding='utf-8') as progress_file:
+        content = progress_file.read()
     lines = content.strip().split("\n") if content.strip() else []
     details = []
     issues = []
@@ -521,7 +524,8 @@ def check_quality(project):
         return {"status": "PASS", "critical": True, "details": ["K0标记不存在，跳过质量检查"], "fix_suggestion": ""}
     
     try:
-        k0_ts = int(open(k0_file).read().strip())
+        with open(k0_file, encoding='utf-8') as marker_file:
+            k0_ts = int(marker_file.read().strip())
     except:
         return {"status": "PASS", "critical": True, "details": [], "fix_suggestion": ""}
     
@@ -649,7 +653,7 @@ def record_potential_false_positive(project, data):
         # 读取现有记录
         existing_records = []
         if os.path.exists(pattern_file):
-            with open(pattern_file, 'r') as f:
+            with open(pattern_file, 'r', encoding='utf-8') as f:
                 existing_records = json.load(f)
         
         # 添加新记录
@@ -658,7 +662,7 @@ def record_potential_false_positive(project, data):
         # 保持最近30条
         existing_records = existing_records[-30:]
         
-        with open(pattern_file, 'w') as f:
+        with open(pattern_file, 'w', encoding='utf-8') as f:
             json.dump(existing_records, f, ensure_ascii=False, indent=2)
             
     except Exception:
@@ -670,7 +674,8 @@ def check_report(project):
     if not os.path.exists(pf):
         return {"status": "WARN", "critical": False, "details": ["进度文件不存在"], "fix_suggestion": ""}
     
-    content = open(pf).read()
+    with open(pf, encoding='utf-8') as progress_file:
+        content = progress_file.read()
     has_push = any("推送" in l or "报告" in l for l in content.split("\n"))
     
     if has_push:
@@ -689,7 +694,8 @@ def check_docs_health(project, thresholds=None):
         limit = thresholds.get(limit_key, default)
         fpath = os.path.join(project, "docs", fname)
         if os.path.exists(fpath):
-            lines = len(open(fpath).read().split("\n"))
+            with open(fpath, encoding='utf-8') as docs_file:
+                lines = len(docs_file.read().split("\n"))
             if lines > limit:
                 issues.append(f"{fname} {lines}行（阈值{limit}）")
             else:
@@ -708,7 +714,8 @@ def check_req_trend(project, thresholds=None):
     if not os.path.exists(req_file):
         return {"status": "PASS", "critical": False, "details": ["REQUIREMENTS.md 不存在"], "fix_suggestion": ""}
     
-    content = open(req_file).read()
+    with open(req_file, encoding='utf-8') as requirements_file:
+        content = requirements_file.read()
     details = []
     issues = []
     
@@ -740,7 +747,8 @@ def check_feedback_loop(project):
     if not os.path.exists(fb):
         return {"status": "PASS", "critical": True, "details": ["FEEDBACK.md 不存在"], "fix_suggestion": ""}
     
-    content = open(fb).read()
+    with open(fb, encoding='utf-8') as feedback_file:
+        content = feedback_file.read()
     pending = content.count("待处理")
     
     if pending > 5:
@@ -783,7 +791,7 @@ def check_adaptive_thresholds(project):
         
         # 分析最近10轮的质量趋势
         recent_records = []
-        with open(hist_file, 'r') as f:
+        with open(hist_file, 'r', encoding='utf-8') as f:
             for line in f:
                 try:
                     record = json.loads(line.strip())
@@ -811,7 +819,7 @@ def check_adaptive_thresholds(project):
         # 检查是否有阈值调整记录
         threshold_adjustment_file = os.path.join(project, "docs", "quality_patterns", "threshold_adjustments.json")
         if os.path.exists(threshold_adjustment_file):
-            with open(threshold_adjustment_file, 'r') as f:
+            with open(threshold_adjustment_file, 'r', encoding='utf-8') as f:
                 adjustments = json.load(f)
             
             # 如果最近有阈值调整，检查是否需要回滚
@@ -844,7 +852,7 @@ def record_threshold_adjustment(project, adjustment_type, old_value, new_value, 
         
         adjustments = []
         if os.path.exists(adjustment_file):
-            with open(adjustment_file, 'r') as f:
+            with open(adjustment_file, 'r', encoding='utf-8') as f:
                 adjustments = json.load(f)
         
         adjustments.append({
@@ -859,7 +867,7 @@ def record_threshold_adjustment(project, adjustment_type, old_value, new_value, 
         # 保持最近50条记录
         adjustments = adjustments[-50:]
         
-        with open(adjustment_file, 'w') as f:
+        with open(adjustment_file, 'w', encoding='utf-8') as f:
             json.dump(adjustments, f, ensure_ascii=False, indent=2)
             
     except Exception:
@@ -889,7 +897,8 @@ def check_cron_config(project, cron_id=None):
     if not os.path.exists(cp):
         return {"status": "FAIL", "critical": True, "details": [".cron-prompt.md 不存在"], "fix_suggestion": "创建 .cron-prompt.md"}
     
-    content = open(cp).read()
+    with open(cp, encoding='utf-8') as cron_file:
+        content = cron_file.read()
     size = len(content)
     if size < 100:
         return {"status": "WARN", "critical": True, "details": [f".cron-prompt.md 只有{size}字节，可能不完整"], "fix_suggestion": "补充 cron-prompt 内容"}
@@ -983,7 +992,8 @@ def save_history(project, output):
     now_file = os.path.join(docs_dir, "NOW.md")
     if os.path.exists(now_file):
         import re
-        m = re.search(r'第\s*(\d+)\s*轮', open(now_file).read())
+        with open(now_file, encoding='utf-8') as now_handle:
+            m = re.search(r'第\s*(\d+)\s*轮', now_handle.read())
         if m:
             round_num = int(m.group(1))
     
@@ -998,7 +1008,7 @@ def save_history(project, output):
     
     lines = []
     if os.path.exists(hist_file):
-        with open(hist_file) as f:
+        with open(hist_file, encoding='utf-8') as f:
             lines = f.readlines()
     
     # 去重：同 round + 同 summary 跳过
@@ -1020,7 +1030,7 @@ def save_history(project, output):
     if len(lines) > 200:
         lines = lines[-200:]
     
-    with open(hist_file, "w") as f:
+    with open(hist_file, "w", encoding='utf-8') as f:
         f.writelines(lines)
 
 def analyze_trend(project):
@@ -1030,7 +1040,7 @@ def analyze_trend(project):
         return "📄 无历史数据"
     
     try:
-        with open(hist_file) as f:
+        with open(hist_file, encoding='utf-8') as f:
             all_lines = f.readlines()
     except Exception:
         return "📄 历史文件读取失败"
@@ -1255,7 +1265,7 @@ def record_threshold_decision(project, check_id, decision, data):
         # 读取现有决策
         existing_decisions = []
         if os.path.exists(decision_file):
-            with open(decision_file, 'r') as f:
+            with open(decision_file, 'r', encoding='utf-8') as f:
                 existing_decisions = json.load(f)
         
         # 添加新决策
@@ -1273,7 +1283,7 @@ def record_threshold_decision(project, check_id, decision, data):
         existing_decisions = existing_decisions[-100:]
         
         # 写入文件
-        with open(decision_file, 'w') as f:
+        with open(decision_file, 'w', encoding='utf-8') as f:
             json.dump(existing_decisions, f, ensure_ascii=False, indent=2)
         
     except Exception as e:

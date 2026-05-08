@@ -23,7 +23,7 @@ ws2 = wb.create_sheet("Sheet2")
 ws2.append(["Key", "Value"])
 ws2.append(["A", 100])
 
-test_file = "/tmp/edge_test_base.xlsx"
+test_file = str(Path(tempfile.gettempdir()) / "edge_test_base.xlsx")
 wb.save(test_file)
 print(f"测试文件已创建: {test_file}")
 

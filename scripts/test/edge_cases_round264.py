@@ -13,8 +13,10 @@ import os
 import sys
 import tempfile
 import json
+from pathlib import Path
 
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', 'src'))
+REPO_ROOT = Path(__file__).resolve().parents[2]
+sys.path.insert(0, str(REPO_ROOT / "src"))
 
 from openpyxl import Workbook, load_workbook
 from excel_mcp_server_fastmcp.server import (
