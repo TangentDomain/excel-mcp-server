@@ -10001,7 +10001,7 @@ class AdvancedSQLQueryEngine:
                 # 检测孤儿锁文件：如果存在且持有者进程已死，自动清理
                 if os.path.exists(lock_path):
                     try:
-                        with open(lock_path, "r") as lf:
+                        with open(lock_path, "r", encoding="utf-8") as lf:
                             pid_str = lf.read().strip()
                         if pid_str:
                             old_pid = int(pid_str)

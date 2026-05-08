@@ -21,9 +21,7 @@ import re
 import pytest
 import numpy as np
 
-# Add workspace for calibrator import
-sys.path.insert(0, "/root/workspace")
-from sql_calibrator import get_db_path, cmd_import
+from excel_mcp_server_fastmcp.calibrator import get_db_path, cmd_import
 
 from excel_mcp_server_fastmcp.api.advanced_sql_query import execute_advanced_sql_query
 

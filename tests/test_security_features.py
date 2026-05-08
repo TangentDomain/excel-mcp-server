@@ -151,7 +151,7 @@ class TestBackupSystem:
     def test_create_backup_success(self):
         """测试成功创建备份"""
         # 创建测试文件
-        with open(self.test_file, 'w') as f:
+        with open(self.test_file, 'w', encoding='utf-8') as f:
             f.write("test content")
 
         result = excel_create_backup(self.test_file)
@@ -167,7 +167,7 @@ class TestBackupSystem:
         import time
 
         # 创建测试文件
-        with open(self.test_file, 'w') as f:
+        with open(self.test_file, 'w', encoding='utf-8') as f:
             f.write("test content")
 
         # 创建多个备份，确保时间戳不同

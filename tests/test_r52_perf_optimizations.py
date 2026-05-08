@@ -127,7 +127,7 @@ class TestP3Perf02_HotPathImports:
         """源码检查：datetime, decimal, hashlib 已在顶层导入"""
         from excel_mcp_server_fastmcp.api import advanced_sql_query
         
-        with open(advanced_sql_query.__file__, 'r') as f:
+        with open(advanced_sql_query.__file__, 'r', encoding='utf-8') as f:
             source = f.read()
         
         # 检查前60行（导入区域）

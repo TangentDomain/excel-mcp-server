@@ -2227,6 +2227,7 @@ class ExcelOperations:
         if cls.DEBUG_LOG_ENABLED:
             logger.info(f"{cls._LOG_PREFIX} 开始检查ID重复: {sheet_name}")
 
+        wb = None
         try:
             # 参数验证
             if not file_path or not sheet_name:
@@ -2335,6 +2336,16 @@ class ExcelOperations:
                         }
             else:
                 col_idx = id_column
+            if col_idx is None:
+                return {
+                    "success": False,
+                    "message": f'列名 "{id_column}" 未在表头行中找到，也不是有效的列字母',
+                    "has_duplicates": False,
+                    "duplicate_count": 0,
+                    "total_ids": 0,
+                    "unique_ids": 0,
+                    "duplicates": [],
+                }
 
             # 检查表头行是否存在（streaming写入后max_row可能为None，跳过检查）
             if header_row < 1 or (ws.max_row is not None and header_row > ws.max_row):
@@ -2409,6 +2420,9 @@ class ExcelOperations:
             error_msg = f"检查ID重复时发生错误: {str(e)}"
             logger.error(f"{cls._LOG_PREFIX} {error_msg}")
             return cls._format_error_result(error_msg)
+        finally:
+            if wb is not None:
+                wb.close()
 
     @classmethod
     def upsert_row(

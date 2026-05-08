@@ -11,6 +11,7 @@ import os
 import re
 import sqlite3
 import time
+import tempfile
 from pathlib import Path
 
 import pandas as pd
@@ -18,7 +19,7 @@ import pandas as pd
 # ============================================================
 # 常量配置
 # ============================================================
-DEFAULT_DB_DIR = "/tmp/calibrator_data/"
+DEFAULT_DB_DIR = str(Path(tempfile.gettempdir()) / "calibrator_data")
 
 
 # ============================================================

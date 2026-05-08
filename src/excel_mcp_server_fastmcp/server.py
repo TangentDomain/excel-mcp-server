@@ -1554,6 +1554,25 @@ def excel_insert_columns(file_path: str, sheet_name: str, column_index: int, cou
 
 @mcp.tool()
 @_track_call
+def excel_check_duplicate_ids(
+    file_path: str,
+    sheet_name: str,
+    id_column: int | str = 1,
+    header_row: int = 1,
+) -> dict[str, Any]:
+    """检查工作表中的ID重复情况。
+
+    Args:
+        file_path: Excel文件路径
+        sheet_name: 工作表名称
+        id_column: ID列名或列索引（从1开始）
+        header_row: 表头行号，默认为1
+    """
+    return _wrap(ExcelOperations.check_duplicate_ids(file_path, sheet_name, id_column, header_row))
+
+
+@mcp.tool()
+@_track_call
 def excel_find_last_row(file_path: str, sheet_name: str, column: str | int | None = None) -> dict[str, Any]:
     """查找工作表最后一行。可指定列来找该列最后一个有值的行。追加数据前必用。
 
@@ -2158,7 +2177,7 @@ def _collect_column_statistics(ws, data_start, num_cols, col_name_list):
         col_name_list: 列名列表
 
     Returns:
-        dict: 列统计信息
+        tuple[dict, int]: (列统计信息, 数据行数)
     """
     col_stats = {}
     for col_idx in range(num_cols):
@@ -2167,7 +2186,10 @@ def _collect_column_statistics(ws, data_start, num_cols, col_name_list):
 
     # 单次遍历所有行和列，同时统计行数和列数据
     total_rows = 0
-    for row in ws.iter_rows(min_row=data_start + 1, values_only=True):
+    for row in ws.iter_rows(min_row=data_start, values_only=True):
+        if not row or not any(cell is not None for cell in row[:num_cols]):
+            continue
+
         total_rows += 1
         for col_idx in range(min(len(row), num_cols)):
             val = row[col_idx]
@@ -2226,7 +2248,7 @@ def _resolve_row_count(ws, data_start, total_rows):
 
     Args:
         ws: 工作表对象
-        data_start: 数据开始行
+        data_start: 数据开始行（1-based）
         total_rows: 已统计的总行数
 
     Returns:
@@ -2234,8 +2256,8 @@ def _resolve_row_count(ws, data_start, total_rows):
     """
     try:
         # 修复：streaming写入后max_row可能为None的问题
-        if hasattr(ws, "max_row") and ws.max_row is not None and ws.max_row > data_start:
-            row_count = ws.max_row - data_start
+        if hasattr(ws, "max_row") and ws.max_row is not None and ws.max_row >= data_start:
+            row_count = ws.max_row - data_start + 1
         else:
             # streaming写入后max_row可能为None，直接使用已统计的total_rows
             # total_rows已经在上面的循环中统计完成，避免重复计算
@@ -2243,7 +2265,7 @@ def _resolve_row_count(ws, data_start, total_rows):
             # 安全检查：如果total_rows为0，回退到iter_rows统计
             if row_count == 0:
                 try:
-                    for idx, row in enumerate(ws.iter_rows(min_row=data_start + 1, values_only=True), start=1):
+                    for row in ws.iter_rows(min_row=data_start, values_only=True):
                         # 只要行中有一个非空单元格，就计数为有效数据行
                         if row and any(cell is not None for cell in row):
                             row_count += 1
@@ -2257,7 +2279,7 @@ def _resolve_row_count(ws, data_start, total_rows):
         # 确保total_rows无效时，使用iter_rows重新统计
         if row_count == 0:
             try:
-                for idx, row in enumerate(ws.iter_rows(min_row=data_start + 1, values_only=True), start=1):
+                for row in ws.iter_rows(min_row=data_start, values_only=True):
                     if row and any(cell is not None for cell in row):
                         row_count += 1
             except Exception as e2:
