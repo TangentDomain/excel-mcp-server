@@ -3,8 +3,10 @@ import os
 import sys
 import pytest
 import pandas as pd
+from pathlib import Path
 
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', 'src'))
+REPO_ROOT = Path(__file__).resolve().parents[1]
+sys.path.insert(0, str(REPO_ROOT / "src"))
 from excel_mcp_server_fastmcp.api.advanced_sql_query import AdvancedSQLQueryEngine
 
 # xdist isolation: run all join type tests in the same worker to avoid file I/O races

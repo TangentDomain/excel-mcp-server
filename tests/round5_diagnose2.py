@@ -1,8 +1,11 @@
 """诊断 SUM/AVG 空结果的完整执行路径"""
 
 import sys
+import tempfile
+from pathlib import Path
 
-sys.path.insert(0, "/root/workspace/excel-mcp-server/src")
+REPO_ROOT = Path(__file__).resolve().parents[1]
+sys.path.insert(0, str(REPO_ROOT / "src"))
 from openpyxl import Workbook
 
 from excel_mcp_server_fastmcp.api.advanced_sql_query import AdvancedSQLQueryEngine
@@ -12,9 +15,10 @@ wb = Workbook()
 ws = wb.active
 ws.title = "test"
 ws.append(["ID", "Name", "Val"])
-wb.save("/tmp/r5_empty_test.xlsx")
+temp_excel = str(Path(tempfile.gettempdir()) / "r5_empty_test.xlsx")
+wb.save(temp_excel)
 
-fp = "/tmp/r5_empty_test.xlsx"
+fp = temp_excel
 engine = AdvancedSQLQueryEngine()
 
 print("=" * 60)

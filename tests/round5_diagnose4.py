@@ -6,8 +6,11 @@
 
 def main():
     import sys
+    import tempfile
+    from pathlib import Path
 
-    sys.path.insert(0, "/root/workspace/excel-mcp-server/src")
+    REPO_ROOT = Path(__file__).resolve().parents[1]
+    sys.path.insert(0, str(REPO_ROOT / "src"))
     from openpyxl import Workbook
 
     from excel_mcp_server_fastmcp.api.advanced_sql_query import AdvancedSQLQueryEngine
@@ -19,9 +22,10 @@ def main():
     ws.append(["ID", "Val"])
     ws.append([1, 0.000001])
     ws.append([2, 8.88e-2])  # 0.0888
-    wb.save("/tmp/r5_float_test.xlsx")
+    test_file = str(Path(tempfile.gettempdir()) / "r5_float_test.xlsx")
+    wb.save(test_file)
 
-    fp = "/tmp/r5_float_test.xlsx"
+    fp = test_file
     engine = AdvancedSQLQueryEngine()
 
     # Step 1: openpyxl 直接读

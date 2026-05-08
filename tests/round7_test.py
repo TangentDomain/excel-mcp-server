@@ -6,9 +6,11 @@ Round 7 迭代测试 — ExcelMCP 持续测试
 
 import random
 import sys
+import tempfile
+from pathlib import Path
 
-sys.path.insert(0, "/root/workspace/excel-mcp-server/src")
-
+REPO_ROOT = Path(__file__).resolve().parents[1]
+sys.path.insert(0, str(REPO_ROOT / "src"))
 from openpyxl import Workbook
 
 
@@ -166,7 +168,7 @@ def create_test_data():
     for row in boundary_data:
         ws_boundary.append(row)
 
-    filepath = "/tmp/excelmcp_round7_test.xlsx"
+    filepath = str(Path(tempfile.gettempdir()) / "excelmcp_round7_test.xlsx")
     wb.save(filepath)
     print(f"✅ 测试文件已创建: {filepath}")
     print(f"   Sheets: {wb.sheetnames}")

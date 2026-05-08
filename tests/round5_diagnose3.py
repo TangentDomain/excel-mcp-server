@@ -1,8 +1,11 @@
 """诊断: 空表上 SUM/AVG 返回空结果的根因"""
 
 import sys
+import tempfile
+from pathlib import Path
 
-sys.path.insert(0, "/root/workspace/excel-mcp-server/src")
+REPO_ROOT = Path(__file__).resolve().parents[1]
+sys.path.insert(0, str(REPO_ROOT / "src"))
 import traceback
 
 from openpyxl import Workbook
@@ -16,9 +19,10 @@ wb = Workbook()
 ws = wb.active
 ws.title = "test"
 ws.append(["ID", "Name", "Val"])
-wb.save("/tmp/r5_empty_test.xlsx")
+empty_test_file = str(Path(tempfile.gettempdir()) / "r5_empty_test.xlsx")
+wb.save(empty_test_file)
 
-fp = "/tmp/r5_empty_test.xlsx"
+fp = empty_test_file
 
 print("=" * 60)
 print("空表聚合查询诊断")
@@ -53,9 +57,10 @@ ws2.title = "test2"
 ws2.append(["ID", "Val"])
 ws2.append([1, 10])
 ws2.append([2, 20])
-wb2.save("/tmp/r5_where_empty.xlsx")
+where_empty_file = str(Path(tempfile.gettempdir()) / "r5_where_empty.xlsx")
+wb2.save(where_empty_file)
 
-fp2 = "/tmp/r5_where_empty.xlsx"
+fp2 = where_empty_file
 
 for sql in [
     "SELECT COUNT(*) as cnt FROM test2 WHERE ID > 99",

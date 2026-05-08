@@ -1,8 +1,11 @@
 """完整追踪: openpyxl写入 → calamine读取 → _optimize_dtypes → 查询结果"""
 
 import sys
+import tempfile
+from pathlib import Path
 
-sys.path.insert(0, "/root/workspace/excel-mcp-server/src")
+REPO_ROOT = Path(__file__).resolve().parents[1]
+sys.path.insert(0, str(REPO_ROOT / "src"))
 import pandas as pd
 from openpyxl import Workbook
 
@@ -30,7 +33,7 @@ equip_data = [
 ]
 for row in equip_data:
     ws.append(list(row))
-fp = "/tmp/r5_trace_test.xlsx"
+fp = str(Path(tempfile.gettempdir()) / "r5_trace_test.xlsx")
 wb.save(fp)
 
 print("=== Step 1: openpyxl 写入完成 ===")

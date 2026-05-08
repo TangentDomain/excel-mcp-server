@@ -1,8 +1,11 @@
 """快速验证 Bug 1 修复: COUNT(*) 空结果返回 [0]"""
 
 import sys
+import tempfile
+from pathlib import Path
 
-sys.path.insert(0, "/root/workspace/excel-mcp-server/src")
+REPO_ROOT = Path(__file__).resolve().parents[1]
+sys.path.insert(0, str(REPO_ROOT / "src"))
 from openpyxl import Workbook
 
 from excel_mcp_server_fastmcp.api.advanced_sql_query import (
@@ -17,9 +20,10 @@ ws.title = "test"
 ws.append(["ID", "Name"])
 ws.append([1, "aaa"])
 ws.append([2, "bbb"])
-wb.save("/tmp/r5_fix_test.xlsx")
+test_file = str(Path(tempfile.gettempdir()) / "r5_fix_test.xlsx")
+wb.save(test_file)
 
-fp = "/tmp/r5_fix_test.xlsx"
+fp = test_file
 
 print("=" * 60)
 print("验证1: COUNT(*) 正常情况")

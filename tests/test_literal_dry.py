@@ -2,10 +2,10 @@ import numpy as np
 """测试 Literal 解析 DRY 统一：_extract_literal_value 和 _parse_literal_value 委托关系"""
 import pytest
 import sys
-import os
+from pathlib import Path
 
-# 添加源码路径（worktree兼容）
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', 'src'))
+REPO_ROOT = Path(__file__).resolve().parents[1]
+sys.path.insert(0, str(REPO_ROOT / "src"))
 from excel_mcp_server_fastmcp.api.advanced_sql_query import AdvancedSQLQueryEngine
 
 

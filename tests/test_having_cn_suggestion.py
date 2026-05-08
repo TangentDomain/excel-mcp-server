@@ -6,7 +6,10 @@ Regression test for round 72 pre-existing limitation:
 """
 import pytest
 import sys
-sys.path.insert(0, 'src')
+from pathlib import Path
+
+REPO_ROOT = Path(__file__).resolve().parents[1]
+sys.path.insert(0, str(REPO_ROOT / "src"))
 
 from excel_mcp_server_fastmcp.api.advanced_sql_query import execute_advanced_sql_query
 

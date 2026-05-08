@@ -1,8 +1,11 @@
 """对比 calamine vs openpyxl 引擎读取极小浮点数"""
 
 import sys
+import tempfile
+from pathlib import Path
 
-sys.path.insert(0, "/root/workspace/excel-mcp-server/src")
+REPO_ROOT = Path(__file__).resolve().parents[1]
+sys.path.insert(0, str(REPO_ROOT / "src"))
 import pandas as pd
 from openpyxl import Workbook
 
@@ -13,9 +16,8 @@ ws.title = "test"
 ws.append(["ID", "Val"])
 ws.append([1, 0.000001])
 ws.append([2, 8.88e-2])
-wb.save("/tmp/r5_float_test.xlsx")
-
-fp = "/tmp/r5_float_test.xlsx"
+fp = str(Path(tempfile.gettempdir()) / "r5_float_test.xlsx")
+wb.save(fp)
 
 print("=== openpyxl 直接读 ===")
 from openpyxl import load_workbook

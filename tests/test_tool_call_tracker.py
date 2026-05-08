@@ -1,11 +1,12 @@
 """ToolCallTracker 工具调用追踪器测试"""
 
 import sys
-import os
+from pathlib import Path
 import time
 
 # 确保能导入包
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', 'src'))
+REPO_ROOT = Path(__file__).resolve().parents[1]
+sys.path.insert(0, str(REPO_ROOT / "src"))
 
 from excel_mcp_server_fastmcp.server import ToolCallTracker, _track_call, _tracker
 

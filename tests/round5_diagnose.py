@@ -1,8 +1,11 @@
 """诊断 Round 5 两个失败用例的根因"""
 
 import sys
+import tempfile
+from pathlib import Path
 
-sys.path.insert(0, "/root/workspace/excel-mcp-server/src")
+REPO_ROOT = Path(__file__).resolve().parents[1]
+sys.path.insert(0, str(REPO_ROOT / "src"))
 import pandas as pd
 from openpyxl import load_workbook
 
@@ -10,7 +13,8 @@ print("=" * 60)
 print("诊断1: 极小浮点数精度 (A4)")
 print("=" * 60)
 
-wb = load_workbook("/tmp/excelmcp_round5_test.xlsx")
+test_file = str(Path(tempfile.gettempdir()) / "excelmcp_round5_test.xlsx")
+wb = load_workbook(test_file)
 ws = wb["装备"]
 
 for row in ws.iter_rows(min_row=2, values_only=True):
@@ -20,7 +24,7 @@ for row in ws.iter_rows(min_row=2, values_only=True):
         print(f"Price type={type(row[4])}, value={row[4]!r}")
         break
 
-df = pd.read_excel("/tmp/excelmcp_round5_test.xlsx", sheet_name="装备", engine="openpyxl")
+df = pd.read_excel(test_file, sheet_name="装备", engine="openpyxl")
 row12 = df[df["ID"] == 12]
 print("\nPandas 读取:")
 print(row12.to_dict("records"))
@@ -40,7 +44,7 @@ from excel_mcp_server_fastmcp.api.advanced_sql_query import (
     execute_advanced_sql_query,
 )
 
-file_path = "/tmp/excelmcp_round5_test.xlsx"
+file_path = test_file
 
 # 先看看当前有哪些 '边界测试' 行
 r1 = execute_advanced_sql_query(file_path, "SELECT ID, Name FROM 装备 WHERE Name LIKE '边界测试%'")

@@ -1,8 +1,11 @@
 """回归测试: 确认 Round 5 修复不破坏已有功能"""
 
 import sys
+import tempfile
+from pathlib import Path
 
-sys.path.insert(0, "/root/workspace/excel-mcp-server/src")
+REPO_ROOT = Path(__file__).resolve().parents[1]
+sys.path.insert(0, str(REPO_ROOT / "src"))
 from openpyxl import Workbook
 
 from excel_mcp_server_fastmcp.api.advanced_sql_query import (
@@ -17,9 +20,8 @@ ws.append(["ID", "Name", "Score", "Rate"])
 ws.append([1, "Alice", 95.5, 0.123])
 ws.append([2, "Bob", 87.25, 0.05])
 ws.append([3, "Charlie", 0.0, 0.999])
-wb.save("/tmp/r5_regression.xlsx")
-
-fp = "/tmp/r5_regression.xlsx"
+fp = str(Path(tempfile.gettempdir()) / "r5_regression.xlsx")
+wb.save(fp)
 passed = 0
 failed = 0
 
@@ -107,9 +109,10 @@ ws2.append(["ID", "Val"])
 ws2.append([1, 0.000001])
 ws2.append([2, 8.88e-2])
 ws2.append([3, 0.005])
-wb2.save("/tmp/r5_tiny.xlsx")
+tiny_fp = str(Path(tempfile.gettempdir()) / "r5_tiny.xlsx")
+wb2.save(tiny_fp)
 
-r = execute_advanced_sql_query("/tmp/r5_tiny.xlsx", "SELECT Val FROM tiny WHERE ID = 1")
+r = execute_advanced_sql_query(tiny_fp, "SELECT Val FROM tiny WHERE ID = 1")
 check(
     "极小值 0.000001 不截断",
     r,
@@ -117,7 +120,7 @@ check(
     f"期望~0.000001, 实际{r.get('data')}",
 )
 
-r = execute_advanced_sql_query("/tmp/r5_tiny.xlsx", "SELECT Val FROM tiny WHERE ID = 2")
+r = execute_advanced_sql_query(tiny_fp, "SELECT Val FROM tiny WHERE ID = 2")
 check(
     "小数值 0.0888 保留",
     r,
@@ -125,7 +128,7 @@ check(
     f"期望~0.0888, 实际{r.get('data')}",
 )
 
-r = execute_advanced_sql_query("/tmp/r5_tiny.xlsx", "SELECT Val FROM tiny WHERE ID = 3")
+r = execute_advanced_sql_query(tiny_fp, "SELECT Val FROM tiny WHERE ID = 3")
 check(
     "中 小值 0.005 保留",
     r,

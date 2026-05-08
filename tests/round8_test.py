@@ -10,9 +10,11 @@ import random
 import sys
 import tempfile
 import traceback
+from pathlib import Path
 
 # 设置环境
-sys.path.insert(0, "/root/workspace/excel-mcp-server/src")
+REPO_ROOT = Path(__file__).resolve().parents[1]
+sys.path.insert(0, str(REPO_ROOT / "src"))
 
 from openpyxl import Workbook
 
@@ -140,7 +142,7 @@ def create_test_xlsx():
     # 负数（异常数据）
     ws_equip.append([1004, "负数异常", -10, -5.5, -99.99, "Rare", "Helmet"])
 
-    tmpfile = tempfile.mktemp(suffix=".xlsx")
+    tmpfile = str(Path(tempfile.gettempdir()) / "excelmcp_round8_test.xlsx")
     wb.save(tmpfile)
     return tmpfile
 
