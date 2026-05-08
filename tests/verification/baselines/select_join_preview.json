@@ -1,0 +1,77 @@
+{
+  "data": [
+    [
+      "技能名称",
+      "skill_name",
+      "技能类型",
+      "skill_type",
+      "伤害",
+      "damage",
+      "装备ID",
+      "equip_id"
+    ],
+    [
+      "火球术",
+      "fireball",
+      "攻击",
+      "attack",
+      150,
+      150,
+      "E001",
+      "E001"
+    ],
+    [
+      "冰冻术",
+      "ice_freeze",
+      "控制",
+      "control",
+      80,
+      80,
+      "E002",
+      "E002"
+    ],
+    [
+      "斩击",
+      "slash",
+      "攻击",
+      "attack",
+      200,
+      200,
+      "E003",
+      "E003"
+    ]
+  ],
+  "query_info": {
+    "available_tables": [
+      "技能表"
+    ],
+    "columns_returned": 8,
+    "data_types": {
+      "damage": "integer",
+      "equip_id": "string",
+      "skill_name": "string",
+      "skill_type": "string",
+      "伤害": "integer",
+      "技能名称": "string",
+      "技能类型": "string",
+      "装备ID": "string"
+    },
+    "filtered_rows": 3,
+    "original_rows": 5,
+    "output_format": "json",
+    "query_applied": true,
+    "returned_columns": [
+      "技能名称",
+      "skill_name",
+      "技能类型",
+      "skill_type",
+      "伤害",
+      "damage",
+      "装备ID",
+      "equip_id"
+    ],
+    "returned_rows": 3,
+    "truncated": false
+  },
+  "success": true
+}

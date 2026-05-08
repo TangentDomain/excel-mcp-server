@@ -233,3 +233,6 @@ test_range.xlsx
 # 版本标记文件
 VERSION
 CURRENT_VERSION
+
+# 闭环验证运行产物
+artifacts/verification/

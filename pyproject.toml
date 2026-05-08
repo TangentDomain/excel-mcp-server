@@ -36,6 +36,7 @@ where = ["src"]
 
 [project.scripts]
 excel-mcp-server-fastmcp = "excel_mcp_server_fastmcp:main"
+excel-mcp-verify = "excel_mcp_server_fastmcp.verification.cli:main"
 
 [project.urls]
 Homepage = "https://github.com/TangentDomain/excel-mcp-server"
@@ -90,6 +91,7 @@ markers = [
     "utils: 标记工具模块测试",
     "xdist_group: pytest-xdist 并行分组",
     "timeout: 超时限制",
+    "verification: 标记 baseline 驱动闭环验证",
 ]
 norecursedirs = [
     ".git", ".tox", "dist", "build", "*.egg",

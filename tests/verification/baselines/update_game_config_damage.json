@@ -1,0 +1,62 @@
+{
+  "post_state": {
+    "data": [
+      [
+        "skill_id",
+        "skill_name",
+        "damage",
+        "cooldown"
+      ],
+      [
+        "SK001",
+        "火球术",
+        101,
+        5
+      ]
+    ],
+    "query_info": {
+      "available_tables": [
+        "技能配置"
+      ],
+      "column_descriptions": {
+        "cooldown": "冷却时间",
+        "damage": "伤害",
+        "skill_id": "技能ID",
+        "skill_name": "技能名称"
+      },
+      "columns_returned": 4,
+      "data_types": {
+        "cooldown": "integer",
+        "damage": "integer",
+        "skill_id": "string",
+        "skill_name": "string"
+      },
+      "dual_header": true,
+      "filtered_rows": 1,
+      "original_rows": 10,
+      "output_format": "json",
+      "query_applied": true,
+      "returned_columns": [
+        "skill_id",
+        "skill_name",
+        "damage",
+        "cooldown"
+      ],
+      "returned_rows": 1,
+      "truncated": false
+    },
+    "success": true
+  },
+  "update_result": {
+    "affected_rows": 1,
+    "changes": [
+      {
+        "column": "damage",
+        "new_value": 101,
+        "old_value": 100,
+        "row": 2
+      }
+    ],
+    "success": true
+  }
+}
