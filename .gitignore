@@ -173,6 +173,7 @@ BEFORE_COMMIT
 # 一次性测试/修复脚本（根目录散落）
 test_req*.py
 test_*.py
+!tests/**/test_*.py
 fix_*.py
 verify_*.py
 debug_*.py
