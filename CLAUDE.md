@@ -381,3 +381,203 @@ __version__ = "1.9.3"  # 递增版本号
 
 **最后更新**: 2026-04-14
 **维护者**: tangjian
+
+---
+
+## 🛡️ 不变量驱动开发（IDD）体系
+
+### 定位正确性
+
+本项目是「SQL-over-Excel」引擎，正确性天然二值——同一条 SQL 在 ExcelMCP 和 SQLite 上的结果必须一致（浮点容差 0.01）。
+因此可以直接进入 IDD 循环，无需投影层。
+
+### 真值来源
+
+| 真值 | 位置 | 查阅方式 |
+|------|------|----------|
+| SQL 标准行为 | SQLite 3.x | `calibrator` 导入 Excel → 跑同 SQL → 对比结果 |
+| 文件完整性 | Excel 文件本身 | 操作前后用 openpyxl 读取验证 |
+| API 契约 | `advanced_sql_query.py` 公共 API | 返回值结构 `{success, data, message}` |
+
+### 判据执行方式
+
+```bash
+# 全量不变量检查（CI 集成用）
+python -m pytest tests/invariants/ -v --tb=short
+
+# 快速烟雾测试（开发中用）
+python -m pytest tests/invariants/ -v -k "smoke"
+
+# SQLite 交叉校验
+python -m pytest tests/test_p02_sqlite_cross_validation.py -v
+```
+
+执行时间：全量 < 60s，烟雾 < 10s。输出格式：pytest 标准输出，二值（PASS/FAIL）。
+
+### 不变量清单
+
+#### L1 外部真值（SQL 标准 + 文件系统）
+
+| 编号 | 名称 | 检查内容 | 发现来源 |
+|------|------|----------|----------|
+| INV-1 | 结果结构一致性 | `result` 必须包含 `success` (bool)、`data` (list)、`message` (str) 三个键 | 初始设计 |
+| INV-2 | SQL-SQLite 结果对齐 | 同一 SQL 在 ExcelMCP 和 SQLite 上的结果集一致（浮点容差 0.01，列顺序无关） | 初始设计 |
+| INV-3 | 文件完整性守恒 | SELECT 不修改文件；UPDATE/INSERT/DELETE 只修改目标 sheet，其他 sheet 和文件属性不变 | 初始设计 |
+| INV-4 | 行数守恒 | `SELECT COUNT(*)` 返回的行数 = 实际数据行数（不含表头） | 初始设计 |
+
+#### L2 架构原则
+
+| 编号 | 名称 | 检查内容 | 发现来源 |
+|------|------|----------|----------|
+| INV-5 | 失败安全 | `success=False` 时 `data` 为空列表，`message` 非空且不含堆栈信息 | 初始设计 |
+| INV-6 | 错误可分类 | 所有错误消息能被 `ToolCallTracker.classify_error()` 归入已知类别 | 初始设计 |
+| INV-7 | 幂等读取 | 同一 SELECT 连续执行两次，结果完全一致 | 初始设计 |
+| INV-8 | LIMIT 约束 | `SELECT ... LIMIT N` 返回行数 ≤ N | 初始设计 |
+| INV-9 | 聚合语义正确 | `COUNT(*)` ≥ `COUNT(col)`（NULL 不计）；`SUM` 忽略 NULL；空表 `COUNT` → 0，`SUM/AVG/MIN/MAX` → NULL | 初始设计 |
+
+#### L3 具体不变量（对抗发现，持续生长）
+
+| 编号 | 名称 | 检查内容 | 发现来源 |
+|------|------|----------|----------|
+| INV-10 | 窗口函数唯一性 | `ROW_NUMBER()` 在同一 PARTITION 内严格递增且无重复 | 初始设计 |
+| INV-11 | 排名标准合规 | `RANK()` 在并列时跳号（1,1,3），`DENSE_RANK()` 不跳号（1,1,2） | 初始设计 |
+| INV-12 | 空表安全 | 空表上执行任意 SELECT 返回空数据行但不报错；聚合返回 NULL/0 | 初始设计 |
+| INV-13 | 特殊字符安全 | 列名/值含中文、emoji、单引号、反斜杠时查询不崩溃 | 初始设计 |
+| INV-14 | 除零安全 | `1/0` 返回 NULL 而非 inf 或崩溃 | 初始设计 |
+| INV-15 | LIKE 安全 | LIKE 模式含正则元字符（`[`、`]`）时不崩溃；超长模式被拒绝 | 初始设计 |
+| INV-16 | UPDATE 后读回验证 | UPDATE 后 SELECT 读回，SET 表达式生效、非目标列/行不变、幂等 | Round 1 对抗 |
+| INV-17 | INSERT 行数守恒 | INSERT N 行后 COUNT(*) 增加 N；读回验证列值；失败不改变文件 | Round 1 对抗 |
+| INV-18 | DELETE 行数守恒 | DELETE 后 COUNT(*) 减少 affected_rows；被删行不再出现；失败安全 | Round 1 对抗 |
+| INV-20 | 公式列守恒 | 含公式的文件 UPDATE 后，非目标列公式仍存在或被正确计算 | Round 1 对抗 |
+| INV-22 | affected_rows 精确 | `affected_rows` == 实际变更行数（openpyxl 验证） | Round 1 对抗 |
+| INV-23 | 无匹配写操作安全 | UPDATE/DELETE WHERE 无匹配 → affected_rows=0，文件完全不变 | Round 1 对抗 |
+| INV-24 | NULL 写入语义 | 数值列写 NULL 后读回为 NULL/空；不影响其他列/行/行数 | Round 1 对抗 |
+| INV-25 | DISTINCT 语义正确性 | DISTINCT 消除重复行；COUNT(DISTINCT) 排除 NULL（SQL 标准） | Round 3 对抗 |
+| INV-26 | HAVING 子句正确性 | HAVING 在 GROUP BY 后正确过滤；HAVING vs WHERE 区别 | Round 3 对抗 |
+| INV-27 | NULL 比较正确性 | IS NULL/IS NOT NULL 正确识别空值；UPDATE 后 IS NULL 可检测 | Round 3 对抗 |
+| INV-28 | 子查询正确性 | IN(SELECT...)、NOT IN(SELECT...)、标量子查询正确执行 | Round 3 对抗 |
+| INV-29 | OFFSET 边界正确性 | OFFSET 超总行数返回空；OFFSET 0 等同不使用 | Round 3 对抗 |
+| INV-30 | NOT IN/NOT LIKE 语义 | NOT IN 排除指定值；NOT LIKE 排除匹配行 | Round 3 对抗 |
+| INV-31 | 双行表头写操作 | 双行表头表的 UPDATE/INSERT/DELETE 正确工作 | Round 3 对抗 |
+| INV-32 | _ROW_NUMBER_ 写操作 | UPDATE/DELETE WHERE _ROW_NUMBER_ 精确定位行 | Round 3 对抗 |
+```
+L1: SQL 标准（SQLite 参考实现）
+  └─ L2: 结果可复现、失败安全、API 契约稳定
+      └─ L3: INV-1~4 结果结构/对齐/完整性/行数
+      └─ L3: INV-5~6 错误处理质量
+      └─ L3: INV-7~9 读取幂等/LIMIT/聚合语义
+      └─ L3: INV-10~15 窗口函数/空表/特殊字符/除零/LIKE
+      └─ L3: INV-19 写操作 SQLite 对齐
+      └─ L3: INV-20 公式列守恒
+      └─ L3: INV-21 跨文件 JOIN 真值
+      └─ L3: INV-22~24 affected_rows精确/无匹配安全/NULL写入语义
+      └─ L3: INV-25~28 DISTINCT/HAVING/NULL比较/子查询
+      └─ L3: INV-29~32 OFFSET边界/NOT操作/双行表头写操作/_ROW_NUMBER_写操作
+
+### 对抗策略
+
+当前已实施的对抗维度：
+
+| 数据篡改 | 空表、单行表、全 NULL 列、超长字符串(5000char)、inf/nan | INV-4, INV-9, INV-12, INV-13, INV-14 |
+| 类型混淆 | 数字列混入文本、空字符串 vs NULL | INV-9, INV-13 |
+| 编码破坏 | 中文/日文/韩文/emoji 列名和值、单引号、反斜杠 | INV-13 |
+| 边界值 | LIMIT 0、OFFSET 超范围、负数、极大值(1e15)、极小值(0.000000001) | INV-8, INV-12 |
+| SQL 注入 | LIKE 模式含正则元字符、超长 LIKE 模式 | INV-15 |
+| 窗口函数 | 空/单行表上跑所有窗口函数、无 ORDER BY 的窗口 | INV-10, INV-11, INV-12 |
+| 交叉验证 | 同一 SQL 跑 ExcelMCP + SQLite 对比 | INV-2 |
+| **写操作语义** | **UPDATE 读回验证、INSERT/DELETE 行数守恒、NULL 写入** | **INV-16, INV-17, INV-18, INV-24** |
+| **公式保留** | **含公式 Excel 上 UPDATE 后公式列完整性** | **INV-20** |
+| **affected_rows 精确性** | **WHERE 匹配/不匹配时 affected_rows 准确性** | **INV-22, INV-23** |
+
+待升级维度（连续 3 轮零发现后启用）：
+- **并发竞争**：多线程同时 UPDATE 同一文件
+- **大文件压力**：10 万行 × 1000 列的聚合/JOIN 性能
+
+### 收敛状态
+
+- **当前轮次**：Round 3（SQL 功能边界）
+- **连续零发现**：0 轮
+- **不变量总数**：32 条（L1: 4, L2: 5, L3: 23）
+- **测试总数**：154 passed, 3 skipped
+- **收敛评级**：C（三轮对抗完成，连续 0 新 bug 发现）
+- **下次对抗触发条件**：新功能合并后、或手动启动
+
+```
+- ❌ 不要在 UPDATE 后假设值已正确写入 → 用 SELECT 读回验证（INV-16）
+- ❌ 不要在 INSERT/DELETE 后假设行数正确 → 用 COUNT(*) 验证（INV-17, INV-18）
+- ❌ 不要在 UPDATE/INSERT/DELETE 后假设文件未变更 → 用 openpyxl 重新读取验证（INV-3）
+- ❌ 不要假设 SELECT 返回的行数等于 Excel 可见行数 → 用 COUNT(*) 验证（INV-4）
+- ❌ 不要手动构造 expected 结果 → 用 SQLite 交叉校验（INV-2）
+- ❌ 不要在测试中容忍 inf/nan → 应返回 NULL（INV-14）
+- ❌ 不要跳过空表测试 → 空表是最常见的边界 case（INV-12）
+- ❌ 不要假设 affected_rows 准确 → 用 openpyxl 实际验证（INV-22）
+- ❌ 不要假设无匹配的写操作是安全的 → 验证文件未变（INV-23）
+```
+
+### 不变量生长记录
+
+#### Round 0 — 2026-05-10（初始设计）
+
+**对抗策略**：基于现有测试覆盖分析，从 test_p02_sqlite_cross_validation.py、test_r42_edge_cases.py、test_r44_edge_cases.py 中提炼。
+
+**发现**：
+- 新 bug：0 个
+- 新不变量：15 条（全部初始设计）
+- 假阴性升级：0 条
+
+**不变集状态**：77 passed, 3 skipped
+
+#### Round 1 — 2026-05-10（写操作对抗）
+
+**对抗策略**：Oracle + Explore 并行诊断，针对写入路径的系统性盲区设计对抗。
+
+**诊断发现**（Oracle 诊断报告）：
+- FN-1: UPDATE 静默写错值（高危假阴性）→ 设计 INV-16 消除
+- FN-2: INSERT 写到错误行（高危假阴性）→ 设计 INV-17 消除
+- FN-3: DELETE 删错行（高危假阴性）→ 设计 INV-18 消除
+- FN-4: UPDATE 覆盖公式列（高危假阴性）→ 设计 INV-20 消除
+- FN-8: affected_rows 多报/少报（中危假阴性）→ 设计 INV-22 消除
+- G1~G5: 写操作无 SQLite 交叉校验（高严重度间隙）→ 留待 Round 2
+
+**对抗结果**：
+- 新 bug：0 个（全部 114 测试通过）
+- 新不变量：7 条（INV-16/17/18/20/22/23/24）
+- 假阴性消除：6 个高危假阴性被 INV-16~24 覆盖
+- 剩余假阴性：G1~G5（写操作 SQLite 对齐）、跨文件 JOIN 真值
+
+**不变集状态**：114 passed, 3 skipped
+
+**技术发现**：pandas FutureWarning 提示 L9367 `df.at[idx, col_name] = new_val` 存在 dtype 不兼容风险，`except (ValueError, TypeError, OverflowError): pass` 静默跳过类型转换错误。非当前 bug 但属技术债。
+
+#### Round 2 — 2026-05-11（SQLite 对齐 + 跨文件 JOIN）
+
+**对抗策略**：针对 G1（写操作 SQLite 对齐）和 G2（跨文件 JOIN 真值）两个高优先级间隙设计对抗。
+
+**诊断发现**：
+- calibrator `cmd_query` 不调用 `conn.commit()`，DML 不持久化 → 测试中直接用 sqlite3 连接执行 DML
+- 跨文件 JOIN 语法 `表名@'path'`，calibrator 支持多文件导入同一 db → 可直接对比
+
+**对抗结果**：
+- 新 bug：0 个（全部 125 测试通过）
+- 新不变量：2 条（INV-19/21）
+- 假阴性消除：G1（写操作 SQLite 对齐）、G2（跨文件 JOIN 真值）
+- 剩余假阴性：并发竞争、大文件压力、跨文件 UPDATE 原子性
+
+**不变集状态**：125 passed, 3 skipped
+
+#### Round 3 — 2026-05-11（SQL 功能边界）
+
+**对抗策略**：扫描 SQL 功能覆盖间隙，针对 DISTINCT/HAVING/NULL比较/子查询/OFFSET/双行表头写操作/_ROW_NUMBER_ 写操作设计对抗。
+
+**对抗结果**：
+- 新 bug：0 个（全部 154 测试通过）
+- 新不变量：8 条（INV-25~32）
+- 假阴性消除：SQL 功能边界覆盖间隙全部填补
+- 剩余假阴性：并发竞争、大文件压力、跨文件 UPDATE 原子性
+
+**不变集状态**：154 passed, 3 skipped
+
+---
+
+**最后更新**: 2026-05-11
+**维护者**: tangjian
