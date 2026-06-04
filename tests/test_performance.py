@@ -5,20 +5,22 @@
 建立性能基准和回归检测机制
 """
 
-import pytest
-import tempfile
 import os
-import time
+import tempfile
 import threading
-from pathlib import Path
-from openpyxl import Workbook
+import time
 from concurrent.futures import ThreadPoolExecutor, as_completed
+from pathlib import Path
+
+import pytest
+from openpyxl import Workbook
 
 from excel_mcp_server_fastmcp.api.excel_operations import ExcelOperations
 
 # Optional psutil import for memory monitoring
 try:
     import psutil
+
     PSUTIL_AVAILABLE = True
 except ImportError:
     PSUTIL_AVAILABLE = False
@@ -102,9 +104,9 @@ class TestPerformanceBenchmarks:
         result = ExcelOperations.get_range(str(file_path), "SmallData!A1:J100")
         end_time = time.time()
 
-        assert result['success'] is True
-        assert len(result['data']) == 100
-        assert len(result['data'][0]) == 10
+        assert result["success"] is True
+        assert len(result["data"]) == 100
+        assert len(result["data"][0]) == 10
 
         read_time = end_time - start_time
         print(f"小数据集(100x10)读取时间: {read_time:.3f}秒")
@@ -116,9 +118,9 @@ class TestPerformanceBenchmarks:
         """测试中等数据集读取性能"""
         # 测试不同大小的数据块读取
         test_cases = [
-            ("A1:T50", 50, 20),      # 50行 x 20列
-            ("A1:T100", 100, 20),    # 100行 x 20列
-            ("A1:T200", 200, 20),    # 200行 x 20列
+            ("A1:T50", 50, 20),  # 50行 x 20列
+            ("A1:T100", 100, 20),  # 100行 x 20列
+            ("A1:T200", 200, 20),  # 200行 x 20列
         ]
 
         performance_results = []
@@ -128,21 +130,17 @@ class TestPerformanceBenchmarks:
             result = ExcelOperations.get_range(large_dataset_file, f"LargeData!{range_expr}")
             end_time = time.time()
 
-            assert result['success'] is True
-            assert len(result['data']) == expected_rows
+            assert result["success"] is True
+            assert len(result["data"]) == expected_rows
 
             read_time = end_time - start_time
-            performance_results.append({
-                'range': range_expr,
-                'time': read_time,
-                'cells': expected_rows * expected_cols
-            })
+            performance_results.append({"range": range_expr, "time": read_time, "cells": expected_rows * expected_cols})
 
             print(f"数据块 {range_expr} 读取时间: {read_time:.3f}秒 ({expected_rows * expected_cols}个单元格)")
 
         # 性能验证：读取速度应该在合理范围内
         for result in performance_results:
-            cells_per_second = result['cells'] / result['time']
+            cells_per_second = result["cells"] / result["time"]
             print(f"  读取速度: {cells_per_second:.0f} 单元格/秒")
             assert cells_per_second > 5, f"读取速度过慢: {cells_per_second:.0f} 单元格/秒"
 
@@ -164,15 +162,10 @@ class TestPerformanceBenchmarks:
 
         # 性能测试：写入数据
         start_time = time.time()
-        result = ExcelOperations.update_range(
-            str(file_path),
-            "WriteTest!A1:J50",
-            test_data,
-            preserve_formulas=False
-        )
+        result = ExcelOperations.update_range(str(file_path), "WriteTest!A1:J50", test_data, preserve_formulas=False)
         end_time = time.time()
 
-        assert result['success'] is True
+        assert result["success"] is True
 
         write_time = end_time - start_time
         cells_written = 50 * 10
@@ -185,12 +178,7 @@ class TestPerformanceBenchmarks:
 
     def test_search_performance(self, large_dataset_file):
         """测试搜索性能"""
-        test_patterns = [
-            ("Data_500", "精确搜索"),
-            (r"\d{3}", "正则表达式搜索"),
-            ("Special_50", "特殊字符串搜索"),
-            ("Column_25", "表头搜索")
-        ]
+        test_patterns = [("Data_500", "精确搜索"), (r"\d{3}", "正则表达式搜索"), ("Special_50", "特殊字符串搜索"), ("Column_25", "表头搜索")]
 
         performance_results = []
 
@@ -198,46 +186,32 @@ class TestPerformanceBenchmarks:
             use_regex = pattern.startswith("r\\")
 
             start_time = time.time()
-            result = ExcelOperations.search(
-                large_dataset_file,
-                pattern,
-                "LargeData",
-                use_regex=use_regex
-            )
+            result = ExcelOperations.search(large_dataset_file, pattern, "LargeData", use_regex=use_regex)
             end_time = time.time()
 
-            assert result['success'] is True
+            assert result["success"] is True
 
             search_time = end_time - start_time
-            match_count = len(result.get('data', []))
+            match_count = len(result.get("data", []))
 
-            performance_results.append({
-                'pattern': pattern,
-                'description': description,
-                'time': search_time,
-                'matches': match_count
-            })
+            performance_results.append({"pattern": pattern, "description": description, "time": search_time, "matches": match_count})
 
             print(f"{description}: {search_time:.3f}秒, 找到 {match_count} 个匹配")
 
         # 性能验证：搜索应该快速完成
         for result in performance_results:
-            assert result['time'] < 5.0, f"{result['description']} 过慢: {result['time']:.3f}秒"
+            assert result["time"] < 5.0, f"{result['description']} 过慢: {result['time']:.3f}秒"
 
     def test_concurrent_read_performance(self, multi_sheet_file):
         """测试并发读取性能（优化后）"""
+
         def read_worker(sheet_name):
             """读取工作表的工作线程"""
             start_time = time.time()
             result = ExcelOperations.get_range(multi_sheet_file, f"{sheet_name}!A1:J50")
             end_time = time.time()
 
-            return {
-                'sheet': sheet_name,
-                'success': result['success'],
-                'time': end_time - start_time,
-                'rows': len(result['data']) if result['success'] else 0
-            }
+            return {"sheet": sheet_name, "success": result["success"], "time": end_time - start_time, "rows": len(result["data"]) if result["success"] else 0}
 
         # 并发读取所有工作表
         sheet_names = [f"Sheet_{i}" for i in range(1, 6)]
@@ -249,8 +223,8 @@ class TestPerformanceBenchmarks:
         end_time = time.time()
 
         total_time = end_time - start_time
-        successful_reads = sum(1 for r in results if r['success'])
-        avg_read_time = sum(r['time'] for r in results) / len(results)
+        successful_reads = sum(1 for r in results if r["success"])
+        avg_read_time = sum(r["time"] for r in results) / len(results)
 
         print(f"并发读取5个工作表:")
         print(f"  总耗时: {total_time:.3f}秒")
@@ -269,16 +243,12 @@ class TestPerformanceBenchmarks:
         initial_memory = process.memory_info().rss / 1024 / 1024  # MB
 
         # 读取文件的不同部分
-        ranges_to_read = [
-            "LargeData!A1:T50",
-            "LargeData!A51:T100",
-            "LargeData!A101:T150"
-        ]
+        ranges_to_read = ["LargeData!A1:T50", "LargeData!A51:T100", "LargeData!A101:T150"]
 
         peak_memory = initial_memory
         for range_expr in ranges_to_read:
             result = ExcelOperations.get_range(large_dataset_file, range_expr)
-            assert result['success'] is True
+            assert result["success"] is True
 
             current_memory = process.memory_info().rss / 1024 / 1024
             peak_memory = max(peak_memory, current_memory)
@@ -317,17 +287,12 @@ class TestPerformanceBenchmarks:
         for i in range(5):
             # 读取操作
             result = ExcelOperations.get_range(str(file_path), "MemoryTest!A1:J100")
-            assert result['success'] is True
+            assert result["success"] is True
 
             # 写入操作
             test_data = [[f"Update_{i}_{r}_{c}" for c in range(10)] for r in range(5)]
-            update_result = ExcelOperations.update_range(
-                str(file_path),
-                "MemoryTest!A1:J5",
-                test_data,
-                preserve_formulas=False
-            )
-            assert update_result['success'] is True
+            update_result = ExcelOperations.update_range(str(file_path), "MemoryTest!A1:J5", test_data, preserve_formulas=False)
+            assert update_result["success"] is True
 
             # 记录内存使用
             current_memory = process.memory_info().rss / 1024 / 1024
@@ -335,6 +300,7 @@ class TestPerformanceBenchmarks:
 
             # 强制垃圾回收
             import gc
+
             gc.collect()
 
         # 分析内存使用趋势
@@ -380,35 +346,27 @@ class TestPerformanceBenchmarks:
             for i in range(5):  # 每个线程执行5次操作
                 # 读取操作
                 read_result = ExcelOperations.get_range(file_path, f"TestSheet{worker_id}!A1:E25")
-                if read_result['success']:
+                if read_result["success"]:
                     operations += 1
 
                 # 列表操作
                 sheets_result = ExcelOperations.list_sheets(file_path)
-                if sheets_result['success']:
+                if sheets_result["success"]:
                     operations += 1
 
             end_time = time.time()
-            return {
-                'worker_id': worker_id,
-                'operations': operations,
-                'time': end_time - start_time,
-                'ops_per_second': operations / (end_time - start_time)
-            }
+            return {"worker_id": worker_id, "operations": operations, "time": end_time - start_time, "ops_per_second": operations / (end_time - start_time)}
 
         # 并发执行操作
         start_time = time.time()
         with ThreadPoolExecutor(max_workers=3) as executor:
-            futures = [
-                executor.submit(simple_operation_worker, file_path, i)
-                for i, file_path in enumerate(test_files)
-            ]
+            futures = [executor.submit(simple_operation_worker, file_path, i) for i, file_path in enumerate(test_files)]
             results = [future.result() for future in as_completed(futures)]
         end_time = time.time()
 
         total_time = end_time - start_time
-        total_operations = sum(r['operations'] for r in results)
-        avg_ops_per_second = sum(r['ops_per_second'] for r in results) / len(results)
+        total_operations = sum(r["operations"] for r in results)
+        avg_ops_per_second = sum(r["ops_per_second"] for r in results) / len(results)
 
         print(f"线程安全性性能测试（简化版）:")
         print(f"  总耗时: {total_time:.3f}秒")
@@ -417,7 +375,7 @@ class TestPerformanceBenchmarks:
 
         # 验证所有操作都成功
         for result in results:
-            assert result['operations'] == 10, f"Worker {result['worker_id']} 只完成了 {result['operations']}/10 个操作"
+            assert result["operations"] == 10, f"Worker {result['worker_id']} 只完成了 {result['operations']}/10 个操作"
 
         # 性能应该在合理范围内（低资源环境适当放宽）
         assert avg_ops_per_second > 1.5, f"并发性能过慢: {avg_ops_per_second:.1f} ops/sec"
@@ -426,25 +384,18 @@ class TestPerformanceBenchmarks:
 
     def test_stress_large_search_operations(self, large_dataset_file):
         """压力测试：搜索操作（简化版）"""
-        search_patterns = [
-            "Data_1", "Data_2", "Data_3", "Data_4", "Data_5"
-        ]
+        search_patterns = ["Data_1", "Data_2", "Data_3", "Data_4", "Data_5"]
 
         start_time = time.time()
         successful_searches = 0
         total_matches = 0
 
         for pattern in search_patterns:
-            result = ExcelOperations.search(
-                large_dataset_file,
-                pattern,
-                "LargeData",
-                use_regex=False
-            )
+            result = ExcelOperations.search(large_dataset_file, pattern, "LargeData", use_regex=False)
 
-            if result['success']:
+            if result["success"]:
                 successful_searches += 1
-                total_matches += len(result['data']) if result['data'] else 0
+                total_matches += len(result["data"]) if result["data"] else 0
 
         end_time = time.time()
         total_time = end_time - start_time
@@ -454,7 +405,7 @@ class TestPerformanceBenchmarks:
         print(f"  成功搜索: {successful_searches}")
         print(f"  总匹配数: {total_matches}")
         print(f"  总耗时: {total_time:.3f}秒")
-        print(f"  平均每次搜索: {total_time/len(search_patterns):.3f}秒")
+        print(f"  平均每次搜索: {total_time / len(search_patterns):.3f}秒")
 
         assert successful_searches == len(search_patterns), f"只有 {successful_searches}/{len(search_patterns)} 次搜索成功"
         assert total_time < 15.0, f"搜索压力测试超时: {total_time:.3f}秒"
@@ -477,25 +428,20 @@ class TestPerformanceBenchmarks:
             # 读取操作
             if i % 3 == 0:
                 result = ExcelOperations.get_range(file_path, "StressTest!A1:C5")
-                if result['success']:
+                if result["success"]:
                     operations_performed += 1
 
             # 写入操作
             elif i % 3 == 1:
                 test_data = [[f"Stress_{i}_{r}_{c}" for c in range(3)] for r in range(3)]
-                result = ExcelOperations.update_range(
-                    file_path,
-                    "StressTest!A1:C3",
-                    test_data,
-                    preserve_formulas=False
-                )
-                if result['success']:
+                result = ExcelOperations.update_range(file_path, "StressTest!A1:C3", test_data, preserve_formulas=False)
+                if result["success"]:
                     operations_performed += 1
 
             # 搜索操作
             else:
                 result = ExcelOperations.search(file_path, f"Stress_{i}", "StressTest")
-                if result['success']:
+                if result["success"]:
                     operations_performed += 1
 
         end_time = time.time()
@@ -505,7 +451,7 @@ class TestPerformanceBenchmarks:
         print(f"  计划操作数: 30")
         print(f"  成功操作数: {operations_performed}")
         print(f"  总耗时: {total_time:.3f}秒")
-        print(f"  平均每次操作: {total_time/30:.3f}秒")
+        print(f"  平均每次操作: {total_time / 30:.3f}秒")
 
         assert operations_performed >= 27, f"成功率过低: {operations_performed}/30"
         assert total_time < 30.0, f"文件操作压力测试超时: {total_time:.3f}秒"
@@ -532,7 +478,7 @@ class TestPerformanceBenchmarks:
         result = ExcelOperations.get_range(str(read_file), "Benchmark!A1:O100")
         read_time = time.time() - start_time
 
-        assert result['success'] is True
+        assert result["success"] is True
         read_cells_per_second = (100 * 15) / read_time
 
         # 2. 写入性能基准（50行 x 10列）
@@ -545,15 +491,10 @@ class TestPerformanceBenchmarks:
         write_data = [[f"Write_{r}_{c}" for c in range(10)] for r in range(50)]
 
         start_time = time.time()
-        result = ExcelOperations.update_range(
-            str(write_file),
-            "Benchmark!A1:J50",
-            write_data,
-            preserve_formulas=False
-        )
+        result = ExcelOperations.update_range(str(write_file), "Benchmark!A1:J50", write_data, preserve_formulas=False)
         write_time = time.time() - start_time
 
-        assert result['success'] is True
+        assert result["success"] is True
         write_cells_per_second = (50 * 10) / write_time
 
         # 3. 搜索性能基准（80行 x 10列）
@@ -572,7 +513,7 @@ class TestPerformanceBenchmarks:
         result = ExcelOperations.search(str(search_file), "Search_40", "Benchmark")
         search_time = time.time() - start_time
 
-        assert result['success'] is True
+        assert result["success"] is True
 
         # 性能基准报告
         print("性能回归检测基准（优化后）:")

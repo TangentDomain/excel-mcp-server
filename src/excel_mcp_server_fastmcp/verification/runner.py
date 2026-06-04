@@ -8,8 +8,6 @@ from pathlib import Path
 from typing import Any
 
 from ..api.advanced_sql_query import (
-    execute_advanced_delete_query,
-    execute_advanced_insert_query,
     execute_advanced_sql_query,
     execute_advanced_update_query,
 )
@@ -18,9 +16,8 @@ from .diff import (
     compare_structured,
     normalize_select_result,
     normalize_update_result,
-    normalize_value,
 )
-from .scenarios import BASELINE_DIR, ARTIFACT_ROOT, VerificationCase, get_verification_cases
+from .scenarios import ARTIFACT_ROOT, BASELINE_DIR, VerificationCase, get_verification_cases
 
 
 def _load_json(path: Path) -> dict[str, Any]:
@@ -128,19 +125,21 @@ def run_verification(case_ids: list[str] | None = None, update_baselines: bool =
         if diffs:
             write_json(case_dir / "diff.json", diffs)
 
-        results.append({
-            "case_id": case.case_id,
-            "kind": case.kind,
-            "fixture": str(case.fixture_path),
-            "sql": case.sql,
-            "sheet_name": case.sheet_name,
-            "baseline_path": str(baseline_path),
-            "baseline_exists": baseline_exists,
-            "passed": not diffs,
-            "diff_count": len(diffs),
-            "diffs": diffs,
-            "artifact_dir": str(case_dir),
-        })
+        results.append(
+            {
+                "case_id": case.case_id,
+                "kind": case.kind,
+                "fixture": str(case.fixture_path),
+                "sql": case.sql,
+                "sheet_name": case.sheet_name,
+                "baseline_path": str(baseline_path),
+                "baseline_exists": baseline_exists,
+                "passed": not diffs,
+                "diff_count": len(diffs),
+                "diffs": diffs,
+                "artifact_dir": str(case_dir),
+            }
+        )
 
     summary = {
         "success": all_passed,

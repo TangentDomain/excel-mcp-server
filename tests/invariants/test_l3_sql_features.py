@@ -29,8 +29,7 @@ from .conftest import (
     simple_file,
     writable_file,
 )
-from .test_l1_result_structure import _align_result, _CAL_DB
-
+from .test_l1_result_structure import _CAL_DB, _align_result
 
 # ============================================================
 # INV-25: DISTINCT 语义正确性
@@ -54,26 +53,20 @@ class TestINV25Distinct:
     def test_distinct_all_columns(self, simple_file):
         """SELECT DISTINCT * 返回唯一完整行"""
         result_all = execute_advanced_sql_query(simple_file, "SELECT * FROM 数据")
-        result_distinct = execute_advanced_sql_query(
-            simple_file, "SELECT DISTINCT * FROM 数据"
-        )
+        result_distinct = execute_advanced_sql_query(simple_file, "SELECT DISTINCT * FROM 数据")
         assert result_all["success"] and result_distinct["success"]
         # DISTINCT * 的行数 <= 原始行数
         assert len(get_data_rows(result_distinct)) <= len(get_data_rows(result_all))
 
     def test_distinct_with_order_by(self, simple_file):
         """DISTINCT + ORDER BY 不报错"""
-        result = execute_advanced_sql_query(
-            simple_file, "SELECT DISTINCT Active FROM 数据 ORDER BY Active"
-        )
+        result = execute_advanced_sql_query(simple_file, "SELECT DISTINCT Active FROM 数据 ORDER BY Active")
         assert result["success"]
         assert len(get_data_rows(result)) >= 1
 
     def test_distinct_count(self, simple_file):
         """SELECT COUNT(DISTINCT col) 正确计数"""
-        result = execute_advanced_sql_query(
-            simple_file, "SELECT COUNT(DISTINCT Active) FROM 数据"
-        )
+        result = execute_advanced_sql_query(simple_file, "SELECT COUNT(DISTINCT Active) FROM 数据")
         assert result["success"]
         # Active 有 "是"(3次), "否"(1次), None(1次)
         # COUNT(DISTINCT) 排除 NULL → 2（是, 否）
@@ -147,9 +140,7 @@ class TestINV27NullComparison:
 
     def test_is_null(self, simple_file):
         """IS NULL 正确找到 NULL 行"""
-        result = execute_advanced_sql_query(
-            simple_file, "SELECT ID, Name FROM 数据 WHERE Name IS NULL"
-        )
+        result = execute_advanced_sql_query(simple_file, "SELECT ID, Name FROM 数据 WHERE Name IS NULL")
         assert result["success"]
         rows = get_data_rows(result)
         # simple_file 中 ID=4 的 Name 是 None
@@ -158,30 +149,22 @@ class TestINV27NullComparison:
 
     def test_is_not_null(self, simple_file):
         """IS NOT NULL 排除 NULL 行"""
-        result = execute_advanced_sql_query(
-            simple_file, "SELECT COUNT(*) FROM 数据 WHERE Name IS NOT NULL"
-        )
+        result = execute_advanced_sql_query(simple_file, "SELECT COUNT(*) FROM 数据 WHERE Name IS NOT NULL")
         assert result["success"]
         count = result["data"][1][0]
         assert count == 4  # 5 行 - 1 个 NULL = 4
 
     def test_is_null_count_zero(self, simple_file):
         """对非 NULL 列 IS NULL 返回 0 行"""
-        result = execute_advanced_sql_query(
-            simple_file, "SELECT COUNT(*) FROM 数据 WHERE ID IS NULL"
-        )
+        result = execute_advanced_sql_query(simple_file, "SELECT COUNT(*) FROM 数据 WHERE ID IS NULL")
         assert result["success"]
         count = result["data"][1][0]
         assert count == 0  # ID 列没有 NULL
 
     def test_is_null_with_update(self, writable_file):
         """UPDATE 设 NULL 后 IS NULL 能找到"""
-        execute_advanced_update_query(
-            writable_file, "UPDATE 商品 SET Stock = NULL WHERE ID = 1"
-        )
-        result = execute_advanced_sql_query(
-            writable_file, "SELECT ID FROM 商品 WHERE Stock IS NULL"
-        )
+        execute_advanced_update_query(writable_file, "UPDATE 商品 SET Stock = NULL WHERE ID = 1")
+        result = execute_advanced_sql_query(writable_file, "SELECT ID FROM 商品 WHERE Stock IS NULL")
         assert result["success"]
         rows = get_data_rows(result)
         assert len(rows) == 1
@@ -259,29 +242,21 @@ class TestINV29OffsetBoundary:
 
     def test_offset_beyond_total(self, simple_file):
         """OFFSET 超过总行数返回空"""
-        result = execute_advanced_sql_query(
-            simple_file, "SELECT * FROM 数据 OFFSET 999"
-        )
+        result = execute_advanced_sql_query(simple_file, "SELECT * FROM 数据 OFFSET 999")
         assert result["success"]
         assert len(get_data_rows(result)) == 0
 
     def test_offset_with_limit(self, simple_file):
         """OFFSET + LIMIT 组合"""
-        result = execute_advanced_sql_query(
-            simple_file, "SELECT * FROM 数据 LIMIT 2 OFFSET 2"
-        )
+        result = execute_advanced_sql_query(simple_file, "SELECT * FROM 数据 LIMIT 2 OFFSET 2")
         assert result["success"]
         rows = get_data_rows(result)
         assert len(rows) <= 2  # 最多 2 行
 
     def test_offset_zero(self, simple_file):
         """OFFSET 0 等同于不使用 OFFSET"""
-        result_no_offset = execute_advanced_sql_query(
-            simple_file, "SELECT * FROM 数据 LIMIT 3"
-        )
-        result_offset_0 = execute_advanced_sql_query(
-            simple_file, "SELECT * FROM 数据 LIMIT 3 OFFSET 0"
-        )
+        result_no_offset = execute_advanced_sql_query(simple_file, "SELECT * FROM 数据 LIMIT 3")
+        result_offset_0 = execute_advanced_sql_query(simple_file, "SELECT * FROM 数据 LIMIT 3 OFFSET 0")
         assert result_no_offset["success"] and result_offset_0["success"]
         assert get_data_rows(result_no_offset) == get_data_rows(result_offset_0)
 
@@ -296,9 +271,7 @@ class TestINV30NotOperators:
 
     def test_not_in(self, simple_file):
         """NOT IN 排除指定值"""
-        result = execute_advanced_sql_query(
-            simple_file, "SELECT ID FROM 数据 WHERE Active NOT IN ('是')"
-        )
+        result = execute_advanced_sql_query(simple_file, "SELECT ID FROM 数据 WHERE Active NOT IN ('是')")
         assert result["success"]
         rows = get_data_rows(result)
         ids = [r[0] for r in rows]
@@ -307,9 +280,7 @@ class TestINV30NotOperators:
 
     def test_not_like(self, simple_file):
         """NOT LIKE 排除匹配行"""
-        result = execute_advanced_sql_query(
-            simple_file, "SELECT Name FROM 数据 WHERE Name NOT LIKE '%剑%'"
-        )
+        result = execute_advanced_sql_query(simple_file, "SELECT Name FROM 数据 WHERE Name NOT LIKE '%剑%'")
         assert result["success"]
         rows = get_data_rows(result)
         names = [r[0] for r in rows]
@@ -318,9 +289,7 @@ class TestINV30NotOperators:
 
     def test_not_in_empty_set(self, simple_file):
         """NOT IN 空集返回所有行"""
-        result = execute_advanced_sql_query(
-            simple_file, "SELECT COUNT(*) FROM 数据 WHERE ID NOT IN ()"
-        )
+        result = execute_advanced_sql_query(simple_file, "SELECT COUNT(*) FROM 数据 WHERE ID NOT IN ()")
         # 空集行为取决于实现，至少不应崩溃
         assert result["success"]
 
@@ -349,31 +318,21 @@ class TestINV31DualHeaderWrite:
 
     def test_insert_dual_header(self, dual_header_file):
         """INSERT 双行表头表后 COUNT 增加"""
-        before = execute_advanced_sql_query(
-            dual_header_file, "SELECT COUNT(*) FROM 技能配置"
-        )
+        before = execute_advanced_sql_query(dual_header_file, "SELECT COUNT(*) FROM 技能配置")
         result = execute_advanced_insert_query(
             dual_header_file,
             "INSERT INTO 技能配置 (skill_id, skill_name, base_damage, cooldown, skill_type) VALUES ('SK999', '新技能', 50, 3, '测试')",
         )
         assert result["success"]
-        after = execute_advanced_sql_query(
-            dual_header_file, "SELECT COUNT(*) FROM 技能配置"
-        )
+        after = execute_advanced_sql_query(dual_header_file, "SELECT COUNT(*) FROM 技能配置")
         assert after["data"][1][0] == before["data"][1][0] + 1
 
     def test_delete_dual_header(self, dual_header_file):
         """DELETE 双行表头表后 COUNT 减少"""
-        before = execute_advanced_sql_query(
-            dual_header_file, "SELECT COUNT(*) FROM 技能配置"
-        )
-        result = execute_advanced_delete_query(
-            dual_header_file, "DELETE FROM 技能配置 WHERE skill_id = 'SK004'"
-        )
+        before = execute_advanced_sql_query(dual_header_file, "SELECT COUNT(*) FROM 技能配置")
+        result = execute_advanced_delete_query(dual_header_file, "DELETE FROM 技能配置 WHERE skill_id = 'SK004'")
         assert result["success"]
-        after = execute_advanced_sql_query(
-            dual_header_file, "SELECT COUNT(*) FROM 技能配置"
-        )
+        after = execute_advanced_sql_query(dual_header_file, "SELECT COUNT(*) FROM 技能配置")
         assert after["data"][1][0] == before["data"][1][0] - 1
 
     def test_update_dual_header_expression(self, dual_header_file):
@@ -403,24 +362,16 @@ class TestINV32RowNumberWrite:
 
     def test_update_by_row_number(self, writable_file):
         """UPDATE WHERE _ROW_NUMBER_ = N 精确定位行"""
-        execute_advanced_update_query(
-            writable_file, "UPDATE 商品 SET Price = 0 WHERE _ROW_NUMBER_ = 3"
-        )
+        execute_advanced_update_query(writable_file, "UPDATE 商品 SET Price = 0 WHERE _ROW_NUMBER_ = 3")
         # 第 3 行应该是 ID=3 的行
-        result = execute_advanced_sql_query(
-            writable_file, "SELECT ID, Price FROM 商品 WHERE ID = 3"
-        )
+        result = execute_advanced_sql_query(writable_file, "SELECT ID, Price FROM 商品 WHERE ID = 3")
         assert result["success"]
         assert result["data"][1][1] == 0
 
     def test_update_row_number_range(self, writable_file):
         """UPDATE WHERE _ROW_NUMBER_ BETWEEN 定位范围"""
-        execute_advanced_update_query(
-            writable_file, "UPDATE 商品 SET Price = 0 WHERE _ROW_NUMBER_ BETWEEN 2 AND 4"
-        )
-        result = execute_advanced_sql_query(
-            writable_file, "SELECT ID, Price FROM 商品 ORDER BY ID"
-        )
+        execute_advanced_update_query(writable_file, "UPDATE 商品 SET Price = 0 WHERE _ROW_NUMBER_ BETWEEN 2 AND 4")
+        result = execute_advanced_sql_query(writable_file, "SELECT ID, Price FROM 商品 ORDER BY ID")
         assert result["success"]
         rows = get_data_rows(result)
         # _ROW_NUMBER_ 2,3,4 → ID=2,3,4
@@ -433,12 +384,8 @@ class TestINV32RowNumberWrite:
 
     def test_delete_by_row_number(self, writable_file):
         """DELETE WHERE _ROW_NUMBER_ = N 精确定位删除"""
-        execute_advanced_delete_query(
-            writable_file, "DELETE FROM 商品 WHERE _ROW_NUMBER_ = 1"
-        )
-        result = execute_advanced_sql_query(
-            writable_file, "SELECT ID FROM 商品 ORDER BY ID"
-        )
+        execute_advanced_delete_query(writable_file, "DELETE FROM 商品 WHERE _ROW_NUMBER_ = 1")
+        result = execute_advanced_sql_query(writable_file, "SELECT ID FROM 商品 ORDER BY ID")
         assert result["success"]
         rows = get_data_rows(result)
         ids = [r[0] for r in rows]

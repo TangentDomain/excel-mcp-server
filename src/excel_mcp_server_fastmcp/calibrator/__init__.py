@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 """
 ExcelMCP SQL 校准器 - 核心模块
 ================================
@@ -12,21 +11,20 @@ ExcelMCP SQL 校准器 - 核心模块
 from .core import (
     # 常量
     DEFAULT_DB_DIR,
-    # 工具函数
-    get_db_path,
-    sanitize_table_name,
-    sanitize_col_name,
-    flatten_multiindex,
-    is_likely_dual_header,
-    infer_sqlite_type,
-    format_table,
     # 核心命令（返回结构化数据，不直接 print）
     cmd_import,
     cmd_query,
-    cmd_tables,
     cmd_schema,
+    cmd_tables,
+    flatten_multiindex,
+    format_table,
+    # 工具函数
+    get_db_path,
+    infer_sqlite_type,
+    is_likely_dual_header,
+    sanitize_col_name,
+    sanitize_table_name,
 )
-
 from .tools import register_calibrator_tools
 
 __all__ = [

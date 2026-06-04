@@ -14,6 +14,7 @@ openpyxl 限制: 列名中的 emoji 可能被替换为下划线.
 
 import os
 import tempfile
+
 import numpy as np
 from openpyxl import Workbook
 
@@ -60,9 +61,7 @@ class TestR42LikeRegexSafety:
             test_file = f.name
         try:
             # 数据含括号: Item-(v1), Item-(v2) 等
-            _create_test_xlsx(test_file, 5, data_fn=lambda n: [
-                (i, f"Item-(v{i})", float(i), "X") for i in range(1, n+1)
-            ])
+            _create_test_xlsx(test_file, 5, data_fn=lambda n: [(i, f"Item-(v{i})", float(i), "X") for i in range(1, n + 1)])
             # LIKE 'Item-(%': ( 被转义为字面量匹配, % 是通配符
             result = execute_advanced_sql_query(test_file, "SELECT * FROM Sheet1 WHERE Name LIKE 'Item-(%'")
             assert result["success"], f"Failed: {result.get('message', '')}"
@@ -78,10 +77,7 @@ class TestR42LikeRegexSafety:
         try:
             _create_test_xlsx(test_file, 5)
             long_pattern = "a%" * 200  # 600 chars
-            result = execute_advanced_sql_query(
-                test_file,
-                f"SELECT * FROM Sheet1 WHERE Name LIKE '{long_pattern}'"
-            )
+            result = execute_advanced_sql_query(test_file, f"SELECT * FROM Sheet1 WHERE Name LIKE '{long_pattern}'")
             # 应返回错误或空结果, 不应挂起
             assert not result["success"] or len(_rows(result)) == 0
         finally:
@@ -126,9 +122,7 @@ class TestR42LikeRegexSafety:
         with tempfile.NamedTemporaryFile(suffix=".xlsx", delete=False) as f:
             test_file = f.name
         try:
-            _create_test_xlsx(test_file, 5, data_fn=lambda n: [
-                (i, f"v1.0.{i}", float(i), "X") for i in range(1, n+1)
-            ])
+            _create_test_xlsx(test_file, 5, data_fn=lambda n: [(i, f"v1.0.{i}", float(i), "X") for i in range(1, n + 1)])
             # 点号是字面量, v1._.% 应匹配 v1.0.1, v1.0.2 等
             result = execute_advanced_sql_query(test_file, "SELECT * FROM Sheet1 WHERE Name LIKE 'v1._.%'")
             assert result["success"]
@@ -142,9 +136,7 @@ class TestR42LikeRegexSafety:
         with tempfile.NamedTemporaryFile(suffix=".xlsx", delete=False) as f:
             test_file = f.name
         try:
-            _create_test_xlsx(test_file, 5, data_fn=lambda n: [
-                (i, f"test[ {i}]", float(i), "X") for i in range(1, n+1)
-            ])
+            _create_test_xlsx(test_file, 5, data_fn=lambda n: [(i, f"test[ {i}]", float(i), "X") for i in range(1, n + 1)])
             result = execute_advanced_sql_query(test_file, "SELECT * FROM Sheet1 WHERE Name LIKE 'test[%'")
             assert result["success"]
             assert len(_rows(result)) >= 1
@@ -161,13 +153,8 @@ class TestR42InfinityHandling:
         with tempfile.NamedTemporaryFile(suffix=".xlsx", delete=False) as f:
             test_file = f.name
         try:
-            _create_test_xlsx(test_file, 5, data_fn=lambda n: [
-                (i, f"Item-{i}", float(i), "X") for i in range(1, n+1)
-            ])
-            result = execute_advanced_sql_query(
-                test_file,
-                "SELECT ID, Value / 0 AS div_result FROM Sheet1"
-            )
+            _create_test_xlsx(test_file, 5, data_fn=lambda n: [(i, f"Item-{i}", float(i), "X") for i in range(1, n + 1)])
+            result = execute_advanced_sql_query(test_file, "SELECT ID, Value / 0 AS div_result FROM Sheet1")
             assert result["success"], f"Failed: {result.get('message', '')}"
             # 列顺序: ID(index 0), div_result(index 1)
             for row in _rows(result):
@@ -210,9 +197,7 @@ class TestR42ScalarSubqueryNull:
         with tempfile.NamedTemporaryFile(suffix=".xlsx", delete=False) as f:
             test_file = f.name
         try:
-            _create_test_xlsx(test_file, 5, data_fn=lambda n: [
-                (i, f"Item-{i}", float(i * 100), "X") for i in range(1, n+1)
-            ])
+            _create_test_xlsx(test_file, 5, data_fn=lambda n: [(i, f"Item-{i}", float(i * 100), "X") for i in range(1, n + 1)])
             # 创建空 sheet
             wb = __import__("openpyxl").load_workbook(test_file)
             ws = wb.create_sheet("EmptySheet")
@@ -221,13 +206,9 @@ class TestR42ScalarSubqueryNull:
             wb.close()
 
             # 空子查询 → NULL → WHERE Value > NULL 不返回行(SQL标准)
-            result = execute_advanced_sql_query(
-                test_file,
-                "SELECT * FROM Sheet1 WHERE Value > (SELECT MAX(Col1) FROM EmptySheet)"
-            )
+            result = execute_advanced_sql_query(test_file, "SELECT * FROM Sheet1 WHERE Value > (SELECT MAX(Col1) FROM EmptySheet)")
             assert result["success"], f"Failed: {result.get('message', '')}"
-            assert len(_rows(result)) == 0, \
-                f"Empty scalar subquery should return 0 rows, got {len(_rows(result))}"
+            assert len(_rows(result)) == 0, f"Empty scalar subquery should return 0 rows, got {len(_rows(result))}"
         finally:
             if os.path.exists(test_file):
                 os.remove(test_file)
@@ -377,7 +358,7 @@ class TestR42EdgeCases:
 
     def test_unicode_column_names_and_values(self):
         """Unicode 列名和值(中文/日文/韩文)
-        
+
         注意: openpyxl 对列名中 emoji 的支持有限,可能被替换为下划线.
         此测试验证中文/日文/韩文等 Unicode 文字可正常工作.
         """
@@ -422,10 +403,7 @@ class TestR42EdgeCases:
             wb.save(test_file)
             wb.close()
 
-            result = execute_advanced_update_query(
-                test_file,
-                "UPDATE EmptyTbl SET Value = 999 WHERE ID = 1"
-            )
+            result = execute_advanced_update_query(test_file, "UPDATE EmptyTbl SET Value = 999 WHERE ID = 1")
             assert result["success"]
             assert result.get("row_count", 0) == 0
         finally:
@@ -438,10 +416,7 @@ class TestR42EdgeCases:
             test_file = f.name
         try:
             _create_test_xlsx(test_file, 5)
-            result = execute_advanced_sql_query(
-                test_file,
-                "SELECT * FROM Sheet1 WHERE ID = 999999"
-            )
+            result = execute_advanced_sql_query(test_file, "SELECT * FROM Sheet1 WHERE ID = 999999")
             assert result["success"]
             assert len(_rows(result)) == 0
             # 表头仍应存在
@@ -453,4 +428,5 @@ class TestR42EdgeCases:
 
 if __name__ == "__main__":
     import pytest
+
     pytest.main([__file__, "-v", "-s"])

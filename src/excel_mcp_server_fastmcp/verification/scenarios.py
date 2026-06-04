@@ -33,7 +33,6 @@ class VerificationCase:
         return self.fixture_path.name
 
 
-
 def get_verification_cases() -> list[VerificationCase]:
     """返回当前项目的确定性验证场景。"""
 

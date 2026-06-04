@@ -52,6 +52,7 @@ def _sanitize_cell_value(value: Any) -> Any:
     # 仅处理浮点类型(含numpy浮点)
     if isinstance(value, (float,)):
         import numpy as np
+
         if np.isnan(value) or math.isinf(value):
             logger.warning(f"P2-4: 清理极端浮点值 {value} → None (NaN/Inf)")
             return None

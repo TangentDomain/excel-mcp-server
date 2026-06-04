@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 """
 format_cells R66 迭代测试 - 深度边缘 case 第六轮
 
@@ -24,19 +23,21 @@ format_cells R66 迭代测试 - 深度边缘 case 第六轮
 """
 
 import os
-import pytest
 import tempfile
 from datetime import date, datetime
 from pathlib import Path
+
+import pytest
 from openpyxl import Workbook, load_workbook
-from openpyxl.styles import Font, Color as OpenpyxlColor, PatternFill, Alignment, Border, Side
+from openpyxl.styles import Alignment, Border, Font, PatternFill, Side
+from openpyxl.styles import Color as OpenpyxlColor
 from openpyxl.utils import get_column_letter
 
-from excel_mcp_server_fastmcp.core.excel_writer import ExcelWriter
 from excel_mcp_server_fastmcp.api.excel_operations import ExcelOperations
-
+from excel_mcp_server_fastmcp.core.excel_writer import ExcelWriter
 
 # ==================== Helper ====================
+
 
 def _create_test_xlsx(file_path: str, rows: int = 5, cols: int = 4, sheet_name: str = "Sheet1"):
     """创建测试用 xlsx 文件，含数据"""
@@ -68,8 +69,8 @@ def _read_cell_style(file_path: str, cell_ref: str = "A1", sheet_name: str = "Sh
         "font_name": font.name,
         "color": str(font.color) if font.color else None,
         "fill_type": fill.fill_type if fill else None,
-        "fgColor": str(fill.fgColor) if fill and hasattr(fill, 'fgColor') and fill.fgColor else None,
-        "bgColor": str(fill.bgColor) if fill and hasattr(fill, 'bgColor') and fill.bgColor else None,
+        "fgColor": str(fill.fgColor) if fill and hasattr(fill, "fgColor") and fill.fgColor else None,
+        "bgColor": str(fill.bgColor) if fill and hasattr(fill, "bgColor") and fill.bgColor else None,
         "alignment_h": alignment.horizontal,
         "alignment_v": alignment.vertical,
         "wrap_text": bool(alignment.wrap_text) if alignment.wrap_text is not None else False,
@@ -89,6 +90,7 @@ def _read_cell_style(file_path: str, cell_ref: str = "A1", sheet_name: str = "Sh
 
 # ==================== Test Class ====================
 
+
 class TestFormatCellsR66:
     """format_cells R66 第六轮测试套件 — 深度边缘 case 第六轮"""
 
@@ -103,14 +105,16 @@ class TestFormatCellsR66:
 
     def test_normalize_all_none_values(self):
         """全 None 值的字典应返回空字典（None 值被过滤）"""
-        result = ExcelOperations._normalize_formatting({
-            "bold": None,
-            "italic": None,
-            "bg_color": None,
-            "font_size": None,
-            "alignment": None,
-            "number_format": None,
-        })
+        result = ExcelOperations._normalize_formatting(
+            {
+                "bold": None,
+                "italic": None,
+                "bg_color": None,
+                "font_size": None,
+                "alignment": None,
+                "number_format": None,
+            }
+        )
         assert result == {}
 
     # ---------- 3. 混合扁平+嵌套键 ----------
@@ -175,10 +179,13 @@ class TestFormatCellsR66:
         wb.close()
 
         writer = ExcelWriter(fp)
-        result = writer.format_cells("Sheet1!A1:B2", {
-            "font": {"bold": True, "size": 14},
-            "fill": {"type": "solid", "color": "FFFF00"},
-        })
+        result = writer.format_cells(
+            "Sheet1!A1:B2",
+            {
+                "font": {"bold": True, "size": 14},
+                "fill": {"type": "solid", "color": "FFFF00"},
+            },
+        )
         assert result.success
 
         style = _read_cell_style(fp, "A1")
@@ -208,25 +215,40 @@ class TestFormatCellsR66:
 
     # ---------- 8. 各种 border_style 枚举 ----------
 
-    @pytest.mark.parametrize("bstyle", [
-        "none", "dashDot", "dashed", "dotted",
-        "mediumDashed", "mediumDashDotDot", "hair", "medium",
-        "mediumDashDot", "thick", "double", "slantDashDot",
-    ])
+    @pytest.mark.parametrize(
+        "bstyle",
+        [
+            "none",
+            "dashDot",
+            "dashed",
+            "dotted",
+            "mediumDashed",
+            "mediumDashDotDot",
+            "hair",
+            "medium",
+            "mediumDashDot",
+            "thick",
+            "double",
+            "slantDashDot",
+        ],
+    )
     def test_border_style_variants(self, tmp_path, bstyle):
         """各种 openpyxl 支持的边框样式枚举值"""
         fp = str(tmp_path / f"border_{bstyle}.xlsx")
         _create_test_xlsx(fp)
 
         writer = ExcelWriter(fp)
-        result = writer.format_cells("Sheet1!A1", {
-            "border": {
-                "left": bstyle,
-                "right": bstyle,
-                "top": bstyle,
-                "bottom": bstyle,
-            }
-        })
+        result = writer.format_cells(
+            "Sheet1!A1",
+            {
+                "border": {
+                    "left": bstyle,
+                    "right": bstyle,
+                    "top": bstyle,
+                    "bottom": bstyle,
+                }
+            },
+        )
         assert result.success, f"border_style={bstyle} 失败: {result.error}"
 
         style = _read_cell_style(fp, "A1")
@@ -244,22 +266,23 @@ class TestFormatCellsR66:
 
         writer = ExcelWriter(fp)
         # 通过嵌套格式传入 RGB 元组
-        result = writer.format_cells("Sheet1!A1", {
-            "font": {"color": (255, 0, 128)}
-        })
+        result = writer.format_cells("Sheet1!A1", {"font": {"color": (255, 0, 128)}})
         # 可能成功也可能失败取决于 openpyxl 兼容性，至少不应崩溃
         # 如果失败，说明需要转换逻辑；如果成功，验证颜色
         assert result.success or result.error is not None
 
     # ---------- 10. 日期 number_format ----------
 
-    @pytest.mark.parametrize("nf,expected_contains", [
-        ("YYYY-MM-DD", "YYYY") | (False,) if False else ("YYYY-MM-DD", "YYYY"),
-        ("DD/MM/YYYY", "DD/MM"),
-        ("0.00%", "%"),
-        ("#,##0.00", ","),
-        ("@", "@"),
-    ])
+    @pytest.mark.parametrize(
+        "nf,expected_contains",
+        [
+            ("YYYY-MM-DD", "YYYY") | (False,) if False else ("YYYY-MM-DD", "YYYY"),
+            ("DD/MM/YYYY", "DD/MM"),
+            ("0.00%", "%"),
+            ("#,##0.00", ","),
+            ("@", "@"),
+        ],
+    )
     def test_number_format_date_and_special(self, tmp_path, nf, expected_contains):
         """各种特殊 number_format 格式"""
         fp = str(tmp_path / f"nf_{nf.replace('/', '_').replace(',', '_').replace('%', 'pct')}.xlsx")
@@ -280,12 +303,15 @@ class TestFormatCellsR66:
         _create_test_xlsx(fp)
 
         writer = ExcelWriter(fp)
-        result = writer.format_cells("Sheet1!A1", {
-            "alignment": {
-                "shrink_to_fit": True,
-                "wrap_text": False,
-            }
-        })
+        result = writer.format_cells(
+            "Sheet1!A1",
+            {
+                "alignment": {
+                    "shrink_to_fit": True,
+                    "wrap_text": False,
+                }
+            },
+        )
         assert result.success
 
         style = _read_cell_style(fp, "A1")
@@ -339,6 +365,7 @@ class TestFormatCellsR66:
         """对含数据验证的单元格格式化不应破坏验证规则"""
         fp = str(tmp_path / "dataval.xlsx")
         from openpyxl.worksheet.datavalidation import DataValidation
+
         wb = Workbook()
         ws = wb.active
         ws.title = "Sheet1"
@@ -394,13 +421,16 @@ class TestFormatCellsR66:
 
     # ---------- 17. font_name 特殊字符 ----------
 
-    @pytest.mark.parametrize("fname", [
-        "微软雅黑",
-        "Arial Unicode MS",
-        "Courier New",
-        "宋体",
-        "Helvetica Neue Light",
-    ])
+    @pytest.mark.parametrize(
+        "fname",
+        [
+            "微软雅黑",
+            "Arial Unicode MS",
+            "Courier New",
+            "宋体",
+            "Helvetica Neue Light",
+        ],
+    )
     def test_font_name_special_chars(self, tmp_path, fname):
         """各种字体名称（中文、空格、特殊字符）"""
         fp = str(tmp_path / f"font_{hash(fname) % 10000}.xlsx")
@@ -490,14 +520,17 @@ class TestFormatCellsR66:
         _create_test_xlsx(fp)
 
         writer = ExcelWriter(fp)
-        result = writer.format_cells("Sheet1!A1", {
-            "border": {
-                "left": None,
-                "right": None,
-                "top": None,
-                "bottom": None,
-            }
-        })
+        result = writer.format_cells(
+            "Sheet1!A1",
+            {
+                "border": {
+                    "left": None,
+                    "right": None,
+                    "top": None,
+                    "bottom": None,
+                }
+            },
+        )
         assert result.success
 
     # ---------- 24. format_cells 对空值单元格 ----------
@@ -514,10 +547,13 @@ class TestFormatCellsR66:
         wb.close()
 
         writer = ExcelWriter(fp)
-        result = writer.format_cells("Sheet1!A1", {
-            "font": {"bold": True},
-            "fill": {"type": "solid", "color": "FFFF00"},
-        })
+        result = writer.format_cells(
+            "Sheet1!A1",
+            {
+                "font": {"bold": True},
+                "fill": {"type": "solid", "color": "FFFF00"},
+            },
+        )
         assert result.success
 
         style = _read_cell_style(fp, "A1")
@@ -571,13 +607,16 @@ class TestFormatCellsR66:
         _create_test_xlsx(fp)
 
         writer = ExcelWriter(fp)
-        result = writer.format_cells("Sheet1!A1", {
-            "fill": {
-                "type": "gradient",
-                "colors": ["FF0000", "0000FF"],
-                "gradient_type": "linear",
-            }
-        })
+        result = writer.format_cells(
+            "Sheet1!A1",
+            {
+                "fill": {
+                    "type": "gradient",
+                    "colors": ["FF0000", "0000FF"],
+                    "gradient_type": "linear",
+                }
+            },
+        )
         assert result.success
 
         style = _read_cell_style(fp, "A1")
@@ -592,14 +631,17 @@ class TestFormatCellsR66:
         _create_test_xlsx(fp)
 
         writer = ExcelWriter(fp)
-        result = writer.format_cells("Sheet1!A1", {
-            "fill": {
-                "type": "pattern",
-                "patternType": "lightGray",  # openpyxl 合法 patternType
-                "fgColor": "FF0000",
-                "bgColor": "00FF00",
-            }
-        })
+        result = writer.format_cells(
+            "Sheet1!A1",
+            {
+                "fill": {
+                    "type": "pattern",
+                    "patternType": "lightGray",  # openpyxl 合法 patternType
+                    "fgColor": "FF0000",
+                    "bgColor": "00FF00",
+                }
+            },
+        )
         assert result.success
 
     # ---------- 29. format_cells 范围含 sheet 名 ! ----------
@@ -666,10 +708,13 @@ class TestFormatCellsR66:
         wb.close()
 
         writer = ExcelWriter(fp)
-        result = writer.format_cells("Sheet1!A1", {
-            "font": {"bold": True},
-            "number_format": "YYYY-MM-DD",
-        })
+        result = writer.format_cells(
+            "Sheet1!A1",
+            {
+                "font": {"bold": True},
+                "number_format": "YYYY-MM-DD",
+            },
+        )
         assert result.success
 
         wb2 = load_workbook(fp)
@@ -687,8 +732,8 @@ class TestFormatCellsR66:
 
         writer = ExcelWriter(fp)
         for i in range(10):
-            result = writer.format_cells(f"Sheet1!A{i+1}", {"font": {"size": 10 + i}})
-            assert result.success, f"第{i+1}次失败: {result.error}"
+            result = writer.format_cells(f"Sheet1!A{i + 1}", {"font": {"size": 10 + i}})
+            assert result.success, f"第{i + 1}次失败: {result.error}"
 
     # ---------- 34. font size 浮点数 ----------
 
@@ -706,9 +751,18 @@ class TestFormatCellsR66:
 
     # ---------- 35. alignment horizontal 全枚举 ----------
 
-    @pytest.mark.parametrize("halign", [
-        "left", "center", "right", "justify", "centerContinuous", "distributed", "general",
-    ])
+    @pytest.mark.parametrize(
+        "halign",
+        [
+            "left",
+            "center",
+            "right",
+            "justify",
+            "centerContinuous",
+            "distributed",
+            "general",
+        ],
+    )
     def test_alignment_horizontal_enum(self, tmp_path, halign):
         """horizontal alignment 各枚举值"""
         fp = str(tmp_path / f"halign_{halign}.xlsx")
@@ -723,9 +777,16 @@ class TestFormatCellsR66:
 
     # ---------- 36. vertical alignment 全枚举 ----------
 
-    @pytest.mark.parametrize("valign", [
-        "top", "center", "bottom", "justify", "distributed",
-    ])
+    @pytest.mark.parametrize(
+        "valign",
+        [
+            "top",
+            "center",
+            "bottom",
+            "justify",
+            "distributed",
+        ],
+    )
     def test_alignment_vertical_enum(self, tmp_path, valign):
         """vertical alignment 各枚举值"""
         fp = str(tmp_path / f"valign_{valign}.xlsx")
@@ -776,7 +837,7 @@ class TestFormatCellsR66:
         merged = ExcelOperations._deep_merge(preset, user)
         assert merged["font"]["bold"] is False  # 用户覆盖
         assert merged["font"]["size"] == 14  # 用户覆盖
-        assert merged["font"]["name"] == "Arial" # 预设保留
+        assert merged["font"]["name"] == "Arial"  # 预设保留
         assert merged["fill"]["color"] == "D9D9D9"  # 预设保留
 
     # ---------- 39. format_cells 空 formatting 字典 ----------
@@ -800,10 +861,13 @@ class TestFormatCellsR66:
         _create_test_xlsx(fp)
 
         writer = ExcelWriter(fp)
-        result = writer.format_cells("Sheet1!A1", {
-            "border": {
-                "diagonal": "thin",
-                "diagonalDirection": 1,  # 从左上到右下
-            }
-        })
+        result = writer.format_cells(
+            "Sheet1!A1",
+            {
+                "border": {
+                    "diagonal": "thin",
+                    "diagonalDirection": 1,  # 从左上到右下
+                }
+            },
+        )
         assert result.success

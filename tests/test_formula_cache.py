@@ -5,21 +5,17 @@ Formula Cache完整测试套件
 目标覆盖率：90%+
 """
 
-import pytest
-import time
-import tempfile
-import threading
 import hashlib
 import os
-from unittest.mock import patch, MagicMock
+import tempfile
+import threading
+import time
+from unittest.mock import MagicMock, patch
+
+import pytest
 from openpyxl import Workbook
 
-from excel_mcp_server_fastmcp.utils.formula_cache import (
-    FormulaCalculationCache,
-    CacheEntry,
-    WorkbookCache,
-    get_formula_cache
-)
+from excel_mcp_server_fastmcp.utils.formula_cache import CacheEntry, FormulaCalculationCache, WorkbookCache, get_formula_cache
 
 
 class TestFormulaCalculationCache:
@@ -145,7 +141,7 @@ class TestFormulaCalculationCache:
         test_value = {"result": 200}
 
         # 创建临时文件
-        with tempfile.NamedTemporaryFile(suffix='.xlsx', delete=False) as tmp:
+        with tempfile.NamedTemporaryFile(suffix=".xlsx", delete=False) as tmp:
             tmp_path = tmp.name
             wb = Workbook()
             wb.save(tmp_path)
@@ -160,7 +156,7 @@ class TestFormulaCalculationCache:
             time.sleep(0.1)  # 确保文件时间戳不同
             wb = Workbook()
             ws = wb.active
-            ws['A1'] = 'modified'
+            ws["A1"] = "modified"
             wb.save(tmp_path)
 
             # 缓存应该失效
@@ -176,11 +172,11 @@ class TestFormulaCalculationCache:
 
         # 初始统计
         stats = self.cache.get_stats()
-        assert stats['cache_size'] == 0
-        assert stats['workbook_cache_size'] == 0
-        assert stats['hit_count'] == 0
-        assert stats['miss_count'] == 0
-        assert stats['hit_rate'] == 0
+        assert stats["cache_size"] == 0
+        assert stats["workbook_cache_size"] == 0
+        assert stats["hit_count"] == 0
+        assert stats["miss_count"] == 0
+        assert stats["hit_rate"] == 0
 
         # 执行一些操作
         self.cache.put(self.test_file, self.test_formula, test_value, self.test_sheet)
@@ -188,16 +184,16 @@ class TestFormulaCalculationCache:
         self.cache.get(self.test_file, "=SUM(B1:B10)", self.test_sheet)  # miss
 
         stats = self.cache.get_stats()
-        assert stats['cache_size'] == 1
-        assert stats['hit_count'] == 1
-        assert stats['miss_count'] == 1
-        assert stats['hit_rate'] == 50.0  # 1/(1+1) * 100
+        assert stats["cache_size"] == 1
+        assert stats["hit_count"] == 1
+        assert stats["miss_count"] == 1
+        assert stats["hit_rate"] == 50.0  # 1/(1+1) * 100
 
     def test_cache_clear(self):
         """测试缓存清理功能"""
         # 添加一些缓存
         for i in range(3):
-            self.cache.put(f"file_{i}.xlsx", f"=SUM(A{i}:A{i+5})", {"result": i})
+            self.cache.put(f"file_{i}.xlsx", f"=SUM(A{i}:A{i + 5})", {"result": i})
 
         assert len(self.cache._cache) == 3
 
@@ -230,12 +226,12 @@ class TestFormulaCalculationCache:
         """测试工作簿缓存功能"""
         wb = Workbook()
         ws = wb.active
-        ws['A1'] = 'test'
+        ws["A1"] = "test"
 
         tmp_path = None
         try:
             # 创建临时文件
-            with tempfile.NamedTemporaryFile(suffix='.xlsx', delete=False) as tmp:
+            with tempfile.NamedTemporaryFile(suffix=".xlsx", delete=False) as tmp:
                 tmp_path = tmp.name
                 wb.save(tmp_path)
 
@@ -341,13 +337,7 @@ class TestFormulaCalculationCache:
 
     def test_cache_entry_dataclass(self):
         """测试CacheEntry数据类"""
-        entry = CacheEntry(
-            value=42,
-            timestamp=time.time(),
-            access_count=1,
-            file_mtime=1234567890,
-            formula_hash="abc123"
-        )
+        entry = CacheEntry(value=42, timestamp=time.time(), access_count=1, file_mtime=1234567890, formula_hash="abc123")
 
         assert entry.value == 42
         assert entry.access_count == 1
@@ -357,13 +347,7 @@ class TestFormulaCalculationCache:
     def test_workbook_cache_dataclass(self):
         """测试WorkbookCache数据类"""
         wb = Workbook()
-        cache = WorkbookCache(
-            workbook=wb,
-            temp_file_path="/tmp/test.xlsx",
-            file_mtime=1234567890,
-            timestamp=time.time(),
-            access_count=1
-        )
+        cache = WorkbookCache(workbook=wb, temp_file_path="/tmp/test.xlsx", file_mtime=1234567890, timestamp=time.time(), access_count=1)
 
         assert cache.workbook is wb
         assert cache.temp_file_path == "/tmp/test.xlsx"
@@ -384,13 +368,13 @@ class TestFormulaCachePerformance:
         # 测试存储性能
         start_time = time.time()
         for i in range(100):
-            self.cache.put(f"file_{i}.xlsx", f"=SUM(A{i}:A{i+10})", test_value)
+            self.cache.put(f"file_{i}.xlsx", f"=SUM(A{i}:A{i + 10})", test_value)
         put_time = time.time() - start_time
 
         # 测试检索性能
         start_time = time.time()
         for i in range(100):
-            result = self.cache.get(f"file_{i}.xlsx", f"=SUM(A{i}:A{i+10})")
+            result = self.cache.get(f"file_{i}.xlsx", f"=SUM(A{i}:A{i + 10})")
             assert result == test_value
         get_time = time.time() - start_time
 
@@ -412,7 +396,7 @@ class TestFormulaCachePerformance:
 
         # 统计信息应该合理
         stats = cache.get_stats()
-        assert stats['cache_size'] <= cache.max_size
+        assert stats["cache_size"] <= cache.max_size
 
 
 class TestFormulaCacheEdgeCases:
@@ -424,7 +408,7 @@ class TestFormulaCacheEdgeCases:
 
     def test_corrupted_file_handling(self):
         """测试损坏文件处理"""
-        with patch('os.path.getmtime', side_effect=OSError("File corrupted")):
+        with patch("os.path.getmtime", side_effect=OSError("File corrupted")):
             mtime = self.cache._get_file_mtime("corrupted.xlsx")
             assert mtime == 0.0
 
@@ -448,10 +432,10 @@ class TestFormulaCacheEdgeCases:
         """测试公式中的特殊字符"""
         special_formulas = [
             "=SUM(A1:A10)",  # 基础公式
-            "=VLOOKUP(\"张三\", A1:B10, 2, FALSE)",  # 中文
-            "=CONCATENATE(\"Hello\", \"World!\")",  # 英文
+            '=VLOOKUP("张三", A1:B10, 2, FALSE)',  # 中文
+            '=CONCATENATE("Hello", "World!")',  # 英文
             "=SUM(1,2,3,4,5,6,7,8,9,10)",  # 数字
-            "=IF(A1>0, \"Positive\", \"Negative\")",  # 条件
+            '=IF(A1>0, "Positive", "Negative")',  # 条件
             "=INDIRECT(\"'Sheet1'!A1\")",  # 复杂引用
         ]
 
@@ -466,8 +450,8 @@ class TestFormulaCacheEdgeCases:
         """测试Unicode内容处理"""
         unicode_formulas = [
             "=SUM(数据表!A1:A10)",  # 中文工作表名
-            "=VLOOKUP(\"测试数据\", A1:B100, 2, FALSE)",  # 中文内容
-            "=CONCATENATE(\"こんにちは\", \"世界\")",  # 日文
+            '=VLOOKUP("测试数据", A1:B100, 2, FALSE)',  # 中文内容
+            '=CONCATENATE("こんにちは", "世界")',  # 日文
             "=SUM(α1:α10)",  # 希腊字母
         ]
 
@@ -484,7 +468,7 @@ class TestFormulaCacheEdgeCases:
 
         # 添加一些缓存
         for i in range(5):
-            cache.put(f"file_{i}.xlsx", f"=SUM(A{i}:A{i+5})", {"result": i})
+            cache.put(f"file_{i}.xlsx", f"=SUM(A{i}:A{i + 5})", {"result": i})
 
         assert len(cache._cache) == 5
 

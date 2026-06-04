@@ -13,15 +13,15 @@ import os
 import tempfile
 import threading
 import time
-import pytest
 from concurrent.futures import ThreadPoolExecutor, as_completed
 
+import pytest
 from openpyxl import Workbook, load_workbook
 
 from excel_mcp_server_fastmcp.api.advanced_sql_query import (
-    execute_advanced_update_query,
-    execute_advanced_insert_query,
     execute_advanced_delete_query,
+    execute_advanced_insert_query,
+    execute_advanced_update_query,
 )
 
 
@@ -70,10 +70,7 @@ class TestP1ConcurrentFix:
                 def update_worker(thread_id):
                     for i in range(ops_per_thread):
                         try:
-                            result = execute_advanced_update_query(
-                                test_file,
-                                f"UPDATE 装备 SET Price = Price * 1.01 WHERE ID = {(thread_id * ops_per_thread + i) % 50 + 1}"
-                            )
+                            result = execute_advanced_update_query(test_file, f"UPDATE 装备 SET Price = Price * 1.01 WHERE ID = {(thread_id * ops_per_thread + i) % 50 + 1}")
                             if not result["success"]:
                                 errors.append(f"Thread-{thread_id} op-{i}: {result.get('message', '')}")
                         except Exception as e:
@@ -118,10 +115,7 @@ class TestP1ConcurrentFix:
 
             def insert_worker():
                 try:
-                    result = execute_advanced_insert_query(
-                        test_file,
-                        "INSERT INTO 装备 (ID, Name, Price, Rarity) VALUES (999, 'ThreadItem', 99.99, 'Legendary')"
-                    )
+                    result = execute_advanced_insert_query(test_file, "INSERT INTO 装备 (ID, Name, Price, Rarity) VALUES (999, 'ThreadItem', 99.99, 'Legendary')")
                     if not result["success"]:
                         errors.append(f"INSERT failed: {result.get('message', '')}")
                 except Exception as e:
@@ -129,10 +123,7 @@ class TestP1ConcurrentFix:
 
             def update_worker():
                 try:
-                    result = execute_advanced_update_query(
-                        test_file,
-                        "UPDATE 装备 SET Price = ROUND(Price * 1.05, 2) WHERE Rarity = 'Common'"
-                    )
+                    result = execute_advanced_update_query(test_file, "UPDATE 装备 SET Price = ROUND(Price * 1.05, 2) WHERE Rarity = 'Common'")
                     if not result["success"]:
                         errors.append(f"UPDATE failed: {result.get('message', '')}")
                 except Exception as e:
@@ -140,10 +131,7 @@ class TestP1ConcurrentFix:
 
             def delete_worker():
                 try:
-                    result = execute_advanced_delete_query(
-                        test_file,
-                        "DELETE FROM 装备 WHERE ID = 999"
-                    )
+                    result = execute_advanced_delete_query(test_file, "DELETE FROM 装备 WHERE ID = 999")
                     if not result["success"] and "没有匹配" not in result.get("message", ""):
                         errors.append(f"DELETE failed: {result.get('message', '')}")
                 except Exception as e:
@@ -184,10 +172,7 @@ class TestP1ConcurrentFix:
 
             def worker(tid):
                 try:
-                    result = execute_advanced_update_query(
-                        test_file,
-                        f"UPDATE 装备 SET Price = {tid * 100.0}, Name = 'T{tid}' WHERE ID = 1"
-                    )
+                    result = execute_advanced_update_query(test_file, f"UPDATE 装备 SET Price = {tid * 100.0}, Name = 'T{tid}' WHERE ID = 1")
                     if not result["errors"]:
                         errors.append(f"T{tid}: {result.get('message')}")
                 except Exception as e:
@@ -228,10 +213,7 @@ class TestP1ConcurrentFix:
 
             def write_to_file(fpath):
                 try:
-                    result = execute_advanced_update_query(
-                        fpath,
-                        "UPDATE 装备 SET Price = 999.99 WHERE ID = 1"
-                    )
+                    result = execute_advanced_update_query(fpath, "UPDATE 装备 SET Price = 999.99 WHERE ID = 1")
                     if not result["success"]:
                         errors.append(f"{fpath}: {result.get('message')}")
                 except Exception as e:
@@ -260,4 +242,5 @@ class TestP1ConcurrentFix:
 
 if __name__ == "__main__":
     import pytest
+
     pytest.main([__file__, "-v", "-s"])

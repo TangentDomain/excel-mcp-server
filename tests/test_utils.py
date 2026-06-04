@@ -1,26 +1,17 @@
-# -*- coding: utf-8 -*-
 """
 工具类和模型测试
 合并了异常处理、数据模型、兼容性测试等工具类功能测试
 这个文件替代了原本的test_models.py, test_compatibility.py等工具类测试
 """
 
-import pytest
 import tempfile
-from pathlib import Path
 from dataclasses import FrozenInstanceError
+from pathlib import Path
 
-from excel_mcp_server_fastmcp.utils.exceptions import (
-    ExcelException,
-    ExcelFileNotFoundError,
-    SheetNotFoundError,
-    DataValidationError,
-    OperationLimitError
-)
-from excel_mcp_server_fastmcp.models.types import (
-    SheetInfo, RangeInfo, CellInfo, SearchMatch, ModifiedCell,
-    OperationResult, RangeType, MatchType
-)
+import pytest
+
+from excel_mcp_server_fastmcp.models.types import CellInfo, MatchType, ModifiedCell, OperationResult, RangeInfo, RangeType, SearchMatch, SheetInfo
+from excel_mcp_server_fastmcp.utils.exceptions import DataValidationError, ExcelException, ExcelFileNotFoundError, OperationLimitError, SheetNotFoundError
 
 
 class TestExceptions:
@@ -80,6 +71,7 @@ class TestExceptions:
 
     def test_exceptions_can_be_raised_and_caught(self):
         """Test that exceptions can be raised and caught"""
+
         def raise_file_not_found():
             raise ExcelFileNotFoundError("test.xlsx")
 
@@ -101,11 +93,7 @@ class TestExceptions:
     def test_exception_chinese_support(self):
         """测试异常类的中文支持"""
         # 测试中文错误消息
-        chinese_errors = [
-            ExcelFileNotFoundError("中文文件名.xlsx"),
-            SheetNotFoundError("中文工作表"),
-            DataValidationError("中文错误信息")
-        ]
+        chinese_errors = [ExcelFileNotFoundError("中文文件名.xlsx"), SheetNotFoundError("中文工作表"), DataValidationError("中文错误信息")]
 
         for error in chinese_errors:
             error_str = str(error)
@@ -118,13 +106,7 @@ class TestModelTypes:
 
     def test_sheet_info_creation(self):
         """Test SheetInfo creation with actual fields"""
-        sheet_info = SheetInfo(
-            index=0,
-            name="Sheet1",
-            max_row=100,
-            max_column=10,
-            max_column_letter="J"
-        )
+        sheet_info = SheetInfo(index=0, name="Sheet1", max_row=100, max_column=10, max_column_letter="J")
 
         assert sheet_info.name == "Sheet1"
         assert sheet_info.index == 0
@@ -134,24 +116,14 @@ class TestModelTypes:
 
     def test_sheet_info_chinese_name(self):
         """测试中文工作表名称"""
-        sheet_info = SheetInfo(
-            index=1,
-            name="数据分析表",
-            max_row=50,
-            max_column=5,
-            max_column_letter="E"
-        )
+        sheet_info = SheetInfo(index=1, name="数据分析表", max_row=50, max_column=5, max_column_letter="E")
 
         assert sheet_info.name == "数据分析表"
         assert sheet_info.index == 1
 
     def test_range_info_creation(self):
         """Test RangeInfo creation with actual fields"""
-        range_info = RangeInfo(
-            sheet_name="Sheet1",
-            cell_range="A1:C10",
-            range_type=RangeType.CELL_RANGE
-        )
+        range_info = RangeInfo(sheet_name="Sheet1", cell_range="A1:C10", range_type=RangeType.CELL_RANGE)
 
         assert range_info.sheet_name == "Sheet1"
         assert range_info.cell_range == "A1:C10"
@@ -159,43 +131,28 @@ class TestModelTypes:
 
     def test_range_info_chinese_sheet(self):
         """测试中文工作表的范围信息"""
-        range_info = RangeInfo(
-            sheet_name="销售数据",
-            cell_range="A1:E20",
-            range_type=RangeType.CELL_RANGE
-        )
+        range_info = RangeInfo(sheet_name="销售数据", cell_range="A1:E20", range_type=RangeType.CELL_RANGE)
 
         assert range_info.sheet_name == "销售数据"
         assert range_info.cell_range == "A1:E20"
 
     def test_cell_info_creation(self):
         """Test CellInfo creation with actual fields"""
-        cell_info = CellInfo(
-            coordinate="A1",
-            value="Test Value"
-        )
+        cell_info = CellInfo(coordinate="A1", value="Test Value")
 
         assert cell_info.coordinate == "A1"
         assert cell_info.value == "Test Value"
 
     def test_cell_info_chinese_value(self):
         """测试中文单元格值"""
-        cell_info = CellInfo(
-            coordinate="B2",
-            value="中文数据测试"
-        )
+        cell_info = CellInfo(coordinate="B2", value="中文数据测试")
 
         assert cell_info.coordinate == "B2"
         assert cell_info.value == "中文数据测试"
 
     def test_search_match_creation(self):
         """测试搜索匹配结果模型"""
-        search_match = SearchMatch(
-            sheet="Sheet1",
-            cell="A1",
-            match="搜索结果",
-            match_type=MatchType.VALUE
-        )
+        search_match = SearchMatch(sheet="Sheet1", cell="A1", match="搜索结果", match_type=MatchType.VALUE)
 
         assert search_match.sheet == "Sheet1"
         assert search_match.cell == "A1"
@@ -204,11 +161,7 @@ class TestModelTypes:
 
     def test_modified_cell_creation(self):
         """测试修改单元格模型"""
-        modified_cell = ModifiedCell(
-            coordinate="C3",
-            old_value="旧值",
-            new_value="新值"
-        )
+        modified_cell = ModifiedCell(coordinate="C3", old_value="旧值", new_value="新值")
 
         assert modified_cell.coordinate == "C3"
         assert modified_cell.old_value == "旧值"
@@ -216,11 +169,7 @@ class TestModelTypes:
 
     def test_operation_result_success(self):
         """测试成功操作结果"""
-        result = OperationResult(
-            success=True,
-            message="操作成功完成",
-            data=["项目1", "项目2"]
-        )
+        result = OperationResult(success=True, message="操作成功完成", data=["项目1", "项目2"])
 
         assert result.success is True
         assert result.message == "操作成功完成"
@@ -229,11 +178,7 @@ class TestModelTypes:
 
     def test_operation_result_failure(self):
         """测试失败操作结果"""
-        result = OperationResult(
-            success=False,
-            error="操作执行失败",
-            data=None
-        )
+        result = OperationResult(success=False, error="操作执行失败", data=None)
 
         assert result.success is False
         assert result.error == "操作执行失败"
@@ -267,13 +212,7 @@ class TestModelTypes:
 
     def test_model_repr_methods(self):
         """测试模型的字符串表示方法"""
-        sheet_info = SheetInfo(
-            index=0,
-            name="测试表",
-            max_row=10,
-            max_column=3,
-            max_column_letter="C"
-        )
+        sheet_info = SheetInfo(index=0, name="测试表", max_row=10, max_column=3, max_column_letter="C")
 
         repr_str = repr(sheet_info)
         assert "测试表" in repr_str
@@ -290,7 +229,7 @@ class TestCompatibility:
         # 检查openpyxl版本
         version = openpyxl.__version__
         assert isinstance(version, str)
-        assert len(version.split('.')) >= 2
+        assert len(version.split(".")) >= 2
 
     def test_excel_file_creation_compatibility(self, temp_dir):
         """测试Excel文件创建兼容性"""
@@ -302,10 +241,10 @@ class TestCompatibility:
         ws.title = "兼容性测试"
 
         # 添加中文数据
-        ws['A1'] = "中文标题"
-        ws['B1'] = "数值"
-        ws['A2'] = "产品1"
-        ws['B2'] = 100
+        ws["A1"] = "中文标题"
+        ws["B1"] = "数值"
+        ws["A2"] = "产品1"
+        ws["B2"] = 100
 
         # 保存文件
         file_path = temp_dir / "compatibility_test.xlsx"
@@ -323,12 +262,12 @@ class TestCompatibility:
 
         # 测试各种Unicode字符
         unicode_data = {
-            'A1': '中文字符',
-            'A2': '日本語',
-            'A3': '한국어',
-            'A4': 'العربية',
-            'A5': 'Русский',
-            'A6': '🔥💡🎉'  # Emoji
+            "A1": "中文字符",
+            "A2": "日本語",
+            "A3": "한국어",
+            "A4": "العربية",
+            "A5": "Русский",
+            "A6": "🔥💡🎉",  # Emoji
         }
 
         for cell, value in unicode_data.items():
@@ -348,10 +287,10 @@ class TestCompatibility:
         ws = wb.active
 
         # 添加数据和公式
-        ws['A1'] = 10
-        ws['A2'] = 20
-        ws['A3'] = '=A1+A2'  # 简单公式
-        ws['A4'] = '=SUM(A1:A2)'  # 函数公式
+        ws["A1"] = 10
+        ws["A2"] = 20
+        ws["A3"] = "=A1+A2"  # 简单公式
+        ws["A4"] = "=SUM(A1:A2)"  # 函数公式
 
         # 保存文件
         file_path = temp_dir / "formula_test.xlsx"
@@ -395,12 +334,12 @@ class TestCompatibility:
 
         for name in test_names:
             # 处理特殊字符
-            safe_name = name.replace('/', '_').replace('\\', '_').replace('*', '_')
-            safe_name = safe_name.replace('?', '_').replace('[', '_').replace(']', '_')
-            safe_name = safe_name.replace(':', '_').strip()
+            safe_name = name.replace("/", "_").replace("\\", "_").replace("*", "_")
+            safe_name = safe_name.replace("?", "_").replace("[", "_").replace("]", "_")
+            safe_name = safe_name.replace(":", "_").strip()
 
             ws = wb.create_sheet(title=safe_name[:31])  # Excel限制31字符
-            ws['A1'] = f"这是{safe_name}工作表"
+            ws["A1"] = f"这是{safe_name}工作表"
 
         # 保存文件
         file_path = temp_dir / "sheet_name_test.xlsx"
@@ -415,18 +354,12 @@ class TestUtilityFunctions:
     def test_string_encoding_handling(self):
         """测试字符串编码处理"""
         # 测试各种编码的字符串
-        test_strings = [
-            "普通英文",
-            "中文字符串",
-            "Mixed 中英文 String",
-            "特殊符号 !@#$%^&*()",
-            "数字123456789"
-        ]
+        test_strings = ["普通英文", "中文字符串", "Mixed 中英文 String", "特殊符号 !@#$%^&*()", "数字123456789"]
 
         for test_str in test_strings:
             # 确保字符串可以正确编码和解码
-            encoded = test_str.encode('utf-8')
-            decoded = encoded.decode('utf-8')
+            encoded = test_str.encode("utf-8")
+            decoded = encoded.decode("utf-8")
             assert decoded == test_str
 
     def test_path_handling_compatibility(self):
@@ -434,12 +367,7 @@ class TestUtilityFunctions:
         from pathlib import Path
 
         # 测试不同格式的路径
-        paths = [
-            "simple_file.xlsx",
-            "folder/file.xlsx",
-            "中文文件夹/测试文件.xlsx",
-            "special chars/file (1).xlsx"
-        ]
+        paths = ["simple_file.xlsx", "folder/file.xlsx", "中文文件夹/测试文件.xlsx", "special chars/file (1).xlsx"]
 
         for path_str in paths:
             path_obj = Path(path_str)
@@ -450,13 +378,7 @@ class TestUtilityFunctions:
     def test_data_type_conversion(self):
         """测试数据类型转换"""
         # 测试不同数据类型的处理
-        test_data = [
-            ("字符串", str),
-            (123, int),
-            (45.67, float),
-            (True, bool),
-            (None, type(None))
-        ]
+        test_data = [("字符串", str), (123, int), (45.67, float), (True, bool), (None, type(None))]
 
         for value, expected_type in test_data:
             assert isinstance(value, expected_type)
@@ -467,12 +389,7 @@ class TestUtilityFunctions:
     def test_error_message_formatting(self):
         """测试错误消息格式化"""
         # 测试不同类型的错误消息
-        error_messages = [
-            "简单错误消息",
-            "包含数字123的错误消息",
-            "包含特殊字符!@#的错误",
-            "多行错误消息\n第二行\n第三行"
-        ]
+        error_messages = ["简单错误消息", "包含数字123的错误消息", "包含特殊字符!@#的错误", "多行错误消息\n第二行\n第三行"]
 
         for msg in error_messages:
             # 确保错误消息可以正确处理

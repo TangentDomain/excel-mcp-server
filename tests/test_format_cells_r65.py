@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 """
 format_cells R65 迭代测试 - 深度边缘 case 第五轮
 
@@ -24,18 +23,20 @@ format_cells R65 迭代测试 - 深度边缘 case 第五轮
 """
 
 import os
-import pytest
 import tempfile
 from datetime import date, datetime
 from pathlib import Path
+
+import pytest
 from openpyxl import Workbook, load_workbook
-from openpyxl.styles import Font, Color as OpenpyxlColor, PatternFill
+from openpyxl.styles import Color as OpenpyxlColor
+from openpyxl.styles import Font, PatternFill
 
-from excel_mcp_server_fastmcp.core.excel_writer import ExcelWriter
 from excel_mcp_server_fastmcp.api.excel_operations import ExcelOperations
-
+from excel_mcp_server_fastmcp.core.excel_writer import ExcelWriter
 
 # ==================== Helper ====================
+
 
 def _create_test_xlsx(file_path: str, rows: int = 5, cols: int = 4, sheet_name: str = "Sheet1"):
     """创建测试用 xlsx 文件，含数据"""
@@ -67,8 +68,8 @@ def _read_cell_style(file_path: str, cell_ref: str = "A1", sheet_name: str = "Sh
         "font_name": font.name,
         "color": str(font.color) if font.color else None,
         "fill_type": fill.fill_type if fill else None,
-        "fgColor": str(fill.fgColor) if fill and hasattr(fill, 'fgColor') and fill.fgColor else None,
-        "bgColor": str(fill.bgColor) if fill and hasattr(fill, 'bgColor') and fill.bgColor else None,
+        "fgColor": str(fill.fgColor) if fill and hasattr(fill, "fgColor") and fill.fgColor else None,
+        "bgColor": str(fill.bgColor) if fill and hasattr(fill, "bgColor") and fill.bgColor else None,
         "alignment_h": alignment.horizontal,
         "alignment_v": alignment.vertical,
         "wrap_text": bool(alignment.wrap_text) if alignment.wrap_text is not None else False,
@@ -87,6 +88,7 @@ def _read_cell_style(file_path: str, cell_ref: str = "A1", sheet_name: str = "Sh
 
 
 # ==================== Test Class ====================
+
 
 class TestFormatCellsR65:
     """format_cells R65 第五轮测试套件 — 深度边缘 case 第五轮"""
@@ -258,12 +260,15 @@ class TestFormatCellsR65:
         fp = str(tmp_path / "bdiag0.xlsx")
         _create_test_xlsx(fp)
         writer = ExcelWriter(fp)
-        result = writer.format_cells("Sheet1!A1", {
-            "border": {
-                "diagonal": "thin",
-                "diagonal_direction": 0,
-            }
-        })
+        result = writer.format_cells(
+            "Sheet1!A1",
+            {
+                "border": {
+                    "diagonal": "thin",
+                    "diagonal_direction": 0,
+                }
+            },
+        )
         assert result.success
 
     def test_border_diagonal_direction_1(self, tmp_path):
@@ -271,12 +276,15 @@ class TestFormatCellsR65:
         fp = str(tmp_path / "bdiag1.xlsx")
         _create_test_xlsx(fp)
         writer = ExcelWriter(fp)
-        result = writer.format_cells("Sheet1!A1", {
-            "border": {
-                "diagonal": "thin",
-                "diagonal_direction": 1,
-            }
-        })
+        result = writer.format_cells(
+            "Sheet1!A1",
+            {
+                "border": {
+                    "diagonal": "thin",
+                    "diagonal_direction": 1,
+                }
+            },
+        )
         assert result.success
 
     def test_border_diagonal_direction_2(self, tmp_path):
@@ -284,12 +292,15 @@ class TestFormatCellsR65:
         fp = str(tmp_path / "bdiag2.xlsx")
         _create_test_xlsx(fp)
         writer = ExcelWriter(fp)
-        result = writer.format_cells("Sheet1!A1", {
-            "border": {
-                "diagonal": "thin",
-                "diagonal_direction": 2,
-            }
-        })
+        result = writer.format_cells(
+            "Sheet1!A1",
+            {
+                "border": {
+                    "diagonal": "thin",
+                    "diagonal_direction": 2,
+                }
+            },
+        )
         assert result.success
 
     def test_border_diagonal_direction_3(self, tmp_path):
@@ -297,12 +308,15 @@ class TestFormatCellsR65:
         fp = str(tmp_path / "bdiag3.xlsx")
         _create_test_xlsx(fp)
         writer = ExcelWriter(fp)
-        result = writer.format_cells("Sheet1!A1", {
-            "border": {
-                "diagonal": "thin",
-                "diagonal_direction": 3,
-            }
-        })
+        result = writer.format_cells(
+            "Sheet1!A1",
+            {
+                "border": {
+                    "diagonal": "thin",
+                    "diagonal_direction": 3,
+                }
+            },
+        )
         assert result.success
 
     # ---------- 7. alignment indent 边界 ----------
@@ -361,21 +375,26 @@ class TestFormatCellsR65:
         fp = str(tmp_path / "all_props.xlsx")
         _create_test_xlsx(fp)
 
-        r = ExcelOperations.format_cells(fp, "Sheet1", "A1", {
-            "bold": True,
-            "italic": True,
-            "underline": "double",
-            "font_name": "Arial",
-            "font_size": 16,
-            "font_color": "FF0000",
-            "bg_color": "00FF00",
-            "alignment": "center",
-            "vertical_alignment": "middle",
-            "wrap_text": True,
-            "text_rotation": 0,
-            "number_format": "#,##0.00",
-            "border_style": "medium",
-        })
+        r = ExcelOperations.format_cells(
+            fp,
+            "Sheet1",
+            "A1",
+            {
+                "bold": True,
+                "italic": True,
+                "underline": "double",
+                "font_name": "Arial",
+                "font_size": 16,
+                "font_color": "FF0000",
+                "bg_color": "00FF00",
+                "alignment": "center",
+                "vertical_alignment": "middle",
+                "wrap_text": True,
+                "text_rotation": 0,
+                "number_format": "#,##0.00",
+                "border_style": "medium",
+            },
+        )
         assert r["success"], f"组合格式化失败: {r.get('message')}"
 
         style = _read_cell_style(fp, "A1")
@@ -522,20 +541,24 @@ class TestFormatCellsR65:
 
     def test_normalize_unknown_keys_passthrough(self, tmp_path):
         """未知键应被透传到嵌套格式"""
-        result = ExcelOperations._normalize_formatting({
-            "custom_key": "custom_value",
-            "another_key": 42,
-        })
+        result = ExcelOperations._normalize_formatting(
+            {
+                "custom_key": "custom_value",
+                "another_key": 42,
+            }
+        )
         assert result["custom_key"] == "custom_value"
         assert result["another_key"] == 42
 
     def test_normalize_unknown_with_known(self, tmp_path):
         """未知键和已知键混合时，已知键正常转换，未知键透传"""
-        result = ExcelOperations._normalize_formatting({
-            "bold": True,
-            "magic_flag": True,
-            "bg_color": "FF0",
-        })
+        result = ExcelOperations._normalize_formatting(
+            {
+                "bold": True,
+                "magic_flag": True,
+                "bg_color": "FF0",
+            }
+        )
         assert result["font"]["bold"] is True
         assert result["fill"]["color"] == "FFFF00"
         assert result["magic_flag"] is True
@@ -550,7 +573,7 @@ class TestFormatCellsR65:
         fmt = {"bold": True, "font_color": "FF0000", "bg_color": "00FF00", "alignment": "center"}
         for i in range(5):
             r = ExcelOperations.format_cells(fp, "Sheet1", "A1", fmt)
-            assert r["success"], f"第{i+1}次格式化失败"
+            assert r["success"], f"第{i + 1}次格式化失败"
 
         style = _read_cell_style(fp, "A1")
         assert style["bold"] is True
@@ -592,9 +615,7 @@ class TestFormatCellsR65:
         fp = str(tmp_path / "fill_mixed.xlsx")
         _create_test_xlsx(fp)
         writer = ExcelWriter(fp)
-        result = writer.format_cells("Sheet1!A1", {
-            "fill": {"type": "Gradient", "colors": ["FF0000", "00FF00"]}
-        })
+        result = writer.format_cells("Sheet1!A1", {"fill": {"type": "Gradient", "colors": ["FF0000", "00FF00"]}})
         assert result.success
 
     # ---------- 17. shrink_to_fit toggle ----------
@@ -675,7 +696,9 @@ class TestFormatCellsR65:
         _create_test_xlsx(fp)
 
         r = ExcelOperations.format_cells(
-            fp, "Sheet1", "A1",
+            fp,
+            "Sheet1",
+            "A1",
             formatting={"bold": False},
             preset="title",
         )
@@ -689,7 +712,9 @@ class TestFormatCellsR65:
         _create_test_xlsx(fp)
 
         r = ExcelOperations.format_cells(
-            fp, "Sheet1", "A1",
+            fp,
+            "Sheet1",
+            "A1",
             formatting={"font_color": "FF0000"},
             preset="header",
         )
@@ -733,10 +758,16 @@ class TestFormatCellsR65:
 
         def test_normalize_all_none_values_flat(self):
             """扁平格式所有值 None 返回空字典"""
-            result = ExcelOperations._normalize_formatting({
-                "bold": None, "italic": None, "bg_color": None,
-                "font_size": None, "alignment": None, "number_format": None,
-            })
+            result = ExcelOperations._normalize_formatting(
+                {
+                    "bold": None,
+                    "italic": None,
+                    "bg_color": None,
+                    "font_size": None,
+                    "alignment": None,
+                    "number_format": None,
+                }
+            )
             # 所有键都被过滤掉
             assert "font" not in result or len(result.get("font", {})) == 0
             assert "fill" not in result
@@ -755,9 +786,7 @@ class TestFormatCellsR65:
 
         def test_normalize_gradient_colors_conversion(self):
             """gradient_colors 正确转换为 fill.colors"""
-            result = ExcelOperations._normalize_formatting({
-                "gradient_colors": ["AA", "BB", "CC"]
-            })
+            result = ExcelOperations._normalize_formatting({"gradient_colors": ["AA", "BB", "CC"]})
             assert result["fill"]["type"] == "gradient"
             assert result["fill"]["colors"] == ["AA", "BB", "CC"]
 

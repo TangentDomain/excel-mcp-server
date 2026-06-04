@@ -19,7 +19,6 @@ from excel_mcp_server_fastmcp.api.advanced_sql_query import (
 )
 from excel_mcp_server_fastmcp.calibrator.core import cmd_import, cmd_query, get_db_path
 
-
 # ============================================================
 # 辅助函数
 # ============================================================
@@ -150,28 +149,17 @@ class TestINV19WriteSQLiteAlignment:
         excel_result = execute_advanced_sql_query(self.file_path, "SELECT ID, Name, Price, Stock, Active FROM 商品 ORDER BY ID")
         sqlite_result = cmd_query(_CAL_DB_WRITE, "SELECT ID, Name, Price, Stock, Active FROM 商品 ORDER BY ID")
 
-        assert _align_result(excel_result, sqlite_result), (
-            f"ExcelMCP 和 SQLite 结果不一致\n"
-            f"Excel: {excel_result['data']}\n"
-            f"SQLite: {sqlite_result.get('rows', [])}"
-        )
+        assert _align_result(excel_result, sqlite_result), f"ExcelMCP 和 SQLite 结果不一致\nExcel: {excel_result['data']}\nSQLite: {sqlite_result.get('rows', [])}"
 
     def test_insert_then_select_alignment(self):
         """INSERT 后 ExcelMCP 和 SQLite 的 SELECT 结果对齐"""
-        execute_advanced_insert_query(self.file_path,
-            "INSERT INTO 商品 (ID, Name, Price, Stock, Active) VALUES (99, '测试', 123.45, 10, '是')")
-        _sqlite_execute_sql(
-            "INSERT INTO 商品 (ID, Name, Price, Stock, Active) VALUES (99, '测试', 123.45, 10, '是')",
-            self.db_path)
+        execute_advanced_insert_query(self.file_path, "INSERT INTO 商品 (ID, Name, Price, Stock, Active) VALUES (99, '测试', 123.45, 10, '是')")
+        _sqlite_execute_sql("INSERT INTO 商品 (ID, Name, Price, Stock, Active) VALUES (99, '测试', 123.45, 10, '是')", self.db_path)
 
         excel_result = execute_advanced_sql_query(self.file_path, "SELECT * FROM 商品 WHERE ID = 99")
         sqlite_result = cmd_query(_CAL_DB_WRITE, "SELECT * FROM 商品 WHERE ID = 99")
 
-        assert _align_result(excel_result, sqlite_result), (
-            f"ExcelMCP 和 SQLite 结果不一致\n"
-            f"Excel: {excel_result['data']}\n"
-            f"SQLite: {sqlite_result.get('rows', [])}"
-        )
+        assert _align_result(excel_result, sqlite_result), f"ExcelMCP 和 SQLite 结果不一致\nExcel: {excel_result['data']}\nSQLite: {sqlite_result.get('rows', [])}"
 
     def test_delete_then_select_alignment(self):
         """DELETE 后 ExcelMCP 和 SQLite 的 SELECT 结果对齐"""
@@ -181,11 +169,7 @@ class TestINV19WriteSQLiteAlignment:
         excel_result = execute_advanced_sql_query(self.file_path, "SELECT ID, Name FROM 商品 ORDER BY ID")
         sqlite_result = cmd_query(_CAL_DB_WRITE, "SELECT ID, Name FROM 商品 ORDER BY ID")
 
-        assert _align_result(excel_result, sqlite_result), (
-            f"ExcelMCP 和 SQLite 结果不一致\n"
-            f"Excel: {excel_result['data']}\n"
-            f"SQLite: {sqlite_result.get('rows', [])}"
-        )
+        assert _align_result(excel_result, sqlite_result), f"ExcelMCP 和 SQLite 结果不一致\nExcel: {excel_result['data']}\nSQLite: {sqlite_result.get('rows', [])}"
 
     def test_update_expression_alignment(self):
         """UPDATE SET 表达式后对齐"""
@@ -195,11 +179,7 @@ class TestINV19WriteSQLiteAlignment:
         excel_result = execute_advanced_sql_query(self.file_path, "SELECT ID, Price FROM 商品 ORDER BY ID")
         sqlite_result = cmd_query(_CAL_DB_WRITE, "SELECT ID, Price FROM 商品 ORDER BY ID")
 
-        assert _align_result(excel_result, sqlite_result), (
-            f"ExcelMCP 和 SQLite 结果不一致\n"
-            f"Excel: {excel_result['data']}\n"
-            f"SQLite: {sqlite_result.get('rows', [])}"
-        )
+        assert _align_result(excel_result, sqlite_result), f"ExcelMCP 和 SQLite 结果不一致\nExcel: {excel_result['data']}\nSQLite: {sqlite_result.get('rows', [])}"
 
     def test_multiple_writes_alignment(self):
         """连续多次写操作后对齐"""
@@ -207,8 +187,7 @@ class TestINV19WriteSQLiteAlignment:
         execute_advanced_update_query(self.file_path, "UPDATE 商品 SET Price = 0 WHERE ID = 1")
         _sqlite_execute_sql("UPDATE 商品 SET Price = 0 WHERE ID = 1", self.db_path)
         # INSERT
-        execute_advanced_insert_query(self.file_path,
-            "INSERT INTO 商品 (ID, Name, Price, Stock, Active) VALUES (90, 'X', 1, 1, '是')")
+        execute_advanced_insert_query(self.file_path, "INSERT INTO 商品 (ID, Name, Price, Stock, Active) VALUES (90, 'X', 1, 1, '是')")
         _sqlite_execute_sql("INSERT INTO 商品 (ID, Name, Price, Stock, Active) VALUES (90, 'X', 1, 1, '是')", self.db_path)
         # DELETE
         execute_advanced_delete_query(self.file_path, "DELETE FROM 商品 WHERE ID = 6")
@@ -217,11 +196,7 @@ class TestINV19WriteSQLiteAlignment:
         excel_result = execute_advanced_sql_query(self.file_path, "SELECT * FROM 商品 ORDER BY ID")
         sqlite_result = cmd_query(_CAL_DB_WRITE, "SELECT * FROM 商品 ORDER BY ID")
 
-        assert _align_result(excel_result, sqlite_result), (
-            f"ExcelMCP 和 SQLite 结果不一致\n"
-            f"Excel: {excel_result['data']}\n"
-            f"SQLite: {sqlite_result.get('rows', [])}"
-        )
+        assert _align_result(excel_result, sqlite_result), f"ExcelMCP 和 SQLite 结果不一致\nExcel: {excel_result['data']}\nSQLite: {sqlite_result.get('rows', [])}"
 
     def test_null_write_alignment(self):
         """NULL 写入后对齐"""
@@ -231,11 +206,7 @@ class TestINV19WriteSQLiteAlignment:
         excel_result = execute_advanced_sql_query(self.file_path, "SELECT ID, Price FROM 商品 WHERE ID = 1")
         sqlite_result = cmd_query(_CAL_DB_WRITE, "SELECT ID, Price FROM 商品 WHERE ID = 1")
 
-        assert _align_result(excel_result, sqlite_result), (
-            f"ExcelMCP 和 SQLite 结果不一致\n"
-            f"Excel: {excel_result['data']}\n"
-            f"SQLite: {sqlite_result.get('rows', [])}"
-        )
+        assert _align_result(excel_result, sqlite_result), f"ExcelMCP 和 SQLite 结果不一致\nExcel: {excel_result['data']}\nSQLite: {sqlite_result.get('rows', [])}"
 
 
 # ============================================================
@@ -272,11 +243,7 @@ class TestINV21CrossFileJoin:
                         FROM 技能配置 s JOIN 掉落配置 d ON s.技能ID = d.关联技能"""
         sqlite_result = self._query_sqlite(sqlite_sql)
 
-        assert _align_result(excel_result, sqlite_result), (
-            f"INNER JOIN 不一致\n"
-            f"Excel: {excel_result['data']}\n"
-            f"SQLite: {sqlite_result.get('rows', [])}"
-        )
+        assert _align_result(excel_result, sqlite_result), f"INNER JOIN 不一致\nExcel: {excel_result['data']}\nSQLite: {sqlite_result.get('rows', [])}"
 
     def test_left_join_alignment(self):
         """LEFT JOIN 结果与 SQLite 对齐"""
@@ -289,11 +256,7 @@ class TestINV21CrossFileJoin:
                         FROM 技能配置 s LEFT JOIN 掉落配置 d ON s.技能ID = d.关联技能"""
         sqlite_result = self._query_sqlite(sqlite_sql)
 
-        assert _align_result(excel_result, sqlite_result), (
-            f"LEFT JOIN 不一致\n"
-            f"Excel: {excel_result['data']}\n"
-            f"SQLite: {sqlite_result.get('rows', [])}"
-        )
+        assert _align_result(excel_result, sqlite_result), f"LEFT JOIN 不一致\nExcel: {excel_result['data']}\nSQLite: {sqlite_result.get('rows', [])}"
 
     def test_join_with_where_alignment(self):
         """JOIN + WHERE 结果与 SQLite 对齐"""
@@ -308,11 +271,7 @@ class TestINV21CrossFileJoin:
                         WHERE d.数量 > 2"""
         sqlite_result = self._query_sqlite(sqlite_sql)
 
-        assert _align_result(excel_result, sqlite_result), (
-            f"JOIN + WHERE 不一致\n"
-            f"Excel: {excel_result['data']}\n"
-            f"SQLite: {sqlite_result.get('rows', [])}"
-        )
+        assert _align_result(excel_result, sqlite_result), f"JOIN + WHERE 不一致\nExcel: {excel_result['data']}\nSQLite: {sqlite_result.get('rows', [])}"
 
     def test_join_with_aggregation_alignment(self):
         """JOIN + 聚合结果与 SQLite 对齐"""
@@ -327,11 +286,7 @@ class TestINV21CrossFileJoin:
                         GROUP BY s.类型"""
         sqlite_result = self._query_sqlite(sqlite_sql)
 
-        assert _align_result(excel_result, sqlite_result), (
-            f"JOIN + 聚合不一致\n"
-            f"Excel: {excel_result['data']}\n"
-            f"SQLite: {sqlite_result.get('rows', [])}"
-        )
+        assert _align_result(excel_result, sqlite_result), f"JOIN + 聚合不一致\nExcel: {excel_result['data']}\nSQLite: {sqlite_result.get('rows', [])}"
 
     def test_join_count_consistency(self):
         """JOIN 结果行数与 SQLite 一致"""
@@ -342,8 +297,4 @@ class TestINV21CrossFileJoin:
         sqlite_sql = """SELECT COUNT(*) FROM 技能配置 s JOIN 掉落配置 d ON s.技能ID = d.关联技能"""
         sqlite_result = self._query_sqlite(sqlite_sql)
 
-        assert _align_result(excel_result, sqlite_result), (
-            f"JOIN COUNT 不一致\n"
-            f"Excel: {excel_result['data']}\n"
-            f"SQLite: {sqlite_result.get('rows', [])}"
-        )
+        assert _align_result(excel_result, sqlite_result), f"JOIN COUNT 不一致\nExcel: {excel_result['data']}\nSQLite: {sqlite_result.get('rows', [])}"

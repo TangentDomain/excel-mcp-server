@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 """
 SQL 校准器 MCP 工具注册
 =======================
@@ -14,8 +13,8 @@ from typing import Any
 from .core import (
     cmd_import,
     cmd_query,
-    cmd_tables,
     cmd_schema,
+    cmd_tables,
 )
 
 

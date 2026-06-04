@@ -5,13 +5,16 @@ R51 深度代码审查修复验证测试
 P2-ORDER-01(混合类型排序), P2-PERF-01(IN子查询缓存),
 P2-CONCUR-01(孤儿锁文件), P3-INSERT-02(Column引用)
 """
+
 import os
-import tempfile
 import shutil
+import tempfile
+
 import pytest
+
 from excel_mcp_server_fastmcp.api.advanced_sql_query import (
-    execute_advanced_sql_query,
     execute_advanced_insert_query,
+    execute_advanced_sql_query,
 )
 
 
@@ -19,6 +22,7 @@ from excel_mcp_server_fastmcp.api.advanced_sql_query import (
 def sample_xlsx(tmp_path):
     """创建标准测试用 Excel 文件"""
     import openpyxl
+
     wb = openpyxl.Workbook()
     ws = wb.active
     ws.title = "Sheet1"
@@ -102,22 +106,23 @@ class TestP2Order01_MixedTypeSorting:
     @pytest.fixture
     def mixed_xlsx(self):
         import openpyxl
+
         tmpdir = tempfile.mkdtemp()
         wb = openpyxl.Workbook()
         ws = wb.active
         ws.title = "Mixed"
         ws.append(["ID", "Value"])
         # 数值占多数(>50%): 7个数值 vs 3个字符串
-        ws.append([1, 10])       # 整数
-        ws.append([2, 2])        # 整数
-        ws.append([3, 100])      # 整数
+        ws.append([1, 10])  # 整数
+        ws.append([2, 2])  # 整数
+        ws.append([3, 100])  # 整数
         ws.append([4, "apple"])  # 字符串
-        ws.append([5, 50])       # 整数
-        ws.append([6, 200])      # 整数
-        ws.append([7, 5])        # 整数
-        ws.append([8, "banana"]) # 字符串
-        ws.append([9, 75])       # 整数
-        ws.append([10, "cherry"])# 字符串
+        ws.append([5, 50])  # 整数
+        ws.append([6, 200])  # 整数
+        ws.append([7, 5])  # 整数
+        ws.append([8, "banana"])  # 字符串
+        ws.append([9, 75])  # 整数
+        ws.append([10, "cherry"])  # 字符串
         path = os.path.join(tmpdir, "mixed_sort.xlsx")
         wb.save(path)
         yield path
@@ -176,6 +181,7 @@ class TestP2Perf01_INSubqueryCache:
     @pytest.fixture
     def in_subquery_file(self):
         import openpyxl
+
         tmpdir = tempfile.mkdtemp()
         # 单文件双工作表（子查询只能访问同文件中的表）
         wb = openpyxl.Workbook()

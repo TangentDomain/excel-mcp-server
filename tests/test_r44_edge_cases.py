@@ -2,29 +2,34 @@
 R44 Edge Case Tests - Window functions, ORDER BY expressions, NULL handling,
 LIMIT/OFFSET, DISTINCT, IN/BETWEEN/LIKE, special characters, complex SQL
 
-Covers: R12 (window on empty table), R13 (ORDER BY expressions), 
+Covers: R12 (window on empty table), R13 (ORDER BY expressions),
 plus comprehensive edge cases discovered during R44 deep testing.
 """
-import pytest
-import pandas as pd
-import tempfile
-import os
-from excel_mcp_server_fastmcp.api.advanced_sql_query import execute_advanced_sql_query
 
+import os
+import tempfile
+
+import pandas as pd
+import pytest
+
+from excel_mcp_server_fastmcp.api.advanced_sql_query import execute_advanced_sql_query
 
 # ============================================================
 # Fixtures
 # ============================================================
 
+
 @pytest.fixture
 def normal_file():
     """Normal 5-row table with various data types"""
-    df = pd.DataFrame({
-        "ID": [1, 2, 3, 4, 5],
-        "Name": ["Alice", "Bob", "Charlie", "Diana", "Eve"],
-        "Score": [85, 92, 78, 95, 88],
-        "Category": ["A", "B", "A", "B", "C"],
-    })
+    df = pd.DataFrame(
+        {
+            "ID": [1, 2, 3, 4, 5],
+            "Name": ["Alice", "Bob", "Charlie", "Diana", "Eve"],
+            "Score": [85, 92, 78, 95, 88],
+            "Category": ["A", "B", "A", "B", "C"],
+        }
+    )
     f = tempfile.mktemp(suffix=".xlsx")
     df.to_excel(f, index=False, sheet_name="Sheet1")
     yield f
@@ -54,11 +59,13 @@ def single_file():
 @pytest.fixture
 def null_file():
     """Table with NULL values"""
-    df = pd.DataFrame({
-        "ID": [1, 2, 3, 4, 5],
-        "Name": ["Alice", None, "Charlie", None, "Eve"],
-        "Score": [85, None, 78, None, 88],
-    })
+    df = pd.DataFrame(
+        {
+            "ID": [1, 2, 3, 4, 5],
+            "Name": ["Alice", None, "Charlie", None, "Eve"],
+            "Score": [85, None, 78, None, 88],
+        }
+    )
     f = tempfile.mktemp(suffix=".xlsx")
     df.to_excel(f, index=False, sheet_name="Sheet1")
     yield f
@@ -68,11 +75,13 @@ def null_file():
 @pytest.fixture
 def special_file():
     """Table with special characters in data"""
-    df = pd.DataFrame({
-        "ID": [1, 2, 3],
-        "Name": ["O'Brien", 'Annie "Bo"', 'Test \\\\ slash'],
-        "Value": [10, 20, 30],
-    })
+    df = pd.DataFrame(
+        {
+            "ID": [1, 2, 3],
+            "Name": ["O'Brien", 'Annie "Bo"', "Test \\\\ slash"],
+            "Value": [10, 20, 30],
+        }
+    )
     f = tempfile.mktemp(suffix=".xlsx")
     df.to_excel(f, index=False, sheet_name="Sheet1")
     yield f
@@ -82,6 +91,7 @@ def special_file():
 # ============================================================
 # Helpers
 # ============================================================
+
 
 def row_count(data):
     """Return number of data rows (excluding header row at index 0)"""
@@ -103,6 +113,7 @@ def query(file_path, sql):
 # ============================================================
 # R12: Window Function Edge Cases
 # ============================================================
+
 
 class TestR12WindowEdgeCases:
     """R12: Window functions on empty/single-row tables"""
@@ -137,6 +148,7 @@ class TestR12WindowEdgeCases:
 # R13: ORDER BY Expression Cases
 # ============================================================
 
+
 class TestR13OrderByExpressions:
     """R13: ORDER BY with arithmetic/CASE WHEN/alias expressions"""
 
@@ -155,8 +167,11 @@ class TestR13OrderByExpressions:
 
     def test_order_by_case_when(self, normal_file):
         """ORDER BY CASE WHEN should sort Category A first, then others by Score DESC"""
-        r = query(normal_file, """SELECT ID, Name, Category, Score FROM Sheet1 
-            ORDER BY CASE WHEN Category='A' THEN 0 ELSE 1 END, Score DESC""")
+        r = query(
+            normal_file,
+            """SELECT ID, Name, Category, Score FROM Sheet1
+            ORDER BY CASE WHEN Category='A' THEN 0 ELSE 1 END, Score DESC""",
+        )
         assert r["success"]
         # First two rows should be Category='A'
         assert get_row(r["data"], 0)[2] == "A"
@@ -174,6 +189,7 @@ class TestR13OrderByExpressions:
 # ============================================================
 # NULL Handling Edge Cases
 # ============================================================
+
 
 class TestNullHandling:
     """NULL value handling in aggregations and GROUP BY"""
@@ -205,15 +221,19 @@ class TestNullHandling:
 # Complex SQL Combinations
 # ============================================================
 
+
 class TestComplexSQLCombinations:
     """Complex SQL combining multiple features"""
 
     def test_cte_with_window_function(self, normal_file):
         """CTE + window function + WHERE filter"""
-        r = query(normal_file, """WITH Ranked AS (
-            SELECT *, ROW_NUMBER() OVER (ORDER BY Score DESC) as rn 
+        r = query(
+            normal_file,
+            """WITH Ranked AS (
+            SELECT *, ROW_NUMBER() OVER (ORDER BY Score DESC) as rn
             FROM Sheet1
-        ) SELECT * FROM Ranked WHERE rn <= 3""")
+        ) SELECT * FROM Ranked WHERE rn <= 3""",
+        )
         assert r["success"]
         assert row_count(r["data"]) == 3
         # Top 3 by score: Diana(95), Bob(92), Eve(88)
@@ -222,29 +242,38 @@ class TestComplexSQLCombinations:
 
     def test_subquery_in_where_with_aggregation(self, normal_file):
         """Subquery in WHERE clause with aggregation comparison"""
-        r = query(normal_file, """SELECT Category, AVG(Score) as AvgSc 
-            FROM Sheet1 
-            WHERE Score > (SELECT AVG(Score) FROM Sheet1) 
-            GROUP BY Category""")
+        r = query(
+            normal_file,
+            """SELECT Category, AVG(Score) as AvgSc
+            FROM Sheet1
+            WHERE Score > (SELECT AVG(Score) FROM Sheet1)
+            GROUP BY Category""",
+        )
         assert r["success"]
         assert row_count(r["data"]) > 0
 
     def test_multiple_aggregation_functions(self, normal_file):
         """Multiple different aggregation functions in one query"""
-        r = query(normal_file, """SELECT Category, 
-            COUNT(*) as Cnt, SUM(Score) as Total, AVG(Score) as AvgSc, 
+        r = query(
+            normal_file,
+            """SELECT Category,
+            COUNT(*) as Cnt, SUM(Score) as Total, AVG(Score) as AvgSc,
             MAX(Score) as MaxSc, MIN(Score) as MinSc
-            FROM Sheet1 GROUP BY Category""")
+            FROM Sheet1 GROUP BY Category""",
+        )
         assert r["success"]
         assert row_count(r["data"]) == 3  # A, B, C groups
 
     def test_nested_case_when_in_aggregation(self, normal_file):
         """CASE WHEN inside SUM aggregation"""
-        r = query(normal_file, """SELECT 
+        r = query(
+            normal_file,
+            """SELECT
             SUM(CASE WHEN Score >= 90 THEN 1 ELSE 0 END) as HighScorers,
             SUM(CASE WHEN Score < 80 THEN 1 ELSE 0 END) as LowScorers,
             COUNT(*) as Total
-            FROM Sheet1""")
+            FROM Sheet1""",
+        )
         assert r["success"]
         assert row_count(r["data"]) == 1
         assert get_row(r["data"], 0) == [2, 1, 5]  # 2 high(>=90), 1 low(<80), 5 total
@@ -253,6 +282,7 @@ class TestComplexSQLCombinations:
 # ============================================================
 # LIMIT/OFFSET Edge Cases
 # ============================================================
+
 
 class TestLimitOffsetEdgeCases:
     """LIMIT/OFFSET boundary conditions"""
@@ -287,6 +317,7 @@ class TestLimitOffsetEdgeCases:
 # DISTINCT Edge Cases
 # ============================================================
 
+
 class TestDistinctEdgeCases:
     """DISTINCT behavior"""
 
@@ -306,6 +337,7 @@ class TestDistinctEdgeCases:
 # ============================================================
 # IN/BETWEEN/LIKE Edge Cases
 # ============================================================
+
 
 class TestInBetweenLikeEdgeCases:
     """IN, BETWEEN, LIKE boundary conditions"""
@@ -344,6 +376,7 @@ class TestInBetweenLikeEdgeCases:
 # ============================================================
 # Special Characters
 # ============================================================
+
 
 class TestSpecialCharacters:
     """Special characters in data values"""

@@ -6,9 +6,10 @@
 
 import os
 import tempfile
-import pytest
-import pandas as pd
+
 import numpy as np
+import pandas as pd
+import pytest
 
 from excel_mcp_server_fastmcp.api.advanced_sql_query import AdvancedSQLQueryEngine
 from excel_mcp_server_fastmcp.api.excel_operations import ExcelOperations
@@ -24,6 +25,7 @@ def temp_dir():
 def mixed_type_file(temp_dir):
     """创建混合类型数据的测试文件"""
     from openpyxl import Workbook
+
     file_path = os.path.join(temp_dir, "mixed_types.xlsx")
     wb = Workbook()
     ws = wb.active
@@ -36,11 +38,11 @@ def mixed_type_file(temp_dir):
 
     # 数据行：混合类型
     for row in range(2, 502):
-        ws.cell(row=row, column=1, value=row - 1)              # int
-        ws.cell(row=row, column=2, value=f"item_{row - 1}")     # string
-        ws.cell(row=row, column=3, value=(row * 3.14) % 100)   # float
+        ws.cell(row=row, column=1, value=row - 1)  # int
+        ws.cell(row=row, column=2, value=f"item_{row - 1}")  # string
+        ws.cell(row=row, column=3, value=(row * 3.14) % 100)  # float
         ws.cell(row=row, column=4, value=f"cat_{(row - 1) % 5}")  # 低基数 string
-        ws.cell(row=row, column=5, value=row % 2 == 0)          # bool
+        ws.cell(row=row, column=5, value=row % 2 == 0)  # bool
 
     wb.save(file_path)
     return file_path
@@ -55,10 +57,10 @@ class TestDtypeOptimization:
 
         # 加载数据（会自动调用 _optimize_dtypes）
         result = engine.execute_sql_query(mixed_type_file, "SELECT * FROM Data LIMIT 100")
-        assert result['success'] is True
+        assert result["success"] is True
 
         # 手动验证优化效果
-        df_raw = pd.read_excel(mixed_type_file, sheet_name="Data", engine='calamine', keep_default_na=False)
+        df_raw = pd.read_excel(mixed_type_file, sheet_name="Data", engine="calamine", keep_default_na=False)
         raw_mem = df_raw.memory_usage(deep=True).sum() / 1024 / 1024
 
         df_opt = engine._optimize_dtypes(df_raw.copy())
@@ -73,7 +75,7 @@ class TestDtypeOptimization:
         """验证 dtype 优化不改变数据内容"""
         engine = AdvancedSQLQueryEngine()
 
-        df_raw = pd.read_excel(mixed_type_file, sheet_name="Data", engine='calamine', keep_default_na=False)
+        df_raw = pd.read_excel(mixed_type_file, sheet_name="Data", engine="calamine", keep_default_na=False)
         df_opt = engine._optimize_dtypes(df_raw.copy())
 
         # 行数列数不变
@@ -82,9 +84,9 @@ class TestDtypeOptimization:
 
         # 数值精度保持（float32 精度足够）
         for col in df_raw.columns:
-            if df_raw[col].dtype == 'float64':
+            if df_raw[col].dtype == "float64":
                 # float32 精度误差 < 1e-6
-                diff = (df_raw[col].astype('float32').values - df_opt[col].values.astype('float32'))
+                diff = df_raw[col].astype("float32").values - df_opt[col].values.astype("float32")
                 if len(diff) > 0:
                     max_diff = np.max(np.abs(diff))
                     assert max_diff < 1e-4, f"列 {col} 精度损失过大: {max_diff}"
@@ -95,61 +97,69 @@ class TestDtypeOptimization:
         """验证整数列正确降级"""
         engine = AdvancedSQLQueryEngine()
 
-        df = pd.DataFrame({
-            'tiny': [1, 2, 3, 4, 5],
-            'small': [100, 200, 300, 40000, 50000],
-            'big': [100000, 200000, 3000000, 40000000, 500000000],
-            'negative': [-100, -50, 0, 50, 100],
-        })
+        df = pd.DataFrame(
+            {
+                "tiny": [1, 2, 3, 4, 5],
+                "small": [100, 200, 300, 40000, 50000],
+                "big": [100000, 200000, 3000000, 40000000, 500000000],
+                "negative": [-100, -50, 0, 50, 100],
+            }
+        )
 
         # 确保初始类型是 int64
         for col in df.columns:
-            df[col] = df[col].astype('int64')
+            df[col] = df[col].astype("int64")
 
         df_opt = engine._optimize_dtypes(df)
 
-        assert df_opt['tiny'].dtype == 'uint8'
-        assert df_opt['small'].dtype == 'uint16'
-        assert df_opt['big'].dtype == 'uint32'
-        assert df_opt['negative'].dtype == 'int8'
+        assert df_opt["tiny"].dtype == "uint8"
+        assert df_opt["small"].dtype == "uint16"
+        assert df_opt["big"].dtype == "uint32"
+        assert df_opt["negative"].dtype == "int8"
 
     def test_optimize_dtypes_float_downcast(self):
         """验证浮点列降级为 float32"""
         engine = AdvancedSQLQueryEngine()
 
-        df = pd.DataFrame({
-            'values': [1.1, 2.2, 3.3, 4.4, 5.5],
-        })
-        df['values'] = df['values'].astype('float64')
+        df = pd.DataFrame(
+            {
+                "values": [1.1, 2.2, 3.3, 4.4, 5.5],
+            }
+        )
+        df["values"] = df["values"].astype("float64")
 
         df_opt = engine._optimize_dtypes(df)
-        assert df_opt['values'].dtype == 'float32'
+        assert df_opt["values"].dtype == "float32"
 
     def test_optimize_dtypes_category_conversion(self):
         """验证字符串列保持 object 类型（不再转 category 以兼容 UPDATE 写入）"""
         engine = AdvancedSQLQueryEngine()
 
         # 100行，只有5个唯一值
-        df = pd.DataFrame({
-            'cat_col': [f"cat_{i % 5}" for i in range(100)],
-        })
-        df['cat_col'] = df['cat_col'].astype('object')
+        df = pd.DataFrame(
+            {
+                "cat_col": [f"cat_{i % 5}" for i in range(100)],
+            }
+        )
+        df["cat_col"] = df["cat_col"].astype("object")
 
         df_opt = engine._optimize_dtypes(df)
-        assert df_opt['cat_col'].dtype == 'object'  # 不再转 category
+        assert df_opt["cat_col"].dtype == "object"  # 不再转 category
 
     def test_optimize_dtypes_high_cardinality_unchanged(self):
         """验证高基数字符串列不转为 category"""
         engine = AdvancedSQLQueryEngine()
 
         # 100行，100个唯一值 → 基数比 = 1.0 > 0.3
-        df = pd.DataFrame({
-            'unique_col': [f"item_{i}" for i in range(100)],
-        })
-        df['unique_col'] = df['unique_col'].astype('object')
+        df = pd.DataFrame(
+            {
+                "unique_col": [f"item_{i}" for i in range(100)],
+            }
+        )
+        df["unique_col"] = df["unique_col"].astype("object")
 
         df_opt = engine._optimize_dtypes(df)
-        assert df_opt['unique_col'].dtype != 'category'
+        assert df_opt["unique_col"].dtype != "category"
 
 
 class TestCacheEnhancement:
@@ -168,14 +178,14 @@ class TestCacheEnhancement:
 
         # 第一次查询（缓存未命中）
         result1 = engine.execute_sql_query(mixed_type_file, sql)
-        assert result1['success'] is True
+        assert result1["success"] is True
 
         # 第二次查询（缓存命中）
         result2 = engine.execute_sql_query(mixed_type_file, sql)
-        assert result2['success'] is True
+        assert result2["success"] is True
 
         # 结果一致
-        assert len(result1['data']) == len(result2['data'])
+        assert len(result1["data"]) == len(result2["data"])
 
         engine.clear_cache()
 
@@ -215,13 +225,14 @@ class TestLargeFileSupport:
 
         # 小文件应该正常查询
         result = engine.execute_sql_query(mixed_type_file, "SELECT * FROM Data LIMIT 10")
-        assert result['success'] is True
+        assert result["success"] is True
 
         engine.clear_cache()
 
     def test_large_file_warning_logged(self, mixed_type_file, caplog):
         """验证大文件（>500MB）有日志记录"""
         import logging
+
         engine = AdvancedSQLQueryEngine()
 
         # 对于小文件，不应有警告日志
@@ -234,6 +245,7 @@ class TestLargeFileSupport:
     def test_medium_dataset_sql_performance(self, temp_dir):
         """测试中等数据集的 SQL 查询性能"""
         from openpyxl import Workbook
+
         file_path = os.path.join(temp_dir, "medium_data.xlsx")
         wb = Workbook()
         ws = wb.active
@@ -255,22 +267,22 @@ class TestLargeFileSupport:
 
         # SELECT ALL（data包含表头行 + 数据行）
         result = engine.execute_sql_query(file_path, "SELECT * FROM Data LIMIT 100")
-        assert result['success'] is True
-        assert len(result['data']) >= 100  # 包含表头
+        assert result["success"] is True
+        assert len(result["data"]) >= 100  # 包含表头
 
         # WHERE
         result = engine.execute_sql_query(file_path, "SELECT * FROM Data WHERE id > 4000")
-        assert result['success'] is True
-        assert len(result['data']) >= 500  # 至少返回数百行
+        assert result["success"] is True
+        assert len(result["data"]) >= 500  # 至少返回数百行
 
         # GROUP BY
         result = engine.execute_sql_query(file_path, "SELECT category, COUNT(*) as cnt FROM Data GROUP BY category")
-        assert result['success'] is True
-        assert len(result['data']) >= 20  # 20个分类
+        assert result["success"] is True
+        assert len(result["data"]) >= 20  # 20个分类
 
         # 聚合
         result = engine.execute_sql_query(file_path, "SELECT AVG(value) as avg_val FROM Data")
-        assert result['success'] is True
+        assert result["success"] is True
 
         engine.clear_cache()
 
@@ -281,6 +293,7 @@ class TestBackwardCompatibility:
     def test_small_file_operations_unchanged(self, temp_dir):
         """验证小文件操作不受影响"""
         from openpyxl import Workbook
+
         file_path = os.path.join(temp_dir, "small.xlsx")
         wb = Workbook()
         ws = wb.active
@@ -293,13 +306,13 @@ class TestBackwardCompatibility:
 
         # 读取
         result = ExcelOperations.get_range(file_path, "Sheet1!A1:A3")
-        assert result['success'] is True
+        assert result["success"] is True
 
         # SQL查询
         engine = AdvancedSQLQueryEngine()
         result = engine.execute_sql_query(file_path, "SELECT * FROM Sheet1")
-        assert result['success'] is True
-        assert len(result['data']) >= 2  # 包含表头行
+        assert result["success"] is True
+        assert len(result["data"]) >= 2  # 包含表头行
 
 
 class TestConcurrentBatchOperations:
@@ -366,6 +379,7 @@ class TestConcurrentBatchOperations:
     def test_batch_delete_rows_single(self, temp_dir):
         """测试批量删除单行"""
         from openpyxl import Workbook
+
         file_path = os.path.join(temp_dir, "batch_del_single.xlsx")
         wb = Workbook()
         ws = wb.active
@@ -377,17 +391,18 @@ class TestConcurrentBatchOperations:
         wb.save(file_path)
 
         result = ExcelOperations.batch_delete_rows(file_path, "Data", [2])
-        assert result['success'] is True
-        deleted = result.get('data', {}).get('deleted_count', 0)
+        assert result["success"] is True
+        deleted = result.get("data", {}).get("deleted_count", 0)
         assert deleted == 1
 
         # 验证数据正确
         read = ExcelOperations.get_range(file_path, "Data!A1:B3")
-        assert read['success'] is True
+        assert read["success"] is True
 
     def test_batch_delete_rows_multiple(self, temp_dir):
         """测试批量删除多行"""
         from openpyxl import Workbook
+
         file_path = os.path.join(temp_dir, "batch_del_multi.xlsx")
         wb = Workbook()
         ws = wb.active
@@ -399,24 +414,23 @@ class TestConcurrentBatchOperations:
 
         # 删除第3、5、7行
         result = ExcelOperations.batch_delete_rows(file_path, "Data", [3, 5, 7])
-        assert result['success'] is True
-        deleted = result.get('data', {}).get('deleted_count', 0)
+        assert result["success"] is True
+        deleted = result.get("data", {}).get("deleted_count", 0)
         assert deleted == 3
 
         # 验证文件可读
         read = ExcelOperations.get_range(file_path, "Data!A1:B2")
-        assert read['success'] is True
+        assert read["success"] is True
 
     def test_batch_delete_rows_empty_list(self, temp_dir):
         """测试批量删除空列表"""
-        result = ExcelOperations.batch_delete_rows(
-            "/tmp/nonexistent.xlsx", "Data", []
-        )
-        assert result['success'] is False
+        result = ExcelOperations.batch_delete_rows("/tmp/nonexistent.xlsx", "Data", [])
+        assert result["success"] is False
 
     def test_batch_delete_rows_preserves_other_data(self, temp_dir):
         """测试批量删除不影响其他行数据"""
         from openpyxl import Workbook
+
         file_path = os.path.join(temp_dir, "batch_del_preserve.xlsx")
         wb = Workbook()
         ws = wb.active
@@ -430,20 +444,21 @@ class TestConcurrentBatchOperations:
 
         # 删除第3行（Bob）
         result = ExcelOperations.batch_delete_rows(file_path, "Data", [3])
-        assert result['success'] is True
+        assert result["success"] is True
 
         # 验证头行和其余数据完好
         read = ExcelOperations.get_range(file_path, "Data!A1:C4")
-        assert read['success'] is True
+        assert read["success"] is True
         # 表头应保留（get_range 返回 [{coordinate, value}, ...] 格式）
-        assert read['data'][0][0]['value'] == "ID"
+        assert read["data"][0][0]["value"] == "ID"
         # Alice 应保留
-        assert read['data'][1][1]['value'] == "Alice"
+        assert read["data"][1][1]["value"] == "Alice"
 
     def test_batch_delete_performance_vs_sequential(self, temp_dir):
         """测试批量删除性能优于逐行删除"""
-        from openpyxl import Workbook
         import time
+
+        from openpyxl import Workbook
 
         # 创建较大数据集
         for label, row_count in [("batch", 100), ("seq", 100)]:
@@ -472,9 +487,7 @@ class TestConcurrentBatchOperations:
 
         print(f"批量删除10行: {batch_time:.3f}s vs 逐行删除: {seq_time:.3f}s")
         # 批量删除应不慢于逐行删除（通常快2-5倍）
-        assert batch_time < seq_time * 2, (
-            f"批量删除应不慢于逐行删除的2倍: {batch_time:.3f}s vs {seq_time:.3f}s"
-        )
+        assert batch_time < seq_time * 2, f"批量删除应不慢于逐行删除的2倍: {batch_time:.3f}s vs {seq_time:.3f}s"
 
         # 清理缓存
-        ExcelOperations.clear_cache() if hasattr(ExcelOperations, 'clear_cache') else None
+        ExcelOperations.clear_cache() if hasattr(ExcelOperations, "clear_cache") else None

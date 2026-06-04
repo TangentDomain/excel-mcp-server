@@ -1,28 +1,22 @@
-# -*- coding: utf-8 -*-
 """
 Excel高级功能和优化测试
 合并了优化功能、格式化工具、比较功能等高级特性的测试
 这个文件替代了test_optimization_features.py, test_formatter.py等高级功能测试
 """
 
-import pytest
-import time
-import tempfile
-from pathlib import Path
 import json
+import tempfile
+import time
 from dataclasses import dataclass
-from typing import Any, Dict, List, Optional
+from pathlib import Path
+from typing import Any
 
-from excel_mcp_server_fastmcp.core.excel_writer import ExcelWriter
+import pytest
+
 from excel_mcp_server_fastmcp.core.excel_manager import ExcelManager
+from excel_mcp_server_fastmcp.core.excel_writer import ExcelWriter
 from excel_mcp_server_fastmcp.models.types import OperationResult
-from excel_mcp_server_fastmcp.utils.formatter import (
-    format_operation_result,
-    _serialize_to_json_dict,
-    _convert_to_compact_array_format,
-    _deep_clean_nulls,
-    _fallback_format_result
-)
+from excel_mcp_server_fastmcp.utils.formatter import _convert_to_compact_array_format, _deep_clean_nulls, _fallback_format_result, _serialize_to_json_dict, format_operation_result
 
 
 class TestExcelFeatures:
@@ -48,7 +42,7 @@ class TestExcelFeatures:
 
         # 测试含非法字符的名称应被拒绝（REQ-038: 不再静默替换）
         invalid_cases = [
-            "测试/数据",   # 含斜杠
+            "测试/数据",  # 含斜杠
             "Sheet*Test",  # 含星号
             "数据[2024]",  # 含方括号
         ]
@@ -78,12 +72,7 @@ class TestExcelFeatures:
         """测试中文数据写入优化"""
         writer = ExcelWriter(sample_excel_file)
 
-        chinese_data = [
-            ["中文标题", "数值", "备注"],
-            ["产品名称", 100, "库存充足"],
-            ["服务项目", 200, "需要补充"],
-            ["特殊符号测试", 300, "包含：、（）等符号"]
-        ]
+        chinese_data = [["中文标题", "数值", "备注"], ["产品名称", 100, "库存充足"], ["服务项目", 200, "需要补充"], ["特殊符号测试", 300, "包含：、（）等符号"]]
 
         result = writer.update_range("Sheet1!A1:C4", chinese_data)
         assert result.success is True
@@ -94,12 +83,7 @@ class TestExcelFeatures:
         writer = ExcelWriter(sample_excel_file)
 
         # 测试不同Unicode编码的相同字符
-        unicode_data = [
-            ["标准中文"],
-            ["繁體中文"],
-            ["日本語"],
-            ["한국어"]
-        ]
+        unicode_data = [["标准中文"], ["繁體中文"], ["日本語"], ["한국어"]]
 
         result = writer.update_range("Sheet1!A1:A4", unicode_data)
         assert result.success is True
@@ -115,12 +99,12 @@ class TestExcelFeatures:
         # 第一次读取
         start_time = time.time()
         result1 = reader.get_range("Sheet1!A1:C10")
-        first_duration = time.time() - start_time
+        time.time() - start_time
 
         # 第二次读取（应该更快，如果有缓存）
         start_time = time.time()
         result2 = reader.get_range("Sheet1!A1:C10")
-        second_duration = time.time() - start_time
+        time.time() - start_time
 
         assert result1.success is True
         assert result2.success is True
@@ -129,7 +113,8 @@ class TestExcelFeatures:
     def test_workbook_caching_optimization(self, sample_excel_file):
         """测试工作簿缓存优化"""
         from excel_mcp_server_fastmcp.core.excel_reader import ExcelReader
-        manager = ExcelManager(sample_excel_file)
+
+        ExcelManager(sample_excel_file)
         reader = ExcelReader(sample_excel_file)
 
         # 连续操作应该重用工作簿对象
@@ -140,15 +125,16 @@ class TestExcelFeatures:
             assert result.success is True
 
         # 所有操作都应该成功
-        assert all(r.success for r in results)    # ==================== 格式化工具测试 ====================
+        assert all(r.success for r in results)  # ==================== 格式化工具测试 ====================
 
     def test_format_operation_result_basic(self):
         """测试基础操作结果格式化"""
+
         @dataclass
         class MockResult:
             success: bool
             message: str
-            data: List[str]
+            data: list[str]
 
         result = MockResult(success=True, message="操作成功", data=["项目1", "项目2"])
         formatted = format_operation_result(result)
@@ -160,12 +146,7 @@ class TestExcelFeatures:
 
     def test_json_serialization_chinese(self):
         """测试中文JSON序列化"""
-        data = {
-            "中文键": "中文值",
-            "数字": 123,
-            "布尔": True,
-            "列表": ["项目1", "项目2", "项目3"]
-        }
+        data = {"中文键": "中文值", "数字": 123, "布尔": True, "列表": ["项目1", "项目2", "项目3"]}
 
         serialized = _serialize_to_json_dict(data)
         assert isinstance(serialized, dict)
@@ -175,33 +156,18 @@ class TestExcelFeatures:
         """测试紧凑数组格式转换"""
         # 创建模拟的结构化比较数据
         data = {
-            'row_differences': [
-                {
-                    'row_id': '1',
-                    'difference_type': 'row_modified',
-                    'detailed_field_differences': [
-                        {'field_name': '标题1', 'old_value': '数据1', 'new_value': '数据2', 'change_type': 'text_change'}
-                    ]
-                }
+            "row_differences": [
+                {"row_id": "1", "difference_type": "row_modified", "detailed_field_differences": [{"field_name": "标题1", "old_value": "数据1", "new_value": "数据2", "change_type": "text_change"}]}
             ]
         }
 
         compact = _convert_to_compact_array_format(data)
         assert isinstance(compact, dict)
-        assert 'row_differences' in compact
+        assert "row_differences" in compact
 
     def test_deep_clean_nulls(self):
         """测试深度null清理"""
-        data_with_nulls = {
-            "valid_key": "valid_value",
-            "null_key": None,
-            "empty_string": "",
-            "nested": {
-                "valid_nested": "value",
-                "null_nested": None
-            },
-            "list_with_nulls": ["value1", None, "value3"]
-        }
+        data_with_nulls = {"valid_key": "valid_value", "null_key": None, "empty_string": "", "nested": {"valid_nested": "value", "null_nested": None}, "list_with_nulls": ["value1", None, "value3"]}
 
         cleaned = _deep_clean_nulls(data_with_nulls)
         assert "null_key" not in cleaned
@@ -211,23 +177,18 @@ class TestExcelFeatures:
 
     def test_fallback_format_handling(self):
         """测试回退格式化处理"""
+
         # 创建一个无法序列化的对象
         class UnserializableObject:
             def __str__(self):
                 raise Exception("Cannot serialize")
 
-        problematic_data = UnserializableObject()
+        UnserializableObject()
         exception = Exception("Mock exception")
-        result = _fallback_format_result(type('MockResult', (), {
-            'success': False,
-            'message': 'Test error',
-            'data': None,
-            'metadata': None,
-            'error': None
-        })(), exception)
+        result = _fallback_format_result(type("MockResult", (), {"success": False, "message": "Test error", "data": None, "metadata": None, "error": None})(), exception)
 
         assert isinstance(result, dict)
-        assert "message" in result or "success" in result    # ==================== 错误处理优化测试 ====================
+        assert "message" in result or "success" in result  # ==================== 错误处理优化测试 ====================
 
     def test_unified_error_handling(self, sample_excel_file):
         """测试统一错误处理机制"""
@@ -337,11 +298,7 @@ class TestExcelFeatures:
         writer = ExcelWriter(sample_excel_file)
 
         # 测试各种数据类型的处理
-        mixed_data = [
-            ["文本", 123, 45.67, True, None],
-            ["更多文本", 456, 78.90, False, ""],
-            [None, 0, -1.23, None, "空值测试"]
-        ]
+        mixed_data = [["文本", 123, 45.67, True, None], ["更多文本", 456, 78.90, False, ""], [None, 0, -1.23, None, "空值测试"]]
 
         result = writer.update_range("Sheet1!A1:E3", mixed_data)
         assert result.success is True
@@ -370,16 +327,13 @@ class TestExcelFeatures:
 
         # 2. 写入中文数据
         writer = ExcelWriter(str(file_path))
-        chinese_data = [
-            ["产品名称", "销售额", "增长率"],
-            ["智能手机", 100000, 0.15],
-            ["笔记本电脑", 200000, 0.25]
-        ]
+        chinese_data = [["产品名称", "销售额", "增长率"], ["智能手机", 100000, 0.15], ["笔记本电脑", 200000, 0.25]]
         write_result = writer.update_range("数据表!A1:C3", chinese_data)
         assert write_result.success is True
 
         # 3. 读取数据验证
         from excel_mcp_server_fastmcp.core.excel_reader import ExcelReader
+
         reader = ExcelReader(str(file_path))
         read_result = reader.get_range("数据表!A1:C3")
         assert read_result.success is True
@@ -397,20 +351,20 @@ class TestExcelFeatures:
 
         reader = ExcelReader(sample_excel_file)
         writer = ExcelWriter(sample_excel_file)
-        manager = ExcelManager(sample_excel_file)
+        ExcelManager(sample_excel_file)
 
         # 执行多个操作
         operations = [
             reader.get_range("Sheet1!A1:B2"),
             writer.update_range("Sheet1!C1", [["优化测试"]]),
-            reader.list_sheets()  # 使用reader的list_sheets方法
+            reader.list_sheets(),  # 使用reader的list_sheets方法
         ]
 
         # 所有操作都应该成功
         for result in operations:
             assert result.success is True
             # 确保结果格式一致
-            assert hasattr(result, 'success')
-            assert hasattr(result, 'data')
+            assert hasattr(result, "success")
+            assert hasattr(result, "data")
             if not result.success:
-                assert hasattr(result, 'error')
+                assert hasattr(result, "error")

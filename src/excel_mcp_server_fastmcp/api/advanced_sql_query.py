@@ -22,13 +22,12 @@
 import csv
 import datetime
 import difflib
+import hashlib
 import io
 import json
 import logging
 import math
 import operator
-import gzip
-import hashlib
 import os
 import re
 import shutil
@@ -420,11 +419,11 @@ def _parse_error_hint(err_str: str, sql: str) -> str:
 
     # === 中文标点混用（全角 CJK 标点 → 半角 ASCII） ===
     cn_punctuation = {
-        "\uff0c": ",",   # fullwidth comma → ASCII comma
-        "\uff08": "(",   # fullwidth left paren → ASCII (
-        "\uff09": ")",   # fullwidth right paren → ASCII )
-        "\uff1a": ":",   # fullwidth colon → ASCII :
-        "\uff1b": ";",   # fullwidth semicolon → ASCII ;
+        "\uff0c": ",",  # fullwidth comma → ASCII comma
+        "\uff08": "(",  # fullwidth left paren → ASCII (
+        "\uff09": ")",  # fullwidth right paren → ASCII )
+        "\uff1a": ":",  # fullwidth colon → ASCII :
+        "\uff1b": ";",  # fullwidth semicolon → ASCII ;
     }
     for cn, en in cn_punctuation.items():
         if cn in sql:
@@ -437,8 +436,7 @@ def _parse_error_hint(err_str: str, sql: str) -> str:
     cross_file_bracket = re.search(r"\[[^\]]+\.xlsx?\]\.\w+", sql, re.IGNORECASE)
     if cross_file_bracket:
         matched = cross_file_bracket.group(0)
-        hint = (f'检测到跨文件引用语法 "{matched}",当前版本不支持 SQL Server 风格的 [文件名.xlsx].表名 语法。'
-                f'请使用 @\'path\' 语法进行跨文件查询，例如: FROM 表名@\'/path/to/file.xlsx\' alias')
+        hint = f"检测到跨文件引用语法 \"{matched}\",当前版本不支持 SQL Server 风格的 [文件名.xlsx].表名 语法。请使用 @'path' 语法进行跨文件查询，例如: FROM 表名@'/path/to/file.xlsx' alias"
         return hint
 
     # === Excel函数名误用 ===
@@ -792,9 +790,7 @@ class AdvancedSQLQueryEngine:
         # 互相污染 _original_to_clean_cols / _current_file_path / _parsed_sql 等共享状态
         # RLock允许同线程嵌套(run_python→query()→引擎内部跨表JOIN再查询同引擎)
         with self._query_lock:
-            return self._execute_sql_query_locked(
-                file_path, sql, sheet_name, limit, include_headers, output_format
-            )
+            return self._execute_sql_query_locked(file_path, sql, sheet_name, limit, include_headers, output_format)
 
     def _execute_sql_query_locked(
         self,
@@ -1384,7 +1380,8 @@ class AdvancedSQLQueryEngine:
             clean_col = re.sub(
                 r"[^\w\u4e00-\u9fff\u3040-\u309f\u30a0-\u30ff\uac00-\ud7af"
                 r"\u00c0-\u024f\u1e00-\u1eff\s()\U0001f300-\U0001f9ff]",
-                "_", clean_col
+                "_",
+                clean_col,
             )
             clean_col = re.sub(r"\s+", "_", clean_col)
 
@@ -1428,7 +1425,6 @@ class AdvancedSQLQueryEngine:
         # 然后转换为 MySQL 方言输出（自动变为 CONCAT）
         # sqlglot already imported at top level
         # exp already imported at top level
-        from sqlglot.dialects.mysql import MySQL
 
         try:
             # 用 PostgreSQL 方言解析（|| = 字符串拼接，非逻辑 OR）
@@ -1439,11 +1435,13 @@ class AdvancedSQLQueryEngine:
 
         # 检查是否真的包含 DPipe 或 Concat 节点（即原 SQL 有 ||）
         has_dpipe = False
+
         def _check_dpipe(node):
             nonlocal has_dpipe
             if isinstance(node, (exp.DPipe, exp.Concat)):
                 has_dpipe = True
             return node
+
         parsed.transform(_check_dpipe)
 
         if not has_dpipe:
@@ -1504,10 +1502,7 @@ class AdvancedSQLQueryEngine:
 
         # Fix(R4): CTE 深度检查 — 防止深层嵌套导致 StackOverflow
         if _cte_depth >= self._MAX_CTE_DEPTH:
-            raise ValueError(
-                f"CTE 嵌套深度超过限制 ({self._MAX_CTE_DEPTH})。"
-                f"💡 请简化查询，减少 CTE 嵌套层数，或改用子查询替代多层 CTE。"
-            )
+            raise ValueError(f"CTE 嵌套深度超过限制 ({self._MAX_CTE_DEPTH})。💡 请简化查询，减少 CTE 嵌套层数，或改用子查询替代多层 CTE。")
 
         # 复制worksheets_data避免修改原始数据，逐步添加CTE结果
         cte_data = dict(worksheets_data)
@@ -1665,25 +1660,25 @@ class AdvancedSQLQueryEngine:
             elif ch == '"':
                 i += 1
                 while i < n and sql[i] != '"':
-                    if sql[i] == '\\':
+                    if sql[i] == "\\":
                         i += 1  # 跳过转义字符
                     i += 1
                 if i < n:
                     i += 1  # 跳过结束引号
                 continue
             # 反引号标识符 - 跳过
-            elif ch == '`':
+            elif ch == "`":
                 i += 1
-                while i < n and sql[i] != '`':
+                while i < n and sql[i] != "`":
                     i += 1
                 if i < n:
                     i += 1
                 continue
             # 检测行注释: -- （双横线）
-            elif ch == '-' and i + 1 < n and sql[i + 1] == '-':
+            elif ch == "-" and i + 1 < n and sql[i + 1] == "-":
                 return "SQL语句包含注释符(--)，可能截断WHERE条件导致非预期修改(安全限制).💡 请移除注释符后重试"
             # 检测行注释: # （MySQL风格）
-            elif ch == '#':
+            elif ch == "#":
                 return "SQL语句包含注释符(#)，可能截断WHERE条件导致非预期修改(安全限制).💡 请移除注释符后重试"
             else:
                 i += 1
@@ -1733,22 +1728,22 @@ class AdvancedSQLQueryEngine:
             elif ch == '"':
                 i += 1
                 while i < n and _stripped[i] != '"':
-                    if _stripped[i] == '\\':
+                    if _stripped[i] == "\\":
                         i += 1  # 跳过转义字符
                     i += 1
                 if i < n:
                     i += 1  # 跳过结束引号
                 continue
             # 反引号标识符 - 跳过
-            elif ch == '`':
+            elif ch == "`":
                 i += 1
-                while i < n and _stripped[i] != '`':
+                while i < n and _stripped[i] != "`":
                     i += 1
                 if i < n:
                     i += 1
                 continue
             # 检测外部分号 → 危险！
-            elif ch == ';':
+            elif ch == ";":
                 return True
             else:
                 i += 1
@@ -2936,11 +2931,7 @@ class AdvancedSQLQueryEngine:
         for i, df in enumerate(result_dfs):
             # Fix(R56): UNION 要求每个 SELECT 返回相同数量的列
             if len(df.columns) != len(base_columns):
-                raise ValueError(
-                    f"UNION 第{i+1}个SELECT的列数({len(df.columns)}) "
-                    f"与第一个({len(base_columns)})不同。"
-                    f"SQL标准要求UNION的每个SELECT返回相同数量的列"
-                )
+                raise ValueError(f"UNION 第{i + 1}个SELECT的列数({len(df.columns)}) 与第一个({len(base_columns)})不同。SQL标准要求UNION的每个SELECT返回相同数量的列")
             aligned = df.reindex(columns=base_columns)
             aligned_dfs.append(aligned)
 
@@ -4042,10 +4033,7 @@ class AdvancedSQLQueryEngine:
 
         # Fix(R4): CTE 深度检查（放在入口处，无论当前 SQL 是否有 CTE 都拦截）
         if _cte_depth >= self._MAX_CTE_DEPTH:
-            raise ValueError(
-                f"CTE 嵌套深度超过限制 ({self._MAX_CTE_DEPTH})。"
-                f"💡 请简化查询，减少 CTE 嵌套层数，或改用子查询替代多层 CTE。"
-            )
+            raise ValueError(f"CTE 嵌套深度超过限制 ({self._MAX_CTE_DEPTH})。💡 请简化查询，减少 CTE 嵌套层数，或改用子查询替代多层 CTE。")
 
         # 处理CTE (WITH ... AS ...)
         # 兼容sqlglot不同版本:arg key可能是'with'或'with_'
@@ -4862,7 +4850,7 @@ class AdvancedSQLQueryEngine:
                 mask = val_series.isna()
                 if mask.any():
                     result = val_series.astype(str).str.len()
-                    result[mask] = float('nan')
+                    result[mask] = float("nan")
                     return result
                 return val_series.astype(str).str.len()
             return getattr(val_series.astype(str).str, self._SIMPLE_STR_OPS[func_type])()
@@ -5561,7 +5549,7 @@ class AdvancedSQLQueryEngine:
                     result_df = result_df.rename(columns={new_col: old_col})
             elif non_equi_cond is not None:
                 # [R53优化] 非等值连接: 检查是否有可用的等值join key + 额外过滤器
-                pending_filters = getattr(self, '_pending_join_filters', None)
+                pending_filters = getattr(self, "_pending_join_filters", None)
                 if left_on_col and right_on_col and pending_filters:
                     # 复合条件路径：先等值JOIN（快速pandas merge），再对缩小后的结果集施加非等值过滤
                     # 这比 cross join + filter 快几个数量级
@@ -5578,8 +5566,13 @@ class AdvancedSQLQueryEngine:
                 else:
                     # [R53优化] 纯非等值连接: 尝试排序归并优化
                     sorted_result = self._try_sorted_non_equi_join(
-                        result_df, right_df_renamed, non_equi_cond,
-                        left_table, right_table, right_alias, join_kind,
+                        result_df,
+                        right_df_renamed,
+                        non_equi_cond,
+                        left_table,
+                        right_table,
+                        right_alias,
+                        join_kind,
                     )
                     if sorted_result is not None:
                         result_df = sorted_result
@@ -5602,8 +5595,7 @@ class AdvancedSQLQueryEngine:
 
         return result_df
 
-    def _try_sorted_non_equi_join(self, left_df, right_df, non_equi_cond,
-                                   left_table, right_table, right_alias, join_kind):
+    def _try_sorted_non_equi_join(self, left_df, right_df, non_equi_cond, left_table, right_table, right_alias, join_kind):
         """
         [R53优化] 对基于排序的非等值连接使用归并算法，避免 O(n*m) 的笛卡尔积。
 
@@ -5626,8 +5618,8 @@ class AdvancedSQLQueryEngine:
 
         left_col_name = left_expr.name
         right_col_name = right_expr.name
-        left_tbl = getattr(left_expr, 'table', None)
-        right_tbl = getattr(right_expr, 'table', None)
+        left_tbl = getattr(left_expr, "table", None)
+        right_tbl = getattr(right_expr, "table", None)
 
         # 确定左右列归属
         if left_tbl:
@@ -5638,9 +5630,7 @@ class AdvancedSQLQueryEngine:
                 # 翻转比较符
                 op_type = type(non_equi_cond)
                 op_map = {exp.LT: exp.GT, exp.GT: exp.LT, exp.LTE: exp.GTE, exp.GTE: exp.LTE}
-                non_equi_cond = op_map.get(op_type, op_type)(this=non_equi_cond.this, 
-                                                              expression=non_equi_cond.expression,
-                                                              comments=non_equi_cond.comments)
+                non_equi_cond = op_map.get(op_type, op_type)(this=non_equi_cond.this, expression=non_equi_cond.expression, comments=non_equi_cond.comments)
         elif right_tbl:
             resolved_right_tbl = self._table_aliases.get(right_tbl, right_tbl)
             if resolved_right_tbl == left_table:
@@ -5648,9 +5638,7 @@ class AdvancedSQLQueryEngine:
                 left_col_name, right_col_name = right_col_name, left_col_name
                 op_type = type(non_equi_cond)
                 op_map = {exp.LT: exp.GT, exp.GT: exp.LT, exp.LTE: exp.GTE, exp.GTE: exp.LTE}
-                non_equi_cond = op_map.get(op_type, op_type)(this=non_equi_cond.this,
-                                                              expression=non_equi_cond.expression,
-                                                              comments=non_equi_cond.comments)
+                non_equi_cond = op_map.get(op_type, op_type)(this=non_equi_cond.this, expression=non_equi_cond.expression, comments=non_equi_cond.comments)
 
         # 验证列存在（右表可能已被重命名为 alias.col 格式）
         _right_col_candidates = [right_col_name]
@@ -5672,9 +5660,10 @@ class AdvancedSQLQueryEngine:
 
         # 数值/日期类型才能排序比较 — 统一转 float64 避免类型混用
         import numpy as np
+
         try:
-            left_keys = pd.to_numeric(left_keys, errors='coerce').astype(np.float64)
-            right_keys = pd.to_numeric(right_keys, errors='coerce').astype(np.float64)
+            left_keys = pd.to_numeric(left_keys, errors="coerce").astype(np.float64)
+            right_keys = pd.to_numeric(right_keys, errors="coerce").astype(np.float64)
             # NaN 值无法参与排序比较，回退
             if np.any(np.isnan(left_keys)) or np.any(np.isnan(right_keys)):
                 return None
@@ -5682,8 +5671,8 @@ class AdvancedSQLQueryEngine:
             return None
 
         # 排序索引
-        left_order = np.argsort(left_keys, kind='mergesort')
-        right_order = np.argsort(right_keys, kind='mergesort')
+        left_order = np.argsort(left_keys, kind="mergesort")
+        right_order = np.argsort(right_keys, kind="mergesort")
 
         left_sorted = left_keys[left_order]
         right_sorted = right_keys[right_order]
@@ -5751,12 +5740,14 @@ class AdvancedSQLQueryEngine:
             unmatched_left = [i for i in range(len(left_df)) if i not in matched_left]
             if unmatched_left:
                 left_unmatched = left_df.iloc[unmatched_left].reset_index(drop=True)
-                right_null = pd.DataFrame([[None] * len(right_df.columns)] * len(unmatched_left),
-                                          columns=right_df.columns)
-                result = pd.concat([
-                    result,
-                    pd.concat([left_unmatched, right_null], axis=1),
-                ], ignore_index=True)
+                right_null = pd.DataFrame([[None] * len(right_df.columns)] * len(unmatched_left), columns=right_df.columns)
+                result = pd.concat(
+                    [
+                        result,
+                        pd.concat([left_unmatched, right_null], axis=1),
+                    ],
+                    ignore_index=True,
+                )
 
         return result
 
@@ -6232,7 +6223,7 @@ class AdvancedSQLQueryEngine:
 
     def _cleanup_tmp_columns(self, df):
         """清理WHERE处理过程中添加的临时列 (R52 refactor)"""
-        tmp_cols = getattr(self, '_pending_tmp_cols', [])
+        tmp_cols = getattr(self, "_pending_tmp_cols", [])
         for tc in tmp_cols:
             if tc in df.columns:
                 del df[tc]
@@ -6301,7 +6292,7 @@ class AdvancedSQLQueryEngine:
             转义后安全用于 pandas query() 的字符串
         """
         # 先转义反斜杠（必须先处理，否则后续转义会双重处理）
-        escaped = value.replace('\\', '\\\\')
+        escaped = value.replace("\\", "\\\\")
         # 再转义单引号
         escaped = escaped.replace("'", "\\'")
         return escaped
@@ -6326,22 +6317,24 @@ class AdvancedSQLQueryEngine:
         # 移除常见绝对路径模式 (Unix)
         # 匹配 /root/, /home/, /usr/, /opt/, /app/, /var/, /etc/ 开头的路径
         path_pattern = r'(?:(?:^|(?<=[^a-zA-Z0-9_./-]))(?:/?(?:root|home|usr|opt|app|var|etc|tmp|src|lib|local|workspace|project|build|dist|\.hermes|\.cache)[/][^\s,"\']{0,300}))'
-        sanitized = re.sub(path_pattern, '<path>', sanitized)
+        sanitized = re.sub(path_pattern, "<path>", sanitized)
 
         # 移除 Python 模块路径格式 (package.module.function)
         # 如 "excel_mcp_server_fastmcp.api.advanced_sql_query.method_name"
-        module_path_pattern = r'[a-z_][a-z0-9_]*(?:\.[a-z_][a-z0-9_]*){2,}(?:\.[A-Z][a-zA-Z]*)?'
+        module_path_pattern = r"[a-z_][a-z0-9_]*(?:\.[a-z_][a-z0-9_]*){2,}(?:\.[A-Z][a-zA-Z]*)?"
         # 只替换看起来像完整模块路径的（至少3段且含已知前缀）
-        known_prefixes = ('excel_mcp', 'sqlglot', 'pandas', 'numpy', 'openpyxl', 'calamine')
+        known_prefixes = ("excel_mcp", "sqlglot", "pandas", "numpy", "openpyxl", "calamine")
+
         def _replace_module_path(m):
             text = m.group(0)
             if any(text.startswith(p) for p in known_prefixes):
-                return '<module>'
+                return "<module>"
             return text
+
         sanitized = re.sub(module_path_pattern, _replace_module_path, sanitized)
 
         # 移除行号引用 "line XXX" 或 ":line XXX"
-        sanitized = re.sub(r':?\s*line\s+\d+', ':<line>', sanitized)
+        sanitized = re.sub(r":?\s*line\s+\d+", ":<line>", sanitized)
 
         return sanitized
 
@@ -6368,10 +6361,7 @@ class AdvancedSQLQueryEngine:
                     sub_values = sub_result.iloc[:, 0].dropna().tolist()
                     # Fix(R56): 使用 set 去重 + 类型感知格式化，避免大结果集 O(n×m)
                     unique_values = list(set(sub_values))
-                    values_str = ", ".join(
-                        f"'{v}'" if isinstance(v, str) else str(v)
-                        for v in unique_values
-                    )
+                    values_str = ", ".join(f"'{v}'" if isinstance(v, str) else str(v) for v in unique_values)
                     return f"{prefix}{left}.isin([{values_str}])"
                 return f"{prefix}{left}.isin([])"
             except Exception as e:
@@ -6418,7 +6408,7 @@ class AdvancedSQLQueryEngine:
                 # 非列表达式(CAST/函数/嵌套表达式/HAVING聚合): 预计算为临时列
                 # R48-fix: HAVING 聚合函数(COUNT/SUM/AVG 等)需映射到已计算的别名列
                 resolved_left = left_expr
-                if isinstance(left_expr, exp.AggFunc) and hasattr(self, '_having_agg_alias_map'):
+                if isinstance(left_expr, exp.AggFunc) and hasattr(self, "_having_agg_alias_map"):
                     agg_sql = left_expr.sql()
                     if agg_sql in self._having_agg_alias_map:
                         alias_col = self._having_agg_alias_map[agg_sql]
@@ -6439,7 +6429,7 @@ class AdvancedSQLQueryEngine:
                         # R48: 聚合函数已解析为列引用 → 直接取列值
                         # 注意: _expression_to_column_reference 返回带反引号的名称(给query用的)
                         # 此处需要原始列名用于 df[col] 访问
-                        col_name_raw = resolved_left.this.this if hasattr(resolved_left, 'this') and hasattr(resolved_left.this, 'this') else str(resolved_left)
+                        col_name_raw = resolved_left.this.this if hasattr(resolved_left, "this") and hasattr(resolved_left.this, "this") else str(resolved_left)
                         if col_name_raw in df.columns:
                             df[temp_col] = df[col_name_raw]
                         else:
@@ -6463,7 +6453,7 @@ class AdvancedSQLQueryEngine:
                     # R52: 使用实例级 _pending_tmp_cols 追踪临时列（避免 pandas UserWarning）
                     # 不在此处删除临时列,因为query()是惰性求值
                     # 调用方(_apply_where_clause)会在查询完成后通过 _cleanup_tmp_columns 清理
-                    getattr(self, '_pending_tmp_cols', []).append(temp_col)
+                    getattr(self, "_pending_tmp_cols", []).append(temp_col)
                     return query_str
                 except Exception as e:
                     if temp_col in df.columns:
@@ -6726,7 +6716,7 @@ class AdvancedSQLQueryEngine:
             if isinstance(inner_val, str):
                 # 字符串形式的负数（来自列引用等）
                 try:
-                    return -float(inner_val) if '.' in inner_val else -int(inner_val)
+                    return -float(inner_val) if "." in inner_val else -int(inner_val)
                 except (ValueError, TypeError):
                     return f"(-{inner_val})"
             elif isinstance(inner_val, (int, float)):
@@ -7432,9 +7422,7 @@ class AdvancedSQLQueryEngine:
                     result_data[alias_name] = grouped[alias_name].first().reset_index(drop=True)
                 else:
                     try:
-                        case_results = self._evaluate_case_with_aggregate(
-                            original_expr, grouped, df, result_data, group_by_columns
-                        )
+                        case_results = self._evaluate_case_with_aggregate(original_expr, grouped, df, result_data, group_by_columns)
                         result_data[alias_name] = case_results
                     except Exception as e:
                         logger.warning("CASE+聚合计算失败 %s: %s", alias_name, e)
@@ -7447,9 +7435,7 @@ class AdvancedSQLQueryEngine:
                 else:
                     # Fix(R47): 含聚合函数的COALESCE(如 COALESCE(SUM(col), 0))
                     try:
-                        coalesce_results = self._evaluate_coalesce_with_aggregate(
-                            original_expr, grouped, df, result_data, group_by_columns
-                        )
+                        coalesce_results = self._evaluate_coalesce_with_aggregate(original_expr, grouped, df, result_data, group_by_columns)
                         result_data[alias_name] = coalesce_results
                     except Exception as e:
                         logger.warning("COALESCE+聚合计算失败 %s: %s", alias_name, e)
@@ -7530,8 +7516,7 @@ class AdvancedSQLQueryEngine:
         # 需要在 grouped 对象仍可用时(聚合后、返回前)计算正确值
         # R53-fix: 同时将 _having_agg_* 列加入 ordered_columns，确保它们出现在
         # 最终 DataFrame 中（否则 _apply_having_clause 找不到这些列）
-        import sys as _sys
-        if having_aggregations and 'grouped' in dir() and grouped is not None:
+        if having_aggregations and "grouped" in dir() and grouped is not None:
             for temp_alias, agg_func in having_aggregations.items():
                 if temp_alias not in result_data:
                     try:
@@ -7676,7 +7661,7 @@ class AdvancedSQLQueryEngine:
             elif isinstance(inner, exp.AggFunc):
                 # Fix(R56): HAVING CAST(AGG(..)) — 聚合函数通过别名映射解析
                 agg_sql = inner.sql()
-                alias_map = getattr(self, '_having_agg_alias_map', {})
+                alias_map = getattr(self, "_having_agg_alias_map", {})
                 resolved = alias_map.get(agg_sql)
                 if resolved and resolved in row.index:
                     inner_val = row[resolved]
@@ -7689,7 +7674,7 @@ class AdvancedSQLQueryEngine:
                 try:
                     inner_val = self._literal_value(inner)
                 except (AttributeError, TypeError):
-                    inner_val = self._get_row_value(inner, row) if hasattr(self, '_get_row_value') else None
+                    inner_val = self._get_row_value(inner, row) if hasattr(self, "_get_row_value") else None
         else:
             # 向量化模式: 用于 SELECT 列计算
             if isinstance(inner, exp.Column):
@@ -7703,7 +7688,7 @@ class AdvancedSQLQueryEngine:
             elif isinstance(inner, exp.AggFunc):
                 # Fix(R56): 向量化模式中 CAST 内的聚合函数通过别名映射解析
                 agg_sql = inner.sql()
-                alias_map = getattr(self, '_having_agg_alias_map', {})
+                alias_map = getattr(self, "_having_agg_alias_map", {})
                 resolved = alias_map.get(agg_sql)
                 if resolved and resolved in df.columns:
                     inner_val = df[resolved]
@@ -7717,7 +7702,7 @@ class AdvancedSQLQueryEngine:
                 except Exception:
                     # 最后尝试: 查找是否有匹配的别名
                     inner_str = str(inner)
-                    matched = [c for c in df.columns if c == inner_str or c.endswith('_' + inner_str)]
+                    matched = [c for c in df.columns if c == inner_str or c.endswith("_" + inner_str)]
                     if len(matched) == 1:
                         inner_val = df[matched[0]]
                     else:
@@ -7841,7 +7826,7 @@ class AdvancedSQLQueryEngine:
 
         处理如 CASE WHEN SUM(Amount) > 300 THEN 'Big' ELSE 'Small' END 的场景.
         策略: 对每个分组构建一行聚合结果DataFrame,然后逐组评估CASE.
-        
+
         关键: 需要先计算CASE内嵌的聚合函数值(这些聚合不在select_exprs中),
         然后将它们注入到row_context中供条件评估使用.
 
@@ -7857,7 +7842,9 @@ class AdvancedSQLQueryEngine:
         """
         # numpy already imported at top level
         results = []
-        group_names = list(grouped.groups.keys())
+        # Pandas 2.x: single-column groupby returns scalar keys, multi-column returns tuples.
+        # Normalize to always use tuples to avoid FutureWarning.
+        group_names = [k if isinstance(k, tuple) else (k,) for k in grouped.groups.keys()]
 
         # Fix(R47-b): 提取并计算CASE内嵌的聚合函数
         inner_agg_expr = self._find_inner_aggregate(case_expr)
@@ -7928,7 +7915,7 @@ class AdvancedSQLQueryEngine:
         """
         # numpy already imported at top level
         results = []
-        group_names = list(grouped.groups.keys())
+        group_names = [k if isinstance(k, tuple) else (k,) for k in grouped.groups.keys()]
 
         for i, group_name in enumerate(group_names):
             if not isinstance(group_name, tuple):
@@ -8013,7 +8000,7 @@ class AdvancedSQLQueryEngine:
         使用 pandas combine_first 实现真正的向量化操作,
         替代逐行 _evaluate_coalesce_for_row 循环.
         仅当所有参数为列引用或字面量时可向量化,否则回退逐行.
-        
+
         Fix(R47): 支持 exp.Neg 等一元表达式作为COALESCE默认值(如 COALESCE(col, -1))
         """
         values = [coalesce_expr.this] + list(coalesce_expr.expressions)
@@ -8136,10 +8123,12 @@ class AdvancedSQLQueryEngine:
                     else:
                         expr_values = self._evaluate_coalesce_vectorized(expr.this, df)
                     df[temp_col] = expr_values
+
                 # 对每个组统计非空值数量
                 def count_non_null(group):
                     return group[temp_col].notna().sum()
-                return grouped.apply(count_non_null)
+
+                return grouped.apply(count_non_null, include_groups=False)
 
             col_name = self._extract_agg_column(expr.this, "COUNT")
             return grouped[col_name].count()
@@ -8416,13 +8405,13 @@ class AdvancedSQLQueryEngine:
                 del result_df[temp_col]
 
         # R48-fix: 清理 _sql_condition_to_pandas 创建的 _cast_tmp_* 临时列
-        cast_tmp_cols = [c for c in result_df.columns if c.startswith('_cast_tmp_')]
+        cast_tmp_cols = [c for c in result_df.columns if c.startswith("_cast_tmp_")]
         for col in cast_tmp_cols:
             del result_df[col]
 
         # R53-fix: 清理 _having_agg_* 临时列（由 _apply_group_by_aggregation 计算，
         # 仅用于 HAVING 条件评估，不应出现在最终 SELECT 结果中）
-        having_agg_cols = [c for c in result_df.columns if c.startswith('_having_agg_')]
+        having_agg_cols = [c for c in result_df.columns if c.startswith("_having_agg_")]
         for col in having_agg_cols:
             del result_df[col]
 
@@ -8645,9 +8634,9 @@ class AdvancedSQLQueryEngine:
                         if num_count / total_count > 0.5:
                             temp_col_name = f"_temp_sort_{col}"
                             # 尝试转为数值，失败者保留原值用于末尾排序
-                            numeric_vals = pd.to_numeric(col_data, errors='coerce')
+                            numeric_vals = pd.to_numeric(col_data, errors="coerce")
                             # 排序键：数值用其值，非数值用 inf（排到末尾）
-                            df[temp_col_name] = numeric_vals.fillna(float('inf'))
+                            df[temp_col_name] = numeric_vals.fillna(float("inf"))
                             sort_columns = [temp_col_name if c == col else c for c in sort_columns]
                             temp_sort_cols.append(temp_col_name)
                         else:
@@ -8879,10 +8868,7 @@ class AdvancedSQLQueryEngine:
 
             # 日期类型检测
             try:
-                is_likely_date = any(
-                    isinstance(val, str) and any(x in str(val) for x in ["-", "/", ":", "年", "月", "日"])
-                    for val in sample
-                )
+                is_likely_date = any(isinstance(val, str) and any(x in str(val) for x in ["-", "/", ":", "年", "月", "日"]) for val in sample)
                 if is_likely_date:
                     converted = pd.to_datetime(series, errors="coerce", format="mixed")
                     if not converted.isna().all():
@@ -8970,10 +8956,7 @@ class AdvancedSQLQueryEngine:
         # R51-opt: 采样量从50降至20（统计显著性足够，减少开销）
         # 不再限制 pd.api.types.is_numeric_dtype，统一走采样检测（兼容 object 型数值列）
         sample = non_null.head(20)
-        numeric_count = sum(
-            1 for v in sample
-            if isinstance(v, (int, float, np.integer, np.floating)) and not (isinstance(v, float) and np.isnan(v))
-        )
+        numeric_count = sum(1 for v in sample if isinstance(v, (int, float, np.integer, np.floating)) and not (isinstance(v, float) and np.isnan(v)))
         if numeric_count == len(sample):
             return "numeric"
 
@@ -9012,18 +8995,12 @@ class AdvancedSQLQueryEngine:
                 try:
                     f_val = float(value)
                     if np.isnan(f_val) or math.isinf(f_val):
-                        return (
-                            f"数值校验失败: 列 '{col_name}' 不支持 NaN 或无穷大(Inf/-Inf)值. "
-                            f"💡 Excel无法表示这些特殊浮点值,请使用有限数值或NULL."
-                        )
+                        return f"数值校验失败: 列 '{col_name}' 不支持 NaN 或无穷大(Inf/-Inf)值. 💡 Excel无法表示这些特殊浮点值,请使用有限数值或NULL."
                     # Excel 实际支持的浮点范围约为 ±1e308(IEEE 754 double),
                     # 但超过 ±1e15 的整数精度会丢失,超过 ±1e308 会溢出.
                     # 此处设置安全阈值: 绝对值不超过 1e308
                     if abs(f_val) > 1e308:
-                        return (
-                            f"数值校验失败: 列 '{col_name}' 的值 {f_val} 超出Excel支持的数值范围(±1e308). "
-                            f"💡 请使用更小的数值."
-                        )
+                        return f"数值校验失败: 列 '{col_name}' 的值 {f_val} 超出Excel支持的数值范围(±1e308). 💡 请使用更小的数值."
                 except (ValueError, TypeError, OverflowError):
                     pass
                 return None
@@ -9033,15 +9010,9 @@ class AdvancedSQLQueryEngine:
                     float(value)
                     return None  # 字符串内容是有效数字,放行(如 "123")
                 except (ValueError, TypeError):
-                    return (
-                        f"类型不匹配: 列 '{col_name}' 是数值型,但写入了字符串 '{value}'. "
-                        f"💡 数值列只能写入数字或数字格式的字符串."
-                    )
+                    return f"类型不匹配: 列 '{col_name}' 是数值型,但写入了字符串 '{value}'. 💡 数值列只能写入数字或数字格式的字符串."
             # 其他类型(如list/dict等)拒绝
-            return (
-                f"类型不匹配: 列 '{col_name}' 是数值型,但写入了 {type(value).__name__} 类型的值. "
-                f"💡 数值列只能写入数字或数字格式的字符串."
-            )
+            return f"类型不匹配: 列 '{col_name}' 是数值型,但写入了 {type(value).__name__} 类型的值. 💡 数值列只能写入数字或数字格式的字符串."
 
         return None
 
@@ -9363,10 +9334,14 @@ class AdvancedSQLQueryEngine:
                 # P0-fix: df.at赋值可能因numpy小dtype(uint8)溢出而截断或报错
                 # 此赋值仅用于链式SET(如SET A=999, B=A+1)的中间状态,实际写Excel走changes列表
                 # 故跳过溢出赋值不影响最终正确性
-                try:
-                    df.at[idx, col_name] = new_val
-                except (ValueError, TypeError, OverflowError):
-                    pass  # 值超出DataFrame列dtype范围,跳过中间状态更新
+                import warnings as _w
+
+                with _w.catch_warnings():
+                    _w.filterwarnings("ignore", message="Setting an item of incompatible dtype")
+                    try:
+                        df.at[idx, col_name] = new_val
+                    except (ValueError, TypeError, OverflowError):
+                        pass  # 值超出DataFrame列dtype范围,跳过中间状态更新
 
         if not changes:
             elapsed = (time.time() - start_time) * 1000
@@ -9544,8 +9519,7 @@ class AdvancedSQLQueryEngine:
             if len(row) != len(col_names):
                 return {
                     "success": False,
-                    "message": f"VALUES 值数量({len(row)})与列数量({len(col_names)})不匹配。"
-                               f"请确保每个 VALUES 元组包含 {len(col_names)} 个值",
+                    "message": f"VALUES 值数量({len(row)})与列数量({len(col_names)})不匹配。请确保每个 VALUES 元组包含 {len(col_names)} 个值",
                     "affected_rows": 0,
                 }
             rows.append(row)
@@ -9558,8 +9532,7 @@ class AdvancedSQLQueryEngine:
         if len(rows) > _MAX_INSERT_BATCH_SIZE:
             return {
                 "success": False,
-                "message": f"INSERT 批量插入行数({len(rows)})超过限制({_MAX_INSERT_BATCH_SIZE})。"
-                           f"请分批插入，每批不超过 {_MAX_INSERT_BATCH_SIZE} 行",
+                "message": f"INSERT 批量插入行数({len(rows)})超过限制({_MAX_INSERT_BATCH_SIZE})。请分批插入，每批不超过 {_MAX_INSERT_BATCH_SIZE} 行",
                 "affected_rows": 0,
             }
 
@@ -9941,7 +9914,7 @@ class AdvancedSQLQueryEngine:
                             target_cell.value = None
                             # 方法2: 强制清除 data_type 确保保存为空
                             try:
-                                target_cell.data_type = 's'  # 先转为字符串类型
+                                target_cell.data_type = "s"  # 先转为字符串类型
                                 target_cell.value = None
                             except Exception:
                                 pass
@@ -10001,7 +9974,7 @@ class AdvancedSQLQueryEngine:
                 # 检测孤儿锁文件：如果存在且持有者进程已死，自动清理
                 if os.path.exists(lock_path):
                     try:
-                        with open(lock_path, "r", encoding="utf-8") as lf:
+                        with open(lock_path, encoding="utf-8") as lf:
                             pid_str = lf.read().strip()
                         if pid_str:
                             old_pid = int(pid_str)
@@ -10111,8 +10084,7 @@ class AdvancedSQLQueryEngine:
         """将值序列化为JSON安全类型(numpy->Python原生)-- 委托给_serialize_value"""
         return self._serialize_value(val)
 
-    def _evaluate_update_expression(self, expr: exp.Expression, df: pd.DataFrame, row_idx: int,
-                                    depth: int = 0) -> Any:
+    def _evaluate_update_expression(self, expr: exp.Expression, df: pd.DataFrame, row_idx: int, depth: int = 0) -> Any:
         """
         评估UPDATE SET表达式,支持常量,列引用和算术运算
 
@@ -10202,25 +10174,21 @@ class AdvancedSQLQueryEngine:
             parts = []
             for arg in expr.expressions:
                 val = self._evaluate_update_expression(arg, df, row_idx, depth + 1)
-                parts.append(str(val) if val is not None else '')
-            return ''.join(parts)
+                parts.append(str(val) if val is not None else "")
+            return "".join(parts)
         elif isinstance(expr, exp.DPipe):
             # || 直接被 sqlglot 识别为 DPipe(如 PostgreSQL 方言)
             left = self._evaluate_update_expression(expr.this, df, row_idx, depth + 1)
             right = self._evaluate_update_expression(expr.expression, df, row_idx, depth + 1)
-            return (str(left) if left is not None else '') + (str(right) if right is not None else '')
+            return (str(left) if left is not None else "") + (str(right) if right is not None else "")
         elif isinstance(expr, exp.Or):
             # Fix: P2-1 — MySQL 方言下 || 被解析为 OR,启发式检测字符串拼接
             if self._is_likely_dpipe_concatenation(expr):
                 left = self._evaluate_update_expression(expr.this, df, row_idx, depth + 1)
                 right = self._evaluate_update_expression(expr.expression, df, row_idx, depth + 1)
-                return (str(left) if left is not None else '') + (str(right) if right is not None else '')
+                return (str(left) if left is not None else "") + (str(right) if right is not None else "")
             else:
-                raise ValueError(
-                    f"不支持的表达式: {expr}。\n"
-                    f"💡 MySQL方言中 || 表示逻辑OR,如需字符串拼接请使用 CONCAT() 函数。\n"
-                    f"🔧 示例: UPDATE table SET col = CONCAT(col, '_suffix') WHERE ..."
-                )
+                raise ValueError(f"不支持的表达式: {expr}。\n💡 MySQL方言中 || 表示逻辑OR,如需字符串拼接请使用 CONCAT() 函数。\n🔧 示例: UPDATE table SET col = CONCAT(col, '_suffix') WHERE ...")
 
         elif isinstance(expr, (exp.Abs, exp.Ceil, exp.Floor, exp.Sqrt)):
             # [FIX R10-B2] UPDATE SET 标量数学函数(ABS/CEIL/FLOOR/SQRT)
@@ -10266,7 +10234,7 @@ class AdvancedSQLQueryEngine:
                 s = str(val)
                 st = int(start) - 1  # SQL is 1-indexed
                 ln = int(length) if length is not None else len(s)
-                return s[st:st + ln]
+                return s[st : st + ln]
             elif isinstance(expr, (exp.Left, exp.Right)):
                 val = self._evaluate_update_expression(expr.this, df, row_idx, depth + 1)
                 length_expr = expr.args.get("length") or expr.args.get("expression")
@@ -10405,10 +10373,10 @@ class AdvancedSQLQueryEngine:
                 return False
             try:
                 if isinstance(left, str) and isinstance(right, (int, float)):
-                    left_num = float(left) if '.' in str(left) else int(left)
+                    left_num = float(left) if "." in str(left) else int(left)
                     left = type(right)(left_num)
                 elif isinstance(right, str) and isinstance(left, (int, float)):
-                    right_num = float(right) if '.' in str(right) else int(right)
+                    right_num = float(right) if "." in str(right) else int(right)
                     right = type(left)(right_num)
                 elif isinstance(left, str) and isinstance(right, str):
                     pass

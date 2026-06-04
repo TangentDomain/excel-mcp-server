@@ -3,9 +3,10 @@
 MCP工具验证测试
 验证Excel MCP服务器的核心功能
 """
+
 import json
-import sys
 import os
+import sys
 from pathlib import Path
 
 # 添加项目路径
@@ -58,10 +59,11 @@ def game_excel_file(tmp_path_factory):
 def test_list_sheets(game_excel_file):
     """测试1: 列出工作表"""
     from excel_mcp_server_fastmcp.api.excel_operations import ExcelOperations
+
     ops = ExcelOperations()
     result = ops.list_sheets(game_excel_file)
-    sheets = result['sheets']
-    expected = ['skills', 'items', 'characters']
+    sheets = result["sheets"]
+    expected = ["skills", "items", "characters"]
     for e in expected:
         assert e in sheets, f"缺少工作表: {e}"
 
@@ -69,15 +71,17 @@ def test_list_sheets(game_excel_file):
 def test_get_headers(game_excel_file):
     """测试2: 获取表头"""
     from excel_mcp_server_fastmcp.api.excel_operations import ExcelOperations
+
     ops = ExcelOperations()
     result = ops.get_headers(game_excel_file, "skills")
-    descriptions = result['descriptions']
+    descriptions = result["descriptions"]
     assert any("技能ID" in desc for desc in descriptions), "缺少技能ID字段描述"
 
 
 def test_query_data(game_excel_file):
     """测试3: 查询数据"""
     from excel_mcp_server_fastmcp.api.excel_operations import ExcelOperations
+
     ops = ExcelOperations()
     query_result = ops.query(game_excel_file, "skills", "职业='法师'")
     assert len(query_result) >= 2, "应该至少有2个法师技能"
@@ -86,6 +90,7 @@ def test_query_data(game_excel_file):
 def test_get_range(game_excel_file):
     """测试4: 获取范围数据"""
     from excel_mcp_server_fastmcp.api.excel_operations import ExcelOperations
+
     ops = ExcelOperations()
     result = ops.get_range(game_excel_file, "skills", "A1:F5")
     assert len(result) >= 2, "应该至少有2行数据"
@@ -94,20 +99,22 @@ def test_get_range(game_excel_file):
 def test_find_last_row(game_excel_file):
     """测试5: 查找最后一行"""
     from excel_mcp_server_fastmcp.api.excel_operations import ExcelOperations
+
     ops = ExcelOperations()
     result = ops.find_last_row(game_excel_file, "skills")
-    last_row = result['last_row']
+    last_row = result["last_row"]
     assert last_row >= 5, f"期望至少5行，实际{last_row}行"
 
 
 def test_get_file_info(game_excel_file):
     """测试6: 表格描述"""
     from excel_mcp_server_fastmcp.api.excel_operations import ExcelOperations
+
     ops = ExcelOperations()
     file_info = ops.get_file_info(game_excel_file)
-    data = file_info.get('data', {})
-    assert 'sheet_count' in data, "缺少工作表计数"
-    assert data['sheet_count'] >= 3, f"期望至少3个工作表，实际{data['sheet_count']}个"
+    data = file_info.get("data", {})
+    assert "sheet_count" in data, "缺少工作表计数"
+    assert data["sheet_count"] >= 3, f"期望至少3个工作表，实际{data['sheet_count']}个"
 
 
 if __name__ == "__main__":

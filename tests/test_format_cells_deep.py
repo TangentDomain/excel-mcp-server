@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 """
 format_cells 深度测试 - R55+ 迭代重点
 
@@ -16,19 +15,19 @@ format_cells 深度测试 - R55+ 迭代重点
 """
 
 import os
-import pytest
 import tempfile
 from pathlib import Path
 
-from openpyxl import Workbook, load_workbook
-from openpyxl.styles import Font, PatternFill, Alignment, Border, Side
 import openpyxl
+import pytest
+from openpyxl import Workbook, load_workbook
+from openpyxl.styles import Alignment, Border, Font, PatternFill, Side
 
-from excel_mcp_server_fastmcp.core.excel_writer import ExcelWriter
 from excel_mcp_server_fastmcp.api.excel_operations import ExcelOperations
-
+from excel_mcp_server_fastmcp.core.excel_writer import ExcelWriter
 
 # ==================== Helper ====================
+
 
 def _create_test_xlsx(file_path: str, rows: int = 5, cols: int = 4, sheet_name: str = "Sheet1"):
     """创建测试用 xlsx 文件，含数据"""
@@ -76,6 +75,7 @@ def _read_cell_style(file_path: str, cell_ref: str = "A1", sheet_name: str = "Sh
 
 
 # ==================== Test Class ====================
+
 
 class TestFormatCellsDeep:
     """format_cells 深度测试套件"""
@@ -192,9 +192,7 @@ class TestFormatCellsDeep:
         fp = str(temp_dir / "gradient.xlsx")
         _create_test_xlsx(fp)
         writer = ExcelWriter(fp)
-        result = writer.format_cells("Sheet1!A1", {
-            "fill": {"type": "gradient", "colors": ["4472C4", "ED7D31"], "gradient_type": "linear"}
-        })
+        result = writer.format_cells("Sheet1!A1", {"fill": {"type": "gradient", "colors": ["4472C4", "ED7D31"], "gradient_type": "linear"}})
         assert result.success is True
 
     def test_pattern_fill(self, temp_dir):
@@ -202,9 +200,7 @@ class TestFormatCellsDeep:
         fp = str(temp_dir / "pattern.xlsx")
         _create_test_xlsx(fp)
         writer = ExcelWriter(fp)
-        result = writer.format_cells("Sheet1!A1", {
-            "fill": {"type": "pattern", "patternType": "lightGray", "fgColor": "FF0000"}
-        })
+        result = writer.format_cells("Sheet1!A1", {"fill": {"type": "pattern", "patternType": "lightGray", "fgColor": "FF0000"}})
         assert result.success is True
 
     # ---------- 3. 对齐与换行 ----------
@@ -304,9 +300,7 @@ class TestFormatCellsDeep:
         fp = str(temp_dir / "border_thin.xlsx")
         _create_test_xlsx(fp)
         writer = ExcelWriter(fp)
-        result = writer.format_cells("Sheet1!A1:C3", {
-            "border": {"left": "thin", "right": "thin", "top": "thin", "bottom": "thin"}
-        })
+        result = writer.format_cells("Sheet1!A1:C3", {"border": {"left": "thin", "right": "thin", "top": "thin", "bottom": "thin"}})
         assert result.success is True
         style = _read_cell_style(fp, "A1")
         assert style["border_left"] == "thin"
@@ -319,15 +313,18 @@ class TestFormatCellsDeep:
         fp = str(temp_dir / "border_mix.xlsx")
         _create_test_xlsx(fp)
         writer = ExcelWriter(fp)
-        result = writer.format_cells("Sheet1!A1", {
-            "border": {
-                "top": "medium",
-                "bottom": "thick",
-                "left": "double",
-                "right": "dashed",
-                "color": "FF0000",
-            }
-        })
+        result = writer.format_cells(
+            "Sheet1!A1",
+            {
+                "border": {
+                    "top": "medium",
+                    "bottom": "thick",
+                    "left": "double",
+                    "right": "dashed",
+                    "color": "FF0000",
+                }
+            },
+        )
         assert result.success is True
         style = _read_cell_style(fp, "A1")
         assert style["border_top"] == "medium"
@@ -338,12 +335,15 @@ class TestFormatCellsDeep:
         fp = str(temp_dir / "border_dict.xlsx")
         _create_test_xlsx(fp)
         writer = ExcelWriter(fp)
-        result = writer.format_cells("Sheet1!A1", {
-            "border": {
-                "top": {"style": "medium", "color": "0000FF"},
-                "bottom": {"style": "thin"},
-            }
-        })
+        result = writer.format_cells(
+            "Sheet1!A1",
+            {
+                "border": {
+                    "top": {"style": "medium", "color": "0000FF"},
+                    "bottom": {"style": "thin"},
+                }
+            },
+        )
         assert result.success is True
 
     # ---------- 6. 组合操作 ----------
@@ -353,11 +353,14 @@ class TestFormatCellsDeep:
         fp = str(temp_dir / "combine_basic.xlsx")
         _create_test_xlsx(fp)
         writer = ExcelWriter(fp)
-        result = writer.format_cells("Sheet1!A1:D1", {
-            "font": {"bold": True, "size": 14},
-            "fill": {"type": "solid", "color": "D9E1F2"},
-            "alignment": {"horizontal": "center", "vertical": "center"},
-        })
+        result = writer.format_cells(
+            "Sheet1!A1:D1",
+            {
+                "font": {"bold": True, "size": 14},
+                "fill": {"type": "solid", "color": "D9E1F2"},
+                "alignment": {"horizontal": "center", "vertical": "center"},
+            },
+        )
         assert result.success is True
         style = _read_cell_style(fp, "A1")
         assert style["bold"] is True
@@ -371,16 +374,19 @@ class TestFormatCellsDeep:
         fp = str(temp_dir / "font_combo.xlsx")
         _create_test_xlsx(fp)
         writer = ExcelWriter(fp)
-        result = writer.format_cells("Sheet1!A1", {
-            "font": {
-                "bold": True,
-                "italic": True,
-                "underline": "double",
-                "color": "FF0000",
-                "size": 16,
-                "name": "Courier New",
-            }
-        })
+        result = writer.format_cells(
+            "Sheet1!A1",
+            {
+                "font": {
+                    "bold": True,
+                    "italic": True,
+                    "underline": "double",
+                    "color": "FF0000",
+                    "size": 16,
+                    "name": "Courier New",
+                }
+            },
+        )
         assert result.success is True
         style = _read_cell_style(fp, "A1")
         assert style["bold"] is True
@@ -394,13 +400,16 @@ class TestFormatCellsDeep:
         fp = str(temp_dir / "full_combo.xlsx")
         _create_test_xlsx(fp)
         writer = ExcelWriter(fp)
-        result = writer.format_cells("Sheet1!A1:C3", {
-            "font": {"bold": True, "color": "FFFFFF", "size": 12},
-            "fill": {"type": "solid", "color": "4472C4"},
-            "alignment": {"horizontal": "right", "wrap_text": True},
-            "number_format": "#,##0.00",
-            "border": {"top": "thin", "bottom": "thin", "left": "thin", "right": "thin"},
-        })
+        result = writer.format_cells(
+            "Sheet1!A1:C3",
+            {
+                "font": {"bold": True, "color": "FFFFFF", "size": 12},
+                "fill": {"type": "solid", "color": "4472C4"},
+                "alignment": {"horizontal": "right", "wrap_text": True},
+                "number_format": "#,##0.00",
+                "border": {"top": "thin", "bottom": "thin", "left": "thin", "right": "thin"},
+            },
+        )
         assert result.success is True
         assert result.metadata.get("formatted_count", 0) >= 3  # 至少3个单元格
 
@@ -417,16 +426,20 @@ class TestFormatCellsDeep:
         assert r1.success is True
 
         # 再格式化合并区域
-        r2 = writer.format_cells("Sheet1!A1:D1", {
-            "font": {"bold": True, "size": 14},
-            "fill": {"type": "solid", "color": "FFFF00"},
-            "alignment": {"horizontal": "center"},
-        })
+        r2 = writer.format_cells(
+            "Sheet1!A1:D1",
+            {
+                "font": {"bold": True, "size": 14},
+                "fill": {"type": "solid", "color": "FFFF00"},
+                "alignment": {"horizontal": "center"},
+            },
+        )
         assert r2.success is True
 
     def test_merge_with_bold_and_bg_via_api(self, temp_dir):
         """通过 API 层 excel_format_cells merge+bold+bg_color"""
         from excel_mcp_server_fastmcp.server import excel_format_cells
+
         fp = str(temp_dir / "api_merge_combo.xlsx")
         _create_test_xlsx(fp)
 
@@ -466,7 +479,7 @@ class TestFormatCellsDeep:
         _create_test_xlsx(fp)
         writer = ExcelWriter(fp)
         # 未合并的区域调用 unmerge，openpyxl 通常不报错
-        result = writer.unmerge_cells("Sheet1!A1:C1")
+        writer.unmerge_cells("Sheet1!A1:C1")
         # openpyxl 允许对非合并区域调用 unmerge_cells（no-op）
 
     # ---------- 9. 边界 case ----------
@@ -495,12 +508,15 @@ class TestFormatCellsDeep:
         _create_test_xlsx(fp, rows=3, cols=3)
         original_val = 11  # A1 = 1*10+1 = 11
         writer = ExcelWriter(fp)
-        result = writer.format_cells("Sheet1!A1:C3", {
-            "font": {"bold": True, "color": "FF0000"},
-            "fill": {"type": "solid", "color": "00FF00"},
-            "alignment": {"horizontal": "right"},
-            "number_format": "0.00",
-        })
+        result = writer.format_cells(
+            "Sheet1!A1:C3",
+            {
+                "font": {"bold": True, "color": "FF0000"},
+                "fill": {"type": "solid", "color": "00FF00"},
+                "alignment": {"horizontal": "right"},
+                "number_format": "0.00",
+            },
+        )
         assert result.success is True
         style = _read_cell_style(fp, "A1")
         assert style["value"] == original_val
@@ -556,7 +572,7 @@ class TestFormatCellsDeep:
         assert result == {"fill": {"color": "FFFF00"}}
 
     def test_normalize_flat_alignment(self):
-        """扁平 alignment: "center" → nested alignment.horizontal: "center\""""
+        """扁平 alignment: "center" → nested alignment.horizontal: "center\" """
         result = ExcelOperations._normalize_formatting({"alignment": "center"})
         assert result == {"alignment": {"horizontal": "center"}}
 
@@ -577,14 +593,16 @@ class TestFormatCellsDeep:
 
     def test_normalize_flat_combined(self):
         """多项扁平参数同时转换"""
-        result = ExcelOperations._normalize_formatting({
-            "bold": True,
-            "bg_color": "FFFF00",
-            "alignment": "center",
-            "font_size": 16,
-            "italic": True,
-            "underline": "double",
-        })
+        result = ExcelOperations._normalize_formatting(
+            {
+                "bold": True,
+                "bg_color": "FFFF00",
+                "alignment": "center",
+                "font_size": 16,
+                "italic": True,
+                "underline": "double",
+            }
+        )
         assert result["font"]["bold"] is True
         assert result["font"]["italic"] is True
         assert result["font"]["underline"] == "double"
@@ -605,10 +623,12 @@ class TestFormatCellsDeep:
 
     def test_normalize_gradient_colors(self):
         """扁平 gradient_colors → fill.gradient"""
-        result = ExcelOperations._normalize_formatting({
-            "gradient_colors": ["4472C4", "ED7D31"],
-            "gradient_type": "linear",
-        })
+        result = ExcelOperations._normalize_formatting(
+            {
+                "gradient_colors": ["4472C4", "ED7D31"],
+                "gradient_type": "linear",
+            }
+        )
         assert result["fill"]["type"] == "gradient"
         assert result["fill"]["colors"] == ["4472C4", "ED7D31"]
         assert result["fill"]["gradient_type"] == "linear"
@@ -665,46 +685,36 @@ class TestFormatCellsDeep:
         """预设 title: 微软雅黑 14号 加粗 居中"""
         fp = str(temp_dir / "preset_title.xlsx")
         _create_test_xlsx(fp)
-        writer = ExcelWriter(fp)
-        result = excel_format_cells = ExcelOperations.format_cells(
-            fp, "Sheet1", "A1", formatting=None, preset="title"
-        )
+        ExcelWriter(fp)
+        result = ExcelOperations.format_cells(fp, "Sheet1", "A1", formatting=None, preset="title")
         assert result["success"] is True
 
     def test_preset_header(self, temp_dir):
         """预设 header: 微软雅黑 11号 加粗 灰底"""
         fp = str(temp_dir / "preset_header.xlsx")
         _create_test_xlsx(fp)
-        result = ExcelOperations.format_cells(
-            fp, "Sheet1", "A1:D1", formatting=None, preset="header"
-        )
+        result = ExcelOperations.format_cells(fp, "Sheet1", "A1:D1", formatting=None, preset="header")
         assert result["success"] is True
 
     def test_preset_currency(self, temp_dir):
         """预设 currency: ¥#,##0.00"""
         fp = str(temp_dir / "preset_currency.xlsx")
         _create_test_xlsx(fp)
-        result = ExcelOperations.format_cells(
-            fp, "Sheet1", "A1", formatting=None, preset="currency"
-        )
+        result = ExcelOperations.format_cells(fp, "Sheet1", "A1", formatting=None, preset="currency")
         assert result["success"] is True
 
     def test_preset_highlight(self, temp_dir):
         """预设 highlight: 黄色背景"""
         fp = str(temp_dir / "preset_highlight.xlsx")
         _create_test_xlsx(fp)
-        result = ExcelOperations.format_cells(
-            fp, "Sheet1", "A1", formatting=None, preset="highlight"
-        )
+        result = ExcelOperations.format_cells(fp, "Sheet1", "A1", formatting=None, preset="highlight")
         assert result["success"] is True
 
     def test_preset_data(self, temp_dir):
         """预设 data: 微软雅黑 10号"""
         fp = str(temp_dir / "preset_data.xlsx")
         _create_test_xlsx(fp)
-        result = ExcelOperations.format_cells(
-            fp, "Sheet1", "A1:C5", formatting=None, preset="data"
-        )
+        result = ExcelOperations.format_cells(fp, "Sheet1", "A1:C5", formatting=None, preset="data")
         assert result["success"] is True
 
     # ---------- 13. formatted_count 元数据 ----------
@@ -746,6 +756,7 @@ class TestFormatCellsDeep:
         writer = ExcelWriter(fp)
         result = writer.set_borders("Sheet1!A1:C3", "medium")
         assert result.success is True
+
     def test_set_borders_thick(self, temp_dir):
         """粗边框"""
         fp = str(temp_dir / "borders_thick.xlsx")
@@ -766,20 +777,34 @@ class TestFormatCellsDeep:
 
         # 路径1: 直接调用 writer.format_cells 传入含 None 值的扁平格式
         # （_apply_cell_format 应跳过 None config 而不 crash）
-        result = writer.format_cells("Sheet1!A1:B2", {
-            "bold": None, "italic": None, "font_size": None,
-            "bg_color": None, "alignment": None,
-        })
+        result = writer.format_cells(
+            "Sheet1!A1:B2",
+            {
+                "bold": None,
+                "italic": None,
+                "font_size": None,
+                "bg_color": None,
+                "alignment": None,
+            },
+        )
         assert result.success is True
         # 值不变
         style = _read_cell_style(fp, "A1")
         assert style["value"] == 11
 
         # 路径2: 通过 ExcelOperations（会经过 _normalize_formatting 过滤 None → 空dict）
-        result2 = ExcelOperations.format_cells(fp, "Sheet1", "A1:B2", {
-            "bold": None, "italic": None, "font_size": None,
-            "bg_color": None, "alignment": None,
-        })
+        result2 = ExcelOperations.format_cells(
+            fp,
+            "Sheet1",
+            "A1:B2",
+            {
+                "bold": None,
+                "italic": None,
+                "font_size": None,
+                "bg_color": None,
+                "alignment": None,
+            },
+        )
         assert result2["success"] is True
 
     def test_merge_with_border_and_bold_combo(self, temp_dir):
@@ -793,16 +818,19 @@ class TestFormatCellsDeep:
         assert r1.success is True
 
         # 再对合并区域应用组合样式
-        r2 = writer.format_cells("Sheet1!A1:C1", {
-            "font": {"bold": True, "size": 14},
-            "fill": {"color": "FF0000"},
-            "border": {
-                "top": {"style": "medium", "color": "000000"},
-                "bottom": {"style": "medium", "color": "000000"},
-                "left": {"style": "medium", "color": "000000"},
-                "right": {"style": "medium", "color": "000000"},
+        r2 = writer.format_cells(
+            "Sheet1!A1:C1",
+            {
+                "font": {"bold": True, "size": 14},
+                "fill": {"color": "FF0000"},
+                "border": {
+                    "top": {"style": "medium", "color": "000000"},
+                    "bottom": {"style": "medium", "color": "000000"},
+                    "left": {"style": "medium", "color": "000000"},
+                    "right": {"style": "medium", "color": "000000"},
+                },
             },
-        })
+        )
         assert r2.success is True
 
         # 验证左上角单元格样式
@@ -836,16 +864,22 @@ class TestFormatCellsDeep:
         writer = ExcelWriter(fp)
 
         # 第一次：设置 bold + bg_color
-        r1 = writer.format_cells("Sheet1!A1", {
-            "font": {"bold": True},
-            "fill": {"color": "00FF00"},
-        })
+        r1 = writer.format_cells(
+            "Sheet1!A1",
+            {
+                "font": {"bold": True},
+                "fill": {"color": "00FF00"},
+            },
+        )
         assert r1.success is True
 
         # 第二次：只改 bold 为 False，不传 fill
-        r2 = writer.format_cells("Sheet1!A1", {
-            "font": {"bold": False},
-        })
+        r2 = writer.format_cells(
+            "Sheet1!A1",
+            {
+                "font": {"bold": False},
+            },
+        )
         assert r2.success is True
 
         # 验证: bold 被 override，但 openpyxl 的 format_cells 是赋值行为
@@ -858,13 +892,15 @@ class TestFormatCellsDeep:
         from excel_mcp_server_fastmcp.api.excel_operations import ExcelOperations
 
         # bold=False 应该正常传递（不是 None，应该被设置）
-        result = ExcelOperations._normalize_formatting({
-            "bold": False,
-            "italic": 0,  # 0 是 falsy 但不是 None
-            "font_size": 0,
-            "bg_color": "",
-            "alignment": "justify",
-        })
+        result = ExcelOperations._normalize_formatting(
+            {
+                "bold": False,
+                "italic": 0,  # 0 是 falsy 但不是 None
+                "font_size": 0,
+                "bg_color": "",
+                "alignment": "justify",
+            }
+        )
         # bold=False 应出现在 font 中
         assert result["font"]["bold"] is False
         # font_size=0 应出现
@@ -886,10 +922,13 @@ class TestFormatCellsDeep:
         wb.close()
 
         writer = ExcelWriter(fp)
-        result = writer.format_cells("数据表!A1:B1", {
-            "font": {"bold": True, "name": "微软雅黑"},
-            "fill": {"color": "D9D9D9"},
-        })
+        result = writer.format_cells(
+            "数据表!A1:B1",
+            {
+                "font": {"bold": True, "name": "微软雅黑"},
+                "fill": {"color": "D9D9D9"},
+            },
+        )
         assert result.success is True
 
         style = _read_cell_style(fp, "A1", sheet_name="数据表")
@@ -926,10 +965,13 @@ class TestFormatCellsMergeCombine:
         r1 = writer.merge_cells("Sheet1!A1:C1")
         assert r1.success is True
         # Step 2: format (嵌套格式)
-        r2 = writer.format_cells("Sheet1!A1", {
-            "font": {"bold": True},
-            "fill": {"type": "solid", "color": "FF0000"},
-        })
+        r2 = writer.format_cells(
+            "Sheet1!A1",
+            {
+                "font": {"bold": True},
+                "fill": {"type": "solid", "color": "FF0000"},
+            },
+        )
         assert r2.success is True
 
         wb = load_workbook(fp)
@@ -951,9 +993,7 @@ class TestFormatCellsMergeCombine:
         assert r1.success is True
 
         # Step 2: format the merged range (嵌套格式)
-        r2 = writer.format_cells("Sheet1!A1:B1", {
-            "font": {"italic": True, "size": 14}
-        })
+        r2 = writer.format_cells("Sheet1!A1:B1", {"font": {"italic": True, "size": 14}})
         assert r2.success is True
 
         style = _read_cell_style(fp, "A1")
@@ -1032,16 +1072,19 @@ class TestFormatCellsAlignmentEdgeCases:
         """同时设置所有对齐参数"""
         fp = _make_sample(tmp_path, [["long text"]])
         writer = ExcelWriter(fp)
-        result = writer.format_cells("Sheet1!A1", {
-            "alignment": {
-                "horizontal": "center",
-                "vertical": "center",
-                "wrap_text": True,
-                "text_rotation": 45,
-                "indent": 3,
-                "shrink_to_fit": True,
-            }
-        })
+        result = writer.format_cells(
+            "Sheet1!A1",
+            {
+                "alignment": {
+                    "horizontal": "center",
+                    "vertical": "center",
+                    "wrap_text": True,
+                    "text_rotation": 45,
+                    "indent": 3,
+                    "shrink_to_fit": True,
+                }
+            },
+        )
         assert result.success is True
 
         style = _read_cell_style(fp, "A1")
@@ -1126,9 +1169,14 @@ class TestFormatCellsFontEdgeCases:
         """中文字体通过 Operations 层嵌套格式设置"""
         fp = _make_sample(tmp_path, [["中文"]])
         # 使用 Operations API + 嵌套格式确保字体名生效
-        result = ExcelOperations.format_cells(fp, "Sheet1", "A1:A1", formatting={
-            "font": {"name": "宋体", "bold": True, "size": 16},
-        })
+        result = ExcelOperations.format_cells(
+            fp,
+            "Sheet1",
+            "A1:A1",
+            formatting={
+                "font": {"name": "宋体", "bold": True, "size": 16},
+            },
+        )
         assert result["success"] is True
         style = _read_cell_style(fp, "A1")
         assert style["font_name"] == "宋体"
@@ -1139,9 +1187,7 @@ class TestFormatCellsFontEdgeCases:
         """删除线 + 字体颜色组合"""
         fp = _make_sample(tmp_path, [["deleted"]])
         writer = ExcelWriter(fp)
-        result = writer.format_cells("Sheet1!A1", {
-            "font": {"strikethrough": True, "color": "999999"}
-        })
+        result = writer.format_cells("Sheet1!A1", {"font": {"strikethrough": True, "color": "999999"}})
         assert result.success is True
 
     def test_font_size_very_small(self, tmp_path):
@@ -1192,18 +1238,14 @@ class TestFormatCellsFillEdgeCases:
         """pattern fill 类型"""
         fp = _make_sample(tmp_path, [[1]])
         writer = ExcelWriter(fp)
-        result = writer.format_cells("Sheet1!A1", {
-            "fill": {"type": "pattern", "patternType": "gray125"}
-        })
+        result = writer.format_cells("Sheet1!A1", {"fill": {"type": "pattern", "patternType": "gray125"}})
         assert result.success is True
 
     def test_gradient_fill(self, tmp_path):
         """渐变填充"""
         fp = _make_sample(tmp_path, [[1]])
         writer = ExcelWriter(fp)
-        result = writer.format_cells("Sheet1!A1", {
-            "fill": {"type": "gradient", "colors": ["FFFFFF", "000000"]}
-        })
+        result = writer.format_cells("Sheet1!A1", {"fill": {"type": "gradient", "colors": ["FFFFFF", "000000"]}})
         assert result.success is True
 
 
@@ -1212,10 +1254,12 @@ class TestFormatCellsNormalizeEdgeCases:
 
     def test_normalize_overwrite_nested_with_flat(self, tmp_path):
         """扁平参数和嵌套参数同时出现时——验证实际行为"""
-        result = ExcelOperations._normalize_formatting({
-            "bold": True,
-            "font": {"bold": False, "name": "Arial"},
-        })
+        result = ExcelOperations._normalize_formatting(
+            {
+                "bold": True,
+                "font": {"bold": False, "name": "Arial"},
+            }
+        )
         # 验证归一化结果存在 font 键
         assert "font" in result
         assert result["font"]["name"] == "Arial"
@@ -1224,20 +1268,24 @@ class TestFormatCellsNormalizeEdgeCases:
 
     def test_normalize_unknown_keys_preserved(self, tmp_path):
         """未知键被保留以兼容未来扩展"""
-        result = ExcelOperations._normalize_formatting({
-            "custom_future_key": "value",
-            "another_unknown": 42,
-        })
+        result = ExcelOperations._normalize_formatting(
+            {
+                "custom_future_key": "value",
+                "another_unknown": 42,
+            }
+        )
         assert "custom_future_key" in result
         assert "another_unknown" in result
 
     def test_normalize_empty_subdicts_filtered(self, tmp_path):
         """空的子字典应该被过滤掉"""
-        result = ExcelOperations._normalize_formatting({
-            "font": {},
-            "fill": {},
-            "alignment": {},
-        })
+        result = ExcelOperations._normalize_formatting(
+            {
+                "font": {},
+                "fill": {},
+                "alignment": {},
+            }
+        )
         # 空子字典不应出现在结果中（或至少不影响输出）
         assert result.get("font") is None or result.get("font") == {}
 
@@ -1320,12 +1368,17 @@ class TestFormatCellsOperationsLayer:
     def test_ops_format_normalize_flat_params(self, tmp_path):
         """Operations 层扁平参数正确归一化"""
         fp = _make_sample(tmp_path, [[99]])
-        result = ExcelOperations.format_cells(fp, "Sheet1", "A1:A1", formatting={
-            "bold": True,
-            "italic": True,
-            "bg_color": "00FF00",
-            "number_format": "0.00%",
-        })
+        result = ExcelOperations.format_cells(
+            fp,
+            "Sheet1",
+            "A1:A1",
+            formatting={
+                "bold": True,
+                "italic": True,
+                "bg_color": "00FF00",
+                "number_format": "0.00%",
+            },
+        )
         assert result["success"] is True
         style = _read_cell_style(fp, "A1")
         assert style["bold"] is True
@@ -1389,10 +1442,7 @@ class TestFormatCellsBugFixNumberFormatNone:
         """Operations 层 number_format=None 被 normalize 过滤掉"""
         fp = _make_sample(tmp_path, [[42]])
         # Operations 层的 _normalize_formatting 会过滤 None 值
-        result = ExcelOperations.format_cells(
-            fp, "Sheet1", "A1:A1",
-            formatting={"number_format": None, "bold": True}
-        )
+        result = ExcelOperations.format_cells(fp, "Sheet1", "A1:A1", formatting={"number_format": None, "bold": True})
         assert result["success"] is True
 
         style = _read_cell_style(fp, "A1")
@@ -1408,17 +1458,18 @@ class TestFormatCellsBugFixBorderNoneSide:
         writer = ExcelWriter(fp)
 
         # 先设置一个 thick 左边框
-        writer.format_cells("Sheet1!A1", {
-            "border": {"left": {"style": "thick", "color": "FF0000"}}
-        })
+        writer.format_cells("Sheet1!A1", {"border": {"left": {"style": "thick", "color": "FF0000"}}})
 
         # 再用 left=None 更新 — left 应变为 None（无边框），right 为 medium
-        writer.format_cells("Sheet1!A1", {
-            "border": {
-                "left": None,
-                "right": {"style": "medium", "color": "0000FF"},
-            }
-        })
+        writer.format_cells(
+            "Sheet1!A1",
+            {
+                "border": {
+                    "left": None,
+                    "right": {"style": "medium", "color": "0000FF"},
+                }
+            },
+        )
 
         style = _read_cell_style(fp, "A1")
         # 修复前：left 会变成 thin（bug）；修复后：left 为 None
@@ -1429,9 +1480,7 @@ class TestFormatCellsBugFixBorderNoneSide:
         """所有 border side 都为 None 时不应崩溃"""
         fp = _make_sample(tmp_path, [[1]])
         writer = ExcelWriter(fp)
-        result = writer.format_cells("Sheet1!A1", {
-            "border": {"left": None, "right": None, "top": None, "bottom": None}
-        })
+        result = writer.format_cells("Sheet1!A1", {"border": {"left": None, "right": None, "top": None, "bottom": None}})
         assert result.success is True
 
 
@@ -1494,12 +1543,15 @@ class TestFormatCellsDiagonalBorder:
         """对角线边框（从左上到右下）"""
         fp = _make_sample(tmp_path, [[1]])
         writer = ExcelWriter(fp)
-        result = writer.format_cells("Sheet1!A1", {
-            "border": {
-                "diagonal": {"style": "thin", "color": "FF0000"},
-                "diagonal_direction": "down",
-            }
-        })
+        result = writer.format_cells(
+            "Sheet1!A1",
+            {
+                "border": {
+                    "diagonal": {"style": "thin", "color": "FF0000"},
+                    "diagonal_direction": "down",
+                }
+            },
+        )
         assert result.success is True
 
         wb = load_workbook(fp)
@@ -1511,12 +1563,15 @@ class TestFormatCellsDiagonalBorder:
         """对角线边框（从左下到右上）"""
         fp = _make_sample(tmp_path, [[1]])
         writer = ExcelWriter(fp)
-        result = writer.format_cells("Sheet1!A1", {
-            "border": {
-                "diagonal": {"style": "medium"},
-                "diagonal_direction": "up",
-            }
-        })
+        result = writer.format_cells(
+            "Sheet1!A1",
+            {
+                "border": {
+                    "diagonal": {"style": "medium"},
+                    "diagonal_direction": "up",
+                }
+            },
+        )
         assert result.success is True
 
 
@@ -1545,10 +1600,13 @@ class TestFormatCellsMergedCellFormatting:
         writer = ExcelWriter(fp)
 
         writer.merge_cells("Sheet1!A1:C1")
-        writer.format_cells("Sheet1!A1", {
-            "font": {"bold": True, "color": "FF0000"},
-            "fill": {"type": "solid", "color": "FFFF00"},
-        })
+        writer.format_cells(
+            "Sheet1!A1",
+            {
+                "font": {"bold": True, "color": "FF0000"},
+                "fill": {"type": "solid", "color": "FFFF00"},
+            },
+        )
         writer.unmerge_cells("Sheet1!A1:C1")
 
         wb = load_workbook(fp)
@@ -1615,17 +1673,16 @@ class TestFormatCellsR55Round2:
         """同时设置 font + fill + alignment + border + number_format"""
         fp = _make_sample(tmp_path, [[42]])
         writer = ExcelWriter(fp)
-        result = writer.format_cells("Sheet1!A1", {
-            "font": {"name": "Arial", "size": 12, "bold": True, "italic": True,
-                     "color": "FF0000", "underline": "single"},
-            "fill": {"type": "solid", "color": "00FF00"},
-            "alignment": {"horizontal": "center", "vertical": "center",
-                         "wrap_text": True, "text_rotation": 0},
-            "border": {"left": "medium", "right": "medium",
-                       "top": "thin", "bottom": "thin",
-                       "color": "0000FF"},
-            "number_format": "#,##0.00",
-        })
+        result = writer.format_cells(
+            "Sheet1!A1",
+            {
+                "font": {"name": "Arial", "size": 12, "bold": True, "italic": True, "color": "FF0000", "underline": "single"},
+                "fill": {"type": "solid", "color": "00FF00"},
+                "alignment": {"horizontal": "center", "vertical": "center", "wrap_text": True, "text_rotation": 0},
+                "border": {"left": "medium", "right": "medium", "top": "thin", "bottom": "thin", "color": "0000FF"},
+                "number_format": "#,##0.00",
+            },
+        )
         assert result.success is True
         s = _read_cell_style(fp, "A1")
         assert s["bold"] is True
@@ -1662,14 +1719,10 @@ class TestFormatCellsR55Round2:
         writer = ExcelWriter(fp)
 
         # 开启
-        writer.format_cells("Sheet1!A1", {
-            "font": {"italic": True, "underline": "double"}
-        })
+        writer.format_cells("Sheet1!A1", {"font": {"italic": True, "underline": "double"}})
 
         # 关闭
-        result = writer.format_cells("Sheet1!A1", {
-            "font": {"italic": False, "underline": False}
-        })
+        result = writer.format_cells("Sheet1!A1", {"font": {"italic": False, "underline": False}})
         assert result.success is True
         s = _read_cell_style(fp, "A1")
         assert s["italic"] is False
@@ -1731,9 +1784,7 @@ class TestFormatCellsR55Round2:
         # 0=水平, 1-90=顺时针旋转, 91-180=堆叠文字
         # 注意：-90 等负值不被 openpyxl 接受
         for rot, ref in [(0, "A1"), (45, "B1"), (90, "C1")]:
-            r = writer.format_cells(f"Sheet1!{ref}", {
-                "alignment": {"text_rotation": rot}
-            })
+            r = writer.format_cells(f"Sheet1!{ref}", {"alignment": {"text_rotation": rot}})
             assert r.success is True, f"rotation={rot} failed"
             s = _read_cell_style(fp, ref)
             assert s["text_rotation"] == rot, f"expected {rot}, got {s['text_rotation']}"
@@ -1762,12 +1813,8 @@ class TestFormatCellsR55Round2:
         fp = _make_sample(tmp_path, [[1]])
         writer = ExcelWriter(fp)
 
-        writer.format_cells("Sheet1!A1", {
-            "font": {"name": "Arial", "size": 14, "bold": True, "color": "FF0000"}
-        })
-        writer.format_cells("Sheet1!A1", {
-            "font": {"name": "Courier New", "size": 10}
-        })
+        writer.format_cells("Sheet1!A1", {"font": {"name": "Arial", "size": 14, "bold": True, "color": "FF0000"}})
+        writer.format_cells("Sheet1!A1", {"font": {"name": "Courier New", "size": 10}})
         s = _read_cell_style(fp, "A1")
         # name 和 size 应被覆盖为新值
         assert s["font_name"] == "Courier New"
@@ -1798,11 +1845,14 @@ class TestFormatCellsR55Round2:
         wb.close()
 
         writer = ExcelWriter(fp)
-        result = writer.format_cells("Sheet1!C1", {
-            "font": {"bold": True},
-            "fill": {"type": "solid", "color": "FFFF00"},
-            "alignment": {"horizontal": "center"},
-        })
+        result = writer.format_cells(
+            "Sheet1!C1",
+            {
+                "font": {"bold": True},
+                "fill": {"type": "solid", "color": "FFFF00"},
+                "alignment": {"horizontal": "center"},
+            },
+        )
         assert result.success is True
 
         wb2 = load_workbook(fp)
@@ -1822,10 +1872,13 @@ class TestFormatCellsR55Round2:
         wb.close()
 
         writer = ExcelWriter(fp)
-        result = writer.format_cells("Sheet1!A1:D1", {
-            "font": {"name": "微软雅黑"},
-            "number_format": "#,##0",
-        })
+        result = writer.format_cells(
+            "Sheet1!A1:D1",
+            {
+                "font": {"name": "微软雅黑"},
+                "number_format": "#,##0",
+            },
+        )
         assert result.success is True
         assert result.metadata.get("formatted_count", 0) == 4
 
@@ -1845,15 +1898,16 @@ class TestFormatCellsR55Round2:
         assert mr.success is True
 
         # 全量样式
-        fr = writer.format_cells("Sheet1!A1", {
-            "font": {"bold": True, "size": 16, "color": "FFFFFF"},
-            "fill": {"type": "solid", "color": "000080"},  # 深蓝底白字
-            "alignment": {"horizontal": "center", "vertical": "center"},
-            "border": {"top": "medium", "bottom": "medium",
-                       "left": "medium", "right": "medium",
-                       "color": "FFD700"},
-            "number_format": "@",  # 文本格式
-        })
+        fr = writer.format_cells(
+            "Sheet1!A1",
+            {
+                "font": {"bold": True, "size": 16, "color": "FFFFFF"},
+                "fill": {"type": "solid", "color": "000080"},  # 深蓝底白字
+                "alignment": {"horizontal": "center", "vertical": "center"},
+                "border": {"top": "medium", "bottom": "medium", "left": "medium", "right": "medium", "color": "FFD700"},
+                "number_format": "@",  # 文本格式
+            },
+        )
         assert fr.success is True
 
         s = _read_cell_style(fp, "A1")
@@ -1876,9 +1930,7 @@ class TestFormatCellsR55Round2:
         """shrink_to_fit=True"""
         fp = _make_sample(tmp_path, [["Long text that shrinks"]])
         writer = ExcelWriter(fp)
-        result = writer.format_cells("Sheet1!A1", {
-            "alignment": {"shrink_to_fit": True}
-        })
+        result = writer.format_cells("Sheet1!A1", {"alignment": {"shrink_to_fit": True}})
         assert result.success is True
         # openpyxl shrink_to_fit 默认 None, 设置后应为 True
         wb = load_workbook(fp)
@@ -1889,9 +1941,7 @@ class TestFormatCellsR55Round2:
         """wrap_text=True + shrink_to_fit=True 同时设置"""
         fp = _make_sample(tmp_path, [["Test wrap and shrink"]])
         writer = ExcelWriter(fp)
-        result = writer.format_cells("Sheet1!A1", {
-            "alignment": {"wrap_text": True, "shrink_to_fit": True}
-        })
+        result = writer.format_cells("Sheet1!A1", {"alignment": {"wrap_text": True, "shrink_to_fit": True}})
         assert result.success is True
         wb = load_workbook(fp)
         align = wb.active["A1"].alignment
@@ -1903,10 +1953,15 @@ class TestFormatCellsR55Round2:
     def test_normalize_flat_all_font_attrs_together(self):
         """扁平格式：所有字体属性同时传入的 normalize 结果"""
         from excel_mcp_server_fastmcp.api.excel_operations import ExcelOperations
+
         flat = {
-            "bold": True, "italic": True, "underline": "double",
-            "font_size": 18, "font_color": "FF0000",
-            "font_name": "Consolas", "strikethrough": True,
+            "bold": True,
+            "italic": True,
+            "underline": "double",
+            "font_size": 18,
+            "font_color": "FF0000",
+            "font_name": "Consolas",
+            "strikethrough": True,
         }
         nested = ExcelOperations._normalize_formatting(flat)
         font = nested.get("font", {})
@@ -1921,6 +1976,7 @@ class TestFormatCellsR55Round2:
     def test_normalize_flat_all_align_attrs_together(self):
         """扁平格式：所有对齐属性同时传入"""
         from excel_mcp_server_fastmcp.api.excel_operations import ExcelOperations
+
         flat = {
             "alignment": "right",
             "vertical_alignment": "top",
@@ -1941,8 +1997,10 @@ class TestFormatCellsR55Round2:
     def test_normalize_flat_complete_combo(self):
         """扁平格式：全部5类属性 + 渐变的完整 normalize"""
         from excel_mcp_server_fastmcp.api.excel_operations import ExcelOperations
+
         flat = {
-            "bold": True, "font_size": 12,
+            "bold": True,
+            "font_size": 12,
             "bg_color": "FF0000",
             "alignment": "center",
             "wrap_text": True,
@@ -1994,13 +2052,17 @@ class TestFormatCellsR55Round2:
         fp = _make_sample(tmp_path, [[1, 2]])
         # 先用 preset
         r1 = ExcelOperations.format_cells(
-            file_path=fp, sheet_name="Sheet1", range="A1:B1",
+            file_path=fp,
+            sheet_name="Sheet1",
+            range="A1:B1",
             preset="highlight",
         )
         assert r1["success"] is True
         # 再追加自定义
         r2 = ExcelOperations.format_cells(
-            file_path=fp, sheet_name="Sheet1", range="A1:B1",
+            file_path=fp,
+            sheet_name="Sheet1",
+            range="A1:B1",
             formatting={"bold": True, "font_size": 12},
         )
         assert r2["success"] is True
@@ -2012,7 +2074,9 @@ class TestFormatCellsR55Round2:
         """通过 API 扁平参数传 border 字典"""
         fp = _make_sample(tmp_path, [[1]])
         result = ExcelOperations.format_cells(
-            file_path=fp, sheet_name="Sheet1", range="A1",
+            file_path=fp,
+            sheet_name="Sheet1",
+            range="A1",
             formatting={
                 "border": {
                     "left": "double",
@@ -2039,10 +2103,12 @@ class TestFormatCellsBgColorMergeBugFix:
         """bg_color + fill_type=pattern 应合并（不丢失 type 信息）"""
         from excel_mcp_server_fastmcp.api.excel_operations import ExcelOperations
 
-        result = ExcelOperations._normalize_formatting({
-            "fill_type": "pattern",
-            "bg_color": "FF0000",
-        })
+        result = ExcelOperations._normalize_formatting(
+            {
+                "fill_type": "pattern",
+                "bg_color": "FF0000",
+            }
+        )
         # 修复前: {"fill": {"color": "FF0000"}} — type 丢失
         # 修复后: {"fill": {"type": "pattern", "color": "FF0000"}}
         assert result["fill"]["type"] == "pattern"
@@ -2052,10 +2118,12 @@ class TestFormatCellsBgColorMergeBugFix:
         """bg_color + gradient_colors 应合并（不丢失 gradient 信息）"""
         from excel_mcp_server_fastmcp.api.excel_operations import ExcelOperations
 
-        result = ExcelOperations._normalize_formatting({
-            "gradient_colors": ["4472C4", "ED7D31"],
-            "bg_color": "FFFF00",
-        })
+        result = ExcelOperations._normalize_formatting(
+            {
+                "gradient_colors": ["4472C4", "ED7D31"],
+                "bg_color": "FFFF00",
+            }
+        )
         # 修复前: {"fill": {"color": "FFFF00"}} — gradient 全丢
         # 修复后: gradient type/colors 保留，color 也存在
         assert result["fill"]["type"] == "gradient"
@@ -2067,7 +2135,9 @@ class TestFormatCellsBgColorMergeBugFix:
         """端到端：通过 Operations API 同时传 fill_type=pattern 和 bg_color"""
         fp = _make_sample(tmp_path, [[1]])
         result = ExcelOperations.format_cells(
-            file_path=fp, sheet_name="Sheet1", range="A1",
+            file_path=fp,
+            sheet_name="Sheet1",
+            range="A1",
             formatting={"fill_type": "pattern", "bg_color": "FF0000"},
         )
         assert result["success"] is True
@@ -2083,7 +2153,9 @@ class TestFormatCellsBgColorMergeBugFix:
         """端到端：bg_color + gradient_colors 通过 Operations API 组合"""
         fp = _make_sample(tmp_path, [[42]])
         result = ExcelOperations.format_cells(
-            file_path=fp, sheet_name="Sheet1", range="A1",
+            file_path=fp,
+            sheet_name="Sheet1",
+            range="A1",
             formatting={
                 "gradient_colors": ["000000", "FFFFFF"],
                 "bg_color": "FFD700",
@@ -2108,27 +2180,21 @@ class TestFormatCellsPatternFillVariants:
         """darkHorizontal 图案填充"""
         fp = _make_sample(tmp_path, [[1]])
         writer = ExcelWriter(fp)
-        result = writer.format_cells("Sheet1!A1", {
-            "fill": {"type": "pattern", "patternType": "darkHorizontal", "fgColor": "FF0000"}
-        })
+        result = writer.format_cells("Sheet1!A1", {"fill": {"type": "pattern", "patternType": "darkHorizontal", "fgColor": "FF0000"}})
         assert result.success is True
 
     def test_pattern_fill_light_down(self, tmp_path):
         """lightDown 图案填充"""
         fp = _make_sample(tmp_path, [[1]])
         writer = ExcelWriter(fp)
-        result = writer.format_cells("Sheet1!A1", {
-            "fill": {"type": "pattern", "patternType": "lightDown", "fgColor": "00FF00"}
-        })
+        result = writer.format_cells("Sheet1!A1", {"fill": {"type": "pattern", "patternType": "lightDown", "fgColor": "00FF00"}})
         assert result.success is True
 
     def test_pattern_fill_medium_gray(self, tmp_path):
         """mediumGray 图案填充"""
         fp = _make_sample(tmp_path, [[1]])
         writer = ExcelWriter(fp)
-        result = writer.format_cells("Sheet1!A1", {
-            "fill": {"type": "pattern", "patternType": "mediumGray"}
-        })
+        result = writer.format_cells("Sheet1!A1", {"fill": {"type": "pattern", "patternType": "mediumGray"}})
         assert result.success is True
 
 

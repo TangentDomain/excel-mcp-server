@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 """
 format_cells R63 迭代测试 - 深度边缘 case 第三轮
 
@@ -20,17 +19,18 @@ format_cells R63 迭代测试 - 深度边缘 case 第三轮
 """
 
 import os
-import pytest
 import tempfile
 from pathlib import Path
+
+import pytest
 from openpyxl import Workbook, load_workbook
 from openpyxl.utils import get_column_letter
 
-from excel_mcp_server_fastmcp.core.excel_writer import ExcelWriter
 from excel_mcp_server_fastmcp.api.excel_operations import ExcelOperations
-
+from excel_mcp_server_fastmcp.core.excel_writer import ExcelWriter
 
 # ==================== Helper ====================
+
 
 def _create_test_xlsx(file_path: str, rows: int = 5, cols: int = 4, sheet_name: str = "Sheet1"):
     """创建测试用 xlsx 文件，含数据"""
@@ -62,7 +62,7 @@ def _read_cell_style(file_path: str, cell_ref: str = "A1", sheet_name: str = "Sh
         "font_name": font.name,
         "color": str(font.color) if font.color else None,
         "fill_type": fill.fill_type if fill else None,
-        "fgColor": str(fill.fgColor) if fill and hasattr(fill, 'fgColor') and fill.fgColor else None,
+        "fgColor": str(fill.fgColor) if fill and hasattr(fill, "fgColor") and fill.fgColor else None,
         "alignment_h": alignment.horizontal,
         "alignment_v": alignment.vertical,
         "wrap_text": bool(alignment.wrap_text) if alignment.wrap_text is not None else False,
@@ -82,6 +82,7 @@ def _read_cell_style(file_path: str, cell_ref: str = "A1", sheet_name: str = "Sh
 
 # ==================== Test Class ====================
 
+
 class TestFormatCellsR63:
     """format_cells R63 第九轮测试套件 — 深度边缘 case 第三轮"""
 
@@ -97,8 +98,7 @@ class TestFormatCellsR63:
         assert r_merge["success"], f"合并失败: {r_merge.get('message')}"
 
         # 再格式化合并区域
-        r_fmt = ExcelOperations.format_cells(fp, "Sheet1", "A1:C1",
-            formatting={"bold": True, "bg_color": "FF0000", "alignment": "center"})
+        r_fmt = ExcelOperations.format_cells(fp, "Sheet1", "A1:C1", formatting={"bold": True, "bg_color": "FF0000", "alignment": "center"})
         assert r_fmt["success"], f"格式化失败: {r_fmt.get('message')}"
 
         # 验证左上角单元格（合并区域的代表）的样式
@@ -121,8 +121,7 @@ class TestFormatCellsR63:
         wb.close()
 
         # 格式化包含合并区域的大范围 A1:E5
-        result = ExcelOperations.format_cells(fp, "Sheet1", "A1:E5",
-            formatting={"italic": True, "font_size": 12})
+        result = ExcelOperations.format_cells(fp, "Sheet1", "A1:E5", formatting={"italic": True, "font_size": 12})
         assert result["success"], f"失败: {result.get('message')}"
         # 验证非合并区域正常
         style = _read_cell_style(fp, "A1")
@@ -135,8 +134,7 @@ class TestFormatCellsR63:
         _create_test_xlsx(fp, 3, 3)
 
         # 先格式化
-        ExcelOperations.format_cells(fp, "Sheet1", "A1:B1",
-            formatting={"bold": True, "bg_color": "00FF00"})
+        ExcelOperations.format_cells(fp, "Sheet1", "A1:B1", formatting={"bold": True, "bg_color": "00FF00"})
         # 再合并
         ExcelOperations.merge_cells(fp, "Sheet1", "A1:B1")
 
@@ -210,8 +208,7 @@ class TestFormatCellsR63:
         """shrink_to_fit=True 启用缩小字体填充"""
         fp = str(tmp_path / "shrink_on.xlsx")
         _create_test_xlsx(fp)
-        result = ExcelOperations.format_cells(fp, "Sheet1", "A1",
-            formatting={"shrink_to_fit": True})
+        result = ExcelOperations.format_cells(fp, "Sheet1", "A1", formatting={"shrink_to_fit": True})
         assert result["success"], f"失败: {result.get('message')}"
         style = _read_cell_style(fp, "A1")
         assert style["shrink_to_fit"] is True
@@ -223,8 +220,7 @@ class TestFormatCellsR63:
         # 先开启
         ExcelOperations.format_cells(fp, "Sheet1", "A1", formatting={"shrink_to_fit": True})
         # 再关闭
-        result = ExcelOperations.format_cells(fp, "Sheet1", "A1",
-            formatting={"shrink_to_fit": False})
+        result = ExcelOperations.format_cells(fp, "Sheet1", "A1", formatting={"shrink_to_fit": False})
         assert result["success"]
         style = _read_cell_style(fp, "A1")
         # openpyxl 可能将 False 存储为 None（默认值）
@@ -251,9 +247,7 @@ class TestFormatCellsR63:
         """不存在的 preset 名称应回退为空格式或报错"""
         fp = str(tmp_path / "bad_preset.xlsx")
         _create_test_xlsx(fp)
-        result = ExcelOperations.format_cells(fp, "Sheet1", "A1",
-            preset="nonexistent_preset",
-            formatting={"bold": True})
+        result = ExcelOperations.format_cells(fp, "Sheet1", "A1", preset="nonexistent_preset", formatting={"bold": True})
         # 无效 preset 应不影响用户提供的 formatting
         assert result["success"], f"失败: {result.get('message')}"
         style = _read_cell_style(fp, "A1")
@@ -275,8 +269,7 @@ class TestFormatCellsR63:
         """range 已含 Sheet!A1 格式"""
         fp = str(tmp_path / "range_sep.xlsx")
         _create_test_xlsx(fp)
-        result = ExcelOperations.format_cells(fp, "Sheet1", "Sheet1!A1:B2",
-            formatting={"bg_color": "FF00FF"})
+        result = ExcelOperations.format_cells(fp, "Sheet1", "Sheet1!A1:B2", formatting={"bg_color": "FF00FF"})
         assert result["success"], f"失败: {result.get('message')}"
 
     def test_range_with_different_sheet_in_separator(self, tmp_path):
@@ -292,8 +285,7 @@ class TestFormatCellsR63:
         wb.close()
 
         # range 指定 Sheet2!A1，sheet_name 参数是 Sheet1
-        result = ExcelOperations.format_cells(fp, "Sheet1", "Sheet2!A1",
-            formatting={"bold": True})
+        result = ExcelOperations.format_cells(fp, "Sheet1", "Sheet2!A1", formatting={"bold": True})
         assert result["success"], f"失败: {result.get('message')}"
         # 验证 Sheet2 的 A1 被格式化了
         style = _read_cell_style(fp, "A1", sheet_name="Sheet2")
@@ -323,28 +315,40 @@ class TestFormatCellsR63:
         """border 包含 diagonal 设置"""
         fp = str(tmp_path / "bdr_diag.xlsx")
         _create_test_xlsx(fp)
-        result = ExcelOperations.format_cells(fp, "Sheet1", "A1",
-            formatting={"border": {
-                "top": "thin",
-                "bottom": "thin",
-                "diagonal": "thin",
-                "diagonal_direction": 1,  # 从左上到右下
-            }})
+        result = ExcelOperations.format_cells(
+            fp,
+            "Sheet1",
+            "A1",
+            formatting={
+                "border": {
+                    "top": "thin",
+                    "bottom": "thin",
+                    "diagonal": "thin",
+                    "diagonal_direction": 1,  # 从左上到右下
+                }
+            },
+        )
         assert result["success"], f"失败: {result.get('message')}"
 
     def test_border_all_sides_detailed(self, tmp_path):
         """border 四边 + diagonal 全部详细设置"""
         fp = str(tmp_path / "bdr_full.xlsx")
         _create_test_xlsx(fp)
-        result = ExcelOperations.format_cells(fp, "Sheet1", "A1:B2",
-            formatting={"border": {
-                "left": {"style": "thin", "color": "FF0000"},
-                "right": {"style": "medium", "color": "00FF00"},
-                "top": {"style": "thick", "color": "0000FF"},
-                "bottom": {"style": "dashed", "color": "FFFF00"},
-                "diagonal": {"style": "double", "color": "FF00FF"},
-                "color": "000000",  # 默认边框色
-            }})
+        result = ExcelOperations.format_cells(
+            fp,
+            "Sheet1",
+            "A1:B2",
+            formatting={
+                "border": {
+                    "left": {"style": "thin", "color": "FF0000"},
+                    "right": {"style": "medium", "color": "00FF00"},
+                    "top": {"style": "thick", "color": "0000FF"},
+                    "bottom": {"style": "dashed", "color": "FFFF00"},
+                    "diagonal": {"style": "double", "color": "FF00FF"},
+                    "color": "000000",  # 默认边框色
+                }
+            },
+        )
         assert result["success"], f"失败: {result.get('message')}"
         style = _read_cell_style(fp, "A1")
         assert style["border_top"] == "thick"
@@ -370,8 +374,7 @@ class TestFormatCellsR63:
         """number_format 空字符串行为"""
         fp = str(tmp_path / "nf_empty.xlsx")
         _create_test_xlsx(fp)
-        result = ExcelOperations.format_cells(fp, "Sheet1", "A1",
-            formatting={"number_format": ""})
+        result = ExcelOperations.format_cells(fp, "Sheet1", "A1", formatting={"number_format": ""})
         # 空字符串可能被 openpyxl 接受或拒绝
         assert result["success"]
 
@@ -382,12 +385,16 @@ class TestFormatCellsR63:
         fp = str(tmp_path / "mixed_keys.xlsx")
         _create_test_xlsx(fp)
         # 由于 normalize 检测到嵌套键就直接返回原样，扁平键会被透传
-        result = ExcelOperations.format_cells(fp, "Sheet1", "A1",
+        result = ExcelOperations.format_cells(
+            fp,
+            "Sheet1",
+            "A1",
             formatting={
-                "bold": True,           # 扁平键
-                "font": {"size": 18},   # 嵌套键
-                "bg_color": "FF0000",   # 扁平键
-            })
+                "bold": True,  # 扁平键
+                "font": {"size": 18},  # 嵌套键
+                "bg_color": "FF0000",  # 扁平键
+            },
+        )
         assert result["success"], f"失败: {result.get('message')}"
 
     # ---------- 12. 整行/整列范围格式化 ----------
@@ -396,8 +403,7 @@ class TestFormatCellsR63:
         """格式化整行范围 1:1"""
         fp = str(tmp_path / "fmt_row.xlsx")
         _create_test_xlsx(fp, 5, 5)
-        result = ExcelOperations.format_cells(fp, "Sheet1", "1:1",
-            formatting={"bold": True, "bg_color": "EEEEEE"})
+        result = ExcelOperations.format_cells(fp, "Sheet1", "1:1", formatting={"bold": True, "bg_color": "EEEEEE"})
         assert result["success"], f"失败: {result.get('message')}"
         style = _read_cell_style(fp, "A1")
         assert style["bold"] is True
@@ -406,8 +412,7 @@ class TestFormatCellsR63:
         """格式化整列范围 A:A"""
         fp = str(tmp_path / "fmt_col.xlsx")
         _create_test_xlsx(fp, 5, 5)
-        result = ExcelOperations.format_cells(fp, "Sheet1", "A:A",
-            formatting={"italic": True, "font_color": "0000FF"})
+        result = ExcelOperations.format_cells(fp, "Sheet1", "A:A", formatting={"italic": True, "font_color": "0000FF"})
         assert result["success"], f"失败: {result.get('message')}"
         style = _read_cell_style(fp, "A1")
         assert style["italic"] is True
@@ -424,14 +429,18 @@ class TestFormatCellsR63:
         wb.save(fp)
         wb.close()
 
-        result = ExcelOperations.format_cells(fp, "数据表", "A1",
+        result = ExcelOperations.format_cells(
+            fp,
+            "数据表",
+            "A1",
             formatting={
                 "font_name": "微软雅黑",
                 "bold": True,
                 "font_size": 12,
                 "bg_color": "FFF2CC",
                 "alignment": "center",
-            })
+            },
+        )
         assert result["success"], f"失败: {result.get('message')}"
         style = _read_cell_style(fp, "A1", sheet_name="数据表")
         assert style["font_name"] == "微软雅黑"
@@ -485,8 +494,7 @@ class TestFormatCellsR63:
         wb.save(fp)
         wb.close()
 
-        result = ExcelOperations.format_cells(fp, "Sheet1", "A1",
-            formatting={"bold": True, "bg_color": "FF0000"})
+        result = ExcelOperations.format_cells(fp, "Sheet1", "A1", formatting={"bold": True, "bg_color": "FF0000"})
         assert result["success"], f"失败: {result.get('message')}"
 
     def test_format_cell_with_long_text(self, tmp_path):
@@ -499,8 +507,7 @@ class TestFormatCellsR63:
         wb.save(fp)
         wb.close()
 
-        result = ExcelOperations.format_cells(fp, "Sheet1", "A1",
-            formatting={"wrap_text": True, "font_size": 11, "font_name": "微软雅黑"})
+        result = ExcelOperations.format_cells(fp, "Sheet1", "A1", formatting={"wrap_text": True, "font_size": 11, "font_name": "微软雅黑"})
         assert result["success"], f"失败: {result.get('message')}"
         style = _read_cell_style(fp, "A1")
         assert style["wrap_text"] is True
@@ -512,8 +519,7 @@ class TestFormatCellsR63:
         fp = str(tmp_path / "bdr_style_dict.xlsx")
         _create_test_xlsx(fp)
         # border_style 正常只接受字符串，但代码有 dict 分支
-        result = ExcelOperations.format_cells(fp, "Sheet1", "A1",
-            formatting={"border_style": {"top": "medium", "custom": "value"}})
+        result = ExcelOperations.format_cells(fp, "Sheet1", "A1", formatting={"border_style": {"top": "medium", "custom": "value"}})
         # 不管成功失败，不崩溃就行
         assert result["success"] or result["success"] is False
 
@@ -537,8 +543,7 @@ class TestFormatCellsR63:
         fp = str(tmp_path / "fc_hex.xlsx")
         _create_test_xlsx(fp)
         for color in ["FF0000", "00FF00", "0000FF", "123ABC", "abcdef"]:
-            result = ExcelOperations.format_cells(fp, "Sheet1", "A1",
-                formatting={"font_color": color})
+            result = ExcelOperations.format_cells(fp, "Sheet1", "A1", formatting={"font_color": color})
             assert result["success"], f"颜色 {color} 失败"
 
     def test_bg_color_various_formats(self, tmp_path):
@@ -564,8 +569,7 @@ class TestFormatCellsR63:
 
         for i, val in enumerate(["top", "center", "bottom", "middle", "justify"], start=1):
             col = get_column_letter(i)
-            result = ExcelOperations.format_cells(fp, "Sheet1", f"{col}1",
-                formatting={"vertical_alignment": val})
+            result = ExcelOperations.format_cells(fp, "Sheet1", f"{col}1", formatting={"vertical_alignment": val})
             assert result["success"], f"vertical_alignment={val} 失败: {result.get('message')}"
 
     # ---------- 21. alignment horizontal 各选项 ----------
@@ -578,8 +582,7 @@ class TestFormatCellsR63:
         options = ["left", "center", "right", "justify", "centerContinuous", "distributed", "general"]
         for i, val in enumerate(options, start=1):
             col = get_column_letter(i)
-            result = ExcelOperations.format_cells(fp, "Sheet1", f"{col}1",
-                formatting={"alignment": val})
+            result = ExcelOperations.format_cells(fp, "Sheet1", f"{col}1", formatting={"alignment": val})
             assert result["success"], f"alignment={val} 失败: {result.get('message')}"
 
         # 验证 center 生效

@@ -22,6 +22,8 @@ except ImportError as e:
     exit(1)
 
 # 导入工具模块
+# 导入校准器工具（内置模块，不依赖外部 tools/ 目录）
+from .calibrator.tools import register_calibrator_tools
 from .tools import (
     register_compare_tools,
     register_data_tools,
@@ -32,9 +34,6 @@ from .tools import (
     register_search_tools,
     register_sql_tools,
 )
-
-# 导入校准器工具（内置模块，不依赖外部 tools/ 目录）
-from .calibrator.tools import register_calibrator_tools
 
 # ==================== 日志配置 ====================
 logging.basicConfig(

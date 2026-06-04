@@ -26,7 +26,6 @@ from .conftest import (
     special_char_file,
 )
 
-
 # ============================================================
 # INV-10: 窗口函数唯一性
 # ============================================================
@@ -44,14 +43,10 @@ class TestINV10WindowFunctionUniqueness:
         rows = get_data_rows(result)
         rn_values = [row[-1] for row in rows]
         # 全局唯一
-        assert len(rn_values) == len(set(rn_values)), (
-            f"ROW_NUMBER 有重复: {rn_values}"
-        )
+        assert len(rn_values) == len(set(rn_values)), f"ROW_NUMBER 有重复: {rn_values}"
         # 严格递增
         for i in range(1, len(rn_values)):
-            assert rn_values[i] == rn_values[i - 1] + 1, (
-                f"ROW_NUMBER 不连续: {rn_values}"
-            )
+            assert rn_values[i] == rn_values[i - 1] + 1, f"ROW_NUMBER 不连续: {rn_values}"
 
     def test_row_number_unique_partitioned(self, numbers_file):
         result = execute_advanced_sql_query(
@@ -68,13 +63,9 @@ class TestINV10WindowFunctionUniqueness:
             partitions.setdefault(cat, []).append(rn)
 
         for cat, rns in partitions.items():
-            assert len(rns) == len(set(rns)), (
-                f"Category={cat} 内 ROW_NUMBER 有重复: {rns}"
-            )
+            assert len(rns) == len(set(rns)), f"Category={cat} 内 ROW_NUMBER 有重复: {rns}"
             for i in range(1, len(rns)):
-                assert rns[i] == rns[i - 1] + 1, (
-                    f"Category={cat} 内 ROW_NUMBER 不连续: {rns}"
-                )
+                assert rns[i] == rns[i - 1] + 1, f"Category={cat} 内 ROW_NUMBER 不连续: {rns}"
 
 
 # ============================================================
@@ -124,8 +115,6 @@ class TestINV11RankingStandard:
         assert 3 in dense_values, f"DENSE_RANK 应包含 3（不跳号）: {dense_values}"
 
 
-
-
 # ============================================================
 # INV-12: 空表安全
 # ============================================================
@@ -160,9 +149,7 @@ class TestINV12EmptyTableSafe:
         assert result["success"], f"空表 GROUP BY 失败: {result['message']}"
 
     def test_empty_window_function(self, empty_file):
-        result = execute_advanced_sql_query(
-            empty_file, "SELECT *, ROW_NUMBER() OVER () as rn FROM 空表"
-        )
+        result = execute_advanced_sql_query(empty_file, "SELECT *, ROW_NUMBER() OVER () as rn FROM 空表")
         assert result["success"], f"空表窗口函数失败: {result['message']}"
         assert len(result["data"]) <= 1, "空表窗口函数应返回 0 数据行"
 
@@ -175,9 +162,7 @@ class TestINV12EmptyTableSafe:
                 f"SELECT *, {func}(Score) OVER () as w FROM 单行表",
             )
             assert result["success"], f"单行表 {func} OVER 失败: {result['message']}"
-            assert len(result["data"]) == 2, (
-                f"单行表 {func} 应返回 1 数据行 + 1 表头行 = 2 行"
-            )
+            assert len(result["data"]) == 2, f"单行表 {func} 应返回 1 数据行 + 1 表头行 = 2 行"
 
         # 需要 ORDER BY 的窗口函数
         for func in ["RANK", "DENSE_RANK"]:
@@ -198,47 +183,33 @@ class TestINV13SpecialCharSafe:
     """INV-13: 列名/值含中文、emoji、单引号、反斜杠时不崩溃"""
 
     def test_chinese_column_name(self, special_char_file):
-        result = execute_advanced_sql_query(
-            special_char_file, "SELECT 名称 FROM 特殊字符"
-        )
+        result = execute_advanced_sql_query(special_char_file, "SELECT 名称 FROM 特殊字符")
         assert result["success"], f"中文列名查询失败: {result['message']}"
 
     def test_emoji_in_data(self, special_char_file):
-        result = execute_advanced_sql_query(
-            special_char_file, "SELECT * FROM 特殊字符 WHERE 名称 LIKE '%⚔️%'"
-        )
+        result = execute_advanced_sql_query(special_char_file, "SELECT * FROM 特殊字符 WHERE 名称 LIKE '%⚔️%'")
         assert result["success"], f"emoji 数据查询失败: {result['message']}"
 
     def test_single_quote_in_data(self, special_char_file):
-        result = execute_advanced_sql_query(
-            special_char_file, "SELECT * FROM 特殊字符 WHERE 名称 = 'O\\'Brien'"
-        )
+        result = execute_advanced_sql_query(special_char_file, "SELECT * FROM 特殊字符 WHERE 名称 = 'O\\'Brien'")
         # 不管是否匹配到，都不应崩溃
         assert result["success"] or True, "查询不应崩溃"
 
     def test_backslash_in_data(self, special_char_file):
-        result = execute_advanced_sql_query(
-            special_char_file, "SELECT * FROM 特殊字符 WHERE 描述 LIKE '%test%'"
-        )
+        result = execute_advanced_sql_query(special_char_file, "SELECT * FROM 特殊字符 WHERE 描述 LIKE '%test%'")
         assert result["success"], f"反斜杠数据查询失败: {result['message']}"
 
     def test_long_string_value(self, special_char_file):
-        result = execute_advanced_sql_query(
-            special_char_file, "SELECT * FROM 特殊字符 WHERE 名称 LIKE '%X%'"
-        )
+        result = execute_advanced_sql_query(special_char_file, "SELECT * FROM 特殊字符 WHERE 名称 LIKE '%X%'")
         assert result["success"], f"超长字符串查询失败: {result['message']}"
 
     def test_extreme_numeric_values(self, special_char_file):
-        result = execute_advanced_sql_query(
-            special_char_file, "SELECT MIN(备注), MAX(备注) FROM 特殊字符"
-        )
+        result = execute_advanced_sql_query(special_char_file, "SELECT MIN(备注), MAX(备注) FROM 特殊字符")
         assert result["success"], f"极端数值查询失败: {result['message']}"
 
     def test_negative_numbers(self, special_char_file):
         # 先插入负数行再测试
-        result = execute_advanced_sql_query(
-            special_char_file, "SELECT * FROM 特殊字符"
-        )
+        result = execute_advanced_sql_query(special_char_file, "SELECT * FROM 特殊字符")
         assert result["success"], "特殊字符表基本查询失败"
 
 
@@ -251,9 +222,7 @@ class TestINV14DivisionByZeroSafe:
     """INV-14: 1/0 返回 NULL 而非 inf 或崩溃"""
 
     def test_division_by_zero(self, simple_file):
-        result = execute_advanced_sql_query(
-            simple_file, "SELECT ID, Price / 0 FROM 数据 WHERE ID = 1"
-        )
+        result = execute_advanced_sql_query(simple_file, "SELECT ID, Price / 0 FROM 数据 WHERE ID = 1")
         assert result["success"], f"除零查询失败（应返回 NULL）: {result['message']}"
         div_val = result["data"][1][1]
         # 不应是 inf 或崩溃
@@ -262,16 +231,12 @@ class TestINV14DivisionByZeroSafe:
             assert not math.isnan(div_val), f"除零结果应为 NULL，实际为 nan"
 
     def test_division_by_zero_in_aggregation(self, simple_file):
-        result = execute_advanced_sql_query(
-            simple_file, "SELECT SUM(Price / 0) FROM 数据"
-        )
+        result = execute_advanced_sql_query(simple_file, "SELECT SUM(Price / 0) FROM 数据")
         assert result["success"], f"聚合中除零查询失败: {result['message']}"
 
     def test_safe_division(self, simple_file):
         """正常除法应正常工作"""
-        result = execute_advanced_sql_query(
-            simple_file, "SELECT Price / 2 FROM 数据 WHERE ID = 1"
-        )
+        result = execute_advanced_sql_query(simple_file, "SELECT Price / 2 FROM 数据 WHERE ID = 1")
         assert result["success"]
         div_val = result["data"][1][0]
         assert abs(div_val - 50.25) < 0.01, f"100.5 / 2 应为 50.25，实际 {div_val}"
@@ -287,33 +252,25 @@ class TestINV15LikeSafe:
 
     def test_like_with_brackets(self, simple_file):
         """LIKE 含方括号 [ ] 不崩溃"""
-        result = execute_advanced_sql_query(
-            simple_file, "SELECT * FROM 数据 WHERE Name LIKE '[武器]%'"
-        )
+        result = execute_advanced_sql_query(simple_file, "SELECT * FROM 数据 WHERE Name LIKE '[武器]%'")
         # 不管是否匹配，都不应崩溃
         assert result["success"] or "success" in str(type(result))
 
     def test_like_with_percent(self, simple_file):
         """LIKE 正常通配符 % 仍工作"""
-        result = execute_advanced_sql_query(
-            simple_file, "SELECT * FROM 数据 WHERE Name LIKE '%剑%'"
-        )
+        result = execute_advanced_sql_query(simple_file, "SELECT * FROM 数据 WHERE Name LIKE '%剑%'")
         assert result["success"], f"LIKE %通配符失败: {result['message']}"
         rows = get_data_rows(result)
         assert len(rows) >= 1, "LIKE '%剑%' 应匹配到至少 1 行"
 
     def test_like_with_underscore(self, simple_file):
         """LIKE 正常通配符 _ 仍工作"""
-        result = execute_advanced_sql_query(
-            simple_file, "SELECT * FROM 数据 WHERE Tags LIKE '_器%'"
-        )
+        result = execute_advanced_sql_query(simple_file, "SELECT * FROM 数据 WHERE Tags LIKE '_器%'")
         assert result["success"], f"LIKE _通配符失败: {result['message']}"
 
     def test_like_normal_pattern(self, simple_file):
         """LIKE 普通模式正常工作"""
-        result = execute_advanced_sql_query(
-            simple_file, "SELECT * FROM 数据 WHERE Name LIKE '火球术'"
-        )
+        result = execute_advanced_sql_query(simple_file, "SELECT * FROM 数据 WHERE Name LIKE '火球术'")
         assert result["success"], f"LIKE 精确匹配失败: {result['message']}"
 
     def test_like_with_regex_metacharacters(self, simple_file):

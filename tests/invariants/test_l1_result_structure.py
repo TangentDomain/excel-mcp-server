@@ -6,6 +6,7 @@ INV-4: 行数守恒 — COUNT(*) 返回的行数 = 实际数据行数（不含�
 """
 
 from __future__ import annotations
+
 import os
 import shutil
 from pathlib import Path
@@ -34,10 +35,10 @@ from .conftest import (
     special_char_file,
 )
 
-
 # ============================================================
 # INV-1: 结果结构一致性
 # ============================================================
+
 
 class TestINV1ResultStructure:
     """INV-1: result 必须包含 success(bool), data(list), message(str)"""
@@ -51,18 +52,14 @@ class TestINV1ResultStructure:
         assert_result_structure(result)
 
     def test_update_success_structure(self, simple_file):
-        result = execute_advanced_update_query(
-            simple_file, "UPDATE 数据 SET Price = 999 WHERE ID = 1"
-        )
+        result = execute_advanced_update_query(simple_file, "UPDATE 数据 SET Price = 999 WHERE ID = 1")
         # UPDATE 返回 {success, affected_rows, changes, message}
         assert isinstance(result, dict)
         assert "success" in result and isinstance(result["success"], bool)
         assert "message" in result and isinstance(result["message"], str)
 
     def test_update_failure_structure(self, simple_file):
-        result = execute_advanced_update_query(
-            simple_file, "UPDATE 不存在的表 SET X = 1"
-        )
+        result = execute_advanced_update_query(simple_file, "UPDATE 不存在的表 SET X = 1")
         assert isinstance(result, dict)
         assert result["success"] is False
         assert len(result.get("message", "")) > 0
@@ -78,18 +75,14 @@ class TestINV1ResultStructure:
         assert "message" in result
 
     def test_delete_success_structure(self, simple_file):
-        result = execute_advanced_delete_query(
-            simple_file, "DELETE FROM 数据 WHERE ID = 99"
-        )
+        result = execute_advanced_delete_query(simple_file, "DELETE FROM 数据 WHERE ID = 99")
         # DELETE 返回 {success, affected_rows, message}
         assert isinstance(result, dict)
         assert "success" in result and isinstance(result["success"], bool)
         assert "message" in result
 
     def test_delete_failure_structure(self, simple_file):
-        result = execute_advanced_delete_query(
-            simple_file, "DELETE FROM 不存在的表 WHERE ID = 1"
-        )
+        result = execute_advanced_delete_query(simple_file, "DELETE FROM 不存在的表 WHERE ID = 1")
         assert isinstance(result, dict)
         assert result["success"] is False
         assert len(result.get("message", "")) > 0
@@ -186,8 +179,6 @@ def _align_result(excel_result: dict, sqlite_result: dict, tol: float = 0.01) ->
     return True
 
 
-
-
 class TestINV2SQLSQLiteAlignment:
     """INV-2: 同一 SQL 在 ExcelMCP 和 SQLite 上的结果一致"""
 
@@ -202,11 +193,7 @@ class TestINV2SQLSQLiteAlignment:
         sql = "SELECT * FROM 数据"
         excel_result = execute_advanced_sql_query(self.file_path, sql)
         sqlite_result = cmd_query(_CAL_DB, sql)
-        assert _align_result(excel_result, sqlite_result), (
-            f"ExcelMCP 和 SQLite 结果不一致\n"
-            f"Excel: {excel_result['data'][:3]}\n"
-            f"SQLite: {sqlite_result.get('rows', [])[:3]}"
-        )
+        assert _align_result(excel_result, sqlite_result), f"ExcelMCP 和 SQLite 结果不一致\nExcel: {excel_result['data'][:3]}\nSQLite: {sqlite_result.get('rows', [])[:3]}"
 
     def test_where_clause(self):
         sql = "SELECT * FROM 数据 WHERE ID = 1"
@@ -273,6 +260,7 @@ class TestINV2SQLSQLiteAlignment:
 # INV-3: 文件完整性守恒
 # ============================================================
 
+
 class TestINV3FileIntegrity:
     """INV-3: SELECT 不修改文件；写操作只改目标 sheet"""
 
@@ -306,9 +294,7 @@ class TestINV3FileIntegrity:
         secondary_rows_before = list(wb_before["副表"].iter_rows(values_only=True))
 
         # UPDATE 主表
-        result = execute_advanced_update_query(
-            multi_sheet_file, "UPDATE 主表 SET Name = 'Charlie' WHERE ID = 1"
-        )
+        result = execute_advanced_update_query(multi_sheet_file, "UPDATE 主表 SET Name = 'Charlie' WHERE ID = 1")
         assert result["success"]
 
         # 验证副表未变
@@ -341,9 +327,7 @@ class TestINV3FileIntegrity:
         wb_before = load_workbook(multi_sheet_file)
         secondary_before = list(wb_before["副表"].iter_rows(values_only=True))
 
-        result = execute_advanced_delete_query(
-            multi_sheet_file, "DELETE FROM 主表 WHERE ID = 2"
-        )
+        result = execute_advanced_delete_query(multi_sheet_file, "DELETE FROM 主表 WHERE ID = 2")
         assert result["success"]
 
         wb_after = load_workbook(multi_sheet_file)
@@ -354,6 +338,7 @@ class TestINV3FileIntegrity:
 # ============================================================
 # INV-4: 行数守恒
 # ============================================================
+
 
 class TestINV4RowCount:
     """INV-4: COUNT(*) 返回的行数 = 实际数据行数（不含表头）"""
@@ -385,12 +370,8 @@ class TestINV4RowCount:
         count_star = result_star["data"][1][0]
         count_name = result_col["data"][1][0]
         count_price = execute_advanced_sql_query(simple_file, "SELECT COUNT(Price) FROM 数据")["data"][1][0]
-        assert count_star >= count_name, (
-            f"COUNT(*)={count_star} < COUNT(Name)={count_name}"
-        )
-        assert count_star >= count_price, (
-            f"COUNT(*)={count_star} < COUNT(Price)={count_price}"
-        )
+        assert count_star >= count_name, f"COUNT(*)={count_star} < COUNT(Name)={count_name}"
+        assert count_star >= count_price, f"COUNT(*)={count_star} < COUNT(Price)={count_price}"
 
     def test_select_star_row_count(self, simple_file):
         """SELECT * 返回的行数（不含表头）应等于 COUNT(*)"""
@@ -399,6 +380,4 @@ class TestINV4RowCount:
         assert count_result["success"] and star_result["success"]
         count_val = count_result["data"][1][0]
         actual_rows = len(star_result["data"]) - 1  # 减去表头
-        assert actual_rows == count_val, (
-            f"SELECT * 返回 {actual_rows} 行，COUNT(*)={count_val}"
-        )
+        assert actual_rows == count_val, f"SELECT * 返回 {actual_rows} 行，COUNT(*)={count_val}"

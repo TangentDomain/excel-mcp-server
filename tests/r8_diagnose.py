@@ -8,6 +8,7 @@ REPO_ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(REPO_ROOT / "src"))
 import os
 import tempfile
+
 from openpyxl import Workbook
 
 from excel_mcp_server_fastmcp.api.advanced_sql_query import execute_advanced_sql_query

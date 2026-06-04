@@ -8,12 +8,13 @@ R49 P1 Bug Fixes — 关键安全/正确性修复测试
 Round: 49
 """
 
-import pytest
-import pandas as pd
-import numpy as np
 import os
 import tempfile
+
+import numpy as np
 import openpyxl
+import pandas as pd
+import pytest
 
 from excel_mcp_server_fastmcp.api.advanced_sql_query import (
     AdvancedSQLQueryEngine,
@@ -40,6 +41,7 @@ def _make_test_xlsx(data, sheet_name="Sheet"):
 # P1-03: DELETE 逆序删除 — 验证多行删除后数据一致性
 # ============================================================
 
+
 class TestP1_03_DeleteReverseOrder:
     """P1-03: batch_delete_rows 在 openpyxl 路径下必须逆序处理行号"""
 
@@ -49,17 +51,11 @@ class TestP1_03_DeleteReverseOrder:
         path = _make_test_xlsx(data)
         try:
             engine = AdvancedSQLQueryEngine()
-            result = engine.execute_delete_query(
-                path,
-                "DELETE FROM Sheet WHERE Name IN ('Bob', 'Dave')"
-            )
+            result = engine.execute_delete_query(path, "DELETE FROM Sheet WHERE Name IN ('Bob', 'Dave')")
             assert result["success"] is True, f"删除失败: {result.get('message', '')}"
 
             # 验证剩余数据：Alice, Carol, Eve
-            verify = execute_advanced_sql_query(
-                path,
-                "SELECT Name FROM Sheet ORDER BY Name"
-            )
+            verify = execute_advanced_sql_query(path, "SELECT Name FROM Sheet ORDER BY Name")
             assert verify["success"] is True
             names = [r[0] for r in verify["data"][1:]]  # 去表头
             assert names == ["Alice", "Carol", "Eve"], f"期望 ['Alice','Carol','Eve'], 实际 {names}"
@@ -72,10 +68,7 @@ class TestP1_03_DeleteReverseOrder:
         path = _make_test_xlsx(data)
         try:
             engine = AdvancedSQLQueryEngine()
-            result = engine.execute_delete_query(
-                path,
-                "DELETE FROM Sheet WHERE ID IN (2, 3, 4)"
-            )
+            result = engine.execute_delete_query(path, "DELETE FROM Sheet WHERE ID IN (2, 3, 4)")
             assert result["success"] is True
 
             verify = execute_advanced_sql_query(path, "SELECT ID FROM Sheet ORDER BY ID")
@@ -90,10 +83,7 @@ class TestP1_03_DeleteReverseOrder:
         path = _make_test_xlsx(data)
         try:
             engine = AdvancedSQLQueryEngine()
-            result = engine.execute_delete_query(
-                path,
-                "DELETE FROM Sheet WHERE N != 3"
-            )
+            result = engine.execute_delete_query(path, "DELETE FROM Sheet WHERE N != 3")
             assert result["success"] is True
 
             verify = execute_advanced_sql_query(path, "SELECT N FROM Sheet")
@@ -108,10 +98,7 @@ class TestP1_03_DeleteReverseOrder:
         path = _make_test_xlsx(data)
         try:
             engine = AdvancedSQLQueryEngine()
-            result = engine.execute_delete_query(
-                path,
-                "DELETE FROM Sheet WHERE A = 999"
-            )
+            result = engine.execute_delete_query(path, "DELETE FROM Sheet WHERE A = 999")
             assert result["success"] is True
 
             verify = execute_advanced_sql_query(path, "SELECT A FROM Sheet ORDER BY A")
@@ -125,6 +112,7 @@ class TestP1_03_DeleteReverseOrder:
 # P1-04: INSERT 批量大小限制
 # ============================================================
 
+
 class TestP1_04_InsertBatchSizeLimit:
     """P1-04: INSERT 必须拒绝超过批量大小限制的请求"""
 
@@ -134,15 +122,11 @@ class TestP1_04_InsertBatchSizeLimit:
         path = _make_test_xlsx(data)
         try:
             engine = AdvancedSQLQueryEngine()
-            result = engine.execute_insert_query(
-                path,
-                "INSERT INTO Sheet (A, B) VALUES (1, 'x'), (2, 'y'), (3, 'z')"
-            )
+            result = engine.execute_insert_query(path, "INSERT INTO Sheet (A, B) VALUES (1, 'x'), (2, 'y'), (3, 'z')")
             # 不应返回"超限"错误
             if not result["success"]:
                 msg = result.get("message", "")
-                assert "超过限制" not in msg and "5000" not in msg, \
-                    f"正常INSERT不应被限流: {msg}"
+                assert "超过限制" not in msg and "5000" not in msg, f"正常INSERT不应被限流: {msg}"
         finally:
             os.unlink(path)
 
@@ -162,10 +146,7 @@ class TestP1_04_InsertBatchSizeLimit:
             # 应该被拒绝
             assert result["success"] is False, "超量 INSERT 应该失败"
             msg = result.get("message", "")
-            assert "超过限制" in msg or "limit" in msg.lower() or \
-                   "batch" in msg.lower() or "5000" in msg or \
-                   "分批" in msg, \
-                   f"错误信息应包含限制相关关键词: {msg}"
+            assert "超过限制" in msg or "limit" in msg.lower() or "batch" in msg.lower() or "5000" in msg or "分批" in msg, f"错误信息应包含限制相关关键词: {msg}"
         finally:
             os.unlink(path)
 
@@ -183,8 +164,7 @@ class TestP1_04_InsertBatchSizeLimit:
             # 不应返回"超限"错误（可能因其他原因失败）
             if not result["success"]:
                 msg = result.get("message", "")
-                assert "超过限制" not in msg and "5000" not in msg, \
-                    f"边界值5000不应被拒绝: {msg}"
+                assert "超过限制" not in msg and "5000" not in msg, f"边界值5000不应被拒绝: {msg}"
         finally:
             os.unlink(path)
 
@@ -201,8 +181,7 @@ class TestP1_04_InsertBatchSizeLimit:
             result = engine.execute_insert_query(path, sql)
             assert result["success"] is False, "5001行的INSERT应被拒绝"
             msg = result.get("message", "")
-            assert "超过限制" in msg or "5000" in msg or "limit" in msg.lower(), \
-                   f"应返回限制相关错误: {msg}"
+            assert "超过限制" in msg or "5000" in msg or "limit" in msg.lower(), f"应返回限制相关错误: {msg}"
         finally:
             os.unlink(path)
 
@@ -210,6 +189,7 @@ class TestP1_04_InsertBatchSizeLimit:
 # ============================================================
 # P1-05: _evaluate_update_expression 递归深度保护
 # ============================================================
+
 
 class TestP1_05_UpdateRecursionDepthGuard:
     """P1-05: UPDATE SET 表达式求值必须有递归深度保护"""
@@ -221,17 +201,11 @@ class TestP1_05_UpdateRecursionDepthGuard:
         try:
             engine = AdvancedSQLQueryEngine()
             # 嵌套算术运算
-            result = engine.execute_update_query(
-                path,
-                "UPDATE Sheet SET Val = Val + 2 * 3 WHERE Name = 'Alice'"
-            )
+            result = engine.execute_update_query(path, "UPDATE Sheet SET Val = Val + 2 * 3 WHERE Name = 'Alice'")
             assert result["success"] is True, f"UPDATE 失败: {result.get('message', '')}"
 
             # 验证结果：10 + 2*3 = 16
-            verify = execute_advanced_sql_query(
-                path,
-                "SELECT Val FROM Sheet WHERE Name = 'Alice'"
-            )
+            verify = execute_advanced_sql_query(path, "SELECT Val FROM Sheet WHERE Name = 'Alice'")
             assert verify["success"] is True
             val = verify["data"][1][0]
             assert val == 16.0, f"期望 16.0, 实际 {val}"
@@ -245,16 +219,11 @@ class TestP1_05_UpdateRecursionDepthGuard:
         try:
             engine = AdvancedSQLQueryEngine()
             # 构造深层嵌套的 LEFT/SUBSTRING 函数调用
-            result = engine.execute_update_query(
-                path,
-                "UPDATE Sheet SET S = LEFT(SUBSTRING(S, 1, 5), 3)"
-            )
+            result = engine.execute_update_query(path, "UPDATE Sheet SET S = LEFT(SUBSTRING(S, 1, 5), 3)")
             # 无论成功还是返回深度保护错误，都不应抛出未捕获的异常
-            assert result["success"] is True or \
-                   "depth" in str(result.get("message", "")).lower() or \
-                   "递归" in result.get("message", "") or \
-                   "error" not in str(result.get("message", "")).lower()[:20], \
-                   f"深层嵌套不应导致未处理异常: {result}"
+            assert (
+                result["success"] is True or "depth" in str(result.get("message", "")).lower() or "递归" in result.get("message", "") or "error" not in str(result.get("message", "")).lower()[:20]
+            ), f"深层嵌套不应导致未处理异常: {result}"
         finally:
             os.unlink(path)
 
@@ -265,10 +234,7 @@ class TestP1_05_UpdateRecursionDepthGuard:
         try:
             engine = AdvancedSQLQueryEngine()
             # 用 Price * Qty 更新 Total
-            result = engine.execute_update_query(
-                path,
-                "UPDATE Sheet SET Total = Price * Qty"
-            )
+            result = engine.execute_update_query(path, "UPDATE Sheet SET Total = Price * Qty")
             assert result["success"] is True, f"UPDATE 失败: {result.get('message', '')}"
 
             verify = execute_advanced_sql_query(path, "SELECT Price, Qty, Total FROM Sheet")
@@ -276,8 +242,7 @@ class TestP1_05_UpdateRecursionDepthGuard:
             for row in verify["data"][1:]:
                 price, qty, total = row[0], row[1], row[2]
                 expected = price * qty
-                assert abs(total - expected) < 0.01, \
-                    f"{price}*{qty}={expected}, 但Total={total}"
+                assert abs(total - expected) < 0.01, f"{price}*{qty}={expected}, 但Total={total}"
         finally:
             os.unlink(path)
 
@@ -287,10 +252,7 @@ class TestP1_05_UpdateRecursionDepthGuard:
         path = _make_test_xlsx(data)
         try:
             engine = AdvancedSQLQueryEngine()
-            result = engine.execute_update_query(
-                path,
-                "UPDATE Sheet SET Name = UPPER(Name)"
-            )
+            result = engine.execute_update_query(path, "UPDATE Sheet SET Name = UPPER(Name)")
             assert result["success"] is True
 
             verify = execute_advanced_sql_query(path, "SELECT Name FROM Sheet ORDER BY Name")
@@ -302,6 +264,7 @@ class TestP1_05_UpdateRecursionDepthGuard:
     def test_recursion_depth_guard_on_unknown_expr_type(self):
         """验证递归深度保护：构造极端嵌套不应导致 RecursionError"""
         import sqlglot.expressions as exp
+
         from excel_mcp_server_fastmcp.api.advanced_sql_query import AdvancedSQLQueryEngine
 
         engine = AdvancedSQLQueryEngine()
@@ -317,7 +280,6 @@ class TestP1_05_UpdateRecursionDepthGuard:
         try:
             result = engine._evaluate_update_expression(inner, df, 0)
             # 如果到达这里且没有崩溃，说明深度保护生效
-            assert result is None or result == "", \
-                f"超深嵌套应返回 None 或空字符串, 实际: {repr(result)}"
+            assert result is None or result == "", f"超深嵌套应返回 None 或空字符串, 实际: {repr(result)}"
         except RecursionError:
             pytest.fail("RecursionError! 递归深度保护未生效")

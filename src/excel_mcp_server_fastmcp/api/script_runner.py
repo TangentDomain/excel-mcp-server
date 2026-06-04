@@ -25,6 +25,7 @@ from .excel_operations import ExcelOperations
 
 class ScriptTimeoutError(Exception):
     """脚本执行超时异常。"""
+
     pass
 
 
@@ -46,10 +47,7 @@ def _query_wrapper(file_path: str, sql: str) -> list:
         # 空结果诊断：正常空结果至少包含表头行
         # 如果 data 为空列表，说明返回格式异常（可能是 include_headers=False 的边界情况）
         if not data:
-            logger.warning(
-                f"query() 返回成功但 data 为空列表 sql={sql[:80]!r} "
-                f"keys={list(result.keys())}"
-            )
+            logger.warning(f"query() 返回成功但 data 为空列表 sql={sql[:80]!r} keys={list(result.keys())}")
             # 尝试从 query_info 中恢复列名
             cols = result.get("query_info", {}).get("returned_columns", [])
             if cols:

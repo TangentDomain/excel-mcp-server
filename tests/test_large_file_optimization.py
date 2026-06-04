@@ -20,7 +20,7 @@ class TestLargeFileOptimization(unittest.TestCase):
 
     def _create_test_file(self, rows=100, cols=10):
         """创建测试用Excel文件"""
-        fd, path = tempfile.mkstemp(suffix='.xlsx')
+        fd, path = tempfile.mkstemp(suffix=".xlsx")
         os.close(fd)
 
         wb = Workbook(write_only=True)
@@ -38,7 +38,7 @@ class TestLargeFileOptimization(unittest.TestCase):
 
     def test_file_size_detection(self):
         """测试文件大小检测"""
-        from excel_mcp_server_fastmcp.core.excel_reader import _get_file_size, _is_large_file, _LARGE_FILE_THRESHOLD
+        from excel_mcp_server_fastmcp.core.excel_reader import _LARGE_FILE_THRESHOLD, _get_file_size, _is_large_file
 
         # 小文件
         small_path = self._create_test_file(rows=100)
@@ -66,8 +66,8 @@ class TestLargeFileOptimization(unittest.TestCase):
             # list_sheets 应包含 file_size_mb 元数据
             result = reader.list_sheets()
             self.assertTrue(result.success)
-            self.assertIn('file_size_mb', result.metadata)
-            self.assertFalse(result.metadata['is_large_file'])
+            self.assertIn("file_size_mb", result.metadata)
+            self.assertFalse(result.metadata["is_large_file"])
 
             reader.close()
         finally:
@@ -96,8 +96,8 @@ class TestLargeFileOptimization(unittest.TestCase):
             reader = ExcelReader(path)
             result = reader.get_range("TestData!A1:C10")
             self.assertTrue(result.success)
-            self.assertIn('file_path', result.metadata)
-            self.assertIn('sheet_name', result.metadata)
+            self.assertIn("file_path", result.metadata)
+            self.assertIn("sheet_name", result.metadata)
             reader.close()
         finally:
             os.unlink(path)
@@ -115,7 +115,7 @@ class TestLargeFileOptimization(unittest.TestCase):
 
             result = reader.get_range("TestData!A1:C5")
             self.assertTrue(result.success)
-            self.assertTrue(result.metadata.get('optimized'))
+            self.assertTrue(result.metadata.get("optimized"))
 
             # 验证数据正确性
             data = result.data
@@ -123,9 +123,9 @@ class TestLargeFileOptimization(unittest.TestCase):
             self.assertEqual(len(data[0]), 3)  # 3列
 
             # 第一行应该是表头
-            self.assertEqual(data[0][0].value, 'Col_0')
-            self.assertEqual(data[0][1].value, 'Col_1')
-            self.assertEqual(data[0][2].value, 'Col_2')
+            self.assertEqual(data[0][0].value, "Col_0")
+            self.assertEqual(data[0][1].value, "Col_1")
+            self.assertEqual(data[0][2].value, "Col_2")
 
             reader.close()
         finally:
@@ -142,8 +142,8 @@ class TestLargeFileOptimization(unittest.TestCase):
 
             result = reader.get_range("TestData!A1:B10")
             self.assertTrue(result.success)
-            self.assertTrue(result.metadata.get('optimized'))
-            self.assertEqual(result.metadata['rows_loaded'], 10)
+            self.assertTrue(result.metadata.get("optimized"))
+            self.assertEqual(result.metadata["rows_loaded"], 10)
 
             # 只应该有10行数据
             self.assertEqual(len(result.data), 10)
@@ -161,14 +161,14 @@ class TestLargeFileOptimization(unittest.TestCase):
             reader = ExcelReader(path)
             result = reader.list_sheets()
             self.assertTrue(result.success)
-            self.assertIn('file_size_mb', result.metadata)
-            self.assertIn('is_large_file', result.metadata)
-            self.assertIsInstance(result.metadata['file_size_mb'], float)
-            self.assertIsInstance(result.metadata['is_large_file'], bool)
+            self.assertIn("file_size_mb", result.metadata)
+            self.assertIn("is_large_file", result.metadata)
+            self.assertIsInstance(result.metadata["file_size_mb"], float)
+            self.assertIsInstance(result.metadata["is_large_file"], bool)
             reader.close()
         finally:
             os.unlink(path)
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     unittest.main()

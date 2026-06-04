@@ -6,7 +6,6 @@ from collections.abc import Mapping, Sequence
 from pathlib import Path
 from typing import Any
 
-
 UNSTABLE_QUERY_INFO_KEYS = {
     "execution_time_ms",
     "markdown_table",
@@ -37,11 +36,7 @@ def normalize_select_result(result: dict[str, Any]) -> dict[str, Any]:
     """提取查询结果中稳定、适合做 baseline 的部分。"""
 
     query_info = result.get("query_info", {}) or {}
-    stable_query_info = {
-        key: normalize_value(value)
-        for key, value in query_info.items()
-        if key not in UNSTABLE_QUERY_INFO_KEYS
-    }
+    stable_query_info = {key: normalize_value(value) for key, value in query_info.items() if key not in UNSTABLE_QUERY_INFO_KEYS}
     return {
         "success": bool(result.get("success")),
         "data": normalize_value(result.get("data", [])),
@@ -65,33 +60,39 @@ def compare_structured(expected: Any, actual: Any, path: str = "$") -> list[dict
     diffs: list[dict[str, Any]] = []
 
     if type(expected) is not type(actual):
-        diffs.append({
-            "path": path,
-            "type": "type_mismatch",
-            "expected_type": type(expected).__name__,
-            "actual_type": type(actual).__name__,
-            "expected": expected,
-            "actual": actual,
-        })
+        diffs.append(
+            {
+                "path": path,
+                "type": "type_mismatch",
+                "expected_type": type(expected).__name__,
+                "actual_type": type(actual).__name__,
+                "expected": expected,
+                "actual": actual,
+            }
+        )
         return diffs
 
     if isinstance(expected, Mapping):
         expected_keys = set(expected.keys())
         actual_keys = set(actual.keys())
         for key in sorted(expected_keys - actual_keys, key=str):
-            diffs.append({
-                "path": f"{path}.{key}",
-                "type": "missing_key",
-                "expected": expected[key],
-                "actual": None,
-            })
+            diffs.append(
+                {
+                    "path": f"{path}.{key}",
+                    "type": "missing_key",
+                    "expected": expected[key],
+                    "actual": None,
+                }
+            )
         for key in sorted(actual_keys - expected_keys, key=str):
-            diffs.append({
-                "path": f"{path}.{key}",
-                "type": "extra_key",
-                "expected": None,
-                "actual": actual[key],
-            })
+            diffs.append(
+                {
+                    "path": f"{path}.{key}",
+                    "type": "extra_key",
+                    "expected": None,
+                    "actual": actual[key],
+                }
+            )
         for key in sorted(expected_keys & actual_keys, key=str):
             diffs.extend(compare_structured(expected[key], actual[key], f"{path}.{key}"))
         return diffs
@@ -101,28 +102,34 @@ def compare_structured(expected: Any, actual: Any, path: str = "$") -> list[dict
         for index in range(min_len):
             diffs.extend(compare_structured(expected[index], actual[index], f"{path}[{index}]"))
         for index in range(min_len, len(expected)):
-            diffs.append({
-                "path": f"{path}[{index}]",
-                "type": "missing_item",
-                "expected": expected[index],
-                "actual": None,
-            })
+            diffs.append(
+                {
+                    "path": f"{path}[{index}]",
+                    "type": "missing_item",
+                    "expected": expected[index],
+                    "actual": None,
+                }
+            )
         for index in range(min_len, len(actual)):
-            diffs.append({
-                "path": f"{path}[{index}]",
-                "type": "extra_item",
-                "expected": None,
-                "actual": actual[index],
-            })
+            diffs.append(
+                {
+                    "path": f"{path}[{index}]",
+                    "type": "extra_item",
+                    "expected": None,
+                    "actual": actual[index],
+                }
+            )
         return diffs
 
     if expected != actual:
-        diffs.append({
-            "path": path,
-            "type": "value_mismatch",
-            "expected": expected,
-            "actual": actual,
-        })
+        diffs.append(
+            {
+                "path": path,
+                "type": "value_mismatch",
+                "expected": expected,
+                "actual": actual,
+            }
+        )
 
     return diffs
 

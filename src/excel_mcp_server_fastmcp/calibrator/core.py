@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 """
 SQL 校准器核心逻辑
 ==================
@@ -10,8 +9,8 @@ SQL 校准器核心逻辑
 import os
 import re
 import sqlite3
-import time
 import tempfile
+import time
 from pathlib import Path
 
 import pandas as pd
@@ -26,22 +25,23 @@ DEFAULT_DB_DIR = str(Path(tempfile.gettempdir()) / "calibrator_data")
 # 工具函数
 # ============================================================
 
+
 def get_db_path(db_name: str) -> str:
     """获取数据库文件的完整路径"""
     os.makedirs(DEFAULT_DB_DIR, exist_ok=True)
-    safe_name = re.sub(r'[\\/*?:"<>|]', '_', db_name)
-    if not safe_name.endswith('.db'):
-        safe_name += '.db'
+    safe_name = re.sub(r'[\\/*?:"<>|]', "_", db_name)
+    if not safe_name.endswith(".db"):
+        safe_name += ".db"
     return os.path.join(DEFAULT_DB_DIR, safe_name)
 
 
 def sanitize_table_name(name: str) -> str:
     """清理表名：去掉非法字符，确保SQLite合法"""
-    name = re.sub(r'^[0-9]+', '', name)
-    name = re.sub(r'[\\/*?:"<>|\s]', '_', name)
-    name = name.strip('_')
+    name = re.sub(r"^[0-9]+", "", name)
+    name = re.sub(r'[\\/*?:"<>|\s]', "_", name)
+    name = name.strip("_")
     if not name:
-        name = 'unnamed_table'
+        name = "unnamed_table"
     return name
 
 
@@ -50,13 +50,13 @@ def sanitize_col_name(name: str) -> str:
     清理列名中的特殊字符，使其在 SQLite 方括号引用中安全
     保留中文、英文、数字、下划线、点号、括号、井号、减号等常见字符
     """
-    if not name or name.strip() == '':
-        return 'unknown_column'
+    if not name or name.strip() == "":
+        return "unknown_column"
     name = str(name).strip()
     # 去掉可能导致问题的控制字符
-    name = re.sub(r'[\x00-\x1f]', '', name)
+    name = re.sub(r"[\x00-\x1f]", "", name)
     if not name:
-        return 'unknown_column'
+        return "unknown_column"
     return name
 
 
@@ -86,17 +86,17 @@ def flatten_multiindex(columns) -> list:
         if isinstance(col, tuple):
             parts = []
             for level in col:
-                s = str(level).strip() if pd.notna(level) else ''
+                s = str(level).strip() if pd.notna(level) else ""
                 # 跳过空值和 pandas 自动生成的 Unnamed 列
-                if s and s.lower() != 'nan' and not s.lower().startswith('unnamed'):
+                if s and s.lower() != "nan" and not s.lower().startswith("unnamed"):
                     parts.append(s)
 
             if len(parts) == 0:
-                result.append('unknown_column')
+                result.append("unknown_column")
             elif len(parts) == 1:
                 result.append(sanitize_col_name(parts[0]))
             else:
-                result.append(sanitize_col_name('.'.join(parts)))
+                result.append(sanitize_col_name(".".join(parts)))
         else:
             result.append(sanitize_col_name(str(col).strip()))
 
@@ -152,7 +152,7 @@ def is_likely_dual_header(df_raw_row0, df_raw_row1):
     for val in df_raw_row1:
         if pd.notna(val):
             s = str(val).strip()
-            if '.' in s and len(s) > 10:
+            if "." in s and len(s) > 10:
                 has_dotted_names = True
                 break
 
@@ -177,23 +177,23 @@ def infer_sqlite_type(series: pd.Series) -> str:
     """
     non_null = series.dropna()
     if len(non_null) == 0:
-        return 'TEXT'
+        return "TEXT"
 
     # 尝试转为整数
     try:
         non_null.astype(int)
-        return 'INTEGER'
+        return "INTEGER"
     except (ValueError, TypeError):
         pass
 
     # 尝试转为浮点数
     try:
         non_null.astype(float)
-        return 'REAL'
+        return "REAL"
     except (ValueError, TypeError):
         pass
 
-    return 'TEXT'
+    return "TEXT"
 
 
 def format_table(rows, headers):
@@ -203,12 +203,12 @@ def format_table(rows, headers):
     # 转换 None 为 NULL 显示
     display_rows = []
     for row in rows:
-        display_rows.append(tuple('NULL' if v is None else str(v) for v in row))
+        display_rows.append(tuple("NULL" if v is None else str(v) for v in row))
 
     try:
         from tabulate import tabulate
-        return tabulate(display_rows, headers=headers, tablefmt='grid',
-                       showindex=False, missingval='NULL')
+
+        return tabulate(display_rows, headers=headers, tablefmt="grid", showindex=False, missingval="NULL")
     except ImportError:
         pass
 
@@ -227,26 +227,25 @@ def format_table(rows, headers):
     padding = 2
     col_widths = [w + padding for w in col_widths]
 
-    sep = '+' + '+'.join('-' * w for w in col_widths) + '+'
-    hdr = '|' + '|'.join(
-        str(h).ljust(col_widths[i]) for i, h in enumerate(headers)
-    ) + '|'
+    sep = "+" + "+".join("-" * w for w in col_widths) + "+"
+    hdr = "|" + "|".join(str(h).ljust(col_widths[i]) for i, h in enumerate(headers)) + "|"
 
     lines = [sep, hdr, sep]
     for row in display_rows:
         cells = []
         for i in range(num_cols):
-            val = row[i] if i < len(row) else ''
+            val = row[i] if i < len(row) else ""
             cells.append(val.ljust(col_widths[i]))
-        lines.append('|' + '|'.join(cells) + '|')
+        lines.append("|" + "|".join(cells) + "|")
     lines.append(sep)
 
-    return '\n'.join(lines)
+    return "\n".join(lines)
 
 
 # ============================================================
 # 核心命令实现（返回结构化 dict，不直接 print）
 # ============================================================
+
 
 def cmd_import(xlsx_path: str, db_name: str = "default") -> dict:
     """
@@ -294,10 +293,10 @@ def cmd_import(xlsx_path: str, db_name: str = "default") -> dict:
         df_raw = pd.read_excel(xlsx_path, sheet_name=sheet_name, header=None, nrows=3)
 
         if df_raw.empty or len(df_raw) < 1:
-            logs.append(f"  [警告] 跳过空 Sheet")
+            logs.append("  [警告] 跳过空 Sheet")
             continue
 
-        row0 = df_raw.iloc[0].tolist()   # 可能的表头行1
+        row0 = df_raw.iloc[0].tolist()  # 可能的表头行1
         row1 = df_raw.iloc[1].tolist() if len(df_raw) > 1 else []  # 可能的表头行2 或 数据行1
 
         # ===== 第二步：智能判断单/双表头 =====
@@ -318,11 +317,11 @@ def cmd_import(xlsx_path: str, db_name: str = "default") -> dict:
             logs.append(f"  使用单表头格式 ({len(final_columns)} 列)")
 
         # ===== 第三步：清理数据 =====
-        df_data = df_data.dropna(how='all')    # 去掉全空行
-        df_data = df_data.dropna(how='all', axis=1)  # 去掉全空列
+        df_data = df_data.dropna(how="all")  # 去掉全空行
+        df_data = df_data.dropna(how="all", axis=1)  # 去掉全空列
 
         if len(df_data) == 0:
-            logs.append(f"  [警告] 跳过空表")
+            logs.append("  [警告] 跳过空表")
             continue
 
         # 更新最终列名（重新扁平化，因为 dropna 后可能变化）
@@ -335,7 +334,6 @@ def cmd_import(xlsx_path: str, db_name: str = "default") -> dict:
         seen = {}
         unique_cols = []
         for col in final_columns:
-            base = col
             if col in seen:
                 seen[col] += 1
                 col = f"{col}_{seen[col]}"
@@ -347,7 +345,7 @@ def cmd_import(xlsx_path: str, db_name: str = "default") -> dict:
         final_columns = unique_cols
 
         # 显示列名预览
-        preview = ', '.join(final_columns[:10])
+        preview = ", ".join(final_columns[:10])
         if len(final_columns) > 10:
             preview += f"... (共{len(final_columns)}列)"
         logs.append(f"  列名: {preview}")
@@ -369,7 +367,7 @@ def cmd_import(xlsx_path: str, db_name: str = "default") -> dict:
             continue
 
         # ===== 第五步：插入数据 =====
-        placeholders = ', '.join(['?' for _ in final_columns])
+        placeholders = ", ".join(["?" for _ in final_columns])
         insert_sql = f"INSERT INTO [{table_name}] VALUES (NULL, {placeholders})"
 
         inserted = 0
@@ -389,20 +387,22 @@ def cmd_import(xlsx_path: str, db_name: str = "default") -> dict:
             except Exception as e:
                 errors += 1
                 if errors <= 3:
-                    logs.append(f"  [警告] 第{idx+1}行插入失败: {e}")
+                    logs.append(f"  [警告] 第{idx + 1}行插入失败: {e}")
 
         if errors > 3:
             logs.append(f"  ... 共 {errors} 行插入失败")
 
         total_tables += 1
         total_rows += inserted
-        table_details.append({
-            "sheet_name": sheet_name,
-            "table_name": table_name,
-            "rows": inserted,
-            "columns": final_columns,
-            "errors": errors,
-        })
+        table_details.append(
+            {
+                "sheet_name": sheet_name,
+                "table_name": table_name,
+                "rows": inserted,
+                "columns": final_columns,
+                "errors": errors,
+            }
+        )
         logs.append(f"  ✓ 插入 {inserted} 行数据" + (f" ({errors} 行失败)" if errors else ""))
 
     conn.commit()
@@ -487,11 +487,7 @@ def cmd_tables(db_name: str) -> dict:
     conn = sqlite3.connect(db_path)
     cursor = conn.cursor()
 
-    cursor.execute(
-        "SELECT name FROM sqlite_master "
-        "WHERE type='table' AND name NOT LIKE 'sqlite_%' "
-        "ORDER BY name"
-    )
+    cursor.execute("SELECT name FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%' ORDER BY name")
     tables = [row[0] for row in cursor.fetchall()]
 
     if not tables:
@@ -512,7 +508,7 @@ def cmd_tables(db_name: str) -> dict:
     return {
         "success": True,
         "tables": [{"name": t, "count": c} for t, c in table_info],
-        "formatted": format_table(table_info, ['表名', '行数']),
+        "formatted": format_table(table_info, ["表名", "行数"]),
     }
 
 
@@ -534,10 +530,7 @@ def cmd_schema(db_name: str, table_name: str) -> dict:
     conn = sqlite3.connect(db_path)
     cursor = conn.cursor()
 
-    cursor.execute(
-        "SELECT name FROM sqlite_master WHERE type='table' AND name=?",
-        (table_name,)
-    )
+    cursor.execute("SELECT name FROM sqlite_master WHERE type='table' AND name=?", (table_name,))
     if not cursor.fetchone():
         conn.close()
         return {
@@ -552,21 +545,20 @@ def cmd_schema(db_name: str, table_name: str) -> dict:
     rows = []
     for col in columns:
         cid, name, dtype, notnull, default, pk = col
-        rows.append({
-            "cid": cid,
-            "name": name,
-            "type": dtype,
-            "notnull": 'NOT NULL' if notnull else 'NULL',
-            "pk": 'PK' if pk else '',
-            "default": str(default) if default is not None else '',
-        })
+        rows.append(
+            {
+                "cid": cid,
+                "name": name,
+                "type": dtype,
+                "notnull": "NOT NULL" if notnull else "NULL",
+                "pk": "PK" if pk else "",
+                "default": str(default) if default is not None else "",
+            }
+        )
 
     return {
         "success": True,
         "table_name": table_name,
         "columns": rows,
-        "formatted": format_table(
-            [(r['cid'], r['name'], r['type'], r['notnull'], r['pk'], r['default']) for r in rows],
-            ['CID', '列名', '类型', '约束', '主键', '默认值']
-        ),
+        "formatted": format_table([(r["cid"], r["name"], r["type"], r["notnull"], r["pk"], r["default"]) for r in rows], ["CID", "列名", "类型", "约束", "主键", "默认值"]),
     }

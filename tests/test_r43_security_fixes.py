@@ -5,9 +5,10 @@ R43 安全修复验证测试
 
 注意: API 返回 data 格式为 list[list], 首行为表头.
 """
-import pytest
-import pandas as pd
+
 import numpy as np
+import pandas as pd
+import pytest
 from openpyxl import Workbook
 
 from excel_mcp_server_fastmcp.api.advanced_sql_query import (
@@ -15,10 +16,10 @@ from excel_mcp_server_fastmcp.api.advanced_sql_query import (
     execute_advanced_update_query,
 )
 
-
 # ============================================================
 # 辅助函数
 # ============================================================
+
 
 def _rows(result):
     """提取数据行(去掉表头)"""
@@ -45,6 +46,7 @@ def _col_val(result, col_name, row_idx=0):
 # 测试数据准备
 # ============================================================
 
+
 @pytest.fixture
 def sample_xlsx(tmp_path):
     """创建测试用 xlsx 文件"""
@@ -57,7 +59,7 @@ def sample_xlsx(tmp_path):
     ws.append([3, "王五", "技术部", 12000])
     ws.append([4, "赵六", "市场部", 9000])
     ws.append([5, "O'Brien", "财务部", 11000])  # 含单引号的名称
-    ws.append([6, '路径\\测试', "技术部", 9500])   # 含反斜杠的名称
+    ws.append([6, "路径\\测试", "技术部", 9500])  # 含反斜杠的名称
     wb.save(tmp_path / "test.xlsx")
     return str(tmp_path / "test.xlsx")
 
@@ -65,6 +67,7 @@ def sample_xlsx(tmp_path):
 # ============================================================
 # R4: CTE 深度限制测试
 # ============================================================
+
 
 class TestR4CTEDepthLimit:
     """R4 [P1] CTE 嵌套深度限制 — 防止 StackOverflow"""
@@ -78,9 +81,9 @@ class TestR4CTEDepthLimit:
         SELECT * FROM TechStaff WHERE 薪资 > 10000
         """
         result = execute_advanced_sql_query(sample_xlsx, sql)
-        assert result['success'] is True, f"Failed: {result.get('message', '')}"
+        assert result["success"] is True, f"Failed: {result.get('message', '')}"
         assert len(_rows(result)) == 1
-        assert _col_val(result, '姓名') == '王五'
+        assert _col_val(result, "姓名") == "王五"
 
     def test_nested_2level_cte_works(self, sample_xlsx):
         """2 层 CTE 嵌套应正常工作（多 CTE 平铺，非递归嵌套）"""
@@ -94,7 +97,7 @@ class TestR4CTEDepthLimit:
         SELECT * FROM Level2
         """
         result = execute_advanced_sql_query(sample_xlsx, sql)
-        assert result['success'] is True, f"Failed: {result.get('message', '')}"
+        assert result["success"] is True, f"Failed: {result.get('message', '')}"
         # 测试数据中技术部且薪资>9000的有：张三(10000), 王五(12000), 路径\测试(9500)
         assert len(_rows(result)) == 3
 
@@ -109,6 +112,7 @@ class TestR4CTEDepthLimit:
         此测试通过直接构造 engine 并调用内部方法来验证深度检查机制。
         """
         import sqlglot
+
         from excel_mcp_server_fastmcp.api.advanced_sql_query import AdvancedSQLQueryEngine
 
         # 用正常方式构造 engine（读取 xlsx）
@@ -118,21 +122,19 @@ class TestR4CTEDepthLimit:
 
         # 直接用超限深度参数调用 _execute_query
         try:
-            result_df = engine._execute_query(
-                parsed, worksheets_data, _cte_depth=100
-            )
+            result_df = engine._execute_query(parsed, worksheets_data, _cte_depth=100)
             # 如果返回了 DataFrame 而不是抛异常，说明检查未生效
             assert False, f"深度检查未拦截超限调用，返回了 {len(result_df)} 行"
         except ValueError as e:
             error_str = str(e)
             # 验证错误消息包含深度相关信息
-            assert '深度' in error_str or 'depth' in error_str.lower() or 'CTE' in error_str or 'overflow' in error_str.lower(), \
-                f"ValueError 消息应包含深度限制提示，实际: {error_str}"
+            assert "深度" in error_str or "depth" in error_str.lower() or "CTE" in error_str or "overflow" in error_str.lower(), f"ValueError 消息应包含深度限制提示，实际: {error_str}"
 
     def test_cte_depth_limit_is_configurable(self):
         """验证 _MAX_CTE_DEPTH 类常量存在且为正整数"""
         from excel_mcp_server_fastmcp.api.advanced_sql_query import AdvancedSQLQueryEngine
-        assert hasattr(AdvancedSQLQueryEngine, '_MAX_CTE_DEPTH')
+
+        assert hasattr(AdvancedSQLQueryEngine, "_MAX_CTE_DEPTH")
         assert isinstance(AdvancedSQLQueryEngine._MAX_CTE_DEPTH, int)
         assert AdvancedSQLQueryEngine._MAX_CTE_DEPTH > 0
         assert AdvancedSQLQueryEngine._MAX_CTE_DEPTH <= 100  # 合理上限
@@ -147,39 +149,40 @@ class TestR4CTEDepthLimit:
         WHERE ID IN (SELECT ID FROM HighSalary)
         """
         result = execute_advanced_update_query(sample_xlsx, sql)
-        assert result['success'] is True, f"Failed: {result.get('message', '')}"
+        assert result["success"] is True, f"Failed: {result.get('message', '')}"
 
 
 # ============================================================
 # R7: pandas query() 注入防护测试
 # ============================================================
 
+
 class TestR7PandasQueryInjection:
     """R7 [P1] pandas query() 字符串注入防护"""
 
     def test_single_quote_in_string_literal(self, sample_xlsx):
         """含单引号的字符串不应破坏 pandas query()"""
-        sql = "SELECT * FROM 员工 WHERE 姓名 = \"O'Brien\""
+        sql = 'SELECT * FROM 员工 WHERE 姓名 = "O\'Brien"'
         result = execute_advanced_sql_query(sample_xlsx, sql)
-        assert result['success'] is True, f"Failed: {result.get('message', '')}"
+        assert result["success"] is True, f"Failed: {result.get('message', '')}"
         assert len(_rows(result)) == 1
-        assert _col_val(result, 'ID') == 5
+        assert _col_val(result, "ID") == 5
 
     def test_backslash_in_string_literal(self, sample_xlsx):
         """含反斜杠的字符串不应破坏 pandas query()"""
         sql = "SELECT * FROM 员工 WHERE 姓名 = '路径\\\\测试'"
         result = execute_advanced_sql_query(sample_xlsx, sql)
-        assert result['success'] is True, f"Failed: {result.get('message', '')}"
+        assert result["success"] is True, f"Failed: {result.get('message', '')}"
         assert len(_rows(result)) == 1
-        assert _col_val(result, 'ID') == 6
+        assert _col_val(result, "ID") == 6
 
     def test_single_quote_in_like_pattern(self, sample_xlsx):
         """LIKE 模式中含单引号不应破坏查询（使用已有数据 O'Brien）"""
         # 注意: 此引擎不支持 INSERT，使用 fixture 中已有的 O'Brien 数据
         # O'Brien 中 ' 后面是 B，所以用 %'B% 模式匹配
-        sql = "SELECT * FROM 员工 WHERE 姓名 LIKE \"%'B%\""
+        sql = 'SELECT * FROM 员工 WHERE 姓名 LIKE "%\'B%"'
         result = execute_advanced_sql_query(sample_xlsx, sql)
-        assert result['success'] is True, f"Failed: {result.get('message', '')}"
+        assert result["success"] is True, f"Failed: {result.get('message', '')}"
         assert len(_rows(result)) >= 1, f"应至少匹配 O'Brien, 实际行数: {len(_rows(result))}"
 
     def test_injection_attempt_column_name(self, sample_xlsx):
@@ -191,14 +194,14 @@ class TestR7PandasQueryInjection:
         sql_update = "UPDATE 员工 SET 姓名 = \"') | (True) | ('\" WHERE ID = 4"
         result = execute_advanced_update_query(sample_xlsx, sql_update)
         # UPDATE 可能成功也可能失败（取决于引擎对特殊字符的处理能力）
-        if result['success']:
+        if result["success"]:
             malicious_name = "') | (True) | ('"
-            sql_select = f"SELECT * FROM 员工 WHERE 姓名 = \"{malicious_name}\""
+            sql_select = f'SELECT * FROM 员工 WHERE 姓名 = "{malicious_name}"'
             result2 = execute_advanced_sql_query(sample_xlsx, sql_select)
-            assert result2['success'] is True
+            assert result2["success"] is True
             if len(_rows(result2)) > 0:
                 for i in range(len(_rows(result2))):
-                    assert _col_val(result2, '姓名', i) == malicious_name
+                    assert _col_val(result2, "姓名", i) == malicious_name
 
     def test_escape_pandas_query_string_method(self):
         """验证 _escape_pandas_query_string 静态方法正确转义"""
@@ -226,12 +229,12 @@ class TestR7PandasQueryInjection:
         ]
         for sql in tests:
             result = execute_advanced_sql_query(sample_xlsx, sql)
-            assert result['success'] is True, f"查询失败: {sql}, 错误: {result.get('message')}"
+            assert result["success"] is True, f"查询失败: {sql}, 错误: {result.get('message')}"
 
     def test_special_chars_in_various_contexts(self, sample_xlsx):
         """各种特殊字符在不同 SQL 上下文中都能正确处理"""
         # 含单引号 + IN 子句
         sql = "SELECT * FROM 员工 WHERE 姓名 IN (\"O'Brien\", '张三')"
         result = execute_advanced_sql_query(sample_xlsx, sql)
-        assert result['success'] is True, f"Failed: {result.get('message', '')}"
+        assert result["success"] is True, f"Failed: {result.get('message', '')}"
         assert len(_rows(result)) == 2

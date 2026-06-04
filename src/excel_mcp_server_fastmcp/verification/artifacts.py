@@ -21,7 +21,6 @@ def create_run_directory(base_dir: Path | None = None) -> Path:
     return run_dir
 
 
-
 def write_json(path: Path, payload: Any) -> Path:
     """写出 UTF-8 JSON artifact。"""
 
@@ -30,7 +29,6 @@ def write_json(path: Path, payload: Any) -> Path:
         json.dump(payload, handle, ensure_ascii=False, indent=2, sort_keys=True)
         handle.write("\n")
     return path
-
 
 
 def write_summary(run_dir: Path, summary: dict[str, Any]) -> Path:

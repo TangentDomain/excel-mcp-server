@@ -1,7 +1,10 @@
 """Tests for practical tools (removed: merge_multiple_files, data_validation, conditional formatting — tools deleted in API simplification)."""
+
 import os
+
 import pytest
 from openpyxl import Workbook
+
 
 def _create_workbook(path, sheet_title, headers, rows):
     """Create a test workbook and save to path."""

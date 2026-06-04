@@ -10,14 +10,15 @@
 合并后保持100%测试覆盖率，消除冗余
 """
 
-import pytest
 import os
-import tempfile
 import sys
-from pathlib import Path
-from openpyxl import Workbook, load_workbook
-import openpyxl
+import tempfile
 import time
+from pathlib import Path
+
+import openpyxl
+import pytest
+from openpyxl import Workbook, load_workbook
 
 # 添加项目路径到sys.path
 project_root = Path(__file__).parent.parent
@@ -108,27 +109,27 @@ class TestCopySheetOperations:
     def test_basic_copy(self, workbook):
         """基本复制：源工作表复制带自动生成的名称"""
         result = ExcelOperations.copy_sheet(workbook, "技能配置")
-        assert result['success'] is True
-        assert "副本" in result.get('data', {}).get('name', '') or "副本" in result.get('message', '')
+        assert result["success"] is True
+        assert "副本" in result.get("data", {}).get("name", "") or "副本" in result.get("message", "")
 
     def test_copy_with_custom_name(self, workbook):
         """测试自定义名称复制"""
         result = ExcelOperations.copy_sheet(workbook, "技能配置", new_name="技能配置备份")
-        assert result['success'] is True
-        data = result.get('data', {})
-        assert data.get('name') == "技能配置备份"
+        assert result["success"] is True
+        data = result.get("data", {})
+        assert data.get("name") == "技能配置备份"
 
     def test_copy_to_existing_sheet(self, workbook):
         """测试复制到已存在工作表 - 现在会自动重命名（加后缀），不会失败"""
         result = ExcelOperations.copy_sheet(workbook, "技能配置", new_name="装备配置")
         # 现在行为是自动重命名，不会返回失败
-        assert result['success'] is True
+        assert result["success"] is True
 
     def test_copy_nonexistent_sheet(self, workbook):
         """测试复制不存在的工作表"""
         result = ExcelOperations.copy_sheet(workbook, "不存在的工作表")
-        assert result['success'] is False
-        assert "工作表" in result.get('message', '')
+        assert result["success"] is False
+        assert "工作表" in result.get("message", "")
 
     def test_copy_single_row_sheet(self, tmp_path):
         """测试单行工作表复制"""
@@ -140,9 +141,9 @@ class TestCopySheetOperations:
         wb.save(filepath)
 
         result = ExcelOperations.copy_sheet(filepath, "SingleRow")
-        assert result['success'] is True
-        data = result.get('data', {})
-        assert "副本" in data.get('name', '')
+        assert result["success"] is True
+        data = result.get("data", {})
+        assert "副本" in data.get("name", "")
 
     # ==================== 流式复制测试 (来自test_copy_sheet_streaming.py) ====================
 
@@ -153,11 +154,11 @@ class TestCopySheetOperations:
 
         result = ExcelOperations.copy_sheet(filepath, "LargeData", new_name="LargeDataCopy", streaming=True)
 
-        assert result['success'], f"复制失败: {result.get('message', '')}"
-        metadata = result.get('metadata', {})
-        assert metadata.get('mode') == 'streaming', f"应使用streaming模式: {result}"
-        assert metadata.get('copied_rows') == 50, f"行数不匹配: {metadata.get('copied_rows')}"
-        assert metadata.get('copied_columns') == 5, f"列数不匹配: {metadata.get('copied_columns')}"
+        assert result["success"], f"复制失败: {result.get('message', '')}"
+        metadata = result.get("metadata", {})
+        assert metadata.get("mode") == "streaming", f"应使用streaming模式: {result}"
+        assert metadata.get("copied_rows") == 50, f"行数不匹配: {metadata.get('copied_rows')}"
+        assert metadata.get("copied_columns") == 5, f"列数不匹配: {metadata.get('copied_columns')}"
 
         # 验证复制后的文件有两个工作表
         wb = load_workbook(filepath)
@@ -172,11 +173,11 @@ class TestCopySheetOperations:
 
         result = ExcelOperations.copy_sheet(filepath, "Sheet1", new_name="TraditionalCopy", streaming=False)
 
-        assert result['success'], f"复制失败: {result.get('message', '')}"
-        metadata = result.get('metadata', {})
+        assert result["success"], f"复制失败: {result.get('message', '')}"
+        metadata = result.get("metadata", {})
         # 非streaming模式可能不设置mode字段，或设置为'traditional'
-        mode = metadata.get('mode')
-        assert mode is None or mode == 'traditional', f"模式不正确: {result}"
+        mode = metadata.get("mode")
+        assert mode is None or mode == "traditional", f"模式不正确: {result}"
 
         # 验证复制
         wb = load_workbook(filepath)
@@ -187,18 +188,18 @@ class TestCopySheetOperations:
     def test_copy_sheet_large_file_streaming(self, large_workbook):
         """测试大文件流式复制性能"""
         result = ExcelOperations.copy_sheet(large_workbook, "LargeData", new_name="LargeDataCopy", streaming=True)
-        
-        assert result['success'], f"大文件复制失败: {result.get('message', '')}"
-        metadata = result.get('metadata', {})
-        assert metadata.get('mode') == 'streaming'
-        assert metadata.get('copied_rows') == 1000
-        assert metadata.get('copied_columns') == 20
+
+        assert result["success"], f"大文件复制失败: {result.get('message', '')}"
+        metadata = result.get("metadata", {})
+        assert metadata.get("mode") == "streaming"
+        assert metadata.get("copied_rows") == 1000
+        assert metadata.get("copied_columns") == 20
 
         # 验证复制完整性
         wb = load_workbook(large_workbook)
         original_data = wb["LargeData"]
         copied_data = wb["LargeDataCopy"]
-        
+
         # 验证行数
         assert original_data.max_row == copied_data.max_row
         # 验证列数
@@ -216,28 +217,28 @@ class TestCopySheetOperations:
     def test_streaming_performance_comparison(self, large_workbook):
         """比较流式复制和传统复制的性能"""
         import time
-        
+
         # 测试流式复制性能
         start_time = time.time()
         result_streaming = ExcelOperations.copy_sheet(large_workbook, "LargeData", new_name="StreamCopy", streaming=True)
         streaming_time = time.time() - start_time
-        
-        assert result_streaming['success'], f"流式复制失败: {result_streaming.get('message', '')}"
-        
+
+        assert result_streaming["success"], f"流式复制失败: {result_streaming.get('message', '')}"
+
         # 测试传统复制性能
         result_traditional = ExcelOperations.copy_sheet(large_workbook, "LargeData", new_name="TraditionalCopy", streaming=False)
         traditional_time = time.time() - start_time
-        
-        assert result_traditional['success'], f"传统复制失败: {result_traditional.get('message', '')}"
-        
+
+        assert result_traditional["success"], f"传统复制失败: {result_traditional.get('message', '')}"
+
         # 验证两种模式都成功
-        assert result_streaming['success']
-        assert result_traditional['success']
-        
+        assert result_streaming["success"]
+        assert result_traditional["success"]
+
         # 记录性能差异
         print(f"流式复制时间: {streaming_time:.2f}s")
         print(f"传统复制时间: {traditional_time:.2f}s")
-        
+
         # 流式复制应该更快或相等
         assert streaming_time <= traditional_time + 1  # 允许1秒误差
 
@@ -249,22 +250,22 @@ class TestCopySheetOperations:
         wb = Workbook()
         ws = wb.active
         ws.title = "FormSheet"
-        
+
         # 添加数据和公式
         ws.append(["A", "B", "C", "D"])
         ws.append([1, 2, "=A1+B1", "=A1*B1"])
         ws.append([3, 4, "=A2+B2", "=A2*B2"])
-        
+
         wb.save(filepath)
-        
+
         result = ExcelOperations.copy_sheet(filepath, "FormSheet", new_name="FormCopy", streaming=True)
-        assert result['success'], f"公式复制失败: {result.get('message', '')}"
-        
+        assert result["success"], f"公式复制失败: {result.get('message', '')}"
+
         # 验证公式是否被正确复制
         wb = load_workbook(filepath)
         original_ws = wb["FormSheet"]
         copied_ws = wb["FormCopy"]
-        
+
         # 验证行数一致（公式复制完整性）
         assert original_ws.max_row == copied_ws.max_row
         assert original_ws.max_column == copied_ws.max_column
@@ -276,18 +277,18 @@ class TestCopySheetOperations:
         wb = Workbook()
         ws = wb.active
         ws.title = "StyleSheet"
-        
+
         # 添加带样式的数据
         ws["A1"].font = openpyxl.styles.Font(bold=True)
         ws["A1"].value = "Bold Text"
         ws["B1"].fill = openpyxl.styles.PatternFill(start_color="FFFF00", end_color="FFFF00", fill_type="solid")
         ws["B1"].value = "Yellow Background"
-        
+
         wb.save(filepath)
-        
+
         result = ExcelOperations.copy_sheet(filepath, "StyleSheet", new_name="StyleCopy", streaming=True)
-        assert result['success'], f"样式复制失败: {result.get('message', '')}"
-        
+        assert result["success"], f"样式复制失败: {result.get('message', '')}"
+
         # 验证文件复制成功
         wb = load_workbook(filepath)
         assert "StyleCopy" in wb.sheetnames
@@ -299,29 +300,29 @@ class TestCopySheetOperations:
         wb = Workbook()
         ws = wb.active
         ws.title = "MergedSheet"
-        
+
         # 创建合并单元格
-        ws.merge_cells('A1:C1')
+        ws.merge_cells("A1:C1")
         ws["A1"] = "Merged Header"
-        
+
         ws["A2"] = "Data1"
         ws["B2"] = "Data2"
         ws["C2"] = "Data3"
-        
+
         wb.save(filepath)
-        
+
         result = ExcelOperations.copy_sheet(filepath, "MergedSheet", new_name="MergedCopy", streaming=True)
-        assert result['success'], f"合并单元格复制失败: {result.get('message', '')}"
-        
+        assert result["success"], f"合并单元格复制失败: {result.get('message', '')}"
+
         # 验证合并单元格
         wb = load_workbook(filepath)
         original_ws = wb["MergedSheet"]
         copied_ws = wb["MergedCopy"]
-        
+
         # 验证合并范围
         merged_ranges_original = list(original_ws.merged_cells.ranges)
         merged_ranges_copied = list(copied_ws.merged_cells.ranges)
-        
+
         assert len(merged_ranges_original) == len(merged_ranges_copied)
         wb.close()
 
@@ -331,15 +332,15 @@ class TestCopySheetOperations:
         wb = Workbook()
         ws = wb.active
         ws.title = "ImageSheet"
-        
+
         # 添加一些数据
         ws["A1"] = "Data with image"
-        
+
         wb.save(filepath)
-        
+
         result = ExcelOperations.copy_sheet(filepath, "ImageSheet", new_name="ImageCopy", streaming=True)
-        assert result['success'], f"图片复制失败: {result.get('message', '')}"
-        
+        assert result["success"], f"图片复制失败: {result.get('message', '')}"
+
         # 验证复制成功
         wb = load_workbook(filepath)
         assert "ImageCopy" in wb.sheetnames
@@ -351,23 +352,23 @@ class TestCopySheetOperations:
         wb = Workbook()
         ws = wb.active
         ws.title = "ValidationSheet"
-        
+
         # 添加数据验证
         from openpyxl.worksheet.datavalidation import DataValidation
-        
+
         dv = DataValidation(type="list", formula1='"Yes,No,Maybe"')
         ws.add_data_validation(dv)
         dv.add("A1:A10")
-        
+
         # 添加数据
         for i in range(1, 11):
             ws.cell(row=i, column=1, value=f"Option{i}")
-        
+
         wb.save(filepath)
-        
+
         result = ExcelOperations.copy_sheet(filepath, "ValidationSheet", new_name="ValidationCopy", streaming=True)
-        assert result['success'], f"数据验证复制失败: {result.get('message', '')}"
-        
+        assert result["success"], f"数据验证复制失败: {result.get('message', '')}"
+
         # 验证复制成功
         wb = load_workbook(filepath)
         assert "ValidationCopy" in wb.sheetnames
@@ -378,27 +379,27 @@ class TestCopySheetOperations:
     def test_copy_sheet_invalid_file(self):
         """测试无效文件复制"""
         result = ExcelOperations.copy_sheet("nonexistent.xlsx", "Sheet1")
-        assert result['success'] is False
-        assert "文件不存在" in result.get('message', '')
+        assert result["success"] is False
+        assert "文件不存在" in result.get("message", "")
 
     def test_copy_sheet_permission_error(self, tmp_path):
         """测试权限错误处理 - 验证不存在的文件返回错误"""
         result = ExcelOperations.copy_sheet("/nonexistent/path/file.xlsx", "Sheet1")
-        assert result['success'] is False
-        assert "文件" in result.get('message', '') or "不存在" in result.get('message', '')
+        assert result["success"] is False
+        assert "文件" in result.get("message", "") or "不存在" in result.get("message", "")
 
     def test_copy_sheet_invalid_streaming_parameter(self, workbook):
         """测试无效的streaming参数"""
         # streaming参数接受bool或truthy值，非bool值会被自动转换
         result = ExcelOperations.copy_sheet(workbook, "技能配置", streaming="invalid")
         # "invalid"是truthy字符串，会被当作streaming=True处理
-        assert result['success'] is True
+        assert result["success"] is True
 
     def test_copy_sheet_memory_error(self, tmp_path):
         """测试无效文件路径的错误处理"""
         result = ExcelOperations.copy_sheet("/dev/null", "Sheet1")
         # /dev/null不是有效的Excel文件，应该返回错误
-        assert result['success'] is False
+        assert result["success"] is False
 
     def test_copy_sheet_disk_full(self, tmp_path):
         """测试磁盘已满错误处理"""
@@ -408,12 +409,13 @@ class TestCopySheetOperations:
         ws.title = "TestSheet"
         ws.append(["Test"])
         wb.save(filepath)
-        
+
         # 模拟磁盘已满 - mock抛出的是英文错误消息
         import unittest.mock
-        with unittest.mock.patch('openpyxl.Workbook.save', side_effect=OSError("Disk full")):
+
+        with unittest.mock.patch("openpyxl.Workbook.save", side_effect=OSError("Disk full")):
             result = ExcelOperations.copy_sheet(filepath, "TestSheet")
-            assert result['success'] is False
+            assert result["success"] is False
             # 错误消息可能包含中文或英文，取决于内部处理
-            msg = result.get('message', '')
+            msg = result.get("message", "")
             assert "磁盘" in msg or "Disk" in msg

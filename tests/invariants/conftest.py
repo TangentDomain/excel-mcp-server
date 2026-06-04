@@ -18,7 +18,6 @@ from pathlib import Path
 import pytest
 from openpyxl import Workbook
 
-
 # ============================================================
 # 辅助函数
 # ============================================================
@@ -135,6 +134,7 @@ def _make_multi_sheet_wb() -> Workbook:
     ws2.append([2, "extra2"])
     return wb
 
+
 def _make_formula_wb() -> Workbook:
     """创建含公式的测试表：A列数值，B列=A*2公式，C列文本"""
     wb = Workbook()
@@ -166,6 +166,7 @@ def _make_writable_wb() -> Workbook:
     ws.append([6, "传说之剑", 999.99, 5, "是"])
     return wb
 
+
 def _make_skills_wb() -> Workbook:
     """创建技能配置表（跨文件 JOIN 左表）"""
     wb = Workbook()
@@ -192,6 +193,7 @@ def _make_drops_wb() -> Workbook:
     ws.append(["D004", "S004", "剑刃碎片", 1])
     ws.append(["D005", "S006", "虚无之尘", 10])  # S006 不存在于技能表
     return wb
+
 
 def _save_wb(wb: Workbook, tmp_dir: Path, name: str) -> str:
     """保存 Workbook 到临时目录，返回路径"""
@@ -271,6 +273,7 @@ def writable_file(inv_tmp_dir) -> str:
     """可写测试表：ID/Name/Price/Stock/Active，6 行数据"""
     return _save_wb(_make_writable_wb(), inv_tmp_dir, "writable.xlsx")
 
+
 @pytest.fixture
 def skills_file(inv_tmp_dir) -> str:
     """技能配置表（跨文件 JOIN 左表）：技能ID/技能名称/伤害/类型，5 行"""
@@ -281,6 +284,8 @@ def skills_file(inv_tmp_dir) -> str:
 def drops_file(inv_tmp_dir) -> str:
     """掉落配置表（跨文件 JOIN 右表）：掉落ID/关联技能/掉落物品/数量，5 行"""
     return _save_wb(_make_drops_wb(), inv_tmp_dir, "drops.xlsx")
+
+
 # ============================================================
 # 辅助函数（供测试文件 import）
 # ============================================================
@@ -304,7 +309,7 @@ def assert_failure_safe(result: dict) -> None:
     assert result["data"] == [], f"失败时 data 应为 []，实际为 {result['data']}"
     assert len(result["message"]) > 0, "失败时 message 不能为空"
     # 不含 Python 堆栈信息
-    stack_patterns = ["Traceback", "File \"", "line ", "Exception"]
+    stack_patterns = ["Traceback", 'File "', "line ", "Exception"]
     msg = result["message"]
     for pattern in stack_patterns:
         assert pattern not in msg, f"错误消息不应包含堆栈信息，发现 '{pattern}'"

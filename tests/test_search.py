@@ -1,15 +1,15 @@
-# -*- coding: utf-8 -*-
 """
 Excel搜索功能测试
 合并了ExcelSearcher和目录搜索功能的测试
 这个文件替代了原本的test_excel_search.py和test_directory_search.py
 """
 
-import pytest
-import tempfile
-from pathlib import Path
 import os
 import re
+import tempfile
+from pathlib import Path
+
+import pytest
 
 from excel_mcp_server_fastmcp.core.excel_search import ExcelSearcher
 from excel_mcp_server_fastmcp.models.types import OperationResult
@@ -40,7 +40,7 @@ class TestExcelSearch:
 
         assert result.success is True
         assert result.data is not None
-        assert hasattr(result, 'data')
+        assert hasattr(result, "data")
 
     def test_regex_search_case_sensitive(self, sample_excel_file):
         """Test case sensitive search"""
@@ -141,16 +141,12 @@ class TestExcelSearch:
 
         searcher = ExcelSearcher(str(excel_files[0]))
 
-        result = searcher.regex_search_directory(
-            directory_path=temp_dir_with_excel_files,
-            pattern=r"[\w]+",
-            flags="i"
-        )
+        result = searcher.regex_search_directory(directory_path=temp_dir_with_excel_files, pattern=r"[\w]+", flags="i")
 
         assert result.success is True
         assert result.data is not None
-        assert 'searched_files' in result.metadata
-        assert 'total_matches' in result.metadata
+        assert "searched_files" in result.metadata
+        assert "total_matches" in result.metadata
 
     def test_regex_search_directory_recursive(self, temp_dir_with_excel_files):
         """Test recursive directory search"""
@@ -160,11 +156,7 @@ class TestExcelSearch:
 
         searcher = ExcelSearcher(str(excel_files[0]))
 
-        result = searcher.regex_search_directory(
-            directory_path=temp_dir_with_excel_files,
-            pattern=r"\d+",
-            recursive=True
-        )
+        result = searcher.regex_search_directory(directory_path=temp_dir_with_excel_files, pattern=r"\d+", recursive=True)
 
         assert result.success is True
         assert result.data is not None
@@ -177,11 +169,7 @@ class TestExcelSearch:
 
         searcher = ExcelSearcher(str(excel_files[0]))
 
-        result = searcher.regex_search_directory(
-            directory_path=temp_dir_with_excel_files,
-            pattern=r"[\w]+",
-            file_extensions=[".xlsx"]
-        )
+        result = searcher.regex_search_directory(directory_path=temp_dir_with_excel_files, pattern=r"[\w]+", file_extensions=[".xlsx"])
 
         assert result.success is True
         assert result.data is not None
@@ -194,11 +182,7 @@ class TestExcelSearch:
 
         searcher = ExcelSearcher(str(excel_files[0]))
 
-        result = searcher.regex_search_directory(
-            directory_path=temp_dir_with_excel_files,
-            pattern=r"[\w]+",
-            file_pattern=r".*test.*"
-        )
+        result = searcher.regex_search_directory(directory_path=temp_dir_with_excel_files, pattern=r"[\w]+", file_pattern=r".*test.*")
 
         assert result.success is True
         assert result.data is not None
@@ -211,16 +195,12 @@ class TestExcelSearch:
 
         searcher = ExcelSearcher(str(excel_files[0]))
 
-        result = searcher.regex_search_directory(
-            directory_path=temp_dir_with_excel_files,
-            pattern=r"[\w]+",
-            max_files=2
-        )
+        result = searcher.regex_search_directory(directory_path=temp_dir_with_excel_files, pattern=r"[\w]+", max_files=2)
 
         assert result.success is True
         assert result.data is not None
-        if 'searched_files' in result.metadata:
-            searched_files = result.metadata['searched_files']
+        if "searched_files" in result.metadata:
+            searched_files = result.metadata["searched_files"]
             if isinstance(searched_files, list):
                 assert len(searched_files) <= 2
             else:
@@ -230,10 +210,7 @@ class TestExcelSearch:
         """Test directory search with non-existent path"""
         searcher = ExcelSearcher(sample_excel_file)
 
-        result = searcher.regex_search_directory(
-            directory_path="/path/that/does/not/exist",
-            pattern=r"test"
-        )
+        result = searcher.regex_search_directory(directory_path="/path/that/does/not/exist", pattern=r"test")
 
         assert result.success is False
         assert "目录" in result.error or "directory" in result.error.lower()
@@ -246,12 +223,7 @@ class TestExcelSearch:
 
         searcher = ExcelSearcher(str(excel_files[0]))
 
-        result = searcher.regex_search_directory(
-            directory_path=temp_dir_with_excel_files,
-            pattern=r"[\w]+",
-            search_values=True,
-            search_formulas=True
-        )
+        result = searcher.regex_search_directory(directory_path=temp_dir_with_excel_files, pattern=r"[\w]+", search_values=True, search_formulas=True)
 
         assert result.success is True
         assert result.data is not None
@@ -281,6 +253,7 @@ class TestExcelSearch:
 
         # Test that search completes in reasonable time
         import time
+
         start_time = time.time()
 
         result = searcher.regex_search(r"[\w\u4e00-\u9fff]+", flags="i")
@@ -347,12 +320,9 @@ class TestExcelSearch:
         assert result1.success is True
 
         # 2. Directory search
-        result2 = searcher.regex_search_directory(
-            directory_path=temp_dir_with_excel_files,
-            pattern=r"[\w]+"
-        )
+        result2 = searcher.regex_search_directory(directory_path=temp_dir_with_excel_files, pattern=r"[\w]+")
         assert result2.success is True
 
         # 3. Compare results - directory should have more matches
-        if 'total_matches' in result2.metadata:
-            assert result2.metadata['total_matches'] >= 0
+        if "total_matches" in result2.metadata:
+            assert result2.metadata["total_matches"] >= 0

@@ -24,10 +24,9 @@ from .conftest import (
     assert_result_structure,
     empty_file,
     get_data_rows,
-    single_row_file,
     simple_file,
+    single_row_file,
 )
-
 
 # ============================================================
 # INV-5: 失败安全
@@ -58,9 +57,7 @@ class TestINV5FailureSafe:
         assert_failure_safe(result)
 
     def test_nonexistent_file(self):
-        result = execute_advanced_sql_query(
-            "/tmp/nonexistent_file_inv_test.xlsx", "SELECT * FROM 数据"
-        )
+        result = execute_advanced_sql_query("/tmp/nonexistent_file_inv_test.xlsx", "SELECT * FROM 数据")
         assert result["success"] is False
         assert_failure_safe(result)
 
@@ -92,6 +89,7 @@ class TestINV6ErrorClassifiable:
     def classifier(self):
         try:
             from excel_mcp_server_fastmcp.utils.formatter import ToolCallTracker
+
             return ToolCallTracker
         except ImportError:
             pytest.skip("ToolCallTracker 不可用")
@@ -100,27 +98,19 @@ class TestINV6ErrorClassifiable:
         result = execute_advanced_sql_query(simple_file, "SELECT * FROM 不存在的表")
         if not result["success"]:
             category = classifier.classify_error(result.get("message", ""))
-            assert category in self.KNOWN_CATEGORIES, (
-                f"错误未被分类: category='{category}', message='{result['message'][:80]}'"
-            )
+            assert category in self.KNOWN_CATEGORIES, f"错误未被分类: category='{category}', message='{result['message'][:80]}'"
 
     def test_syntax_error_classified(self, simple_file, classifier):
         result = execute_advanced_sql_query(simple_file, "INVALID SQL !!!")
         if not result["success"]:
             category = classifier.classify_error(result.get("message", ""))
-            assert category in self.KNOWN_CATEGORIES, (
-                f"错误未被分类: category='{category}', message='{result['message'][:80]}'"
-            )
+            assert category in self.KNOWN_CATEGORIES, f"错误未被分类: category='{category}', message='{result['message'][:80]}'"
 
     def test_missing_file_classified(self, classifier):
-        result = execute_advanced_sql_query(
-            "/tmp/inv_nonexistent_12345.xlsx", "SELECT 1"
-        )
+        result = execute_advanced_sql_query("/tmp/inv_nonexistent_12345.xlsx", "SELECT 1")
         if not result["success"]:
             category = classifier.classify_error(result.get("message", ""))
-            assert category in self.KNOWN_CATEGORIES, (
-                f"错误未被分类: category='{category}', message='{result['message'][:80]}'"
-            )
+            assert category in self.KNOWN_CATEGORIES, f"错误未被分类: category='{category}', message='{result['message'][:80]}'"
 
 
 # ============================================================
@@ -185,16 +175,12 @@ class TestINV8LimitConstraint:
         assert len(result["data"]) - 1 <= 1000
 
     def test_limit_with_order(self, simple_file):
-        result = execute_advanced_sql_query(
-            simple_file, "SELECT * FROM 数据 ORDER BY Price DESC LIMIT 2"
-        )
+        result = execute_advanced_sql_query(simple_file, "SELECT * FROM 数据 ORDER BY Price DESC LIMIT 2")
         assert result["success"]
         assert len(result["data"]) - 1 <= 2
 
     def test_limit_with_offset(self, simple_file):
-        result = execute_advanced_sql_query(
-            simple_file, "SELECT * FROM 数据 LIMIT 2 OFFSET 1"
-        )
+        result = execute_advanced_sql_query(simple_file, "SELECT * FROM 数据 LIMIT 2 OFFSET 1")
         assert result["success"]
         assert len(result["data"]) - 1 <= 2
 
@@ -275,7 +261,6 @@ class TestINV9AggregateSemantics:
         val = result["data"][1][0]
         # openpyxl 的空单元格读取为空字符串，SUM 空字符串返回 0
         assert val == 0, f"全空列 SUM 应为 0，实际 {val}"
-
 
     def test_all_null_column_count(self, all_null_file):
         """全 NULL 列 COUNT(col) → 0，但 COUNT(*) > 0"""
