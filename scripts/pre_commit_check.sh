@@ -46,7 +46,16 @@ echo "检查docstring契约..."
 if ! python3 scripts/lint_docstring_contract.py --quiet; then
     echo "ERROR: Docstring契约验证失败，请运行 'python3 scripts/lint_docstring_contract.py' 查看详情"
     exit 1
+# Ruff 格式检查
+echo "检查 ruff format..."
+if command -v ruff &>/dev/null; then
+    ruff format --check src/ tests/ || { echo "ERROR: ruff format 检查失败，请运行 'ruff format src/ tests/'"; exit 1; }
+    ruff check src/ tests/ || { echo "ERROR: ruff check 检查失败，请运行 'ruff check src/ tests/ --fix'"; exit 1; }
 fi
+
+# 不变量测试
+echo "运行不变量测试..."
+python3 -m pytest tests/invariants/ -q --tb=short --timeout=30 || { echo "ERROR: 不变量测试失败"; exit 1; }
 
 echo "Pre-commit检查通过"
 exit 0
