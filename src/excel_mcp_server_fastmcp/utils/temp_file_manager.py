@@ -4,13 +4,12 @@ Excel MCP Server - 临时文件管理器
 提供安全的临时文件创建和管理功能
 """
 
-import tempfile
+import logging
 import os
-import time
 import random
 import string
-import logging
-from typing import Optional
+import tempfile
+import time
 
 logger = logging.getLogger(__name__)
 
@@ -35,7 +34,7 @@ class TempFileManager:
         # 生成唯一文件名：前缀 + 进程ID + 时间戳 + 随机字符串
         timestamp = int(time.time())
         process_id = os.getpid()
-        random_str = ''.join(random.choices(string.ascii_lowercase + string.digits, k=6))
+        random_str = "".join(random.choices(string.ascii_lowercase + string.digits, k=6))
 
         filename = f"{prefix}_{process_id}_{timestamp}_{random_str}{suffix}"
         temp_file_path = os.path.join(temp_dir, filename)
