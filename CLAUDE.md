@@ -83,3 +83,13 @@ python -m pytest tests/invariants/ -k "smoke"   # 烟雾（<10s）
 ruff check src/ tests/ && ruff format --check src/ tests/
 python -m pytest tests/invariants/ -q --tb=short --timeout=30
 ```
+
+## Enforcement
+
+CLAUDE.md 是 advisory。Hard limits 在：
+
+- `.claude/settings.json` — permissions deny/ask/allow + hooks
+- `~/.claude/hooks/preToolUse-bash-guard.sh` — regex 拦截危险命令（exit 2 block）
+- `~/.claude/hooks/postToolUse-audit.sh` — 工具调用 JSONL 审计日志
+- `~/.claude/hooks/stop-lint.sh` — 每轮结束自动 lint 检查
+- `scripts/pre_commit_check.sh` — git commit 门禁（docstring + ruff + pytest）

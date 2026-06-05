@@ -46,6 +46,7 @@ echo "检查docstring契约..."
 if ! python3 scripts/lint_docstring_contract.py --quiet; then
     echo "ERROR: Docstring契约验证失败，请运行 'python3 scripts/lint_docstring_contract.py' 查看详情"
     exit 1
+fi
 # Ruff 格式检查
 echo "检查 ruff format..."
 if command -v ruff &>/dev/null; then
