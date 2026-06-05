@@ -1,0 +1,1 @@
+Project is at L4 maturity. L4 achieved: 公理体系 (32 INV, L1-L3) + 对抗闭环 (7 rounds converged, 1858 passed, 0 failed). Harness: CLAUDE.md 95 lines, 4 rules with 🔴🟢🟡 markers, INV skill, hooks (Guard/Injector/Auditor), pre_commit gate. All dead code archived (tests/_legacy, docs/_archive-*, src/_legacy). Unused deps removed. Ruff: 0 errors.

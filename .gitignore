@@ -237,3 +237,4 @@ CURRENT_VERSION
 
 # 闭环验证运行产物
 artifacts/verification/
+.iteration-memory.md
