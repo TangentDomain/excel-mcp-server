@@ -88,8 +88,8 @@ python -m pytest tests/invariants/ -q --tb=short --timeout=30
 
 CLAUDE.md 是 advisory。Hard limits 在：
 
-- `.claude/settings.json` — permissions deny/ask/allow + hooks
-- `~/.claude/hooks/preToolUse-bash-guard.sh` — regex 拦截危险命令（exit 2 block）
-- `~/.claude/hooks/postToolUse-audit.sh` — 工具调用 JSONL 审计日志
-- `~/.claude/hooks/stop-lint.sh` — 每轮结束自动 lint 检查
-- `scripts/pre_commit_check.sh` — git commit 门禁（docstring + ruff + pytest）
+  - `.claude/settings.json` — permissions deny/ask/allow + hooks
+  - `~/.claude/hooks/preToolUse-bash-guard.sh` — 🛡️ Guard: regex 拦截危险命令（exit 2）
+  - `~/.claude/hooks/postToolUse-audit.sh` — 💉 Injector: Edit/Write 后 ruff 质量反馈 + 📝 Auditor: JSONL 日志
+  - `~/.claude/hooks/stop-lint.sh` — 🛡️ Guard: 会话结束 ruff check+format 门禁（exit 2）
+  - `scripts/pre_commit_check.sh` — git commit 门禁（docstring + ruff + pytest）
