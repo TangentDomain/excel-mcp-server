@@ -556,9 +556,8 @@ class TestNestedFunctionCalls:
                 categories.add(c)
         assert len(categories) >= 2, f"Should have grouped by category, got {rc} rows"
 
-    @pytest.mark.xfail(reason="Known bug: ROUND(ABS(MIN(value))) returns negative — ROUND doesn't process ABS result correctly (R45 discovered)")
     def test_deeply_nested_functions(self, func_test_file):
-        """三层嵌套: ROUND(ABS(MIN(Price)), 1) — 已知 Bug：ROUND 未正确处理 ABS 结果"""
+        """三层嵌套: ROUND(ABS(MIN(Price)), 1) — R45 bug 已修复"""
         sql = "SELECT ROUND(ABS(MIN(Price)), 1) AS AbsMinPrice FROM Products"
         r = query(func_test_file, sql)
         assert r["success"], f"Failed: {r.get('message', '')}"
