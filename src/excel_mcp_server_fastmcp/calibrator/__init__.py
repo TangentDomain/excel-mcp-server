@@ -25,7 +25,6 @@ from .core import (
     sanitize_col_name,
     sanitize_table_name,
 )
-from .tools import register_calibrator_tools
 
 __all__ = [
     "DEFAULT_DB_DIR",
@@ -40,5 +39,4 @@ __all__ = [
     "cmd_query",
     "cmd_tables",
     "cmd_schema",
-    "register_calibrator_tools",
 ]
