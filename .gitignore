@@ -238,3 +238,8 @@ CURRENT_VERSION
 # 闭环验证运行产物
 artifacts/verification/
 .iteration-memory.md
+# CEO 工作文件（本地）
+.ceo-active
+.ceo-directives.md
+.ceo-plan.md
+memory:
