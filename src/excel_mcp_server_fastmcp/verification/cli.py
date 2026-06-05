@@ -10,6 +10,7 @@ from .runner import run_verification
 
 
 def build_parser() -> argparse.ArgumentParser:
+    """构建 CLI 参数解析器。"""
     parser = argparse.ArgumentParser(description="运行 Excel MCP Server baseline 驱动闭环验证")
     parser.add_argument("--case", action="append", dest="cases", help="只运行指定 case_id，可重复传入")
     parser.add_argument("--update-baselines", action="store_true", help="将实际结果写回 baseline")
@@ -17,6 +18,7 @@ def build_parser() -> argparse.ArgumentParser:
 
 
 def main(argv: list[str] | None = None) -> int:
+    """CLI 入口：运行验证并输出 JSON 结果。"""
     parser = build_parser()
     args = parser.parse_args(argv)
     if args.update_baselines and not args.cases:

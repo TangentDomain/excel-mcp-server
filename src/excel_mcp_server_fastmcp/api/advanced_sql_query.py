@@ -8129,6 +8129,7 @@ class AdvancedSQLQueryEngine:
 
                 # 对每个组统计非空值数量
                 def count_non_null(group):
+                    """统计组内非空值数量。"""
                     return group[temp_col].notna().sum()
 
                 return grouped.apply(count_non_null, include_groups=False)

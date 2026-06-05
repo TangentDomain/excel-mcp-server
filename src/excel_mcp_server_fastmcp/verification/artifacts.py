@@ -32,6 +32,7 @@ def write_json(path: Path, payload: Any) -> Path:
 
 
 def write_summary(run_dir: Path, summary: dict[str, Any]) -> Path:
+    """将验证摘要写入 summary.json。"""
     return write_json(run_dir / "summary.json", summary)
 
 

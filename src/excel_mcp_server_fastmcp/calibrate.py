@@ -36,6 +36,7 @@ from .calibrator.core import (
 
 
 def main():
+    """CLI 入口：解析子命令并执行校准操作（import/query/tables/schema）。"""
     parser = argparse.ArgumentParser(
         description="ExcelMCP SQL 校准器 - 将游戏配置Excel导入SQLite并查询",
         formatter_class=argparse.RawDescriptionHelpFormatter,
