@@ -3354,7 +3354,7 @@ class AdvancedSQLQueryEngine:
                 return pd.Series([non_null_count] * len(group), index=group.index)
 
         if partition_cols:
-            grouped = df.groupby(partition_cols, sort=False, dropna=False)
+            grouped = df.groupby(partition_cols, sort=False, dropna=False, observed=False)
             result = grouped.apply(compute_count_in_group, include_groups=False)
             if isinstance(result.index, pd.MultiIndex):
                 result = result.droplevel(result.index.names[:-1])
@@ -3389,7 +3389,7 @@ class AdvancedSQLQueryEngine:
 
         sorted_df = df.sort_values(order_cols, ascending=ascending)
         if partition_cols:
-            result = sorted_df.groupby(partition_cols, sort=False, dropna=False)[order_cols[0]].rank(method="min", ascending=ascending[0])
+            result = sorted_df.groupby(partition_cols, sort=False, dropna=False, observed=False)[order_cols[0]].rank(method="min", ascending=ascending[0])
         else:
             result = sorted_df[order_cols[0]].rank(method="min", ascending=ascending[0])
         return result.reindex(df.index).astype("Int64")
@@ -3401,7 +3401,7 @@ class AdvancedSQLQueryEngine:
 
         sorted_df = df.sort_values(order_cols, ascending=ascending)
         if partition_cols:
-            result = sorted_df.groupby(partition_cols, sort=False)[order_cols[0]].rank(method="dense", ascending=ascending[0])
+            result = sorted_df.groupby(partition_cols, sort=False, observed=False)[order_cols[0]].rank(method="dense", ascending=ascending[0])
         else:
             result = sorted_df[order_cols[0]].rank(method="dense", ascending=ascending[0])
         return result.reindex(df.index).astype("Int64")
@@ -3413,8 +3413,8 @@ class AdvancedSQLQueryEngine:
 
         sorted_df = df.sort_values(order_cols, ascending=ascending) if order_cols else df
         if partition_cols:
-            rank = sorted_df.groupby(partition_cols, sort=False)[order_cols[0]].rank(method="min", ascending=ascending[0])
-            counts = sorted_df.groupby(partition_cols, sort=False)[order_cols[0]].transform("count")
+            rank = sorted_df.groupby(partition_cols, sort=False, observed=False)[order_cols[0]].rank(method="min", ascending=ascending[0])
+            counts = sorted_df.groupby(partition_cols, sort=False, observed=False)[order_cols[0]].transform("count")
             result = (rank - 1) / (counts - 1)
             result = result.reindex(df.index).fillna(0.0)
         else:
@@ -3431,8 +3431,8 @@ class AdvancedSQLQueryEngine:
 
         sorted_df = df.sort_values(order_cols, ascending=ascending) if order_cols else df
         if partition_cols:
-            rank = sorted_df.groupby(partition_cols, sort=False)[order_cols[0]].rank(method="max", ascending=ascending[0])
-            counts = sorted_df.groupby(partition_cols, sort=False)[order_cols[0]].transform("count")
+            rank = sorted_df.groupby(partition_cols, sort=False, observed=False)[order_cols[0]].rank(method="max", ascending=ascending[0])
+            counts = sorted_df.groupby(partition_cols, sort=False, observed=False)[order_cols[0]].transform("count")
             result = rank / counts
             result = result.reindex(df.index)
         else:
@@ -3508,7 +3508,7 @@ class AdvancedSQLQueryEngine:
             series = df[col_name]
 
         if partition_cols:
-            grouped = series.groupby([df[c] for c in partition_cols], sort=False)
+            grouped = series.groupby([df[c] for c in partition_cols], sort=False, observed=False)
         else:
             grouped = None
 
@@ -3516,7 +3516,7 @@ class AdvancedSQLQueryEngine:
         if order_cols:
             sorted_df = df.sort_values(order_cols, ascending=ascending)
             if partition_cols:
-                sorted_group = series.reindex(sorted_df.index).groupby([df[c].reindex(sorted_df.index) for c in partition_cols], sort=False)
+                sorted_group = series.reindex(sorted_df.index).groupby([df[c].reindex(sorted_df.index) for c in partition_cols], sort=False, observed=False)
             else:
                 sorted_group = None
 
@@ -3581,7 +3581,7 @@ class AdvancedSQLQueryEngine:
             raise ValueError("PERCENT_RANK() 窗口函数需要 ORDER BY 子句")
 
         if partition_cols:
-            grouped = df.groupby(partition_cols, sort=False)
+            grouped = df.groupby(partition_cols, sort=False, observed=False)
         else:
             grouped = None
 
@@ -3622,7 +3622,7 @@ class AdvancedSQLQueryEngine:
             raise ValueError("CUME_DIST() 窗口函数需要 ORDER BY 子句")
 
         if partition_cols:
-            grouped = df.groupby(partition_cols, sort=False)
+            grouped = df.groupby(partition_cols, sort=False, observed=False)
         else:
             grouped = None
 
@@ -3677,7 +3677,7 @@ class AdvancedSQLQueryEngine:
 
         # 分组计算NTILE
         if partition_cols:
-            grouped = df.groupby(partition_cols, sort=False)
+            grouped = df.groupby(partition_cols, sort=False, observed=False)
         else:
             grouped = None
 
@@ -3793,7 +3793,7 @@ class AdvancedSQLQueryEngine:
             # [FIX R15-B2] 推断目标列的dtype，避免字符串列赋值到float Series报错
             target_dtype = df[target_col].dtype if target_col in df.columns else object
             result = pd.Series(None, index=df.index, dtype=target_dtype)
-            for _, group in df.groupby(partition_cols, sort=False):
+            for _, group in df.groupby(partition_cols, sort=False, observed=False):
                 sorted_group = group.sort_values(order_cols, ascending=ascending)
                 lagged = sorted_group[target_col].shift(periods=offset)
                 if default_value is not None:
@@ -3886,7 +3886,7 @@ class AdvancedSQLQueryEngine:
             # [FIX R15-B2] 推断目标列的dtype，避免字符串列赋值到float Series报错
             target_dtype = df[target_col].dtype if target_col in df.columns else object
             result = pd.Series(None, index=df.index, dtype=target_dtype)
-            for _, group in df.groupby(partition_cols, sort=False):
+            for _, group in df.groupby(partition_cols, sort=False, observed=False):
                 sorted_group = group.sort_values(order_cols, ascending=ascending)
                 led = sorted_group[target_col].shift(periods=-offset)
                 if default_value is not None:
@@ -3924,7 +3924,7 @@ class AdvancedSQLQueryEngine:
 
         result = pd.Series(None, index=df.index, dtype=df[target_col].dtype)
         if partition_cols:
-            for _, group in df.groupby(partition_cols, sort=False):
+            for _, group in df.groupby(partition_cols, sort=False, observed=False):
                 sorted_group = group.sort_values(order_cols, ascending=ascending)
                 first_val = sorted_group[target_col].iloc[0] if len(sorted_group) > 0 else None
                 result.loc[group.index] = first_val
@@ -3958,7 +3958,7 @@ class AdvancedSQLQueryEngine:
 
         result = pd.Series(None, index=df.index, dtype=df[target_col].dtype)
         if partition_cols:
-            for _, group in df.groupby(partition_cols, sort=False):
+            for _, group in df.groupby(partition_cols, sort=False, observed=False):
                 sorted_group = group.sort_values(order_cols, ascending=ascending)
                 last_val = sorted_group[target_col].iloc[-1] if len(sorted_group) > 0 else None
                 result.loc[group.index] = last_val
@@ -3995,7 +3995,7 @@ class AdvancedSQLQueryEngine:
 
         result = pd.Series(None, index=df.index, dtype=df[target_col].dtype)
         if partition_cols:
-            for _, group in df.groupby(partition_cols, sort=False):
+            for _, group in df.groupby(partition_cols, sort=False, observed=False):
                 sorted_group = group.sort_values(order_cols, ascending=ascending)
                 nth_val = sorted_group[target_col].iloc[n - 1] if n <= len(sorted_group) else None
                 result.loc[group.index] = nth_val
@@ -6034,7 +6034,7 @@ class AdvancedSQLQueryEngine:
         right_group_cols = list(lateral_col_map.keys())
         left_group_cols = list(lateral_col_map.values())
 
-        right_grouped = right_df.groupby(right_group_cols)
+        right_grouped = right_df.groupby(right_group_cols, observed=False)
 
         # 6. 对每个left行查找对应的right分组并计算结果
         results = []
@@ -8215,7 +8215,7 @@ class AdvancedSQLQueryEngine:
                         raise ValueError("无法获取分组列名")
 
                     # 重新分组,包含临时列
-                    grouped = df.groupby(group_cols, sort=False, dropna=False)
+                    grouped = df.groupby(group_cols, sort=False, dropna=False, observed=False)
                     col_name = temp_col  # 使用临时列名
                 else:
                     raise ValueError("GROUP_CONCAT 表达式计算需要有效的DataFrame")
@@ -8371,7 +8371,7 @@ class AdvancedSQLQueryEngine:
                 try:
                     # 使用groupby对象计算聚合
                     if hasattr(self, "_group_by_columns") and self._group_by_columns:
-                        grouped = df.groupby(self._group_by_columns, sort=False, dropna=False)
+                        grouped = df.groupby(self._group_by_columns, sort=False, dropna=False, observed=False)
                         agg_result = self._apply_aggregation_function(agg_func, grouped, df)
                         df[temp_col_name] = agg_result.values
                     else:
