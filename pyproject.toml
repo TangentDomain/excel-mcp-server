@@ -97,6 +97,39 @@ norecursedirs = [
     ".git", ".tox", "dist", "build", "*.egg",
     ".venv", "venv", "env", "__pycache__", ".pytest_cache", "htmlcov",
 ]
+filterwarnings = [
+    # openpyxl 内部未关闭文件句柄
+    "ignore::ResourceWarning",
+    "default::DeprecationWarning",
+    # sqlglot 上游 bug: LIKE pattern 产生无效转义 (Python 编译器级别)
+    "ignore::SyntaxWarning",
+]
 timeout = 600
 timeout_method = "thread"
 minversion = "6.0"
+[tool.coverage.run]
+source = ["src"]
+omit = [
+    "tests/*",
+    "test_*",
+    "__pycache__/*",
+    "*migrations*",
+    "*venv*",
+    "*env*",
+    "setup.py",
+]
+[tool.coverage.report]
+exclude_lines = [
+    "pragma: no cover",
+    "def __repr__",
+    "if self.debug:",
+    "if settings.DEBUG",
+    "raise AssertionError",
+    "raise NotImplementedError",
+    "if 0:",
+    'if __name__ == .__main__.:',
+    'class .*\bProtocol\):',
+    "@(abc\\.)?abstractmethod",
+]
+[tool.coverage.html]
+directory = "htmlcov"
