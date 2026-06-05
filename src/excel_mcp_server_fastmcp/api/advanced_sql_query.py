@@ -34,6 +34,7 @@ import shutil
 import tempfile
 import threading
 import time
+import warnings
 from collections.abc import Generator
 from contextlib import contextmanager
 from decimal import Decimal, InvalidOperation
@@ -2314,7 +2315,9 @@ class AdvancedSQLQueryEngine:
             elif col_type == "float64":
                 # 浮点列降级为 float32(精度足够)，但需检查溢出风险
                 # float32 范围约 ±3.4e38，超出会变成 inf 导致后续 int() 转换崩溃
-                test_series = df[col].astype("float32")
+                with warnings.catch_warnings():
+                    warnings.filterwarnings("ignore", "overflow", RuntimeWarning)
+                    test_series = df[col].astype("float32")
                 if not (test_series.isin([float("inf"), float("-inf")]).any() or test_series.isna().any()):
                     df[col] = test_series
                 # 否则保持 float64，避免 inf 值导致崩溃
