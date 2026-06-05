@@ -3376,7 +3376,7 @@ class AdvancedSQLQueryEngine:
             sorted_df = df
 
         if partition_cols:
-            result = sorted_df.groupby(partition_cols, sort=False, dropna=False).cumcount() + 1
+            result = sorted_df.groupby(partition_cols, sort=False, dropna=False, observed=False).cumcount() + 1
         else:
             result = pd.Series(range(1, len(sorted_df) + 1), index=sorted_df.index, dtype=int)
 
