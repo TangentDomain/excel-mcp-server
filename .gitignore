@@ -36,7 +36,6 @@ Thumbs.db
 .coverage
 htmlcov/
 pytestdebug.log
-uv.lock
 
 # Claude Code (local config)
 .claude/
