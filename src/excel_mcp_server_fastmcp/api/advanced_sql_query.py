@@ -9679,7 +9679,7 @@ class AdvancedSQLQueryEngine:
             if not where_clause:
                 return {
                     "success": False,
-                    "message": "DELETE必须指定WHERE条件(防止误删全表).如需清空请逐行删除或使用excel_delete_rows工具",
+                    "message": "DELETE必须指定WHERE条件(防止误删全表).如需清空请逐行删除或使用excel_structure工具",
                 }
 
             # 中文列名替换

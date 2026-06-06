@@ -621,7 +621,7 @@ mcp = FastMCP(
 │
 └─ 🗑️ 删行？
     按条件删？────────────────────────────→ excel_delete_query（SQL DELETE，必须WHERE）
-    按行号删？────────────────────────────→ excel_delete_rows（row_index从1开始）
+    按行号删？────────────────────────────→ excel_structure(file, sheet, 'delete_rows', row_index, count)
 
 ═══ 高级脚本 ═══
 🐍 循环/复杂逻辑/重复操作？──────────────→ excel_run_python（直接执行Python代码）
@@ -641,8 +641,7 @@ mcp = FastMCP(
 
 ═══ 对比 & 备份 ═══
 按ID对比两表差异？           → excel_compare_sheets（对象级: 新增/删除/修改）
-逐单元格对比差异？           → excel_compare_files（单元格级）
-备份恢复？                   → excel_create_backup / excel_restore_backup / excel_list_backups
+备份恢复？                   → excel_backup（create/restore/list）
 ```
 
 ## 🔥 LLM 防错自查清单（调用前速查）
@@ -795,8 +794,8 @@ _ERROR_HINTS = {
     "ASSESSMENT_FAILED": "数据影响评估失败。请检查文件路径和工作表名是否正确。",
     "DEPENDENCY_MISSING": "需要安装额外依赖。按提示运行pip install命令后重试。",
     "BACKUP_FAILED": "备份创建失败。请检查磁盘空间和文件权限。",
-    "BACKUP_NOT_FOUND": "备份文件不存在。请用excel_list_backups查看可用的备份列表。",
-    "RESTORE_FAILED": "恢复失败。备份文件可能已损坏。请用excel_list_backups选择其他备份。",
+    "BACKUP_NOT_FOUND": "备份文件不存在。请用excel_backup('list')查看可用的备份列表。",
+    "RESTORE_FAILED": "恢复失败。备份文件可能已损坏。请用excel_backup('list')选择其他备份。",
     "LIST_BACKUPS_FAILED": "获取备份列表失败。请检查备份目录是否存在。",
     "DELETE_SHEET_FAILED": "删除工作表失败。文件可能被锁定或工作表名不正确。",
     "DELETE_ROWS_FAILED": "删除行失败。请确认行号范围有效（不能删除表头行）。",
@@ -2376,7 +2375,7 @@ def excel_compare_sheets(
 ) -> dict[str, Any]:
     """按ID列比较两个工作表的行级差异（对象级对比：新增/删除/修改）。
 
-    与 excel_compare_files 的区别：本工具按ID匹配行，返回行级别的变更摘要（新增/删除/修改了哪些行）。
+    与逐单元格对比的区别：本工具按ID匹配行，返回行级别的变更摘要（新增/删除/修改了哪些行）。
     适用于：比较两个版本的配置表，了解数据变动概况。
 
     Args:
