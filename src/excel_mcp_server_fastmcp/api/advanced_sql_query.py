@@ -9145,250 +9145,252 @@ class AdvancedSQLQueryEngine:
         if not SQLGLOT_AVAILABLE:
             return self._update_error("SQLGLOT未安装,无法使用UPDATE功能")
 
-        # 加载数据(使用缓存)
-        worksheets_data = self._load_data_with_cache(file_path, sheet_name)
+        # Fix: P1-concurrent — 写锁保护 load→modify→save 全流程
+        # 防止并发线程在 load 和 save 之间交错导致数据损坏
+        with self._get_write_lock(file_path):
+            worksheets_data = self._load_data_with_cache(file_path, sheet_name)
 
-        if not worksheets_data:
-            return self._update_error("无法加载Excel数据")
+            if not worksheets_data:
+                return self._update_error("无法加载Excel数据")
 
-        # 清理ANSI转义序列(终端粘贴可能带入的不可见字符)
-        sql = re.sub(r"\x1b\[[0-9;]*[a-zA-Z]", "", sql)
+            # 清理ANSI转义序列(终端粘贴可能带入的不可见字符)
+            sql = re.sub(r"\x1b\[[0-9;]*[a-zA-Z]", "", sql)
 
-        # Fix: P0-4 UPDATE 分号多语句注入
-        if self._has_dangerous_semicolon(sql):
-            return self._update_error("SQL语法错误: 不支持分号分隔的多语句执行(安全限制).💡 请将每条SQL语句分开执行")
+            # Fix: P0-4 UPDATE 分号多语句注入
+            if self._has_dangerous_semicolon(sql):
+                return self._update_error("SQL语法错误: 不支持分号分隔的多语句执行(安全限制).💡 请将每条SQL语句分开执行")
 
-        # Fix: P0-7 UPDATE 注释符注入防御
-        # -- 和 # 可截断WHERE条件导致全表篡改，必须在解析前拦截
-        _comment_err = self._detect_dangerous_comments(sql)
-        if _comment_err:
-            return self._update_error(_comment_err)
+            # Fix: P0-7 UPDATE 注释符注入防御
+            # -- 和 # 可截断WHERE条件导致全表篡改，必须在解析前拦截
+            _comment_err = self._detect_dangerous_comments(sql)
+            if _comment_err:
+                return self._update_error(_comment_err)
 
-        # 预处理: 自动为 MySQL 保留字标识符添加反引号
-        sql = self._preprocess_reserved_words(sql)
+            # 预处理: 自动为 MySQL 保留字标识符添加反引号
+            sql = self._preprocess_reserved_words(sql)
 
-        # Fix: P2-1 预处理: 将 || 字符串拼接操作符转为 CONCAT()
-        # 因为 MySQL 方言将 || 解析为逻辑 OR，需要提前转换
-        sql = self._preprocess_dpipe_to_concat(sql)
+            # Fix: P2-1 预处理: 将 || 字符串拼接操作符转为 CONCAT()
+            # 因为 MySQL 方言将 || 解析为逻辑 OR，需要提前转换
+            sql = self._preprocess_dpipe_to_concat(sql)
 
-        # 解析UPDATE语句
-        # 中文列名替换(与SELECT查询保持一致)
-        try:
-            sql = self._replace_cn_columns_in_sql(sql, worksheets_data)
-        except Exception:
-            pass  # 替换失败时继续用原始SQL
+            # 解析UPDATE语句
+            # 中文列名替换(与SELECT查询保持一致)
+            try:
+                sql = self._replace_cn_columns_in_sql(sql, worksheets_data)
+            except Exception:
+                pass  # 替换失败时继续用原始SQL
 
-        try:
-            parsed = sqlglot.parse_one(sql, read="mysql")
-        except ParseError as e:
-            return self._update_error(f"SQL语法错误: {e}")
+            try:
+                parsed = sqlglot.parse_one(sql, read="mysql")
+            except ParseError as e:
+                return self._update_error(f"SQL语法错误: {e}")
 
-        # 验证是UPDATE语句
-        if not isinstance(parsed, exp.Update):
-            return self._update_error("只支持UPDATE语句.💡 写入操作只支持UPDATE,查询请用 excel_query")
+            # 验证是UPDATE语句
+            if not isinstance(parsed, exp.Update):
+                return self._update_error("只支持UPDATE语句.💡 写入操作只支持UPDATE,查询请用 excel_query")
 
-        # 提取表名(sqlglot中table在this属性)
-        table_node = parsed.this if isinstance(parsed.this, exp.Table) else None
-        if not table_node:
-            return self._update_error("UPDATE语句缺少表名")
-        target_table = table_node.name
+            # 提取表名(sqlglot中table在this属性)
+            table_node = parsed.this if isinstance(parsed.this, exp.Table) else None
+            if not table_node:
+                return self._update_error("UPDATE语句缺少表名")
+            target_table = table_node.name
 
-        # 匹配工作表(支持中英文表名)
-        matched_sheet = None
-        for sheet in worksheets_data:
-            if sheet == target_table:
-                matched_sheet = sheet
-                break
-            # 模糊匹配
-            if target_table.lower() == sheet.lower():
-                matched_sheet = sheet
-                break
+            # 匹配工作表(支持中英文表名)
+            matched_sheet = None
+            for sheet in worksheets_data:
+                if sheet == target_table:
+                    matched_sheet = sheet
+                    break
+                # 模糊匹配
+                if target_table.lower() == sheet.lower():
+                    matched_sheet = sheet
+                    break
 
-        if not matched_sheet:
-            available = list(worksheets_data.keys())
-            suggestion = self._suggest_column_name(target_table, available)
-            return self._update_error(f"工作表 '{target_table}' 不存在.可用工作表: {available}.{suggestion}")
+            if not matched_sheet:
+                available = list(worksheets_data.keys())
+                suggestion = self._suggest_column_name(target_table, available)
+                return self._update_error(f"工作表 '{target_table}' 不存在.可用工作表: {available}.{suggestion}")
 
-        df = worksheets_data[matched_sheet].copy()
-        original_df = df.copy()
+            df = worksheets_data[matched_sheet].copy()
+            original_df = df.copy()
 
-        # P1: 添加行号虚拟列 _ROW_NUMBER_
-        df["_ROW_NUMBER_"] = range(1, len(df) + 1)
+            # P1: 添加行号虚拟列 _ROW_NUMBER_
+            df["_ROW_NUMBER_"] = range(1, len(df) + 1)
 
-        # 中文列名替换
-        cn_map = {}
-        desc_map = self._header_descriptions.get(matched_sheet, {})
-        for en_col, cn_desc in desc_map.items():
-            if en_col in df.columns:
-                cn_map[cn_desc] = en_col
+            # 中文列名替换
+            cn_map = {}
+            desc_map = self._header_descriptions.get(matched_sheet, {})
+            for en_col, cn_desc in desc_map.items():
+                if en_col in df.columns:
+                    cn_map[cn_desc] = en_col
 
-        # 解析SET子句(sqlglot中在expressions属性)
-        set_exprs = parsed.args.get("expressions", [])
-        if not set_exprs:
-            return self._update_error("UPDATE语句缺少SET子句")
+            # 解析SET子句(sqlglot中在expressions属性)
+            set_exprs = parsed.args.get("expressions", [])
+            if not set_exprs:
+                return self._update_error("UPDATE语句缺少SET子句")
 
-        set_operations = []  # [(col_name, expression_node)]
-        for set_item in set_exprs:
-            # sqlglot Update SET items: EQ expression (col = value)
-            if isinstance(set_item, exp.EQ):
-                col_name = set_item.left.name
-                # 中文列名替换 + 大小写不敏感
-                if col_name in cn_map:
-                    col_name = cn_map[col_name]
-                if col_name == "_ROW_NUMBER_":
-                    return self._update_error("_ROW_NUMBER_ 是虚拟列，不允许修改")
-                # 大小写不敏感列名查找
-                actual_col = self._find_column_name(col_name, df)
-                if not actual_col:
-                    suggestion = self._suggest_column_name(col_name, list(df.columns))
-                    return self._update_error(f"列 '{col_name}' 不存在.可用列: {list(df.columns)}.{suggestion}")
-                # 使用实际列名(保持原始大小写)
-                col_name = actual_col
-                set_operations.append((col_name, set_item.right))
-            else:
-                return self._update_error(f"不支持的SET表达式: {set_item}")
+            set_operations = []  # [(col_name, expression_node)]
+            for set_item in set_exprs:
+                # sqlglot Update SET items: EQ expression (col = value)
+                if isinstance(set_item, exp.EQ):
+                    col_name = set_item.left.name
+                    # 中文列名替换 + 大小写不敏感
+                    if col_name in cn_map:
+                        col_name = cn_map[col_name]
+                    if col_name == "_ROW_NUMBER_":
+                        return self._update_error("_ROW_NUMBER_ 是虚拟列，不允许修改")
+                    # 大小写不敏感列名查找
+                    actual_col = self._find_column_name(col_name, df)
+                    if not actual_col:
+                        suggestion = self._suggest_column_name(col_name, list(df.columns))
+                        return self._update_error(f"列 '{col_name}' 不存在.可用列: {list(df.columns)}.{suggestion}")
+                    # 使用实际列名(保持原始大小写)
+                    col_name = actual_col
+                    set_operations.append((col_name, set_item.right))
+                else:
+                    return self._update_error(f"不支持的SET表达式: {set_item}")
 
-        # 设置当前工作表数据供子查询使用（IN子查询可能需要）
-        # Fix(R13): 支持 WITH CTE 子句 — 提取CTE并执行，结果加入可用表
-        self._current_worksheets = self._inject_ctes_to_worksheets(parsed, worksheets_data)
+            # 设置当前工作表数据供子查询使用（IN子查询可能需要）
+            # Fix(R13): 支持 WITH CTE 子句 — 提取CTE并执行，结果加入可用表
+            self._current_worksheets = self._inject_ctes_to_worksheets(parsed, worksheets_data)
 
-        # 应用WHERE条件筛选（支持窗口函数预处理）
-        where_clause = parsed.args.get("where")
-        if where_clause:
-            # 预处理: 只处理WHERE直接条件中的窗口函数，跳过IN子查询内部的
-            where_expr = where_clause.this
-            in_nodes = list(where_expr.find_all(exp.In))
-            window_nodes = [n for n in where_expr.find_all(exp.Window) if not any(n in list(in_node.walk()) for in_node in in_nodes)]
-            if window_nodes:
-                df = self._precompute_update_window_where(df, where_expr, window_nodes)
-                # 重新解析WHERE（窗口函数已被替换为临时列引用）
-                where_clause = parsed.args.get("where")
+            # 应用WHERE条件筛选（支持窗口函数预处理）
+            where_clause = parsed.args.get("where")
+            if where_clause:
+                # 预处理: 只处理WHERE直接条件中的窗口函数，跳过IN子查询内部的
                 where_expr = where_clause.this
-            condition_str = self._sql_condition_to_pandas(where_clause.this, df)
-            if condition_str:
-                try:
-                    filtered_df = df.query(condition_str)
-                except Exception:
+                in_nodes = list(where_expr.find_all(exp.In))
+                window_nodes = [n for n in where_expr.find_all(exp.Window) if not any(n in list(in_node.walk()) for in_node in in_nodes)]
+                if window_nodes:
+                    df = self._precompute_update_window_where(df, where_expr, window_nodes)
+                    # 重新解析WHERE（窗口函数已被替换为临时列引用）
+                    where_clause = parsed.args.get("where")
+                    where_expr = where_clause.this
+                condition_str = self._sql_condition_to_pandas(where_clause.this, df)
+                if condition_str:
+                    try:
+                        filtered_df = df.query(condition_str)
+                    except Exception:
+                        filtered_df = self._apply_row_filter(where_clause.this, df)
+                else:
+                    logger.warning(
+                        "UPDATE WHERE条件转换为pandas表达式失败,回退到逐行过滤: %s",
+                        where_clause.this,
+                    )
                     filtered_df = self._apply_row_filter(where_clause.this, df)
             else:
-                logger.warning(
-                    "UPDATE WHERE条件转换为pandas表达式失败,回退到逐行过滤: %s",
-                    where_clause.this,
-                )
-                filtered_df = self._apply_row_filter(where_clause.this, df)
-        else:
-            filtered_df = df
+                filtered_df = df
 
-        if filtered_df.empty:
-            return {
-                "success": True,
-                "message": "没有匹配WHERE条件的行,无需更新",
-                "affected_rows": 0,
-                "changes": [],
-                "execution_time_ms": 0,
-            }
+            if filtered_df.empty:
+                return {
+                    "success": True,
+                    "message": "没有匹配WHERE条件的行,无需更新",
+                    "affected_rows": 0,
+                    "changes": [],
+                    "execution_time_ms": 0,
+                }
 
-        # P1: 重复行检测
-        warnings = []
-        match_ratio = len(filtered_df) / len(df) if len(df) > 0 else 0
-        if match_ratio > 0.5:
-            warnings.append(f"WHERE条件匹配了 {len(filtered_df)}/{len(df)} 行({match_ratio * 100:.0f}%)，请确认条件是否正确")
+            # P1: 重复行检测
+            warnings = []
+            match_ratio = len(filtered_df) / len(df) if len(df) > 0 else 0
+            if match_ratio > 0.5:
+                warnings.append(f"WHERE条件匹配了 {len(filtered_df)}/{len(df)} 行({match_ratio * 100:.0f}%)，请确认条件是否正确")
 
-        # 检测完全重复行(排除_ROW_NUMBER_)
-        check_cols = [c for c in filtered_df.columns if c != "_ROW_NUMBER_"]
-        dup_mask = filtered_df[check_cols].duplicated(keep=False)
-        dup_count = dup_mask.sum()
-        if dup_count > 0:
-            warnings.append(f"发现 {dup_count} 行完全重复的记录（可用 _ROW_NUMBER_ 精确定位）")
+            # 检测完全重复行(排除_ROW_NUMBER_)
+            check_cols = [c for c in filtered_df.columns if c != "_ROW_NUMBER_"]
+            dup_mask = filtered_df[check_cols].duplicated(keep=False)
+            dup_count = dup_mask.sum()
+            if dup_count > 0:
+                warnings.append(f"发现 {dup_count} 行完全重复的记录（可用 _ROW_NUMBER_ 精确定位）")
 
-        affected_indices = filtered_df.index.tolist()
-        changes = []
+            affected_indices = filtered_df.index.tolist()
+            changes = []
 
-        # 应用SET操作
-        for col_name, value_expr in set_operations:
-            for idx in affected_indices:
-                old_val = df.at[idx, col_name]
-                new_val = self._evaluate_update_expression(value_expr, df, idx)
+            # 应用SET操作
+            for col_name, value_expr in set_operations:
+                for idx in affected_indices:
+                    old_val = df.at[idx, col_name]
+                    new_val = self._evaluate_update_expression(value_expr, df, idx)
 
-                # Fix: P2-type-check — 写入前校验值类型是否与目标列匹配
-                type_err = self._validate_value_type(new_val, df, col_name)
-                if type_err:
-                    return self._update_error(type_err)
+                    # Fix: P2-type-check — 写入前校验值类型是否与目标列匹配
+                    type_err = self._validate_value_type(new_val, df, col_name)
+                    if type_err:
+                        return self._update_error(type_err)
 
-                # 类型兼容性:数值类型可互通(含numpy整数/浮点,避免uint8溢出),其他类型尝试转为旧值类型
-                # [FIX R54] NULL/None 值跳过类型强制转换 — 避免 None 被旧值类型转换(如 int(None) 异常后 fallback 到 0)
-                if new_val is not None and old_val != "" and new_val != "" and type(old_val) != type(new_val):
-                    if isinstance(old_val, (int, float, np.integer, np.floating)) and isinstance(new_val, (int, float, np.integer, np.floating)):
-                        pass  # 数值互通:不转换(P0-fix: numpy数值类型不走type转换避免溢出)
-                    else:
+                    # 类型兼容性:数值类型可互通(含numpy整数/浮点,避免uint8溢出),其他类型尝试转为旧值类型
+                    # [FIX R54] NULL/None 值跳过类型强制转换 — 避免 None 被旧值类型转换(如 int(None) 异常后 fallback 到 0)
+                    if new_val is not None and old_val != "" and new_val != "" and type(old_val) != type(new_val):
+                        if isinstance(old_val, (int, float, np.integer, np.floating)) and isinstance(new_val, (int, float, np.integer, np.floating)):
+                            pass  # 数值互通:不转换(P0-fix: numpy数值类型不走type转换避免溢出)
+                        else:
+                            try:
+                                new_val = type(old_val)(new_val)
+                            except (ValueError, TypeError):
+                                pass
+
+                    if old_val != new_val:
+                        changes.append(
+                            {
+                                "row": int(idx) + 2,  # +2 for header offset (0-indexed + header row)
+                                "column": col_name,
+                                "old_value": self._serialize_update_value(old_val),
+                                "new_value": self._serialize_update_value(new_val),
+                            }
+                        )
+                    # P0-fix: df.at赋值可能因numpy小dtype(uint8)溢出而截断或报错
+                    # 此赋值仅用于链式SET(如SET A=999, B=A+1)的中间状态,实际写Excel走changes列表
+                    # 故跳过溢出赋值不影响最终正确性
+                    import warnings as _w
+
+                    with _w.catch_warnings():
+                        _w.filterwarnings("ignore", message="Setting an item of incompatible dtype")
                         try:
-                            new_val = type(old_val)(new_val)
-                        except (ValueError, TypeError):
-                            pass
+                            df.at[idx, col_name] = new_val
+                        except (ValueError, TypeError, OverflowError):
+                            pass  # 值超出DataFrame列dtype范围,跳过中间状态更新
 
-                if old_val != new_val:
-                    changes.append(
-                        {
-                            "row": int(idx) + 2,  # +2 for header offset (0-indexed + header row)
-                            "column": col_name,
-                            "old_value": self._serialize_update_value(old_val),
-                            "new_value": self._serialize_update_value(new_val),
-                        }
-                    )
-                # P0-fix: df.at赋值可能因numpy小dtype(uint8)溢出而截断或报错
-                # 此赋值仅用于链式SET(如SET A=999, B=A+1)的中间状态,实际写Excel走changes列表
-                # 故跳过溢出赋值不影响最终正确性
-                import warnings as _w
+            if not changes:
+                elapsed = (time.time() - start_time) * 1000
+                result = {
+                    "success": True,
+                    "message": f"匹配 {len(affected_indices)} 行,但值无变化",
+                    "affected_rows": len(affected_indices),
+                    "changes": [],
+                    "execution_time_ms": round(elapsed, 1),
+                }
+                if warnings:
+                    result["warnings"] = warnings
+                return result
 
-                with _w.catch_warnings():
-                    _w.filterwarnings("ignore", message="Setting an item of incompatible dtype")
-                    try:
-                        df.at[idx, col_name] = new_val
-                    except (ValueError, TypeError, OverflowError):
-                        pass  # 值超出DataFrame列dtype范围,跳过中间状态更新
+            if dry_run:
+                elapsed = (time.time() - start_time) * 1000
+                result = {
+                    "success": True,
+                    "message": f"[预览] 将修改 {len(changes)} 个单元格({len(affected_indices)} 行)",
+                    "affected_rows": len(affected_indices),
+                    "changes": changes,
+                    "dry_run": True,
+                    "execution_time_ms": round(elapsed, 1),
+                }
+                if warnings:
+                    result["warnings"] = warnings
+                return result
 
-        if not changes:
-            elapsed = (time.time() - start_time) * 1000
-            result = {
-                "success": True,
-                "message": f"匹配 {len(affected_indices)} 行,但值无变化",
-                "affected_rows": len(affected_indices),
-                "changes": [],
-                "execution_time_ms": round(elapsed, 1),
-            }
-            if warnings:
-                result["warnings"] = warnings
-            return result
-
-        if dry_run:
-            elapsed = (time.time() - start_time) * 1000
-            result = {
-                "success": True,
-                "message": f"[预览] 将修改 {len(changes)} 个单元格({len(affected_indices)} 行)",
-                "affected_rows": len(affected_indices),
-                "changes": changes,
-                "dry_run": True,
-                "execution_time_ms": round(elapsed, 1),
-            }
-            if warnings:
-                result["warnings"] = warnings
-            return result
-
-        # 写回Excel(事务保护:失败自动回滚)
-        try:
-            result = self._write_changes_to_excel(file_path, matched_sheet, changes, df, len(affected_indices), start_time)
-            if warnings:
-                result["warnings"] = warnings
-            return result
-        except Exception as e:
-            elapsed = (time.time() - start_time) * 1000
-            return {
-                "success": False,
-                "message": f"写入Excel失败,已自动回滚: {e}",
-                "affected_rows": 0,
-                "changes": changes,
-                "execution_time_ms": round(elapsed, 1),
-            }
+            # 写回Excel(事务保护:失败自动回滚)
+            try:
+                result = self._write_changes_to_excel(file_path, matched_sheet, changes, df, len(affected_indices), start_time)
+                if warnings:
+                    result["warnings"] = warnings
+                return result
+            except Exception as e:
+                elapsed = (time.time() - start_time) * 1000
+                return {
+                    "success": False,
+                    "message": f"写入Excel失败,已自动回滚: {e}",
+                    "affected_rows": 0,
+                    "changes": changes,
+                    "execution_time_ms": round(elapsed, 1),
+                }
 
     def execute_insert_query(
         self,
@@ -9446,141 +9448,143 @@ class AdvancedSQLQueryEngine:
         table_name = table_node.name
         specified_cols = [c.name for c in col_nodes] if col_nodes else None
 
-        # 加载数据
-        worksheets_data = self._load_data_with_cache(file_path, sheet_name)
+        # Fix: P1-concurrent — 写锁保护 load→modify→save 全流程
+        with self._get_write_lock(file_path):
+            # 加载数据
+            worksheets_data = self._load_data_with_cache(file_path, sheet_name)
 
-        # 匹配工作表
-        matched_sheet = None
-        for s in worksheets_data:
-            if s == table_name or s.lower() == table_name.lower():
-                matched_sheet = s
-                break
-        if not matched_sheet:
-            return {
-                "success": False,
-                "message": f"工作表 '{table_name}' 不存在.可用: {list(worksheets_data.keys())}",
-            }
-
-        df = worksheets_data[matched_sheet]
-        col_names = specified_cols if specified_cols else list(df.columns)
-
-        # 双表头列名解析：将中文描述映射为英文字段名
-        if specified_cols:
-            try:
-                from .header_analyzer import HeaderAnalyzer
-
-                info = HeaderAnalyzer.analyze(file_path, matched_sheet)
-                if info.is_dual and info.column_map:
-                    _resolved_cols = []
-                    for col in col_names:
-                        if col in df.columns:
-                            _resolved_cols.append(col)
-                        elif col in info.column_map:
-                            _resolved_cols.append(info.column_map[col])
-                        else:
-                            _resolved_cols.append(col)  # 保留原值，后续验证会报错
-                    col_names = _resolved_cols
-            except Exception:
-                pass
-
-        # 验证列名
-        for col in col_names:
-            if col not in df.columns:
-                return {
-                    "success": False,
-                    "message": f"列 '{col}' 不存在.可用: {list(df.columns)}",
-                }
-
-        # 提取VALUES
-        values_node = parsed.expression
-        if not isinstance(values_node, (exp.Values, exp.Select)):
-            return {
-                "success": False,
-                "message": "VALUES格式不支持,请使用 INSERT INTO ... VALUES (...)",
-            }
-
-        if isinstance(values_node, exp.Select):
-            return {
-                "success": False,
-                "message": "INSERT ... SELECT 暂不支持,请使用VALUES",
-            }
-
-        rows = []
-        for tuple_expr in values_node.expressions:
-            if not isinstance(tuple_expr, exp.Tuple):
-                continue
-            row = {}
-            for i, val_expr in enumerate(tuple_expr.expressions):
-                if i >= len(col_names):
+            # 匹配工作表
+            matched_sheet = None
+            for s in worksheets_data:
+                if s == table_name or s.lower() == table_name.lower():
+                    matched_sheet = s
                     break
-                val = self._eval_insert_value(val_expr)
-                # Fix: P2-type-check — INSERT写入前校验值类型是否与目标列匹配
-                type_err = self._validate_value_type(val, df, col_names[i])
-                if type_err:
-                    return {"success": False, "message": type_err, "affected_rows": 0}
-                row[col_names[i]] = val
-            # Fix: 检查VALUES值数量与列数量是否匹配，防止静默截断导致数据不完整
-            if len(row) != len(col_names):
+            if not matched_sheet:
                 return {
                     "success": False,
-                    "message": f"VALUES 值数量({len(row)})与列数量({len(col_names)})不匹配。请确保每个 VALUES 元组包含 {len(col_names)} 个值",
-                    "affected_rows": 0,
+                    "message": f"工作表 '{table_name}' 不存在.可用: {list(worksheets_data.keys())}",
                 }
-            rows.append(row)
 
-        if not rows:
-            return {"success": False, "message": "没有数据可插入"}
+            df = worksheets_data[matched_sheet]
+            col_names = specified_cols if specified_cols else list(df.columns)
 
-        # Fix(P1-04): INSERT 批量大小限制，防止意外的大批量插入导致性能问题
-        _MAX_INSERT_BATCH_SIZE = 5000
-        if len(rows) > _MAX_INSERT_BATCH_SIZE:
-            return {
-                "success": False,
-                "message": f"INSERT 批量插入行数({len(rows)})超过限制({_MAX_INSERT_BATCH_SIZE})。请分批插入，每批不超过 {_MAX_INSERT_BATCH_SIZE} 行",
-                "affected_rows": 0,
-            }
+            # 双表头列名解析：将中文描述映射为英文字段名
+            if specified_cols:
+                try:
+                    from .header_analyzer import HeaderAnalyzer
 
-        if dry_run:
-            elapsed = (time.time() - start_time) * 1000
-            return {
-                "success": True,
-                "message": f"[预览] 将插入 {len(rows)} 行",
-                "affected_rows": len(rows),
-                "data": rows,
-                "dry_run": True,
-                "execution_time_ms": round(elapsed, 1),
-            }
+                    info = HeaderAnalyzer.analyze(file_path, matched_sheet)
+                    if info.is_dual and info.column_map:
+                        _resolved_cols = []
+                        for col in col_names:
+                            if col in df.columns:
+                                _resolved_cols.append(col)
+                            elif col in info.column_map:
+                                _resolved_cols.append(info.column_map[col])
+                            else:
+                                _resolved_cols.append(col)  # 保留原值，后续验证会报错
+                        col_names = _resolved_cols
+                except Exception:
+                    pass
 
-        # 写入Excel
-        try:
-            # Fix: P1-concurrent — 线程级写锁保护INSERT操作
-            with self._get_write_lock(file_path):
-                from .excel_operations import ExcelOperations
-
-                result = ExcelOperations.batch_insert_rows(file_path, matched_sheet, rows, streaming=True)
-                elapsed = (time.time() - start_time) * 1000
-                if result.get("success"):
-                    return {
-                        "success": True,
-                        "message": f"成功插入 {len(rows)} 行到 {matched_sheet}",
-                        "affected_rows": len(rows),
-                        "execution_time_ms": round(elapsed, 1),
-                    }
-                else:
+            # 验证列名
+            for col in col_names:
+                if col not in df.columns:
                     return {
                         "success": False,
-                        "message": f"写入失败: {result.get('message', '')}",
-                        "affected_rows": 0,
-                        "execution_time_ms": round(elapsed, 1),
+                        "message": f"列 '{col}' 不存在.可用: {list(df.columns)}",
                     }
-        except Exception as e:
-            elapsed = (time.time() - start_time) * 1000
-            return {
-                "success": False,
-                "message": f"INSERT执行失败: {e}",
-                "affected_rows": 0,
-                "execution_time_ms": round(elapsed, 1),
-            }
+
+            # 提取VALUES
+            values_node = parsed.expression
+            if not isinstance(values_node, (exp.Values, exp.Select)):
+                return {
+                    "success": False,
+                    "message": "VALUES格式不支持,请使用 INSERT INTO ... VALUES (...)",
+                }
+
+            if isinstance(values_node, exp.Select):
+                return {
+                    "success": False,
+                    "message": "INSERT ... SELECT 暂不支持,请使用VALUES",
+                }
+
+            rows = []
+            for tuple_expr in values_node.expressions:
+                if not isinstance(tuple_expr, exp.Tuple):
+                    continue
+                row = {}
+                for i, val_expr in enumerate(tuple_expr.expressions):
+                    if i >= len(col_names):
+                        break
+                    val = self._eval_insert_value(val_expr)
+                    # Fix: P2-type-check — INSERT写入前校验值类型是否与目标列匹配
+                    type_err = self._validate_value_type(val, df, col_names[i])
+                    if type_err:
+                        return {"success": False, "message": type_err, "affected_rows": 0}
+                    row[col_names[i]] = val
+                # Fix: 检查VALUES值数量与列数量是否匹配，防止静默截断导致数据不完整
+                if len(row) != len(col_names):
+                    return {
+                        "success": False,
+                        "message": f"VALUES 值数量({len(row)})与列数量({len(col_names)})不匹配。请确保每个 VALUES 元组包含 {len(col_names)} 个值",
+                        "affected_rows": 0,
+                    }
+                rows.append(row)
+
+            if not rows:
+                return {"success": False, "message": "没有数据可插入"}
+
+            # Fix(P1-04): INSERT 批量大小限制，防止意外的大批量插入导致性能问题
+            _MAX_INSERT_BATCH_SIZE = 5000
+            if len(rows) > _MAX_INSERT_BATCH_SIZE:
+                return {
+                    "success": False,
+                    "message": f"INSERT 批量插入行数({len(rows)})超过限制({_MAX_INSERT_BATCH_SIZE})。请分批插入，每批不超过 {_MAX_INSERT_BATCH_SIZE} 行",
+                    "affected_rows": 0,
+                }
+
+            if dry_run:
+                elapsed = (time.time() - start_time) * 1000
+                return {
+                    "success": True,
+                    "message": f"[预览] 将插入 {len(rows)} 行",
+                    "affected_rows": len(rows),
+                    "data": rows,
+                    "dry_run": True,
+                    "execution_time_ms": round(elapsed, 1),
+                }
+
+            # 写入Excel
+            try:
+                # Fix: P1-concurrent — 线程级写锁保护INSERT操作
+                with self._get_write_lock(file_path):
+                    from .excel_operations import ExcelOperations
+
+                    result = ExcelOperations.batch_insert_rows(file_path, matched_sheet, rows, streaming=True)
+                    elapsed = (time.time() - start_time) * 1000
+                    if result.get("success"):
+                        return {
+                            "success": True,
+                            "message": f"成功插入 {len(rows)} 行到 {matched_sheet}",
+                            "affected_rows": len(rows),
+                            "execution_time_ms": round(elapsed, 1),
+                        }
+                    else:
+                        return {
+                            "success": False,
+                            "message": f"写入失败: {result.get('message', '')}",
+                            "affected_rows": 0,
+                            "execution_time_ms": round(elapsed, 1),
+                        }
+            except Exception as e:
+                elapsed = (time.time() - start_time) * 1000
+                return {
+                    "success": False,
+                    "message": f"INSERT执行失败: {e}",
+                    "affected_rows": 0,
+                    "execution_time_ms": round(elapsed, 1),
+                }
 
     def _eval_insert_value(self, val_expr) -> Any:
         """将sqlglot表达式转为Python值"""
@@ -9648,107 +9652,109 @@ class AdvancedSQLQueryEngine:
         # 提取表名
         table_name = parsed.this.name
 
-        # 加载数据
-        worksheets_data = self._load_data_with_cache(file_path, sheet_name)
-        # Fix(R13): 支持 WITH CTE 子句 — 提取CTE并执行，结果加入可用表
-        self._current_worksheets = self._inject_ctes_to_worksheets(parsed, worksheets_data)
+        # Fix: P1-concurrent — 写锁保护 load→modify→save 全流程
+        with self._get_write_lock(file_path):
+            # 加载数据
+            worksheets_data = self._load_data_with_cache(file_path, sheet_name)
+            # Fix(R13): 支持 WITH CTE 子句 — 提取CTE并执行，结果加入可用表
+            self._current_worksheets = self._inject_ctes_to_worksheets(parsed, worksheets_data)
 
-        # 匹配工作表
-        matched_sheet = None
-        for s in worksheets_data:
-            if s == table_name or s.lower() == table_name.lower():
-                matched_sheet = s
-                break
-        if not matched_sheet:
-            return {
-                "success": False,
-                "message": f"工作表 '{table_name}' 不存在.可用: {list(worksheets_data.keys())}",
-            }
+            # 匹配工作表
+            matched_sheet = None
+            for s in worksheets_data:
+                if s == table_name or s.lower() == table_name.lower():
+                    matched_sheet = s
+                    break
+            if not matched_sheet:
+                return {
+                    "success": False,
+                    "message": f"工作表 '{table_name}' 不存在.可用: {list(worksheets_data.keys())}",
+                }
 
-        df = worksheets_data[matched_sheet].copy()
-        df["_ROW_NUMBER_"] = range(1, len(df) + 1)
+            df = worksheets_data[matched_sheet].copy()
+            df["_ROW_NUMBER_"] = range(1, len(df) + 1)
 
-        # WHERE条件（必须）
-        where_clause = parsed.args.get("where")
-        if not where_clause:
-            return {
-                "success": False,
-                "message": "DELETE必须指定WHERE条件(防止误删全表).如需清空请逐行删除或使用excel_delete_rows工具",
-            }
+            # WHERE条件（必须）
+            where_clause = parsed.args.get("where")
+            if not where_clause:
+                return {
+                    "success": False,
+                    "message": "DELETE必须指定WHERE条件(防止误删全表).如需清空请逐行删除或使用excel_delete_rows工具",
+                }
 
-        # 中文列名替换
-        cn_map = {}
-        desc_map = self._header_descriptions.get(matched_sheet, {})
-        for en_col, cn_desc in desc_map.items():
-            if en_col in df.columns:
-                cn_map[cn_desc] = en_col
+            # 中文列名替换
+            cn_map = {}
+            desc_map = self._header_descriptions.get(matched_sheet, {})
+            for en_col, cn_desc in desc_map.items():
+                if en_col in df.columns:
+                    cn_map[cn_desc] = en_col
 
-        # WHERE过滤（复用UPDATE的逻辑）
-        try:
-            condition_str = self._sql_condition_to_pandas(where_clause.this, df)
-            if condition_str:
-                filtered_df = df.query(condition_str)
-            else:
-                filtered_df = self._apply_row_filter(where_clause.this, df)
-        except Exception:
-            filtered_df = self._apply_row_filter(where_clause.this, df)
-
-        if filtered_df.empty:
-            elapsed = (time.time() - start_time) * 1000
-            return {
-                "success": True,
-                "message": "没有匹配WHERE条件的行,无需删除",
-                "affected_rows": 0,
-                "execution_time_ms": round(elapsed, 1),
-            }
-
-        # DataFrame行号转Excel行号
-        # 单行表头: DataFrame第1行 = Excel第2行 (+1)
-        # 双行表头: DataFrame第1行 = Excel第3行 (+2)
-        df_row_numbers = filtered_df["_ROW_NUMBER_"].tolist()
-        header_offset = 2 if matched_sheet in self._header_descriptions and self._header_descriptions[matched_sheet] else 1
-        excel_row_numbers = [r + header_offset for r in df_row_numbers]
-
-        if dry_run:
-            elapsed = (time.time() - start_time) * 1000
-            return {
-                "success": True,
-                "message": f"[预览] 将删除 {len(excel_row_numbers)} 行",
-                "affected_rows": len(excel_row_numbers),
-                "dry_run": True,
-                "execution_time_ms": round(elapsed, 1),
-            }
-
-        # 写入Excel
-        try:
-            # Fix: P1-concurrent — 线程级写锁保护DELETE操作
-            with self._get_write_lock(file_path):
-                from .excel_operations import ExcelOperations
-
-                result = ExcelOperations.batch_delete_rows(file_path, matched_sheet, excel_row_numbers, streaming=True)
-                elapsed = (time.time() - start_time) * 1000
-                if result.get("success"):
-                    return {
-                        "success": True,
-                        "message": f"成功删除 {len(excel_row_numbers)} 行",
-                        "affected_rows": len(excel_row_numbers),
-                        "execution_time_ms": round(elapsed, 1),
-                    }
+            # WHERE过滤（复用UPDATE的逻辑）
+            try:
+                condition_str = self._sql_condition_to_pandas(where_clause.this, df)
+                if condition_str:
+                    filtered_df = df.query(condition_str)
                 else:
-                    return {
-                        "success": False,
-                        "message": f"删除失败: {result.get('message', '')}",
-                        "affected_rows": 0,
-                        "execution_time_ms": round(elapsed, 1),
-                    }
-        except Exception as e:
-            elapsed = (time.time() - start_time) * 1000
-            return {
-                "success": False,
-                "message": f"DELETE执行失败: {e}",
-                "affected_rows": 0,
-                "execution_time_ms": round(elapsed, 1),
-            }
+                    filtered_df = self._apply_row_filter(where_clause.this, df)
+            except Exception:
+                filtered_df = self._apply_row_filter(where_clause.this, df)
+
+            if filtered_df.empty:
+                elapsed = (time.time() - start_time) * 1000
+                return {
+                    "success": True,
+                    "message": "没有匹配WHERE条件的行,无需删除",
+                    "affected_rows": 0,
+                    "execution_time_ms": round(elapsed, 1),
+                }
+
+            # DataFrame行号转Excel行号
+            # 单行表头: DataFrame第1行 = Excel第2行 (+1)
+            # 双行表头: DataFrame第1行 = Excel第3行 (+2)
+            df_row_numbers = filtered_df["_ROW_NUMBER_"].tolist()
+            header_offset = 2 if matched_sheet in self._header_descriptions and self._header_descriptions[matched_sheet] else 1
+            excel_row_numbers = [r + header_offset for r in df_row_numbers]
+
+            if dry_run:
+                elapsed = (time.time() - start_time) * 1000
+                return {
+                    "success": True,
+                    "message": f"[预览] 将删除 {len(excel_row_numbers)} 行",
+                    "affected_rows": len(excel_row_numbers),
+                    "dry_run": True,
+                    "execution_time_ms": round(elapsed, 1),
+                }
+
+            # 写入Excel
+            try:
+                # Fix: P1-concurrent — 线程级写锁保护DELETE操作
+                with self._get_write_lock(file_path):
+                    from .excel_operations import ExcelOperations
+
+                    result = ExcelOperations.batch_delete_rows(file_path, matched_sheet, excel_row_numbers, streaming=True)
+                    elapsed = (time.time() - start_time) * 1000
+                    if result.get("success"):
+                        return {
+                            "success": True,
+                            "message": f"成功删除 {len(excel_row_numbers)} 行",
+                            "affected_rows": len(excel_row_numbers),
+                            "execution_time_ms": round(elapsed, 1),
+                        }
+                    else:
+                        return {
+                            "success": False,
+                            "message": f"删除失败: {result.get('message', '')}",
+                            "affected_rows": 0,
+                            "execution_time_ms": round(elapsed, 1),
+                        }
+            except Exception as e:
+                elapsed = (time.time() - start_time) * 1000
+                return {
+                    "success": False,
+                    "message": f"DELETE执行失败: {e}",
+                    "affected_rows": 0,
+                    "execution_time_ms": round(elapsed, 1),
+                }
 
     def _write_changes_to_excel(
         self,
@@ -9954,11 +9960,11 @@ class AdvancedSQLQueryEngine:
     # Fix: P1-concurrent — 线程级写锁上下文管理器(按文件路径隔离)
     @contextmanager
     def _get_write_lock(self, file_path: str) -> Generator[None, None, None]:
-        """获取指定文件的线程级写锁,确保同文件并发写入互斥"""
+        """获取指定文件的线程级写锁,确保同文件并发写入互斥。使用RLock允许同线程嵌套获取(外层包裹load→save全流程,内层在_commit中二次获取)"""
         # 获取或创建该文件的锁(线程安全)
         with self._write_locks_global:
             if file_path not in self._write_locks:
-                self._write_locks[file_path] = threading.Lock()
+                self._write_locks[file_path] = threading.RLock()
             lock = self._write_locks[file_path]
         with lock:
             yield
