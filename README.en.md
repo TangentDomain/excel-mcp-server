@@ -2,7 +2,7 @@
 
 # 🎮 ExcelMCP: The Excel Wizard That Understands Game Devs
 
-[![PyPI](https://img.shields.io/pypi/v/excel-mcp-server-fastmcp.svg)](https://pypi.org/project/excel-mcp-server-fastmcp/v1.16.0)
+[![PyPI](https://img.shields.io/pypi/v/excel-mcp-server-fastmcp.svg)](https://pypi.org/project/excel-mcp-server-fastmcp/v1.17.0)
 [![CI](https://github.com/TangentDomain/excel-mcp-server/actions/workflows/ci.yml/badge.svg)](https://github.com/TangentDomain/excel-mcp-server/actions/workflows/ci.yml)
 ![Tests](https://img.shields.io/badge/tests-1880-brightgreen.svg)
 ![Tools](https://img.shields.io/badge/tools-26-green.svg)
@@ -16,7 +16,7 @@
 
 ---
 
-## 🚀 Latest Updates (v1.16.0)
+## 🚀 Latest Updates (v1.17.0)
 
 ### 🐛 Bug Fixes
 - **excel_create_pivot_table fix**: Changed error code from OPERATION_FAILED to SHEET_NOT_FOUND when sheet doesn't exist, consistent with other functions
