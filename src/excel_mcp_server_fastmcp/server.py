@@ -2058,45 +2058,6 @@ def _prepare_describe_result(sheet_name, is_dual_header, columns, row_count, fil
     )
 
 
-def _detect_dual_header(rows: list) -> tuple:
-    """检测双行表头模式（第1行中文描述 + 第2行英文字段名）。
-
-    Args:
-        rows: 工作表前几行数据（values_only=True的列表）
-
-    Returns:
-        tuple: (is_dual_header, header_row_idx, descriptions)
-    """
-    if len(rows) < 2:
-        return False, 0, []
-
-    first_row = [_cell_str(c) for c in rows[0]]
-    second_row = [_cell_str(c) for c in rows[1]]
-
-    # 第二行是否全是有效英文字段名
-    second_row_strs = [v for v in second_row if v is not None]
-    all_valid_names = len(second_row_strs) >= 2 and all(isinstance(v, str) and v.strip() and v.strip()[0].isalpha() and v.strip()[0].isascii() for v in second_row_strs)
-
-    # 第一行是否有中文
-    first_row_strs = [v for v in first_row if v is not None]
-    any_chinese = any(isinstance(v, str) and any("\u4e00" <= ch <= "\u9fff" for ch in v) for v in first_row_strs)
-
-    is_dual_header = all_valid_names and any_chinese
-    header_row_idx = 1 if is_dual_header else 0  # 双行时数据从第3行开始(idx=2)，表头用第2行(idx=1)
-    descriptions = first_row if is_dual_header else []
-
-    return is_dual_header, header_row_idx, descriptions
-
-
-def _cell_str(c):
-    """统一单元格值转字符串"""
-    if c is None:
-        return None
-    if hasattr(c, "value"):
-        return c.value
-    return str(c)
-
-
 @mcp.tool()
 @_validate_file_path()
 @_track_call
