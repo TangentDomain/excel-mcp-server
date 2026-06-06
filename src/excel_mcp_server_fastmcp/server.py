@@ -1040,6 +1040,9 @@ def excel_delete_sheet(file_path: str, sheet_name: str) -> dict[str, Any]:
         file_path: Excel文件路径
         sheet_name: 要删除的工作表名称
     """
+    if not sheet_name:
+        return _fail("工作表名称不能为空", meta={"error_code": "MISSING_SHEET_NAME"})
+
     # 开始操作会话
     operation_logger.start_session(file_path)
 
@@ -2446,7 +2449,9 @@ def excel_run_python(
     if not code or not code.strip():
         return _fail("code不能为空", meta={"error_code": "MISSING_CODE"})
 
-    timeout = max(1, min(timeout, 120))
+    if not isinstance(timeout, int) or timeout < 1:
+        timeout = 30
+    timeout = min(timeout, 120)
 
     try:
         from .api.script_runner import execute_python_script

@@ -38,6 +38,11 @@ class TestRunPythonValidation:
         result = excel_run_python(sample_excel_file, "result = 1", timeout=0)
         assert result["success"] is True
 
+    def test_invalid_timeout_type(self, sample_excel_file):
+        """String timeout should be rejected gracefully, not crash."""
+        result = excel_run_python(sample_excel_file, "result = 1", timeout="invalid")
+        assert result["success"] is True  # falls back to default 30
+
 
 class TestRunPythonExecution:
     """Test normal execution through the MCP tool layer."""

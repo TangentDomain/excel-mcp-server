@@ -435,6 +435,12 @@ class TestServerInterfaces:
         assert result["success"] is False
         assert "message" in result
 
+    def test_excel_delete_sheet_none_name(self, sample_excel_file):
+        """Test excel_delete_sheet with None sheet_name (should not crash)."""
+        result = excel_delete_sheet(sample_excel_file, None)
+        assert result["success"] is False
+        assert "message" in result
+
     def test_excel_rename_sheet(self, sample_excel_file):
         """Test excel_rename_sheet interface"""
         result = excel_rename_sheet(sample_excel_file, "Sheet1", "数据表")
