@@ -162,7 +162,7 @@ When you receive replies like this, configuration is successful:
 ## 🎮 Game Development Scenarios (See It in Action!)
 
 ### 🎯 Game Designer Daily Work Examples
-> 🎯 **Real Cases**: All operations verified with 53 game-specific tools  
+> 🎯 **Real Cases**: All operations verified with 26 MCP tools
 > 🎮 **Supported Games**: RPG, MMO, Card, Tower Defense, Shooter, Strategy etc.  
 > ⚡ **Performance**: Handles 100K+ data batches, response time <1 second
 
@@ -461,7 +461,7 @@ When encountering problems, check in order:
 
 - **Response Speed**: < 1s (small files), < 5s (large files)
 - **Data Scale**: 100K rows × 1000 columns
-- **Tool Count**: 53 game-specific tools
+- **Tool Count**: 26 MCP tools
 - **Memory Usage**: < 100MB (typical files)
 - **Supported Formats**: .xlsx, .xlsm, .xlsb
 
