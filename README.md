@@ -2,10 +2,10 @@
 
 # 🎮 ExcelMCP: 让游戏策划用嘴说话的Excel神器
 
-[![PyPI](https://img.shields.io/pypi/v/excel-mcp-server-fastmcp.svg)](https://pypi.org/project/excel-mcp-server-fastmcp/v1.9.1)
+[![PyPI](https://img.shields.io/pypi/v/excel-mcp-server-fastmcp.svg)](https://pypi.org/project/excel-mcp-server-fastmcp/v1.16.0)
 [![CI](https://github.com/TangentDomain/excel-mcp-server/actions/workflows/ci.yml/badge.svg)](https://github.com/TangentDomain/excel-mcp-server/actions/workflows/ci.yml)
-![Tests](https://img.shields.io/badge/tests-968-brightgreen.svg)
-![Tools](https://img.shields.io/badge/tools-52-green.svg)
+![Tests](https://img.shields.io/badge/tests-1876-brightgreen.svg)
+![Tools](https://img.shields.io/badge/tools-38-green.svg)
 ![GitHub stars](https://img.shields.io/github/stars/TangentDomain/excel-mcp-server?style=social&label=Stars)
 
 > **🚀 游戏策划必备：用中文/SQL直接操作Excel，告别手动VBA！**
@@ -16,7 +16,7 @@
 
 ---
 
-## 🚀 最新更新 (v1.9.1)
+## 🚀 最新更新 (v1.16.0)
 
 ### ⚡ 性能大升级
 - **整体性能提升 10.3x**：核心查询路径全面优化，大数据量场景响应速度质的飞跃
@@ -119,7 +119,7 @@ claude mcp add excelmcp -- uvx excel-mcp-server-fastmcp
 ## 🎮 游戏开发场景演示 (所见即所得！)
 
 ### 🎯 策划日常工作示例
-> 🎯 **真实案例**: 以下所有操作都已通过41个MCP工具验证  
+> 🎯 **真实案例**: 以下所有操作都已通过38个MCP工具验证
 > 🎮 **支持游戏**: RPG、MMO、卡牌、塔防、射击、策略等各类游戏  
 > ⚡ **性能表现**: 支持10万+数据批量处理，响应时间 <1秒
 
@@ -368,7 +368,7 @@ GitHub Issues → 使用 Bug 报告模板
 
 - **响应速度**:小文件 < 1秒,大文件 < 3秒
 - **数据规模**:10万行 × 1000列
-- **工具数量**:52 个游戏专用工具
+- **工具数量**:38 个游戏专用工具
 - **内存占用**:< 100MB(典型文件)
 - **支持格式**:.xlsx、.xlsm、.xlsb
 

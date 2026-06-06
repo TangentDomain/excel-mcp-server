@@ -2,10 +2,10 @@
 
 # 🎮 ExcelMCP: The Excel Wizard That Understands Game Devs
 
-[![PyPI](https://img.shields.io/pypi/v/excel-mcp-server-fastmcp.svg)](https://pypi.org/project/excel-mcp-server-fastmcp/v1.7.19)
+[![PyPI](https://img.shields.io/pypi/v/excel-mcp-server-fastmcp.svg)](https://pypi.org/project/excel-mcp-server-fastmcp/v1.16.0)
 [![CI](https://github.com/TangentDomain/excel-mcp-server/actions/workflows/ci.yml/badge.svg)](https://github.com/TangentDomain/excel-mcp-server/actions/workflows/ci.yml)
-![Tests](https://img.shields.io/badge/tests-851-brightgreen.svg)
-![Tools](https://img.shields.io/badge/tools-53-green.svg)
+![Tests](https://img.shields.io/badge/tests-1876-brightgreen.svg)
+![Tools](https://img.shields.io/badge/tools-38-green.svg)
 ![GitHub stars](https://img.shields.io/github/stars/TangentDomain/excel-mcp-server?style=social&label=Stars)
 
 > **🚀 Game Designer's Secret Weapon: Talk to Excel in plain English!**
@@ -16,7 +16,7 @@
 
 ---
 
-## 🚀 Latest Updates (v1.7.19)
+## 🚀 Latest Updates (v1.16.0)
 
 ### 🐛 Bug Fixes
 - **excel_create_pivot_table fix**: Changed error code from OPERATION_FAILED to SHEET_NOT_FOUND when sheet doesn't exist, consistent with other functions
