@@ -566,9 +566,9 @@ if _cleaned:
 # 创建FastMCP服务器实例，开启调试模式和详细日志
 mcp = FastMCP(
     name="excel-mcp",
-    instructions=r""" 游戏开发Excel配置表管理专家 — 35个工具
+    instructions=r"""游戏开发Excel配置表管理专家 — 26个工具
 
-##  核心原则：SQL优先
+## 核心原则：SQL优先
 
 **优先使用 `excel_query`** - 所有数据查询分析任务
 - 复杂条件筛选  WHERE, LIKE, IN, BETWEEN, 子查询
@@ -579,47 +579,47 @@ mcp = FastMCP(
 - 结果合并  UNION, UNION ALL
 - 窗口函数  ROW_NUMBER, RANK, DENSE_RANK
 
-##  工具选择决策树
+## 工具选择决策树
 ```
 ═══ 读数据 ═══
- 首选：所有数据查询/分析任务 → excel_query（SQL引擎，批量分析首选）
-│    复杂条件筛选 → WHERE, LIKE, IN, BETWEEN, 子查询
-│    聚合统计 → COUNT, SUM, AVG, MAX, MIN, GROUP BY, HAVING
-│    多表关联 → 5种JOIN类型，支持跨文件查询
-│    窗口函数 → ROW_NUMBER, RANK, DENSE_RANK
-│    字符串函数 → UPPER, LOWER, TRIM, LENGTH, CONCAT, REPLACE, SUBSTRING
+首选：所有数据查询/分析任务 → excel_query（SQL引擎，批量分析首选）
+│  复杂条件筛选 → WHERE, LIKE, IN, BETWEEN, 子查询
+│  聚合统计 → COUNT, SUM, AVG, MAX, MIN, GROUP BY, HAVING
+│  多表关联 → 5种JOIN类型，支持跨文件查询
+│  窗口函数 → ROW_NUMBER, RANK, DENSE_RANK
+│  字符串函数 → UPPER, LOWER, TRIM, LENGTH, CONCAT, REPLACE, SUBSTRING
 │
-├─  已知精确坐标（如A1:C10）────────────→ excel_get_range
+├─ 已知精确坐标（如A1:C10）────────────→ excel_get_range
 │
-├─  快速了解表结构（列名+类型+样本值）───→ excel_describe_table
+├─ 快速了解表结构（列名+类型+样本值）───→ excel_describe_table
 │
-├─  只需表头信息（中文+英文）───────────→ excel_get_headers（更轻量）
+├─ 只需表头信息（中文+英文）───────────→ excel_get_headers（更轻量）
 │
-├─  定位文本位置───────────────────────→ excel_search（返回row/column）
+├─ 定位文本位置───────────────────────→ excel_search（返回row/column）
 │
-└─  跨文件搜索─────────────────────────→ excel_search_directory
+└─ 跨文件搜索─────────────────────────→ excel_search_directory
 
 ═══ 写数据（重要！选对工具） ═══
-┌─  批量修改多行？（改10行以上/按条件改）──→ excel_update_query（SQL UPDATE）
-│   例: UPDATE 怪物表 SET 血量=血量*2 WHERE 等级>5
-│    需要计算表达式 → SET 血量=血量*2
-│    需要预览变更 → dry_run=True
-│    条件复杂 → WHERE 等级>5 AND 稀有度='传说'
+┌─ 批量修改多行？（改10行以上/按条件改）──→ excel_update_query（SQL UPDATE）
+│  例: UPDATE 怪物表 SET 血量=血量*2 WHERE 等级>5
+│  需要计算表达式 → SET 血量=血量*2
+│  需要预览变更 → dry_run=True
+│  条件复杂 → WHERE 等级>5 AND 稀有度='传说'
 │
-├─  精确坐标写入（知道具体A1:C10）───────→ excel_update_range
-│    默认覆盖模式！insert_mode=True 才是插入！
-│    安全追加数据？→ 先 find_last_row → 再 update_range(..., insert_mode=True)
-│    直接覆盖数据？→ update_range(..., insert_mode=False) 【默认，危险】
+├─ 精确坐标写入（知道具体A1:C10）───────→ excel_update_range
+│  默认覆盖模式！insert_mode=True 才是插入！
+│  安全追加数据？→ 先 find_last_row → 再 update_range(..., insert_mode=True)
+│  直接覆盖数据？→ update_range(..., insert_mode=False) 【默认，危险】
 │
-├─  按ID改单行（知道 key_column + key_value）→ excel_upsert_row
-│   例: upsert_row(file, sheet, "ID", 3, {"血量": 900, "攻击力": 70})
-│    优点：不会误改其他行、行不存在自动插入、参数自文档化
-│    只改2-3个字段、dict传参方便、幂等安全
+├─ 按ID改单行（知道 key_column + key_value）→ excel_upsert_row
+│  例: upsert_row(file, sheet, "ID", 3, {"血量": 900, "攻击力": 70})
+│  优点：不会误改其他行、行不存在自动插入、参数自文档化
+│  只改2-3个字段、dict传参方便、幂等安全
 │
-├─  批量插入新行────────────────────────→ excel_insert_query（SQL INSERT）
-│   例: INSERT INTO 怪物表 (ID,名称,血量) VALUES (6,'Boss',9999)
+├─ 批量插入新行────────────────────────→ excel_insert_query（SQL INSERT）
+│  例: INSERT INTO 怪物表 (ID,名称,血量) VALUES (6,'Boss',9999)
 │
-└─  删行？
+└─ 删行？
     按条件删？────────────────────────────→ excel_delete_query（SQL DELETE，必须WHERE）
     按行号删？────────────────────────────→ excel_structure(file, sheet, 'delete_rows', row_index, count)
 
@@ -644,7 +644,7 @@ mcp = FastMCP(
 备份恢复？                   → excel_backup（create/restore/list）
 ```
 
-##  LLM 防错自查清单（调用前速查）
+## LLM 防错自查清单（调用前速查）
 
 > 选完工具后、调用前，花3秒检查这5项，避免90%的错误：
 
@@ -656,9 +656,9 @@ mcp = FastMCP(
 | 4 | SQL语句类型对吗？ | 把 SELECT 传给 update_query 或 UPDATE 传给 query | 查询→query / 改→update_query / 增→insert_query / 删→delete_query |
 | 5 | 写入后验证了吗？ | 写完就结束，没确认实际效果 | 安全链路：写入 → query验证 → 有备份可恢复 |
 
-**错误信号速认**：返回值含 `覆盖模式` → 你可能忘了 insert_mode=True；含 `` → 按提示修复即可
+**错误信号速认**：返回值含 `覆盖模式` → 你可能忘了 insert_mode=True；含 [提示] → 按提示修复即可
 
-##  双行表头列名注意事项
+## 双行表头列名注意事项
 
 当 Excel 有双行表头（第1行中文 + 第2行英文）时：
 - **SQL工具**（query/update_query/insert_query/delete_query）：中英文名都  能用
@@ -666,7 +666,7 @@ mcp = FastMCP(
 - **upsert_row 的 key_column**： 中英文名都能用（自动检测双行表头，自动兼容）
 - **建议**：直接用 describe_table 返回的英文名即可，无需额外确认原始列名
 
-## ⚡ SQL vs Direct 选择原则
+## SQL vs Direct 选择原则
 ```
  用 SQL (query/update_query/insert_query/delete_query)：
    - 需要条件筛选(WHERE)、聚合(GROUP BY)、JOIN、排序(ORDER BY)
@@ -679,7 +679,7 @@ mcp = FastMCP(
    - 需要保持格式/公式的精确区域写入
 ```
 
-##  SQL已支持功能
+## SQL已支持功能
 基础: SELECT, DISTINCT, 别名(AS), 数学表达式(+-*/%)
 条件: WHERE, 比较运算(=/></≤/≥/≠), LIKE, NOT LIKE, IN, NOT IN, BETWEEN, AND, OR, IS NULL, IS NOT NULL, NOT
 高级: WHERE子查询, FROM子查询(FROM (SELECT ...) AS alias), CASE WHEN, COALESCE, EXISTS, CTE(WITH ... AS ...)
@@ -691,37 +691,37 @@ mcp = FastMCP(
 窗口: ROW_NUMBER, RANK, DENSE_RANK, LAG, LEAD, FIRST_VALUE, LAST_VALUE, NTILE, PERCENT_RANK, CUME_DIST, AVG/SUM/COUNT/MIN/MAX OVER
 数据修改: INSERT INTO ... VALUES (...), DELETE FROM ... WHERE ..., UPDATE ... SET ... WHERE ...
 
-##  SQL不支持
+## SQL不支持
 NATURAL JOIN, WITH RECURSIVE, LATERAL JOIN(请改用子查询或CTE), 跨文件JOIN需使用@'path'语法
 
-##  跨文件JOIN
+## 跨文件JOIN
 使用@'path'语法引用其他Excel文件的工作表：
 ```sql
 SELECT a.*, b.掉落物品 FROM 技能表@'./data/技能配置.xlsx' a JOIN 掉落表@'./data/掉落配置.xlsx' b ON a.id = b.skill_id
 ```
 
-##  FROM子查询
+## FROM子查询
 支持多层嵌套FROM子查询：`FROM (SELECT ...) AS alias`。
 ```sql
 SELECT * FROM (SELECT skill_name, damage FROM 技能配置 WHERE damage > 100) AS 高伤技能
 ```
 
-##  UNION / UNION ALL
+## UNION / UNION ALL
 合并多个SELECT查询结果。支持ORDER BY和LIMIT。
 ```sql
 SELECT name FROM 技能配置 WHERE 类型='法师' UNION ALL SELECT name FROM 技能配置 WHERE 类型='战士' ORDER BY name LIMIT 10
 ```
 
-##  重要原则
+## 重要原则
 - 双行表头: 第1行中文描述+第2行英文字段名，中英文列名均可查询
 - **统一1-based索引: 第1行=1, 第1列=1（所有工具一致，含insert_rows/delete_rows）**
 - **范围格式(cell_range参数): 优先使用 "工作表名!A1:C10"；不含!时单工作表文件自动推断**
-- ** update_range 默认覆盖模式（insert_mode=False）！目标区域数据会被直接替换！**
+- **update_range 默认覆盖模式（insert_mode=False）！目标区域数据会被直接替换！**
   -  追加/插入数据：必须设置 `insert_mode=True` + 先用 `find_last_row` 定位末行
   -  确实要覆盖：不用改参数，但返回消息会标注 `[覆盖模式]`
   -  安全链路：`find_last_row` → `update_range(..., insert_mode=True)` → `query` 验证
 
-##  典型用法示例
+## 典型用法示例
 ```sql
 -- 聚合统计
 SELECT 技能类型, AVG(伤害), COUNT(*) FROM 技能表 GROUP BY 技能类型
@@ -733,13 +733,13 @@ SELECT * FROM 技能表 WHERE 伤害 > (SELECT AVG(伤害) FROM 技能表)
 SELECT a.*, b.掉落物品 FROM 技能表@'./data/技能配置.xlsx' a JOIN 掉落表@'./data/掉落配置.xlsx' b ON a.id = b.skill_id
 ```
 
-##  统一返回格式
+## 统一返回格式
 所有工具返回统一JSON结构：`{success, message, data, meta}`
 - 成功时 `success=true`，`data` 为实际数据
 - 失败时 `success=false`，`meta.error_code` 为机器可读错误码
 - 所有错误均包含修复提示
 
-##  常用工作流
+## 常用工作流
 ```
 了解结构 → describe_table → 查询分析 → query → 修改数据 → update_query/update_range → 验证结果 → compare_sheets
 ```
