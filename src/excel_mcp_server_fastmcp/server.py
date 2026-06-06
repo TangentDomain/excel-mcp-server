@@ -1019,7 +1019,7 @@ def excel_list_sheets(file_path: str) -> dict[str, Any]:
 
 
 @mcp.tool()
-@_track_call
+@_validate_file_path()
 def excel_create_sheet(file_path: str, sheet_name: str, index: int | None = None) -> dict[str, Any]:
     """创建新工作表。可指定插入位置index（从0开始，0=最前面）。
 
@@ -1032,7 +1032,7 @@ def excel_create_sheet(file_path: str, sheet_name: str, index: int | None = None
 
 
 @mcp.tool()
-@_track_call
+@_validate_file_path()
 def excel_delete_sheet(file_path: str, sheet_name: str) -> dict[str, Any]:
     """删除指定工作表。
 
@@ -1072,7 +1072,7 @@ def excel_delete_sheet(file_path: str, sheet_name: str) -> dict[str, Any]:
 
 
 @mcp.tool()
-@_track_call
+@_validate_file_path()
 def excel_rename_sheet(file_path: str, old_name: str, new_name: str) -> dict[str, Any]:
     """重命名工作表。
 
@@ -1085,7 +1085,7 @@ def excel_rename_sheet(file_path: str, old_name: str, new_name: str) -> dict[str
 
 
 @mcp.tool()
-@_track_call
+@_validate_file_path()
 def excel_copy_sheet(
     file_path: str,
     source_name: str,
@@ -1103,7 +1103,7 @@ def excel_copy_sheet(
 
 
 @mcp.tool()
-@_track_call
+@_validate_file_path()
 def excel_backup(file_path: str, operation: str, backup_dir: str | None = None, **kwargs) -> dict[str, Any]:
     """Excel 文件的备份与恢复。
 
@@ -1141,8 +1141,9 @@ def excel_backup(file_path: str, operation: str, backup_dir: str | None = None, 
         target_path = kwargs.get("target_path")
         if not backup_path:
             return _fail("restore 操作需要 backup_path 参数", meta={"error_code": "MISSING_PARAM"})
-        if not os.path.exists(backup_path):
-            return _fail(f"备份文件不存在: {backup_path}", meta={"error_code": "BACKUP_NOT_FOUND"})
+        _bp_err = _validate_path(backup_path)
+        if _bp_err:
+            return _bp_err
         try:
             if target_path is None:
                 filename = os.path.basename(backup_path)
@@ -1536,7 +1537,7 @@ def excel_update_range(
 
 
 @mcp.tool()
-@_track_call
+@_validate_file_path()
 def excel_find_last_row(file_path: str, sheet_name: str, column: str | int | None = None) -> dict[str, Any]:
     """查找工作表最后一行。可指定列来找该列最后一个有值的行。追加数据前必用。
 
@@ -1549,7 +1550,7 @@ def excel_find_last_row(file_path: str, sheet_name: str, column: str | int | Non
 
 
 @mcp.tool()
-@_track_call
+@_validate_file_path()
 def excel_structure(file_path: str, sheet_name: str, operation: str, index: int, count: int = 1) -> dict[str, Any]:
     """插入或删除工作表的行和列。
 
@@ -1593,7 +1594,7 @@ def excel_create_file(file_path: str, sheet_names: list[str] | None = None) -> d
 
 
 @mcp.tool()
-@_track_call
+@_validate_file_path()
 def excel_rename_column(
     file_path: str,
     sheet_name: str,
@@ -1614,7 +1615,7 @@ def excel_rename_column(
 
 
 @mcp.tool()
-@_track_call
+@_validate_file_path()
 def excel_upsert_row(
     file_path: str,
     sheet_name: str,
@@ -1650,7 +1651,7 @@ def excel_upsert_row(
 
 
 @mcp.tool()
-@_track_call
+@_validate_file_path()
 def excel_set_formula(file_path: str, sheet_name: str, cell_address: str, formula: str) -> dict[str, Any]:
     """在单元格写入Excel公式。
 
@@ -1688,7 +1689,7 @@ def excel_set_formula(file_path: str, sheet_name: str, cell_address: str, formul
 
 
 @mcp.tool()
-@_track_call
+@_validate_file_path()
 def excel_query(
     file_path: str,
     query_expression: str,
@@ -1766,7 +1767,7 @@ def excel_query(
 
 
 @mcp.tool()
-@_track_call
+@_validate_file_path()
 def excel_update_query(file_path: str, update_expression: str, dry_run: bool = False) -> dict[str, Any]:
     """按条件批量修改多行数据。
 
@@ -1827,7 +1828,7 @@ def excel_update_query(file_path: str, update_expression: str, dry_run: bool = F
 
 
 @mcp.tool()
-@_track_call
+@_validate_file_path()
 def excel_insert_query(file_path: str, insert_expression: str, dry_run: bool = False) -> dict[str, Any]:
     """SQL插入数据。支持单行/多行INSERT。
 
@@ -1868,7 +1869,7 @@ def excel_insert_query(file_path: str, insert_expression: str, dry_run: bool = F
 
 
 @mcp.tool()
-@_track_call
+@_validate_file_path()
 def excel_delete_query(file_path: str, delete_expression: str, dry_run: bool = False) -> dict[str, Any]:
     """SQL删除数据。必须指定WHERE条件。
 
@@ -2196,7 +2197,7 @@ def _check_merge_data_loss(file_path: str, sheet_name: str, cell_range: str) -> 
 
 
 @mcp.tool()
-@_track_call
+@_validate_file_path()
 def excel_format_cells(
     file_path: str,
     sheet_name: str,
@@ -2354,7 +2355,7 @@ def excel_set_layout(file_path: str, sheet_name: str, operation: str, index: int
 
 
 @mcp.tool()
-@_track_call
+@_validate_file_path(["file1_path", "file2_path"])
 def excel_compare_sheets(
     file1_path: str,
     sheet1_name: str,
