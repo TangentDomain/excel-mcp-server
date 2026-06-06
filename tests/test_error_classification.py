@@ -26,10 +26,10 @@ class TestErrorClassification:
         return _tracker
 
     def test_classify_security_error(self):
-        """🔒前缀的错误分类为security"""
+        """安全验证失败前缀的错误分类为security"""
         from excel_mcp_server_fastmcp.server import ToolCallTracker
 
-        assert ToolCallTracker.classify_error("🔒 安全验证失败: 路径穿越") == "security"
+        assert ToolCallTracker.classify_error("安全验证失败: 路径穿越") == "security"
 
     def test_classify_file_not_found(self):
         """文件不存在错误分类为file_not_found"""
@@ -270,7 +270,7 @@ class TestTrackCallDecorator:
 
         @_track_call
         def fake_tool():
-            return {"success": False, "message": "🔒 安全验证失败: 路径穿越"}
+            return {"success": False, "message": "安全验证失败: 路径穿越"}
 
         fake_tool()
         stats = self._get_tracker().get_stats()
@@ -289,7 +289,7 @@ class TestTrackCallDecorator:
         fake_tool(success=True)
         fake_tool(success=True)
         fake_tool(success=False, msg="文件不存在: a.xlsx")
-        fake_tool(success=False, msg="🔒 安全验证失败")
+        fake_tool(success=False, msg="安全验证失败")
         fake_tool(success=True)
 
         stats = self._get_tracker().get_stats()
