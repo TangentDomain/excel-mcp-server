@@ -7,10 +7,8 @@
 import json
 import os
 import subprocess
-import tempfile
 from datetime import datetime
 from pathlib import Path
-from typing import Dict, List, Optional
 
 
 class EdgeCaseAutomation:
@@ -29,9 +27,9 @@ class EdgeCaseAutomation:
         self.discovery_output = discovery_output
         self.test_output_dir = test_output_dir
         self.markdown_output = markdown_output
-        self.cases: List[Dict] = []
+        self.cases: list[dict] = []
 
-    def load_from_discovery(self, json_path: Optional[str] = None) -> List[Dict]:
+    def load_from_discovery(self, json_path: str | None = None) -> list[dict]:
         """从 edge_case_discovery.py 的输出加载案例
 
         Args:
@@ -47,7 +45,7 @@ class EdgeCaseAutomation:
             return []
 
         try:
-            with open(path, 'r', encoding='utf-8') as f:
+            with open(path, encoding='utf-8') as f:
                 data = json.load(f)
                 self.cases = data.get('edge_cases', [])
                 print(f"成功加载 {len(self.cases)} 个边缘案例")
@@ -67,7 +65,7 @@ class EdgeCaseAutomation:
 
         for test_file in test_files:
             try:
-                with open(test_file, 'r', encoding='utf-8') as f:
+                with open(test_file, encoding='utf-8') as f:
                     content = f.read()
                     import re
                     matches = list(map(int, re.findall(r'self\.test\((\d+)', content)))
@@ -95,7 +93,7 @@ class EdgeCaseAutomation:
 
         return max_round + 1
 
-    def _generate_test_case_method(self, case: Dict, test_num: int) -> str:
+    def _generate_test_case_method(self, case: dict, test_num: int) -> str:
         """生成测试用例方法
 
         Args:
@@ -132,7 +130,7 @@ class EdgeCaseAutomation:
         method_code += "        return {'success': False, 'message': '待实现测试'}\n\n"
         return method_code
 
-    def _generate_test_function_call(self, case: Dict, test_num: int) -> str:
+    def _generate_test_function_call(self, case: dict, test_num: int) -> str:
         """生成测试函数调用
 
         Args:
@@ -153,7 +151,7 @@ class EdgeCaseAutomation:
 '''
         return test_code
 
-    def generate_test_round(self, round_num: Optional[int] = None) -> str:
+    def generate_test_round(self, round_num: int | None = None) -> str:
         """生成当前轮次的测试脚本
 
         Args:
@@ -415,7 +413,7 @@ if __name__ == "__main__":
         print(f"包含 {len(self.cases)} 个测试用例 (T{start_num}-T{end_num})")
         return script_path
 
-    def run_tests(self, round_num: Optional[int] = None) -> List[Dict]:
+    def run_tests(self, round_num: int | None = None) -> list[dict]:
         """执行测试并返回结果
 
         Args:
@@ -481,7 +479,7 @@ if __name__ == "__main__":
                 'timestamp': datetime.now().isoformat()
             }]
 
-    def generate_markdown(self, results: Optional[List[Dict]] = None) -> str:
+    def generate_markdown(self, results: list[dict] | None = None) -> str:
         """生成符合 EDGE-CASE-TESTS.md 格式的 markdown
 
         Args:

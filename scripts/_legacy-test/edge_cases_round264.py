@@ -9,63 +9,42 @@ format_cells preset, set_data_validation custom type, SQL CASE/NULL handling,
 merge_cells then format, get_range include_formatting.
 """
 
+import json
 import os
 import sys
 import tempfile
-import json
 from pathlib import Path
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(REPO_ROOT / "src"))
 
-from openpyxl import Workbook, load_workbook
+from openpyxl import Workbook
+
 from excel_mcp_server_fastmcp.server import (
-    excel_create_file,
-    excel_list_sheets,
-    excel_get_range,
-    excel_get_headers,
-    excel_update_range,
-    excel_find_last_row,
-    excel_create_sheet,
-    excel_delete_sheet,
-    excel_rename_sheet,
-    excel_copy_sheet,
-    excel_rename_column,
-    excel_upsert_row,
-    excel_batch_insert_rows,
-    excel_delete_rows,
-    excel_delete_columns,
-    excel_set_formula,
-    excel_evaluate_formula,
-    excel_query,
-    excel_format_cells,
-    excel_merge_cells,
-    excel_unmerge_cells,
-    excel_set_borders,
-    excel_set_row_height,
-    excel_set_column_width,
-    excel_set_data_validation,
-    excel_clear_validation,
     excel_add_conditional_format,
+    excel_batch_insert_rows,
     excel_clear_conditional_format,
-    excel_export_to_csv,
-    excel_import_from_csv,
+    excel_clear_validation,
     excel_convert_format,
-    excel_compare_files,
-    excel_compare_sheets,
-    excel_search,
-    excel_search_directory,
-    excel_get_file_info,
-    excel_server_stats,
-    excel_get_operation_history,
-    excel_create_backup,
-    excel_restore_backup,
-    excel_list_backups,
-    excel_insert_rows,
-    excel_insert_columns,
-    excel_write_only_override,
+    excel_copy_sheet,
+    excel_create_file,
+    excel_delete_columns,
     excel_describe_table,
-    excel_check_duplicate_ids,
+    excel_format_cells,
+    excel_get_file_info,
+    excel_get_headers,
+    excel_get_operation_history,
+    excel_insert_columns,
+    excel_insert_rows,
+    excel_list_sheets,
+    excel_merge_cells,
+    excel_query,
+    excel_rename_column,
+    excel_search_directory,
+    excel_server_stats,
+    excel_set_data_validation,
+    excel_upsert_row,
+    excel_write_only_override,
 )
 
 
@@ -120,7 +99,7 @@ class TestRunner:
         info = sum(1 for r in self.results if r["status"] == "INFO")
         failed = sum(1 for r in self.results if r["status"] == "FAIL")
         total = len(self.results)
-        print(f"\n=== Round 264 Summary ===")
+        print("\n=== Round 264 Summary ===")
         print(f"Total: {total} | PASS: {passed} | INFO: {info} | FAIL: {failed}")
         for r in self.results:
             if r["status"] == "FAIL":
@@ -137,7 +116,7 @@ def test_server_stats(runner):
         else:
             data = result
         assert "cache" in str(data).lower() or "call" in str(data).lower() or "uptime" in str(data).lower(), f"Unexpected stats: {str(data)[:200]}"
-        return {"status": "PASS", "detail": f"返回服务器状态信息"}
+        return {"status": "PASS", "detail": "返回服务器状态信息"}
     runner.run("server_stats返回有效结构", t)
 
 
@@ -413,14 +392,14 @@ def main():
         # Append results to EDGE-CASE-TESTS.md
         docs_path = os.path.join(os.path.dirname(__file__), '..', 'docs', 'EDGE-CASE-TESTS.md')
         with open(docs_path, 'a') as f:
-            f.write(f"\n## 2026-04-03 第264轮 (T356-T375)\n\n")
+            f.write("\n## 2026-04-03 第264轮 (T356-T375)\n\n")
             for r in runner.results:
                 f.write(f"### 测试{r['id']}: {r['name']}\n")
                 f.write(f"- **操作步骤**: {r['name']}\n")
                 f.write(f"- **实际结果**: {r['detail']}\n")
                 f.write(f"- **是否通过**: {r['status']}\n\n")
-            f.write(f"### 第264轮统计\n")
-            f.write(f"- **总计**: 20个边缘案例（T356-T375）\n")
+            f.write("### 第264轮统计\n")
+            f.write("- **总计**: 20个边缘案例（T356-T375）\n")
             f.write(f"- **通过**: {passed}个\n")
             f.write(f"- **信息**: {info}个\n")
             f.write(f"- **失败**: {failed}个\n")
@@ -430,7 +409,7 @@ def main():
                 for bug in new_bugs:
                     f.write(f"  - {bug['id']}: {bug['name']} - {bug['detail']}\n")
             else:
-                f.write(f"- **发现BUG**: 0个\n")
+                f.write("- **发现BUG**: 0个\n")
 
         return 0 if failed == 0 else 1
     finally:

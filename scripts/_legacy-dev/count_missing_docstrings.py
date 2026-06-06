@@ -7,10 +7,9 @@
 import ast
 import os
 from pathlib import Path
-from typing import Dict, List, Set, Tuple
 
 
-def analyze_docstring(docstring: str) -> Tuple[bool, bool]:
+def analyze_docstring(docstring: str) -> tuple[bool, bool]:
     """
     分析 docstring 是否包含 Args/Parameters 和 Returns 段
 
@@ -40,7 +39,7 @@ def analyze_docstring(docstring: str) -> Tuple[bool, bool]:
     return has_args, has_returns
 
 
-def analyze_file(file_path: Path) -> Dict:
+def analyze_file(file_path: Path) -> dict:
     """
     分析单个 Python 文件
 
@@ -60,7 +59,7 @@ def analyze_file(file_path: Path) -> Dict:
     }
 
     try:
-        with open(file_path, 'r', encoding='utf-8') as f:
+        with open(file_path, encoding='utf-8') as f:
             content = f.read()
             tree = ast.parse(content)
 
@@ -103,7 +102,7 @@ def analyze_file(file_path: Path) -> Dict:
     return result
 
 
-def scan_directory(directory: Path, exclude_dirs: Set[str] = None) -> List[Dict]:
+def scan_directory(directory: Path, exclude_dirs: set[str] = None) -> list[dict]:
     """
     扫描目录下的所有 Python 文件
 
@@ -181,7 +180,7 @@ def main():
         problematic_funcs = [f for f in result['functions_detail']
                            if f['missing_args'] or f['missing_returns']]
         if problematic_funcs:
-            print(f"  需要改进的函数:")
+            print("  需要改进的函数:")
             for func in problematic_funcs:
                 issues = []
                 if func['missing_args']:

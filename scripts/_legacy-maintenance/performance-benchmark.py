@@ -13,9 +13,7 @@ import argparse
 import json
 import os
 import sys
-import tempfile
 import time
-import traceback
 from datetime import datetime
 from pathlib import Path
 
@@ -269,7 +267,7 @@ def bench_sql_query(file_path, sql):
         engine.clear_cache()
 
         return {
-            "engine": f"sql_query",
+            "engine": "sql_query",
             "sql": sql[:60],
             "rows_returned": row_count,
             "time_s": round(elapsed, 3),
@@ -338,7 +336,7 @@ def run_benchmark(output_dir):
     os.makedirs(output_dir, exist_ok=True)
 
     print(f"\n{'='*60}")
-    print(f"Excel MCP Server 性能基准测试")
+    print("Excel MCP Server 性能基准测试")
     print(f"{'='*60}")
     print(f"环境: Python {sys.version.split()[0]}")
     print(f"  calamine: {'✓' if _HAS_CALAMINE else '✗'}")
@@ -372,7 +370,7 @@ def run_benchmark(output_dir):
             ("pandas+dtype优化", bench_pandas_dtype_optimized, [test_file]),
         ]
 
-        print(f"  [读取测试]")
+        print("  [读取测试]")
         for bench_name, bench_fn, args in benchmarks:
             try:
                 result = bench_fn(*args)
@@ -386,7 +384,7 @@ def run_benchmark(output_dir):
 
         # 写入测试
         write_file = os.path.join(output_dir, f"bench_write_{rows}x{cols}.xlsx")
-        print(f"  [写入测试]")
+        print("  [写入测试]")
         try:
             write_result = bench_write_only(write_file, rows, cols)
             if write_result:
@@ -398,7 +396,7 @@ def run_benchmark(output_dir):
             print(f"    {'write_only写入':30s} → 失败: {e}")
 
         # SQL查询测试
-        print(f"  [SQL查询测试]")
+        print("  [SQL查询测试]")
         sql_queries = [
             ("SELECT * LIMIT 100", "SELECT * FROM TestData LIMIT 100"),
             ("SELECT WHERE", f"SELECT * FROM TestData WHERE Col_0 > {rows // 2}"),

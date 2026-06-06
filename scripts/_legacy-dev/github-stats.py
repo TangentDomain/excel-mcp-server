@@ -3,9 +3,8 @@
 GitHub 统计工具 - 显示仓库统计信息
 """
 
-import json
 import requests
-from datetime import datetime
+
 
 def get_github_stats(repo="TangentDomain/excel-mcp-server"):
     """获取 GitHub 仓库统计信息"""
@@ -15,19 +14,19 @@ def get_github_stats(repo="TangentDomain/excel-mcp-server"):
         info_response = requests.get(info_url, timeout=10)
         info_response.raise_for_status()
         info_data = info_response.json()
-        
+
         # 获取贡献者信息
         contributors_url = f"https://api.github.com/repos/{repo}/contributors"
         contributors_response = requests.get(contributors_url, timeout=10)
         contributors_response.raise_for_status()
         contributors_data = contributors_response.json()
-        
+
         # 获取最近的提交
         commits_url = f"https://api.github.com/repos/{repo}/commits?per_page=10"
         commits_response = requests.get(commits_url, timeout=10)
         commits_response.raise_for_status()
         commits_data = commits_response.json()
-        
+
         stats = {
             "repo": repo,
             "stars": info_data.get("stargazers_count", 0),
@@ -41,7 +40,7 @@ def get_github_stats(repo="TangentDomain/excel-mcp-server"):
             "recent_commits": len(commits_data),
             "total_commits": info_data.get("size", 0),  # 这是一个近似值
         }
-        
+
         # 计算里程碑进度
         stats["milestones"] = {
             "50_stars": {"current": stats["stars"], "target": 50, "achieved": stats["stars"] >= 50},
@@ -49,9 +48,9 @@ def get_github_stats(repo="TangentDomain/excel-mcp-server"):
             "200_stars": {"current": stats["stars"], "target": 200, "achieved": stats["stars"] >= 200},
             "500_stars": {"current": stats["stars"], "target": 500, "achieved": stats["stars"] >= 500},
         }
-        
+
         return stats
-        
+
     except Exception as e:
         print(f"获取 GitHub 统计信息失败: {e}")
         return None
@@ -60,7 +59,7 @@ def generate_github_readme_section(stats):
     """生成 GitHub README 相关部分"""
     if not stats:
         return ""
-    
+
     # 生成统计徽章
     badges = f"""
 [![GitHub stars](https://img.shields.io/github/stars/{stats['repo']}?style=social&label=Star&color=gold)](https://github.com/{stats['repo']}/stargazers)
@@ -70,7 +69,7 @@ def generate_github_readme_section(stats):
 [![GitHub last commit](https://img.shields.io/github/last-commit/{stats['repo']}?style=social)](https://github.com/{stats['repo']}/commits/main)
 
 """
-    
+
     # 生成统计信息
     section = f"""
 ## 📊 GitHub 统计
@@ -90,13 +89,13 @@ def generate_github_readme_section(stats):
 ## 🎯 里程碑进度
 
 """
-    
+
     # 添加里程碑进度
     for milestone_key, milestone_info in stats['milestones'].items():
         achieved = "✅" if milestone_info['achieved'] else "⏳"
         target_name = milestone_key.replace('_', ' ').title()
         section += f"- {achieved} **{target_name}**: {milestone_info['current']} / {milestone_info['target']}\n"
-    
+
     section += f"""
 
 ## 📈 项目状态
@@ -116,7 +115,7 @@ def generate_github_readme_section(stats):
 5. 📢 **Share**: 分享项目给更多开发者
 
 """
-    
+
     return section
 
 def update_readme_with_github_stats():
@@ -125,19 +124,19 @@ def update_readme_with_github_stats():
     if not stats:
         print("无法获取 GitHub 统计信息")
         return False
-    
+
     # 读取 README.md
     readme_path = "README.md"
     if os.path.exists(readme_path):
-        with open(readme_path, 'r', encoding='utf-8') as f:
+        with open(readme_path, encoding='utf-8') as f:
             content = f.read()
-        
+
         # 生成新的 GitHub 统计内容
         github_section = generate_github_readme_section(stats)
-        
+
         # 查找现有的 GitHub 统计部分并替换
         import re
-        
+
         # 检查是否已有 GitHub 统计
         github_stats_pattern = r'## 📊 GitHub 统计.*?(?=##|\Z)'
         if re.search(github_stats_pattern, content, re.DOTALL):
@@ -149,14 +148,14 @@ def update_readme_with_github_stats():
                 insertion_point = content.find("## Features")
             if insertion_point == -1:
                 insertion_point = len(content)
-            
+
             content = content[:insertion_point] + "\n\n" + github_section + "\n\n" + content[insertion_point:]
-        
+
         # 写回文件
         with open(readme_path, 'w', encoding='utf-8') as f:
             f.write(content)
-        
-        print(f"README.md 已更新 GitHub 统计信息")
+
+        print("README.md 已更新 GitHub 统计信息")
         return True
     else:
         print("README.md 不存在")
@@ -164,13 +163,13 @@ def update_readme_with_github_stats():
 
 if __name__ == "__main__":
     import os
-    
+
     print("开始更新 GitHub 统计信息...")
-    
+
     # 更新 README
     if update_readme_with_github_stats():
         print("✅ GitHub 统计信息更新成功")
     else:
         print("❌ GitHub 统计信息更新失败")
-    
+
     print("📊 GitHub 统计信息更新完成！")

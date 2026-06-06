@@ -4,26 +4,26 @@
 为关键Excel操作函数添加更好的错误处理和AI修复建议
 """
 
-import re
 from pathlib import Path
+
 
 def improve_error_handling(file_path):
     """改进指定文件中的错误处理"""
-    
-    with open(file_path, 'r', encoding='utf-8') as f:
+
+    with open(file_path, encoding='utf-8') as f:
         content = f.read()
-    
+
     lines = content.split('\n')
-    
+
     # 为关键Excel操作函数添加更好的错误处理
     key_functions = [
         'excel_get_range',
-        'excel_update_range', 
+        'excel_update_range',
         'excel_insert_rows',
         'excel_search',
         'excel_get_headers'
     ]
-    
+
     for func in key_functions:
         # 找到函数并改进错误处理
         for i, line in enumerate(lines):
@@ -46,7 +46,7 @@ def improve_error_handling(file_path):
 {indent}try:
 {indent}    # 原有的操作代码
 {indent}'''
-                                
+
                                 # 在try块后添加错误分类和处理
                                 improved_except = f'''{indent}except SheetNotFoundError as e:
 {indent}    error_type = 'SHEET_NOT_FOUND'
@@ -78,12 +78,12 @@ def improve_error_handling(file_path):
 {indent}        suggested_fix=suggested_fix,
 {indent}        context=context
 {indent})'''
-                                
+
                                 # 替换原有的try-except块
                                 try_end = j + 1
                                 while try_end < len(lines) and not lines[try_end].strip().startswith('except'):
                                     try_end += 1
-                                
+
                                 if try_end < len(lines):
                                     # 删除原有的try-except块
                                     del lines[j:try_end + 1]
@@ -91,25 +91,25 @@ def improve_error_handling(file_path):
                                     lines.insert(j, improved_except)
                                     break
                         break
-    
+
     # 写回文件
     with open(file_path, 'w', encoding='utf-8') as f:
         f.write('\n'.join(lines))
-    
+
     return True
 
 def main():
     """主函数"""
     src_dir = Path('src/excel_mcp_server_fastmcp')
     server_file = src_dir / 'server.py'
-    
+
     print("🔧 改进Excel操作函数的错误处理...")
-    
+
     if improve_error_handling(server_file):
         print("✅ 成功改进错误处理")
     else:
         print("❌ 改进错误处理失败")
-    
+
     # 验证文件语法
     try:
         import py_compile
@@ -118,7 +118,7 @@ def main():
     except py_compile.PyCompileError as e:
         print(f"❌ 语法错误: {e}")
         return False
-    
+
     return True
 
 if __name__ == '__main__':

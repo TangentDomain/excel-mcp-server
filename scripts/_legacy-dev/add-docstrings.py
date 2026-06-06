@@ -4,13 +4,14 @@ Docstring批量添加脚本
 为缺失docstring的函数添加标准格式的文档
 """
 
-import re
 import ast
+import re
 from pathlib import Path
+
 
 def generate_docstring(func_name, file_path):
     """根据函数名和文件路径生成docstring"""
-    
+
     # 基础模板
     docstring_templates = {
         '__init__': f'''"""
@@ -20,7 +21,7 @@ Args:
     file_path (str): Excel文件路径
     session_id (str, optional): 会话ID
 """''',
-        'wrapper': f'''"""
+        'wrapper': '''"""
 包装函数，提供统一的错误处理和日志记录
 
 Args:
@@ -36,7 +37,7 @@ Examples:
     ... def my_function():
     ...     pass
 """''',
-        'format': f'''"""
+        'format': '''"""
 格式化输出数据
 
 Args:
@@ -46,7 +47,7 @@ Args:
 Returns:
     str: 格式化后的字符串
 """''',
-        'excel_search': f'''"""
+        'excel_search': '''"""
 Excel文件搜索功能
 
 Args:
@@ -57,7 +58,7 @@ Args:
 Returns:
     List[Dict]: 搜索结果
 """''',
-        'excel_search_directory': f'''"""
+        'excel_search_directory': '''"""
 目录内Excel文件批量搜索
 
 Args:
@@ -68,7 +69,7 @@ Args:
 Returns:
     List[Dict]: 搜索结果
 """''',
-        'protect_string': f'''"""
+        'protect_string': '''"""
 字符串保护，防止SQL注入
 
 Args:
@@ -77,7 +78,7 @@ Args:
 Returns:
     str: 保护后的字符串
 """''',
-        '_extract_selects': f'''"""
+        '_extract_selects': '''"""
 提取SQL查询中的SELECT字段
 
 Args:
@@ -86,7 +87,7 @@ Args:
 Returns:
     List[str]: SELECT字段列表
 """''',
-        'assign_row_number': f'''"""
+        'assign_row_number': '''"""
 为查询结果分配行号
 
 Args:
@@ -97,7 +98,7 @@ Args:
 Returns:
     DataFrame: 添加了行号的DataFrame
 """''',
-        'assign_rank': f'''"""
+        'assign_rank': '''"""
 为查询结果分配排名
 
 Args:
@@ -108,7 +109,7 @@ Args:
 Returns:
     DataFrame: 添加了排名的DataFrame
 """''',
-        '_track_call': f'''"""
+        '_track_call': '''"""
 工具调用追踪装饰器
 
 Args:
@@ -117,7 +118,7 @@ Args:
 Returns:
     function: 装饰后的函数
 """''',
-        '_save_log': f'''"""
+        '_save_log': '''"""
 保存日志到文件
 
 Args:
@@ -126,7 +127,7 @@ Args:
 Returns:
     bool: 保存是否成功
 """''',
-        'log_operation': f'''"""
+        'log_operation': '''"""
 记录操作到日志
 
 Args:
@@ -138,7 +139,7 @@ Args:
 Returns:
     bool: 记录是否成功
 """''',
-        'get_recent_operations': f'''"""
+        'get_recent_operations': '''"""
 获取最近的操作记录
 
 Args:
@@ -147,7 +148,7 @@ Args:
 Returns:
     List[Dict]: 操作记录列表
 """''',
-        'record': f'''"""
+        'record': '''"""
 记录一次工具调用
 
 Args:
@@ -160,7 +161,7 @@ Args:
 Returns:
     bool: 记录是否成功
 """''',
-        'classify_error': f'''"""
+        'classify_error': '''"""
 根据错误消息自动分类错误类型
 
 Args:
@@ -169,7 +170,7 @@ Args:
 Returns:
     str: 错误类型分类
 """''',
-        'get_stats': f'''"""
+        'get_stats': '''"""
 获取工具调用统计
 
 Args:
@@ -178,7 +179,7 @@ Args:
 Returns:
     Dict: 统计信息
 """''',
-        'reset': f'''"""
+        'reset': '''"""
 重置所有统计信息
 
 Args:
@@ -187,7 +188,7 @@ Args:
 Returns:
     bool: 重置是否成功
 """''',
-        'start_session': f'''"""
+        'start_session': '''"""
 开始新的操作会话
 
 Args:
@@ -197,7 +198,7 @@ Args:
 Returns:
     str: 会话ID
 """''',
-        'main': f'''"""
+        'main': '''"""
 MCP服务器主入口
 
 Args:
@@ -207,11 +208,11 @@ Returns:
     MCP: MCP服务器实例
 """'''
     }
-    
+
     # 使用基础模板
     if func_name in docstring_templates:
         return docstring_templates[func_name]
-    
+
     # 通用模板
     return f'''"""
 {func_name}函数的功能描述
@@ -230,17 +231,17 @@ Examples:
 
 def add_docstrings_to_file(file_path):
     """为文件中缺失docstring的函数添加docstring"""
-    
-    with open(file_path, 'r', encoding='utf-8') as f:
+
+    with open(file_path, encoding='utf-8') as f:
         content = f.read()
-    
+
     # 解析AST
     try:
         tree = ast.parse(content)
     except SyntaxError:
         print(f"⚠️ 语法错误 {file_path}")
         return False
-    
+
     # 收集需要添加docstring的函数
     functions_to_update = []
     for node in ast.walk(tree):
@@ -250,41 +251,41 @@ def add_docstrings_to_file(file_path):
                 'line': node.lineno,
                 'end_line': node.end_lineno
             })
-    
+
     if not functions_to_update:
         print(f"✅ {file_path}: 无需更新")
         return True
-    
+
     print(f"📝 {file_path}: 发现 {len(functions_to_update)} 个函数需要添加docstring")
-    
+
     # 按行号倒序排序，避免影响后续行号
     functions_to_update.sort(key=lambda x: x['line'], reverse=True)
-    
+
     # 修改文件内容
     lines = content.split('\n')
-    
+
     for func in functions_to_update:
         docstring = generate_docstring(func['name'], str(file_path))
-        
+
         # 在函数定义后插入docstring
         insert_line = func['line']  # 转换为0-based
         indent = '    '  # 4个空格的缩进
-        
+
         # 插入docstring
         docstring_lines = docstring.split('\n')
         for i, line in enumerate(docstring_lines):
             lines.insert(insert_line + i, indent + line)
-        
+
         # 调整后续函数的行号
         line_offset = len(docstring_lines)
         for other_func in functions_to_update:
             if other_func['line'] > func['line']:
                 other_func['line'] += line_offset
-    
+
     # 写回文件
     with open(file_path, 'w', encoding='utf-8') as f:
         f.write('\n'.join(lines))
-    
+
     print(f"✅ {file_path}: 成功添加 {len(functions_to_update)} 个docstring")
     return True
 
@@ -293,19 +294,19 @@ def main():
     src_dir = Path('src/excel_mcp_server_fastmcp')
     processed_files = 0
     total_functions = 0
-    
+
     print("🔍 开始批量添加docstring...")
-    
+
     for py_file in src_dir.rglob('*.py'):
         if add_docstrings_to_file(py_file):
             processed_files += 1
             # 统计该文件的函数数量
-            with open(py_file, 'r', encoding='utf-8') as f:
+            with open(py_file, encoding='utf-8') as f:
                 content = f.read()
             functions = len(re.findall(r'^\s*def\s+\w+', content, re.MULTILINE))
             total_functions += functions
-    
-    print(f"\n📊 处理完成:")
+
+    print("\n📊 处理完成:")
     print(f"   - 处理文件数: {processed_files}")
     print(f"   - 总函数数: {total_functions}")
     print("✅ 批量docstring添加完成")

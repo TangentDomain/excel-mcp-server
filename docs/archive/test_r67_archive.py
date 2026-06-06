@@ -6,13 +6,13 @@
 3. _resolve_order_column 临时列DRY（数学/CASE/COALESCE）
 4. _apply_having_clause 回退到 _apply_row_filter
 """
-import pytest
-import pandas as pd
-import sys, os
 
-from excel_mcp_server_fastmcp.api.advanced_sql_query import AdvancedSQLQueryEngine
+import pandas as pd
+import pytest
 import sqlglot
 from sqlglot import exp
+
+from excel_mcp_server_fastmcp.api.advanced_sql_query import AdvancedSQLQueryEngine
 
 
 @pytest.fixture

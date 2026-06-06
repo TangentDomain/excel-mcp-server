@@ -3,10 +3,10 @@
 边缘案例测试 T416-T435 - 第267轮
 """
 
-import subprocess
 import json
-import tempfile
 import os
+import subprocess
+import tempfile
 from pathlib import Path
 
 # 创建测试文件

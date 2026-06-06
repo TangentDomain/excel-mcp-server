@@ -6,8 +6,8 @@ import json
 import os
 import subprocess
 import sys
-from datetime import datetime, timezone, timedelta
-from pathlib import Path
+from datetime import datetime, timedelta, timezone
+
 
 def run(cmd, cwd=None):
     """执行命令，返回stdout"""
@@ -20,7 +20,7 @@ def run(cmd, cwd=None):
 def get_instance_type(project):
     """识别项目类型，用于个性化质量基线"""
     project_name = os.path.basename(project)
-    
+
     # 基于项目路径和文件特征识别类型
     if "excel-mcp" in project_name.lower():
         return "code"
@@ -42,10 +42,10 @@ def should_use_r1_warn(project):
         hist_file = os.path.join(project, "docs", "check-history.jsonl")
         if not os.path.exists(hist_file):
             return False
-        
+
         # 分析最近30轮的R1结果（扩大采样范围）
         recent_r1_fails = []
-        with open(hist_file, 'r', encoding='utf-8') as f:
+        with open(hist_file, encoding='utf-8') as f:
             for line in f:
                 try:
                     record = json.loads(line.strip())
@@ -55,9 +55,9 @@ def should_use_r1_warn(project):
                             recent_r1_fails.append(record)
                 except:
                     continue
-        
+
         instance_type = get_instance_type(project)
-        
+
         # 增强自适应逻辑（REQ-023质量模式自适应优化）：
         # 1. 统计误报模式：R1 FAIL但最终完成的记录
         success_after_fail = 0
@@ -73,7 +73,7 @@ def should_use_r1_warn(project):
                     "timestamp": fail_record.get("timestamp"),
                     "instance_type": instance_type
                 })
-        
+
         # 2. 特殊处理excel-mcp-server的连续误报模式（增强检测）
         excel_mcp_specific_pattern = False
         if "excel-mcp" in project.lower():
@@ -85,7 +85,7 @@ def should_use_r1_warn(project):
                     round_num = fail_record.get('round', 0)
                     if check_round_success(project, round_num + 1):
                         consecutive_fails += 1
-                
+
                 # 新规则：连续3轮以上误报但最终完成，或者总误报率超过60%
                 total_fails = len(recent_r1_fails)
                 fail_rate = total_fails / 30.0
@@ -93,7 +93,7 @@ def should_use_r1_warn(project):
                     excel_mcp_specific_pattern = True
                     # 记录特殊模式
                     record_excel_mcp_special_pattern(project, recent_r1_fails, consecutive_fails, fail_rate)
-        
+
         # 3. 根据项目类型和模式调整阈值（REQ-023核心改进）- 更精细的分级
         if instance_type == "code" and "excel-mcp" in project.lower():
             # excel-mcp-server特殊处理：大幅降低阈值到2轮（针对观察到的连续误报）
@@ -107,24 +107,24 @@ def should_use_r1_warn(project):
         else:
             # 其他类型：中等阈值
             required_fails = 4
-        
+
         consecutive_fails = len(recent_r1_fails) >= required_fails
-        
+
         # 4. 新增：学习模式记录和阈值自适应调整
         learning_mode_score = calculate_learning_mode_score(project, recent_r1_fails)
         if learning_mode_score >= 0.7:  # 学习模式分数达到70%
             required_fails = max(1, required_fails - 1)  # 自动降低阈值
-        
+
         # 5. 记录误报模式到数据库（增强版）
         if false_positive_pattern:
             record_false_positive_pattern(project, false_positive_pattern)
-        
+
         # 6. 最终判断条件（REQ-023增强版）
-        should_warn = (excel_mcp_specific_pattern or 
-                      success_after_fail >= required_fails or 
+        should_warn = (excel_mcp_specific_pattern or
+                      success_after_fail >= required_fails or
                       consecutive_fails or
                       learning_mode_score >= 0.7)
-        
+
         # 记录阈值调整决策
         if should_warn:
             record_threshold_decision(project, "R1", "WARN", {
@@ -135,9 +135,9 @@ def should_use_r1_warn(project):
                 "excel_mcp_pattern": excel_mcp_specific_pattern,
                 "learning_score": learning_mode_score
             })
-        
+
         return should_warn
-        
+
     except Exception as e:
         # 出错时保守处理，使用严格模式
         print(f"R1自适应阈值检查异常: {e}")
@@ -149,8 +149,8 @@ def check_round_success(project, target_round):
         hist_file = os.path.join(project, "docs", "check-history.jsonl")
         if not os.path.exists(hist_file):
             return False
-        
-        with open(hist_file, 'r', encoding='utf-8') as f:
+
+        with open(hist_file, encoding='utf-8') as f:
             for line in f:
                 try:
                     record = json.loads(line.strip())
@@ -169,7 +169,7 @@ def get_current_round(project):
         now_file = os.path.join(project, "docs", "NOW.md")
         if not os.path.exists(now_file):
             return 0
-        
+
         with open(now_file, encoding='utf-8') as f:
             content = f.read()
         # 匹配 "轮次：第X轮" 或类似格式
@@ -186,7 +186,7 @@ def calculate_learning_mode_score(project, recent_r1_fails):
     try:
         # 获取项目类型
         instance_type = get_instance_type(project)
-        
+
         # 基于类型设置基线
         if instance_type == "excel-mcp":
             base_improvement_rate = 0.6  # 代码项目改善较快
@@ -194,7 +194,7 @@ def calculate_learning_mode_score(project, recent_r1_fails):
             base_improvement_rate = 0.5  # 元迭代项目适中
         else:
             base_improvement_rate = 0.4  # 其他项目较慢
-        
+
         # 1. 分析R1失败趋势（反向指标）
         if not recent_r1_fails:
             fail_score = 0.8  # 没有失败是好消息
@@ -202,15 +202,15 @@ def calculate_learning_mode_score(project, recent_r1_fails):
             # 计算失败密度
             fail_count = len(recent_r1_fails)
             fail_score = max(0, 1 - (fail_count / 10))  # 最多10次失败扣分到0
-        
+
         # 2. 检查系统改进速度（通过git commit频率）
-        git_log_result, git_code = run(f"git log --since='30 days ago' --oneline | wc -l", project)
+        git_log_result, git_code = run("git log --since='30 days ago' --oneline | wc -l", project)
         commit_frequency = min(1, int(git_log_result) / 30) if git_code == 0 else 0.3
-        
+
         # 3. 检查配置优化情况（通过文件变更）
         config_files = [
             ".check-config.json",
-            "SKILL.md", 
+            "SKILL.md",
             "references/rules-template.md"
         ]
         config_changes = 0
@@ -220,21 +220,21 @@ def calculate_learning_mode_score(project, recent_r1_fails):
                 # 检查30天内是否有修改
                 if datetime.fromtimestamp(stat.st_mtime, timezone.utc) > datetime.now(timezone.utc) - timedelta(days=30):
                     config_changes += 1
-        
+
         config_score = min(1, config_changes / len(config_files))
-        
+
         # 4. 综合计算学习模式分数
         learning_score = (fail_score * 0.4 +  # 失败趋势权重
-                         commit_frequency * 0.3 +  # 改进速度权重  
+                         commit_frequency * 0.3 +  # 改进速度权重
                          config_score * 0.3)  # 配置优化权重
-        
+
         # 5. 实例类型调整
         if instance_type == "meta":
             learning_score *= 1.1  # 元迭代项目学习效率更高
-        
+
         # 6. 防止过度乐观
         learning_score = min(0.9, learning_score)
-        
+
         return learning_score
     except:
         # 异常情况返回保守分数
@@ -245,16 +245,16 @@ def record_false_positive_pattern(project, pattern_data):
     try:
         os.makedirs(os.path.join(project, "docs", "quality_patterns"), exist_ok=True)
         pattern_file = os.path.join(project, "docs", "quality_patterns", "false_positive_patterns.json")
-        
+
         # 读取现有模式
         existing_patterns = []
         if os.path.exists(pattern_file):
-            with open(pattern_file, 'r', encoding='utf-8') as f:
+            with open(pattern_file, encoding='utf-8') as f:
                 existing_patterns = json.load(f)
-        
+
         # 添加新模式
         existing_patterns.extend(pattern_data)
-        
+
         # 去重：基于round和instance_type
         unique_patterns = []
         seen = set()
@@ -263,13 +263,13 @@ def record_false_positive_pattern(project, pattern_data):
             if key not in seen:
                 unique_patterns.append(pattern)
                 seen.add(key)
-        
+
         # 保持最近50条记录
         unique_patterns = unique_patterns[-50:]
-        
+
         with open(pattern_file, 'w', encoding='utf-8') as f:
             json.dump(unique_patterns, f, ensure_ascii=False, indent=2)
-            
+
     except Exception:
         # 记录失败不影响主要逻辑
         pass
@@ -279,13 +279,13 @@ def should_use_r4_relaxed(project):
     try:
         instance_type = get_instance_type(project)
         hist_file = os.path.join(project, "docs", "check-history.jsonl")
-        
+
         if not os.path.exists(hist_file):
             return False  # 无历史数据时使用严格模式
-        
+
         # 分析最近10轮的R4结果
         recent_r4_results = []
-        with open(hist_file, 'r', encoding='utf-8') as f:
+        with open(hist_file, encoding='utf-8') as f:
             for line in f:
                 try:
                     record = json.loads(line.strip())
@@ -298,7 +298,7 @@ def should_use_r4_relaxed(project):
                             })
                 except:
                     continue
-        
+
         if instance_type == "code":
             # 代码项目质量要求高，较少放宽
             return len(recent_r4_results) >= 8 and all(r['status'] == 'PASS' for r in recent_r4_results[-5:])
@@ -308,7 +308,7 @@ def should_use_r4_relaxed(project):
         else:
             # 其他类型居中
             return len(recent_r4_results) >= 7 and all(r['status'] in ['PASS', 'WARN'] for r in recent_r4_results[-4:])
-            
+
     except Exception:
         return False
 
@@ -317,7 +317,7 @@ def check_critical_steps(project):
     details = []
     fails = []
     warnings = []
-    
+
     # 获取已存在的步骤和它们的标记
     existing_steps = {}
     for step in ["K0", "K1", "K2", "K3"]:
@@ -334,7 +334,7 @@ def check_critical_steps(project):
         else:
             details.append(f"{step}❌ (标记不存在)")
             fails.append(step)
-    
+
     # 如果只有K0存在，说明刚开始，直接PASS
     if len(existing_steps) == 1 and "K0" in existing_steps:
         return {
@@ -343,7 +343,7 @@ def check_critical_steps(project):
             "details": ["刚开始执行，只有K0标记，跳过严格检查"],
             "fix_suggestion": ""
         }
-    
+
     # 自适应阈值检查 - 读取历史数据优化误报
     should_warn_only = should_use_r1_warn(project)
     if should_warn_only:
@@ -353,12 +353,12 @@ def check_critical_steps(project):
         for i in range(len(step_order) - 1):
             current_step = step_order[i]
             next_step = step_order[i + 1]
-            
+
             if current_step in existing_steps and next_step in existing_steps:
                 if existing_steps[current_step] > existing_steps[next_step]:
                     details.append(f"⚠️ 时间戳乱序: {current_step}({existing_steps[current_step]}) > {next_step}({existing_steps[next_step]})")
                     warnings.append(f"{current_step}>{next_step}")
-        
+
         # 在自适应模式下，允许更多的不完整情况
         if len(fails) <= 2:  # 允许最多2个步骤缺失
             status = "WARN"
@@ -370,12 +370,12 @@ def check_critical_steps(project):
         for i in range(len(step_order) - 1):
             current_step = step_order[i]
             next_step = step_order[i + 1]
-            
+
             if current_step in existing_steps and next_step in existing_steps:
                 if existing_steps[current_step] > existing_steps[next_step]:
                     details.append(f"⚠️ 时间戳乱序: {current_step}({existing_steps[current_step]}) > {next_step}({existing_steps[next_step]})")
                     warnings.append(f"{current_step}>{next_step}")
-        
+
         # 渐进式逻辑：如果K0和K1存在，允许K2/K3暂时缺失
         if "K0" in existing_steps and "K1" in existing_steps and "K2" not in existing_steps and "K3" not in existing_steps:
             status = "PASS"
@@ -390,18 +390,18 @@ def check_critical_steps(project):
             details.append("⚠️ K3步骤缺失，可能推送步骤未完成")
         else:
             status = "FAIL"
-    
+
     # 检查时间戳递增 - 只检查连续的步骤
     step_order = ["K0", "K1", "K2", "K3"]
     for i in range(len(step_order) - 1):
         current_step = step_order[i]
         next_step = step_order[i + 1]
-        
+
         if current_step in existing_steps and next_step in existing_steps:
             if existing_steps[current_step] > existing_steps[next_step]:
                 details.append(f"⚠️ 时间戳乱序: {current_step}({existing_steps[current_step]}) > {next_step}({existing_steps[next_step]})")
                 warnings.append(f"{current_step}>{next_step}")
-    
+
     # 渐进式逻辑：如果K0和K1存在，允许K2/K3暂时缺失
     if "K0" in existing_steps and "K1" in existing_steps and "K2" not in existing_steps and "K3" not in existing_steps:
         status = "PASS"
@@ -416,7 +416,7 @@ def check_critical_steps(project):
         details.append("⚠️ K3步骤缺失，可能推送步骤未完成")
     else:
         status = "FAIL"
-    
+
     # 修复建议
     if status == "FAIL":
         fix = "关键步骤严重缺失，需要完整执行K0-K3流程"
@@ -439,18 +439,18 @@ def check_progress(project):
     pf = os.path.join(project, ".claude-progress.md")
     if not os.path.exists(pf):
         return {"status": "FAIL", "critical": False, "details": ["进度文件不存在"], "fix_suggestion": "创建 .claude-progress.md"}
-    
+
     with open(pf, encoding='utf-8') as progress_file:
         content = progress_file.read()
     lines = content.strip().split("\n") if content.strip() else []
     details = []
     issues = []
-    
+
     # 检查标题行
     has_title = any("# 进度" in l for l in lines)
     if not has_title:
         issues.append("缺少标题行 # 进度 - 第N轮")
-    
+
     # 检查未关闭的 ▶️
     opened = [i for i, l in enumerate(lines) if "▶️" in l]
     closed = [i for i, l in enumerate(lines) if ("✅" in l or "❌" in l)]
@@ -465,19 +465,19 @@ def check_progress(project):
                     break
             if step_marker and not found_close:
                 issues.append(f"未关闭阶段: 第{step_marker}步")
-    
+
     # 检查格式
     progress_lines = [l for l in lines if "▶️" in l or "✅" in l or "❌" in l or "🔄" in l]
     for l in progress_lines:
         if not l.strip().startswith("[") and ":" not in l[:10]:
             issues.append(f"格式不规范: {l[:50]}")
             break
-    
+
     if not issues:
         details.append(f"进度文件存在，{len(progress_lines)}条进度记录")
     else:
         details.extend(issues)
-    
+
     status = "WARN" if issues else "PASS"
     return {"status": status, "critical": False, "details": details, "fix_suggestion": "; ".join(issues[:3]) if issues else ""}
 
@@ -489,29 +489,29 @@ def check_git(project, thresholds=None):
     # 工作区是否干净
     out, rc = run("git status --porcelain", cwd=project)
     uncommitted = len(out.split("\n")) if out else 0
-    
+
     # develop vs main
     out2, rc2 = run("git rev-list main..develop --count 2>/dev/null || echo 0", cwd=project)
     try:
         ahead = int(out2)
     except:
         ahead = 0
-    
+
     details = []
     issues = []
-    
+
     if uncommitted > 0:
         issues.append(f"工作区有{uncommitted}个未提交改动")
     else:
         details.append("工作区干净")
-    
+
     if ahead > ahead_max:
         issues.append(f"develop领先main {ahead}个commit（阈值{ahead_max}）")
     elif ahead > 0:
         details.append(f"develop领先main {ahead}个commit")
     else:
         details.append("main与develop同步")
-    
+
     status = "WARN" if issues else "PASS"
     fix = "; ".join(issues)
     return {"status": status, "critical": False, "details": details, "fix_suggestion": fix}
@@ -522,23 +522,23 @@ def check_quality(project):
     k0_file = os.path.join(project, ".step-K0.done")
     if not os.path.exists(k0_file):
         return {"status": "PASS", "critical": True, "details": ["K0标记不存在，跳过质量检查"], "fix_suggestion": ""}
-    
+
     try:
         with open(k0_file, encoding='utf-8') as marker_file:
             k0_ts = int(marker_file.read().strip())
     except:
         return {"status": "PASS", "critical": True, "details": [], "fix_suggestion": ""}
-    
+
     out, rc = run(f"git log --since='{k0_ts}' --oneline", cwd=project)
     commits = [l for l in out.split("\n") if l.strip()]
-    
+
     if not commits:
         return {"status": "PASS", "critical": True, "details": ["本轮无新commit，跳过质量检查"], "fix_suggestion": ""}
-    
+
     instance_type = get_instance_type(project)
     details = [f"📊 实例类型: {instance_type}, 本轮{len(commits)}个新commit"]
     issues = []
-    
+
     # 自适应质量基线 - 根据项目类型调整检查强度
     if instance_type == "code":
         # 代码项目严格检查commit质量
@@ -552,7 +552,7 @@ def check_quality(project):
         # 其他类型中等标准
         max_bad_commits = 1
         max_file_deletion = 15
-    
+
     # 检查commit message格式 - 增强误报模式识别
     bad_commits = []
     for commit in commits:
@@ -560,9 +560,9 @@ def check_quality(project):
         # 跳过无效的commit消息格式
         if not commit_msg or len(commit_msg) < 5:
             continue
-            
+
         first_word = commit_msg.split()[0] if commit_msg.split() else ""
-        
+
         # 合法的commit类型（增强版）
         is_valid = (
             "[REQ-" in commit_msg or  # 包含需求标记
@@ -578,13 +578,13 @@ def check_quality(project):
             "自动" in commit_msg or "meta-evolve" in commit_msg or  # 自动化相关
             "自适应" in commit_msg or "质量模式" in commit_msg  # 质量优化相关
         )
-        
+
         if not is_valid:
             bad_commits.append(commit_msg)
-    
+
     if len(bad_commits) > max_bad_commits:
         issues.append(f"⚠️ commit格式: {len(bad_commits)}/{len(commits)} 个异常（阈值{max_bad_commits}）")
-    
+
     # 检查文件删除比例 - 自适应阈值
     out2, rc2 = run(f"git diff --stat --since='{k0_ts}'", cwd=project)
     if out2:
@@ -592,7 +592,7 @@ def check_quality(project):
         total_deleted = len(deleted_files)
         if total_deleted > max_file_deletion:
             issues.append(f"🗑️ 文件删除过多: {total_deleted}个（阈值{max_file_deletion}）")
-    
+
     # 根据项目类型和当前模式决定状态
     if not issues:
         status = "PASS"
@@ -603,7 +603,7 @@ def check_quality(project):
         details.append("⚠️ 质量检查有1个警告，在可接受范围内")
     else:
         status = "FAIL"
-    
+
     # 记录误报模式（如果FAIL但实际上是合理的）
     if status == "FAIL" and is_potential_false_positive(project, commits, issues):
         record_potential_false_positive(project, {
@@ -615,11 +615,11 @@ def check_quality(project):
         })
         status = "WARN"  # 降级为WARN，记录待观察
         details.insert(0, "🎯 自适应调整：检测到潜在误报，降级为WARN")
-    
+
     return {
-        "status": status, 
-        "critical": True, 
-        "details": details + issues, 
+        "status": status,
+        "critical": True,
+        "details": details + issues,
         "fix_suggestion": "; ".join(issues[:2]) if issues else ""
     }
 
@@ -628,19 +628,19 @@ def is_potential_false_positive(project, commits, issues):
     try:
         # 检查是否有质量优化相关的提交
         quality_optimizations = any(
-            "质量" in commit or "adaptive" in commit.lower() or "优化" in commit 
+            "质量" in commit or "adaptive" in commit.lower() or "优化" in commit
             for commit in commits
         )
-        
+
         # 检查是否是元迭代的自我优化
         meta_evolve_commits = any(
             "meta-evolve" in commit or "自适应" in commit or "质量模式" in commit
             for commit in commits
         )
-        
+
         # 如果有质量优化相关的提交，可能是合理的不合格
         return quality_optimizations or meta_evolve_commits
-        
+
     except:
         return False
 
@@ -649,22 +649,22 @@ def record_potential_false_positive(project, data):
     try:
         os.makedirs(os.path.join(project, "docs", "quality_patterns"), exist_ok=True)
         pattern_file = os.path.join(project, "docs", "quality_patterns", "potential_false_positives.json")
-        
+
         # 读取现有记录
         existing_records = []
         if os.path.exists(pattern_file):
-            with open(pattern_file, 'r', encoding='utf-8') as f:
+            with open(pattern_file, encoding='utf-8') as f:
                 existing_records = json.load(f)
-        
+
         # 添加新记录
         existing_records.append(data)
-        
+
         # 保持最近30条
         existing_records = existing_records[-30:]
-        
+
         with open(pattern_file, 'w', encoding='utf-8') as f:
             json.dump(existing_records, f, ensure_ascii=False, indent=2)
-            
+
     except Exception:
         pass
 
@@ -673,11 +673,11 @@ def check_report(project):
     pf = os.path.join(project, ".claude-progress.md")
     if not os.path.exists(pf):
         return {"status": "WARN", "critical": False, "details": ["进度文件不存在"], "fix_suggestion": ""}
-    
+
     with open(pf, encoding='utf-8') as progress_file:
         content = progress_file.read()
     has_push = any("推送" in l or "报告" in l for l in content.split("\n"))
-    
+
     if has_push:
         return {"status": "PASS", "critical": False, "details": ["推送记录存在"], "fix_suggestion": ""}
     else:
@@ -689,7 +689,7 @@ def check_docs_health(project, thresholds=None):
         thresholds = {}
     details = []
     issues = []
-    
+
     for fname, limit_key, default in [("RULES.md", "H1_rules_max_lines", 300), ("NOW.md", "H1_now_max_lines", 30), ("DECISIONS.md", "H1_decisions_max_items", 40)]:
         limit = thresholds.get(limit_key, default)
         fpath = os.path.join(project, "docs", fname)
@@ -702,7 +702,7 @@ def check_docs_health(project, thresholds=None):
                 details.append(f"{fname} {lines}/{limit}行")
         else:
             details.append(f"{fname} 不存在（跳过）")
-    
+
     status = "WARN" if issues else "PASS"
     return {"status": status, "critical": False, "details": details + issues, "fix_suggestion": "; ".join(issues) if issues else ""}
 
@@ -713,12 +713,12 @@ def check_req_trend(project, thresholds=None):
     req_file = os.path.join(project, "docs", "REQUIREMENTS.md")
     if not os.path.exists(req_file):
         return {"status": "PASS", "critical": False, "details": ["REQUIREMENTS.md 不存在"], "fix_suggestion": ""}
-    
+
     with open(req_file, encoding='utf-8') as requirements_file:
         content = requirements_file.read()
     details = []
     issues = []
-    
+
     # P0 attempts > 10
     import re
     high_attempts = re.findall(r'REQ-\d+.*?attempts["\s:]+(\d+)', content)
@@ -729,15 +729,15 @@ def check_req_trend(project, thresholds=None):
                 issues.append(f"REQ attempts={match}（阈值{attempt_max}）")
         except:
             pass
-    
+
     # DONE未归档
     done_count = content.count('"DONE"')
     if done_count > 0:
         issues.append(f"{done_count}个DONE需求未归档")
-    
+
     if not issues:
         details.append("需求状态正常")
-    
+
     status = "WARN" if issues else "PASS"
     return {"status": status, "critical": False, "details": details + issues, "fix_suggestion": "; ".join(issues) if issues else ""}
 
@@ -746,11 +746,11 @@ def check_feedback_loop(project):
     fb = os.path.join(project, "FEEDBACK.md")
     if not os.path.exists(fb):
         return {"status": "PASS", "critical": True, "details": ["FEEDBACK.md 不存在"], "fix_suggestion": ""}
-    
+
     with open(fb, encoding='utf-8') as feedback_file:
         content = feedback_file.read()
     pending = content.count("待处理")
-    
+
     if pending > 5:
         return {"status": "FAIL", "critical": True, "details": [f"FEEDBACK.md 有{pending}个待处理条目（阈值5）"], "fix_suggestion": "FEEDBACK.md 积压严重，需优先处理"}
     elif pending > 0:
@@ -767,17 +767,17 @@ def check_cron_alive(project, thresholds=None):
     pf = os.path.join(project, ".claude-progress.md")
     if not os.path.exists(pf):
         return {"status": "FAIL", "critical": True, "details": ["进度文件不存在，无法判断活跃度"], "fix_suggestion": "检查cron是否正常运行"}
-    
+
     import time
     mtime = os.path.getmtime(pf)
     age_min = (time.time() - mtime) / 60
-    
+
     if age_min > threshold_min:
         return {
-            "status": "FAIL", 
-            "critical": True, 
+            "status": "FAIL",
+            "critical": True,
             "details": [f"进度文件{age_min:.0f}分钟未更新（阈值{threshold_min}分钟）"],
-            "fix_suggestion": f"流程可能卡住！检查cron job状态，必要时disable→enable重置。CEO需要知道这个问题。"
+            "fix_suggestion": "流程可能卡住！检查cron job状态，必要时disable→enable重置。CEO需要知道这个问题。"
         }
     else:
         return {"status": "PASS", "critical": True, "details": [f"进度文件{age_min:.0f}分钟前更新（阈值{threshold_min}分钟）"], "fix_suggestion": ""}
@@ -788,10 +788,10 @@ def check_adaptive_thresholds(project):
         hist_file = os.path.join(project, "docs", "check-history.jsonl")
         if not os.path.exists(hist_file):
             return {"status": "PASS", "critical": False, "details": ["无历史数据，跳过阈值检查"], "fix_suggestion": ""}
-        
+
         # 分析最近10轮的质量趋势
         recent_records = []
-        with open(hist_file, 'r', encoding='utf-8') as f:
+        with open(hist_file, encoding='utf-8') as f:
             for line in f:
                 try:
                     record = json.loads(line.strip())
@@ -799,62 +799,62 @@ def check_adaptive_thresholds(project):
                         recent_records.append(record)
                 except:
                     continue
-        
+
         if len(recent_records) < 5:
             return {"status": "PASS", "critical": False, "details": ["数据不足，跳过阈值检查"], "fix_suggestion": ""}
-        
+
         # 检查质量下降趋势
         recent_fail_count = sum(1 for r in recent_records if r.get('critical_fail', False))
         recent_quality_fails = sum(1 for r in recent_records if r.get('checks', {}).get('R4_quality') == 'FAIL')
-        
+
         issues = []
-        
+
         # 如果自适应阈值启用后质量明显下降，建议回滚
         if recent_fail_count > 3:  # 最近10轮超过3次关键失败
-            issues.append("⚠️ 关键失败频发: {}次/10轮".format(recent_fail_count))
-        
+            issues.append(f"⚠️ 关键失败频发: {recent_fail_count}次/10轮")
+
         if recent_quality_fails > 4:  # R4失败次数过多
-            issues.append("⚠️ 质量检查失败: {}次/10轮".format(recent_quality_fails))
-        
+            issues.append(f"⚠️ 质量检查失败: {recent_quality_fails}次/10轮")
+
         # 检查是否有阈值调整记录
         threshold_adjustment_file = os.path.join(project, "docs", "quality_patterns", "threshold_adjustments.json")
         if os.path.exists(threshold_adjustment_file):
-            with open(threshold_adjustment_file, 'r', encoding='utf-8') as f:
+            with open(threshold_adjustment_file, encoding='utf-8') as f:
                 adjustments = json.load(f)
-            
+
             # 如果最近有阈值调整，检查是否需要回滚
-            recent_adjustments = [a for a in adjustments if a.get('timestamp') and 
+            recent_adjustments = [a for a in adjustments if a.get('timestamp') and
                                 datetime.fromisoformat(a['timestamp']) > datetime.now(timezone.utc) - timedelta(days=7)]
-            
+
             if recent_adjustments:
                 for adj in recent_adjustments:
                     if adj.get('rollback_needed', False):
                         issues.append(f"⚠️ 检测到回滚需求: {adj.get('reason', '未知原因')}")
-        
+
         if issues:
             return {
-                "status": "WARN", 
-                "critical": False, 
+                "status": "WARN",
+                "critical": False,
                 "details": issues,
                 "fix_suggestion": "考虑回滚阈值设置或重新评估质量基线"
             }
         else:
             return {"status": "PASS", "critical": False, "details": ["自适应阈值运行正常"], "fix_suggestion": ""}
-            
+
     except Exception as e:
-        return {"status": "WARN", "critical": False, "details": ["阈值检查异常: {}".format(e)], "fix_suggestion": ""}
+        return {"status": "WARN", "critical": False, "details": [f"阈值检查异常: {e}"], "fix_suggestion": ""}
 
 def record_threshold_adjustment(project, adjustment_type, old_value, new_value, reason):
     """记录阈值调整用于后续回滚判断"""
     try:
         os.makedirs(os.path.join(project, "docs", "quality_patterns"), exist_ok=True)
         adjustment_file = os.path.join(project, "docs", "quality_patterns", "threshold_adjustments.json")
-        
+
         adjustments = []
         if os.path.exists(adjustment_file):
-            with open(adjustment_file, 'r', encoding='utf-8') as f:
+            with open(adjustment_file, encoding='utf-8') as f:
                 adjustments = json.load(f)
-        
+
         adjustments.append({
             "timestamp": datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
             "type": adjustment_type,
@@ -863,13 +863,13 @@ def record_threshold_adjustment(project, adjustment_type, old_value, new_value, 
             "reason": reason,
             "rollback_needed": False  # 默认不需要回滚
         })
-        
+
         # 保持最近50条记录
         adjustments = adjustments[-50:]
-        
+
         with open(adjustment_file, 'w', encoding='utf-8') as f:
             json.dump(adjustments, f, ensure_ascii=False, indent=2)
-            
+
     except Exception:
         pass
 
@@ -887,7 +887,7 @@ def check_directory(project):
         else:
             details.append(f"{item} ❌")
             missing.append(item)
-    
+
     status = "FAIL" if missing else "PASS"
     return {"status": status, "critical": True, "details": details, "fix_suggestion": f"创建缺失: {', '.join(missing)}" if missing else ""}
 
@@ -896,13 +896,13 @@ def check_cron_config(project, cron_id=None):
     cp = os.path.join(project, ".cron-prompt.md")
     if not os.path.exists(cp):
         return {"status": "FAIL", "critical": True, "details": [".cron-prompt.md 不存在"], "fix_suggestion": "创建 .cron-prompt.md"}
-    
+
     with open(cp, encoding='utf-8') as cron_file:
         content = cron_file.read()
     size = len(content)
     if size < 100:
         return {"status": "WARN", "critical": True, "details": [f".cron-prompt.md 只有{size}字节，可能不完整"], "fix_suggestion": "补充 cron-prompt 内容"}
-    
+
     return {"status": "PASS", "critical": True, "details": [f".cron-prompt.md 存在（{size}字节）"], "fix_suggestion": ""}
 
 def check_init_docs(project):
@@ -917,7 +917,7 @@ def check_init_docs(project):
         else:
             details.append(f"{name} ❌")
             missing.append(name)
-    
+
     status = "WARN" if missing else "PASS"
     return {"status": status, "critical": False, "details": details, "fix_suggestion": f"创建缺失: {', '.join(missing)}" if missing else ""}
 
@@ -986,7 +986,7 @@ def save_history(project, output):
     docs_dir = os.path.join(project, "docs")
     os.makedirs(docs_dir, exist_ok=True)
     hist_file = os.path.join(docs_dir, "check-history.jsonl")
-    
+
     # 从 NOW.md 解析 round
     round_num = None
     now_file = os.path.join(docs_dir, "NOW.md")
@@ -996,7 +996,7 @@ def save_history(project, output):
             m = re.search(r'第\s*(\d+)\s*轮', now_handle.read())
         if m:
             round_num = int(m.group(1))
-    
+
     entry = {
         "timestamp": output["timestamp"],
         "round": round_num,
@@ -1005,12 +1005,12 @@ def save_history(project, output):
         "action_required": output["action_required"],
         "checks": {cid: r["status"] for cid, r in output["checks"].items()},
     }
-    
+
     lines = []
     if os.path.exists(hist_file):
         with open(hist_file, encoding='utf-8') as f:
             lines = f.readlines()
-    
+
     # 去重：同 round + 同 summary 跳过
     entry_str = json.dumps(entry, ensure_ascii=False)
     duplicate = False
@@ -1022,14 +1022,14 @@ def save_history(project, output):
                 break
         except:
             pass
-    
+
     if not duplicate:
         lines.append(entry_str + "\n")
-    
+
     # 截断到200行
     if len(lines) > 200:
         lines = lines[-200:]
-    
+
     with open(hist_file, "w", encoding='utf-8') as f:
         f.writelines(lines)
 
@@ -1038,37 +1038,37 @@ def analyze_trend(project):
     hist_file = os.path.join(project, "docs", "check-history.jsonl")
     if not os.path.exists(hist_file):
         return "📄 无历史数据"
-    
+
     try:
         with open(hist_file, encoding='utf-8') as f:
             all_lines = f.readlines()
     except Exception:
         return "📄 历史文件读取失败"
-    
+
     recent = all_lines[-20:]
     if not recent:
         return "📄 无历史数据"
-    
+
     records = []
     for line in recent:
         try:
             records.append(json.loads(line.strip()))
         except Exception:
             continue
-    
+
     if not records:
         return "📄 无有效历史记录"
-    
+
     # 收集所有检查项
     all_check_ids = set()
     for rec in records:
         all_check_ids.update(rec.get("checks", {}).keys())
     all_check_ids = sorted(all_check_ids)
-    
+
     lines_out = []
     lines_out.append(f"📈 趋势分析（最近 {len(records)} 条记录）")
     lines_out.append(f"{'─'*40}")
-    
+
     # 各检查项通过率
     lines_out.append("\n📋 检查项通过率:")
     for cid in all_check_ids:
@@ -1080,7 +1080,7 @@ def analyze_trend(project):
         w = statuses.count("WARN")
         f = statuses.count("FAIL")
         lines_out.append(f"  {cid}: PASS {p/total*100:.0f}% | WARN {w/total*100:.0f}% | FAIL {f/total*100:.0f}%")
-    
+
     # critical_fail 频率趋势
     lines_out.append("\n🔴 Critical Fail 频率趋势:")
     window = 5
@@ -1100,20 +1100,20 @@ def analyze_trend(project):
     else:
         total_fail = sum(1 for r in records if r.get("critical_fail"))
         lines_out.append(f"  数据不足，总计 {total_fail}/{len(records)} 次 critical fail")
-    
+
     # 最常失败的检查项 TOP3
     fail_counts = {}
     for rec in records:
         for cid, status in rec.get("checks", {}).items():
             if status == "FAIL":
                 fail_counts[cid] = fail_counts.get(cid, 0) + 1
-    
+
     if fail_counts:
         top3 = sorted(fail_counts.items(), key=lambda x: -x[1])[:3]
         lines_out.append("\n❌ 最常失败 TOP3:")
         for cid, count in top3:
             lines_out.append(f"  {cid}: {count}/{len(records)} 次")
-    
+
     return "\n".join(lines_out)
 
 def main():
@@ -1131,7 +1131,7 @@ def main():
     args = parser.parse_args()
 
     project = os.path.abspath(args.project)
-    
+
     # 加载配置
     thresholds = load_config(project)
     if args.config:
@@ -1142,7 +1142,7 @@ def main():
                 thresholds.update(data["thresholds"])
         except Exception:
             pass
-    
+
     # 命令行 --threshold 覆盖
     if args.threshold and "=" in str(args.threshold):
         key, val = args.threshold.split("=", 1)
@@ -1155,7 +1155,7 @@ def main():
             thresholds["H4_cron_alive"] = int(args.threshold)
         except ValueError:
             pass
-    
+
     # 趋势分析模式
     if args.trend:
         trend = analyze_trend(project)
@@ -1166,7 +1166,7 @@ def main():
         sys.exit(0)
 
     project = os.path.abspath(args.project)
-    
+
     # 确定检查项
     checks = {}
     if args.check:
@@ -1261,13 +1261,13 @@ def record_threshold_decision(project, check_id, decision, data):
     try:
         os.makedirs(os.path.join(project, "docs", "quality_patterns"), exist_ok=True)
         decision_file = os.path.join(project, "docs", "quality_patterns", "threshold_adjustments.json")
-        
+
         # 读取现有决策
         existing_decisions = []
         if os.path.exists(decision_file):
-            with open(decision_file, 'r', encoding='utf-8') as f:
+            with open(decision_file, encoding='utf-8') as f:
                 existing_decisions = json.load(f)
-        
+
         # 添加新决策
         new_decision = {
             "timestamp": datetime.now(timezone.utc).isoformat(),
@@ -1276,17 +1276,17 @@ def record_threshold_decision(project, check_id, decision, data):
             "data": data,
             "rollback_needed": data.get("learning_score", 0) < 0.3  # 学习分数过低需要回滚
         }
-        
+
         existing_decisions.append(new_decision)
-        
+
         # 保持最近100条记录
         existing_decisions = existing_decisions[-100:]
-        
+
         # 写入文件
         with open(decision_file, 'w', encoding='utf-8') as f:
             json.dump(existing_decisions, f, ensure_ascii=False, indent=2)
-        
-    except Exception as e:
+
+    except Exception:
         # 记录失败不影响主流程
         pass
 

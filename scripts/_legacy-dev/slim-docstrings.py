@@ -9,7 +9,7 @@ SLIM_DOCS = {
     "excel_list_sheets": '列出Excel文件中的所有工作表名称。查询前先用此工具确认工作表存在。',
 
     "excel_search": '在Excel中搜索匹配pattern的单元格。支持正则、大小写、全词匹配。',
-    
+
     "excel_search_directory": '在目录下所有Excel文件中搜索内容。支持文件类型过滤和递归搜索。',
 
     "excel_get_range": '读取指定范围的数据。返回{headers, data, shape}。支持include_formatting获取样式。',
@@ -132,7 +132,7 @@ def slim_docstring(name: str, original: str) -> str:
 
 
 def main():
-    with open('src/excel_mcp_server_fastmcp/server.py', 'r', encoding='utf-8') as f:
+    with open('src/excel_mcp_server_fastmcp/server.py', encoding='utf-8') as f:
         content = f.read()
 
     # Match: @mcp.tool() ... def excel_xxx(...): \n    """..."""
@@ -148,7 +148,7 @@ def main():
         name = m.group(2)
         original_doc = m.group(3)
         total_before += len(original_doc)
-        
+
         new_doc = slim_docstring(name, original_doc)
         new_doc_block = f'    """{new_doc}"""'
         total_after += len(new_doc_block)

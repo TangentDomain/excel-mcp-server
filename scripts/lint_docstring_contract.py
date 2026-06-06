@@ -18,7 +18,6 @@ import argparse
 import ast
 import sys
 from pathlib import Path
-from typing import Dict, List, Tuple, Set, Optional
 
 
 class DocstringValidator:
@@ -51,7 +50,7 @@ class DocstringValidator:
             return True
         return False
 
-    def get_function_signatures(self, file_path: Path) -> Dict[str, Tuple[List[str], Dict[str, Optional[str]], List[str]]]:
+    def get_function_signatures(self, file_path: Path) -> dict[str, tuple[list[str], dict[str, str | None], list[str]]]:
         """Extract function signatures from Python file.
 
         Returns:
@@ -61,7 +60,7 @@ class DocstringValidator:
             - param_names: ordered list of all parameter names
         """
         try:
-            with open(file_path, 'r', encoding='utf-8') as f:
+            with open(file_path, encoding='utf-8') as f:
                 content = f.read()
         except Exception as e:
             self.warnings.append(f"{file_path}: | 文件读取失败: {e}")
@@ -115,7 +114,7 @@ class DocstringValidator:
 
         return functions
 
-    def parse_docstring_args(self, docstring: str) -> Dict[str, Optional[str]]:
+    def parse_docstring_args(self, docstring: str) -> dict[str, str | None]:
         """Extract parameter documentation from docstring.
 
         Returns:
@@ -151,7 +150,7 @@ class DocstringValidator:
 
         return params
 
-    def _parse_param_lines(self, section: str) -> Dict[str, Optional[str]]:
+    def _parse_param_lines(self, section: str) -> dict[str, str | None]:
         """Parse parameter lines from a docstring section."""
         params = {}
         lines = section.strip().split('\n')
@@ -186,14 +185,14 @@ class DocstringValidator:
 
         return params
 
-    def get_docstring_params(self, file_path: Path) -> Dict[str, Dict[str, Optional[str]]]:
+    def get_docstring_params(self, file_path: Path) -> dict[str, dict[str, str | None]]:
         """Extract parameter documentation from all functions in a file.
 
         Returns:
             Dict mapping function name to dict of {param_name: default_value_or_None}
         """
         try:
-            with open(file_path, 'r', encoding='utf-8') as f:
+            with open(file_path, encoding='utf-8') as f:
                 content = f.read()
         except Exception as e:
             self.warnings.append(f"{file_path}: | 文件读取失败: {e}")
@@ -224,7 +223,7 @@ class DocstringValidator:
     def has_docstring(self, file_path: Path, func_name: str) -> bool:
         """Check if a function has any docstring at all."""
         try:
-            with open(file_path, 'r', encoding='utf-8') as f:
+            with open(file_path, encoding='utf-8') as f:
                 content = f.read()
         except Exception:
             return False
@@ -242,7 +241,7 @@ class DocstringValidator:
 
         return False
 
-    def validate_file(self, file_path: Path) -> List[str]:
+    def validate_file(self, file_path: Path) -> list[str]:
         """Validate all functions in a single Python file.
 
         Returns:
@@ -326,7 +325,7 @@ class DocstringValidator:
         return value
 
 
-def lint_docstring_contract(src_dir: str) -> List[str]:
+def lint_docstring_contract(src_dir: str) -> list[str]:
     """Validate docstring contracts for all Python files in a directory.
 
     Args:

@@ -11,12 +11,11 @@
   python3 scripts/progress.py archive-round 21
 """
 
-import json
-import os
-import sys
 import argparse
+import json
 from datetime import datetime
 from pathlib import Path
+
 
 def get_project_root():
     """获取项目根目录"""
@@ -35,7 +34,7 @@ def get_archive_dir(round_num):
 def init_progress_file(step, round_num):
     """初始化进度文件"""
     progress_file = get_progress_file(step)
-    
+
     # 定义各步骤的子步骤
     sub_steps_config = {
         "K0": [
@@ -69,7 +68,7 @@ def init_progress_file(step, round_num):
             {"name": "push_reports", "description": "推送报告到飞书和QQ"}
         ]
     }
-    
+
     progress_data = {
         "round": round_num,
         "step": step,
@@ -78,10 +77,10 @@ def init_progress_file(step, round_num):
         "context": {},
         "outputs": {}
     }
-    
+
     with open(progress_file, 'w', encoding='utf-8') as f:
         json.dump(progress_data, f, indent=2, ensure_ascii=False)
-    
+
     print(f"✅ 初始化进度文件: {progress_file}")
     return progress_file
 
@@ -90,8 +89,8 @@ def load_progress(step):
     progress_file = get_progress_file(step)
     if not progress_file.exists():
         return None
-    
-    with open(progress_file, 'r', encoding='utf-8') as f:
+
+    with open(progress_file, encoding='utf-8') as f:
         return json.load(f)
 
 def save_progress(progress_data):
@@ -106,7 +105,7 @@ def mark_substep_done(step, substep_name, output_data=None):
     if not progress_data:
         print(f"❌ 进度文件不存在: {step}")
         return False
-    
+
     # 查找并更新子步骤
     for substep in progress_data["sub_steps"]:
         if substep["name"] == substep_name:
@@ -118,11 +117,11 @@ def mark_substep_done(step, substep_name, output_data=None):
     else:
         print(f"❌ 子步骤不存在: {substep_name}")
         return False
-    
+
     # 更新上下文
     if "round" not in progress_data["context"]:
         progress_data["context"]["round"] = progress_data["round"]
-    
+
     save_progress(progress_data)
     print(f"✅ 子步骤完成: {step}.{substep_name}")
     return True
@@ -135,21 +134,21 @@ def get_next_substep(step):
         project_root = get_project_root()
         init_progress_file(step, get_current_round())
         return progress_data["sub_steps"][0] if progress_data else None
-    
+
     # 找到第一个未完成的子步骤
     for substep in progress_data["sub_steps"]:
         if substep.get("status") != "done":
             return substep
-    
+
     return None
 
 def get_current_round():
     """获取当前轮次"""
     project_root = get_project_root()
     now_file = project_root / "docs" / "NOW.md"
-    
+
     if now_file.exists():
-        with open(now_file, 'r', encoding='utf-8') as f:
+        with open(now_file, encoding='utf-8') as f:
             content = f.read()
             for line in content.split('\n'):
                 if '第' in line and '轮' in line:
@@ -158,17 +157,17 @@ def get_current_round():
                     match = re.search(r'第(\d+)轮', line)
                     if match:
                         return int(match.group(1))
-    
+
     return 21  # 默认轮次
 
 def archive_progress(round_num):
     """归档当前轮次的进度文件"""
     project_root = get_project_root()
     archive_dir = get_archive_dir(round_num)
-    
+
     # 创建归档目录
     archive_dir.mkdir(parents=True, exist_ok=True)
-    
+
     # 移动进度文件
     for step in ["K0", "K1", "K2", "K3"]:
         progress_file = get_progress_file(step)
@@ -176,7 +175,7 @@ def archive_progress(round_num):
             archive_file = archive_dir / f"progress-{step}.json"
             progress_file.rename(archive_file)
             print(f"📁 归档进度文件: {progress_file} -> {archive_file}")
-    
+
     print(f"✅ 轮次 {round_num} 进度已归档到: {archive_dir}")
 
 def check_step_exists(step):
@@ -187,45 +186,45 @@ def check_step_exists(step):
 def main():
     parser = argparse.ArgumentParser(description="元迭代进度管理工具")
     subparsers = parser.add_subparsers(dest='command', help='可用命令')
-    
+
     # 检查步骤
     check_parser = subparsers.add_parser('check-step', help='检查步骤状态')
     check_parser.add_argument('step', choices=['K0', 'K1', 'K2', 'K3'], help='步骤名称')
-    
+
     # 标记子步骤完成
     mark_parser = subparsers.add_parser('mark-step', help='标记子步骤完成')
     mark_parser.add_argument('step', choices=['K0', 'K1', 'K2', 'K3'], help='步骤名称')
     mark_parser.add_argument('substep', help='子步骤名称')
     mark_parser.add_argument('--output', help='输出数据（JSON格式）')
-    
+
     # 获取进度
     get_parser = subparsers.add_parser('get-progress', help='获取进度信息')
     get_parser.add_argument('step', choices=['K0', 'K1', 'K2', 'K3'], help='步骤名称')
-    
+
     # 归档轮次
     archive_parser = subparsers.add_parser('archive-round', help='归档轮次进度')
     archive_parser.add_argument('round', type=int, help='轮次号')
-    
+
     # 初始化进度文件
     init_parser = subparsers.add_parser('init', help='初始化指定步骤的进度文件')
     init_parser.add_argument('step', choices=['K0', 'K1', 'K2', 'K3'], help='步骤名称')
-    
+
     args = parser.parse_args()
-    
+
     if not args.command:
         parser.print_help()
         return
-    
+
     if args.command == 'check-step':
         exists = check_step_exists(args.step)
         print(f"步骤 {args.step}: {'存在' if exists else '不存在'}")
-        
+
         if exists:
             progress = load_progress(args.step)
             print(f"开始时间: {progress.get('started_at', 'N/A')}")
             completed = [s for s in progress.get('sub_steps', []) if s.get('status') == 'done']
             print(f"完成子步骤: {len(completed)}/{len(progress.get('sub_steps', []))}")
-    
+
     elif args.command == 'mark-step':
         output_data = None
         if args.output:
@@ -234,24 +233,24 @@ def main():
             except json.JSONDecodeError:
                 print("❌ 输出数据格式错误，应为JSON")
                 return
-        
+
         success = mark_substep_done(args.step, args.substep, output_data)
         if success:
             print(f"✅ {args.step}.{args.substep} 已标记为完成")
         else:
             print(f"❌ 标记失败: {args.step}.{args.substep}")
-    
+
     elif args.command == 'get-progress':
         progress = load_progress(args.step)
         if progress:
             print(json.dumps(progress, indent=2, ensure_ascii=False))
         else:
             print(f"❌ 进度文件不存在: {args.step}")
-    
+
     elif args.command == 'archive-round':
         archive_progress(args.round)
         print(f"✅ 轮次 {args.round} 已归档")
-    
+
     elif args.command == 'init':
         round_num = get_current_round()
         init_progress_file(args.step, round_num)

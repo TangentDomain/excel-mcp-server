@@ -5,10 +5,11 @@
      WHERE EXISTS边界、复杂表达式边界、数据类型边界
 """
 
-import subprocess
 import json
-import tempfile
 import os
+import subprocess
+import tempfile
+
 from openpyxl import Workbook
 
 

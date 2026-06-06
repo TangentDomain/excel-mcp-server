@@ -4,6 +4,7 @@ Tests the server.py tool wrapper: validation, decorator chain,
 and result format. Does not re-test script_runner internals."""
 
 import pytest
+
 from excel_mcp_server_fastmcp.server import excel_run_python
 
 

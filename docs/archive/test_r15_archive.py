@@ -3,9 +3,10 @@
 验证StreamingWriter使用write_only模式写入后，所有读取工具仍能正常工作。
 核心问题：write_only模式不写<dimension>元数据，导致read_only模式下max_row/max_column返回None。
 """
-import pytest
-import tempfile
 import os
+import tempfile
+
+import pytest
 from openpyxl import Workbook
 
 
@@ -114,8 +115,8 @@ class TestStreamingWriteReadCompat:
 
     def test_sql_query_after_streaming(self, streamed_file):
         """SQL查询在流式写入后应正常工作"""
-        from src.excel_mcp_server_fastmcp.core.streaming_writer import StreamingWriter
         from src.excel_mcp_server_fastmcp.api.advanced_sql_query import AdvancedSQLQueryEngine
+        from src.excel_mcp_server_fastmcp.core.streaming_writer import StreamingWriter
 
         StreamingWriter.batch_insert_rows(streamed_file, "技能表", [
             {"技能ID": 6, "名称": "streamed", "伤害": 600, "类型": "fire"},
@@ -130,8 +131,8 @@ class TestStreamingWriteReadCompat:
 
     def test_sql_join_after_streaming(self, streamed_file):
         """SQL JOIN在流式写入后应正常工作"""
-        from src.excel_mcp_server_fastmcp.core.streaming_writer import StreamingWriter
         from src.excel_mcp_server_fastmcp.api.advanced_sql_query import AdvancedSQLQueryEngine
+        from src.excel_mcp_server_fastmcp.core.streaming_writer import StreamingWriter
 
         StreamingWriter.batch_insert_rows(streamed_file, "技能表", [
             {"技能ID": 6, "名称": "streamed", "伤害": 600, "类型": "fire"},

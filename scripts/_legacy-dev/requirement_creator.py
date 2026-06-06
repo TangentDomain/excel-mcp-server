@@ -8,7 +8,6 @@ import json
 import os
 import re
 from datetime import datetime
-from typing import Dict, List, Optional
 
 
 class RequirementCreator:
@@ -24,10 +23,10 @@ class RequirementCreator:
         """
         self.test_results_path = test_results_path
         self.requirements_path = requirements_path
-        self.failed_cases: List[Dict] = []
-        self.generated_requirements: List[Dict] = []
+        self.failed_cases: list[dict] = []
+        self.generated_requirements: list[dict] = []
 
-    def parse_test_results(self) -> List[Dict]:
+    def parse_test_results(self) -> list[dict]:
         """解析测试结果 markdown，提取 FAIL/ERROR 案例
 
         Returns:
@@ -38,7 +37,7 @@ class RequirementCreator:
             return []
 
         try:
-            with open(self.test_results_path, 'r', encoding='utf-8') as f:
+            with open(self.test_results_path, encoding='utf-8') as f:
                 content = f.read()
 
             # 解析 markdown 中的测试用例
@@ -62,7 +61,7 @@ class RequirementCreator:
             print(f"解析测试结果失败: {e}")
             return []
 
-    def _parse_single_test_case(self, test_block: str) -> Optional[Dict]:
+    def _parse_single_test_case(self, test_block: str) -> dict | None:
         """解析单个测试用例
 
         Args:
@@ -100,7 +99,7 @@ class RequirementCreator:
             print(f"解析单个测试用例失败: {e}")
             return None
 
-    def convert_to_requirement(self, case: Dict) -> Dict:
+    def convert_to_requirement(self, case: dict) -> dict:
         """将失败案例转换为 REQUIREMENTS.md 格式
 
         Args:
@@ -142,7 +141,7 @@ class RequirementCreator:
         """
         try:
             if os.path.exists(self.requirements_path):
-                with open(self.requirements_path, 'r', encoding='utf-8') as f:
+                with open(self.requirements_path, encoding='utf-8') as f:
                     data = json.load(f)
 
                 requirements = data.get('REQUIREMENTS', {})
@@ -164,7 +163,7 @@ class RequirementCreator:
         # 默认从 66 开始（避免与现有需求冲突）
         return 66
 
-    def _determine_priority(self, case: Dict) -> str:
+    def _determine_priority(self, case: dict) -> str:
         """根据失败案例确定优先级
 
         Args:
@@ -194,7 +193,7 @@ class RequirementCreator:
         # P3: 其他
         return "P3"
 
-    def _build_title(self, case: Dict) -> str:
+    def _build_title(self, case: dict) -> str:
         """构建需求标题
 
         Args:
@@ -222,7 +221,7 @@ class RequirementCreator:
 
         return title
 
-    def _build_description(self, case: Dict) -> str:
+    def _build_description(self, case: dict) -> str:
         """构建需求描述
 
         Args:
@@ -253,7 +252,7 @@ class RequirementCreator:
 
         return "\n".join(parts)
 
-    def _build_notes(self, case: Dict) -> str:
+    def _build_notes(self, case: dict) -> str:
         """构建需求备注
 
         Args:
@@ -299,7 +298,7 @@ class RequirementCreator:
         # 检查是否已存在相同需求
         if os.path.exists(self.requirements_path):
             try:
-                with open(self.requirements_path, 'r', encoding='utf-8') as f:
+                with open(self.requirements_path, encoding='utf-8') as f:
                     data = json.load(f)
 
                 existing_requirements = data.get('REQUIREMENTS', {})
@@ -351,7 +350,7 @@ class RequirementCreator:
         try:
             # 读取现有需求
             if os.path.exists(self.requirements_path):
-                with open(self.requirements_path, 'r', encoding='utf-8') as f:
+                with open(self.requirements_path, encoding='utf-8') as f:
                     data = json.load(f)
             else:
                 data = {"REQUIREMENTS": {}}

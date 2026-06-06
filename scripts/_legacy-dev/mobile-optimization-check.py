@@ -4,36 +4,36 @@
 识别并改善文档的移动端友好性、导航结构和交互体验
 """
 
-import os
-import re
 import json
+import re
 from pathlib import Path
+
 
 def analyze_readme_mobile_friendly():
     """分析README.md的移动端友好性"""
     readme_path = Path("README.md")
     if not readme_path.exists():
         return {"error": "README.md not found"}
-    
-    with open(readme_path, 'r', encoding='utf-8') as f:
+
+    with open(readme_path, encoding='utf-8') as f:
         content = f.read()
-    
+
     analysis = {
         "mobile_friendly_issues": [],
         "navigation_issues": [],
         "interaction_issues": [],
         "content_structure": {}
     }
-    
+
     # 检查表格移动端友好性
     table_pattern = r'\|[^|]+\|[^|]+\|[^|]+\|'
     tables = re.findall(table_pattern, content)
-    
+
     if len(tables) > 2:
         analysis["mobile_friendly_issues"].append(
             "发现复杂表格，在移动端可能显示不全"
         )
-    
+
     # 检查代码块长度
     code_blocks = re.findall(r'```.*?```', content, re.DOTALL)
     for i, block in enumerate(code_blocks):
@@ -41,16 +41,16 @@ def analyze_readme_mobile_friendly():
             analysis["mobile_friendly_issues"].append(
                 f"代码块{i+1}过长({len(block)}字符)，移动端需要滚动"
             )
-    
+
     # 检查导航结构
     headers = re.findall(r'^#+\s+(.+)$', content, re.MULTILINE)
     analysis["content_structure"]["headers"] = headers
     analysis["content_structure"]["header_count"] = len(headers)
-    
+
     # 检查内部链接
     internal_links = re.findall(r'\[([^\]]+)\]\(([^)]+)\)', content)
     analysis["content_structure"]["internal_links"] = internal_links
-    
+
     return analysis
 
 def generate_mobile_optimizations():
@@ -267,12 +267,12 @@ function highlightSearchTerm(term) {
 def main():
     """主执行函数"""
     print("开始用户体验优化检查...")
-    
+
     # 分析当前状态
     analysis = analyze_readme_mobile_friendly()
     print("当前状态分析:")
     print(json.dumps(analysis, indent=2, ensure_ascii=False))
-    
+
     # 生成优化建议
     optimizations = generate_mobile_optimizations()
     print("\n优化建议:")
@@ -280,24 +280,24 @@ def main():
         print(f"\n{details['title']}:")
         for change in details['changes']:
             print(f"  - {change}")
-    
+
     # 创建优化文件
     print("\n创建优化文件...")
-    
+
     # 创建移动端CSS
     css_content = create_mobile_friendly_css()
     with open('docs/mobile-friendly.css', 'w', encoding='utf-8') as f:
         f.write(css_content)
     print("✅ 创建移动端样式文件: docs/mobile-friendly.css")
-    
+
     # 创建交互JavaScript
     js_content = create_interactive_js()
     with open('docs/mobile-friendly.js', 'w', encoding='utf-8') as f:
         f.write(js_content)
     print("✅ 创建交互功能文件: docs/mobile-friendly.js")
-    
+
     # 创建移动端优化说明文档
-    optimization_doc = f"""# 移动端优化实施指南
+    optimization_doc = """# 移动端优化实施指南
 
 ## 🎯 优化目标
 提升文档在移动设备上的可读性和交互体验
@@ -367,7 +367,7 @@ def main():
     with open('docs/mobile-friendly-optimization.md', 'w', encoding='utf-8') as f:
         f.write(optimization_doc)
     print("✅ 创建优化说明文档: docs/mobile-friendly-optimization.md")
-    
+
     print("\n🎉 移动端用户体验优化完成!")
     print("主要改进：")
     print("  - 响应式表格和代码块")

@@ -1,8 +1,9 @@
 """Generate performance report Excel from pytest --durations=0 output."""
 import re
 from pathlib import Path
+
 from openpyxl import Workbook
-from openpyxl.styles import Font, Alignment, PatternFill
+from openpyxl.styles import Alignment, Font, PatternFill
 from openpyxl.utils import get_column_letter
 
 # Read raw pytest output
@@ -161,6 +162,6 @@ print(f"Saved to {output_path}")
 print(f"Total tests: {len(rows)}")
 print(f"Tests >= 1.0s: {sum(1 for r in rows if r['total_s'] >= 1.0)}")
 print(f"Tests 0.3-1.0s: {sum(1 for r in rows if 0.3 <= r['total_s'] < 1.0)}")
-print(f"\nTop 10 slowest:")
+print("\nTop 10 slowest:")
 for r in rows[:10]:
     print(f"  {r['total_s']:.3f}s  {r['file']}::{r['test']}")

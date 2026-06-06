@@ -4,10 +4,11 @@
 聚焦：图表操作边界、数据透视表边界、验证规则边界、格式化边界、文件操作边界
 """
 
-import subprocess
 import json
-import tempfile
 import os
+import subprocess
+import tempfile
+
 from openpyxl import Workbook
 
 
@@ -433,7 +434,7 @@ if __name__ == "__main__":
     stats = tester.print_summary()
 
     # 生成markdown文档内容
-    markdown = f"""
+    markdown = """
 ## 2026-04-03 第273轮
 
 """

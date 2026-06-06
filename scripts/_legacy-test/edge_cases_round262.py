@@ -12,29 +12,26 @@ import tempfile
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', 'src'))
 
 from openpyxl import Workbook, load_workbook
+
 from excel_mcp_server_fastmcp.server import (
-    excel_create_sheet,
-    excel_delete_sheet,
-    excel_rename_sheet,
-    excel_copy_sheet,
-    excel_search,
-    excel_get_headers,
-    excel_find_last_row,
-    excel_insert_rows,
-    excel_insert_columns,
-    excel_update_range,
-    excel_merge_cells,
-    excel_unmerge_cells,
-    excel_set_formula,
-    excel_format_cells,
-    excel_set_data_validation,
-    excel_query,
-    excel_compare_sheets,
-    excel_export_to_csv,
     excel_batch_insert_rows,
-    excel_list_sheets,
-    excel_upsert_row,
+    excel_compare_sheets,
+    excel_copy_sheet,
+    excel_create_sheet,
     excel_delete_rows,
+    excel_export_to_csv,
+    excel_find_last_row,
+    excel_format_cells,
+    excel_get_headers,
+    excel_insert_columns,
+    excel_list_sheets,
+    excel_merge_cells,
+    excel_query,
+    excel_rename_sheet,
+    excel_search,
+    excel_set_data_validation,
+    excel_update_range,
+    excel_upsert_row,
 )
 
 
@@ -108,7 +105,7 @@ def test_T317():
         list_result = excel_list_sheets(path)
         sheets = list_result.get('sheets', [])
         assert name_31 in sheets, f"31-char sheet not in list: {sheets}"
-        return f"Created and listed 31-char sheet name successfully"
+        return "Created and listed 31-char sheet name successfully"
     finally:
         os.unlink(path)
 
@@ -320,7 +317,7 @@ def test_T332():
         result = excel_export_to_csv(path, csv_path)
         assert result.get('success'), f"Export CSV failed: {result}"
         assert os.path.exists(csv_path), "CSV file not created"
-        with open(csv_path, 'r', encoding='utf-8') as f:
+        with open(csv_path, encoding='utf-8') as f:
             content = f.read()
         assert "Alice" in content and "Beijing" in content, "Data missing from CSV"
         return "CSV export verified with correct content"

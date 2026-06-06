@@ -8,10 +8,7 @@ import argparse
 import json
 import os
 import re
-import sys
 from datetime import datetime
-from typing import Dict, List, Optional
-from urllib.parse import quote, urlencode
 
 
 class EdgeCaseCollector:
@@ -37,7 +34,7 @@ class EdgeCaseCollector:
             "Excel calculation error"
         ]
 
-    def _load_existing_cases(self) -> Dict[str, Dict]:
+    def _load_existing_cases(self) -> dict[str, dict]:
         """加载已存在的边缘案例
         
         Returns:
@@ -45,14 +42,14 @@ class EdgeCaseCollector:
         """
         if os.path.exists(self.output_path):
             try:
-                with open(self.output_path, 'r', encoding='utf-8') as f:
+                with open(self.output_path, encoding='utf-8') as f:
                     data = json.load(f)
                 return {case['title']: case for case in data.get('edge_cases', [])}
             except Exception as e:
                 print(f"加载现有案例失败: {e}")
         return {}
 
-    def _save_cases(self, cases: List[Dict]) -> None:
+    def _save_cases(self, cases: list[dict]) -> None:
         """保存边缘案例到 JSON 文件
         
         Args:
@@ -97,7 +94,7 @@ class EdgeCaseCollector:
         else:
             return "low"
 
-    def _parse_stackoverflow_item(self, item: Dict) -> Optional[Dict]:
+    def _parse_stackoverflow_item(self, item: dict) -> dict | None:
         """解析 Stack Overflow 问答项
         
         Args:
@@ -154,7 +151,7 @@ class EdgeCaseCollector:
         text = re.sub(r'\s+', ' ', text)
         return text.strip()[:500]
 
-    def _extract_steps(self, text: str) -> List[str]:
+    def _extract_steps(self, text: str) -> list[str]:
         """从文本中提取操作步骤
         
         Args:
@@ -170,17 +167,17 @@ class EdgeCaseCollector:
             r'first,\s*([^.]+)',
             r'when i\s*([^.]+)',
         ]
-        
+
         for pattern in patterns:
             matches = re.finditer(pattern, text, re.IGNORECASE)
             for match in matches:
                 step = match.group(1).strip()
                 if len(step) > 10:
                     steps.append(step[:200])
-        
+
         return steps[:5]
 
-    def search_stackoverflow(self, max_results: int = 20) -> List[Dict]:
+    def search_stackoverflow(self, max_results: int = 20) -> list[dict]:
         """搜索 Stack Overflow 获取 Excel 相关问题
         
         Args:
@@ -190,12 +187,12 @@ class EdgeCaseCollector:
             边缘案例列表
         """
         cases = []
-        
+
         for keyword in self.search_keywords:
             try:
                 query = f"{keyword} [excel]"
-                url = f"https://api.stackexchange.com/2.3/search/advanced"
-                
+                url = "https://api.stackexchange.com/2.3/search/advanced"
+
                 params = {
                     'order': 'desc',
                     'sort': 'votes',
@@ -206,25 +203,25 @@ class EdgeCaseCollector:
                     'site': 'stackoverflow',
                     'filter': 'withbody'
                 }
-                
+
                 import requests
                 response = requests.get(url, params=params, timeout=30)
                 response.raise_for_status()
                 data = response.json()
-                
+
                 for item in data.get('items', []):
                     case = self._parse_stackoverflow_item(item)
                     if case:
                         cases.append(case)
                         self.existing_cases[case['title']] = case
-                        
+
             except Exception as e:
                 print(f"搜索 Stack Overflow 失败 ({keyword}): {e}")
                 continue
 
         return cases
 
-    def search_github_issues(self, repos: List[str] = None, max_per_repo: int = 5) -> List[Dict]:
+    def search_github_issues(self, repos: list[str] = None, max_per_repo: int = 5) -> list[dict]:
         """搜索 GitHub Issues 获取 Excel 相关问题
         
         Args:
@@ -241,9 +238,9 @@ class EdgeCaseCollector:
                 "closedxml/closedxml",
                 "microsoft/Excel-JS"
             ]
-        
+
         cases = []
-        
+
         for repo in repos:
             try:
                 url = f"https://api.github.com/repos/{repo}/issues"
@@ -254,26 +251,26 @@ class EdgeCaseCollector:
                     'per_page': max_per_repo,
                     'labels': 'bug'
                 }
-                
+
                 import requests
                 response = requests.get(url, params=params, timeout=30)
                 response.raise_for_status()
                 data = response.json()
-                
+
                 for issue in data:
                     if 'pull_request' in issue:
                         continue
-                    
+
                     title = issue.get('title', '')
                     if not title or self._is_duplicate(title):
                         continue
-                    
+
                     priority = self._calculate_priority(
                         issue.get('comments', 0) * 10,
                         issue.get('comments', 0),
                         issue.get('reactions', {}).get('+1', 0)
                     )
-                    
+
                     case = {
                         'title': title,
                         'description': self._clean_text(issue.get('body', '')),
@@ -289,37 +286,37 @@ class EdgeCaseCollector:
                         'priority': priority,
                         'discovered_at': datetime.now().isoformat()
                     }
-                    
+
                     cases.append(case)
                     self.existing_cases[case['title']] = case
-                    
+
             except Exception as e:
                 print(f"搜索 GitHub Issues 失败 ({repo}): {e}")
                 continue
 
         return cases
 
-    def discover_edge_cases(self) -> List[Dict]:
+    def discover_edge_cases(self) -> list[dict]:
         """发现并收集边缘案例
         
         Returns:
             所有发现的边缘案例列表
         """
         all_cases = []
-        
+
         print("正在搜索 Stack Overflow...")
         so_cases = self.search_stackoverflow()
         all_cases.extend(so_cases)
         print(f"从 Stack Overflow 发现 {len(so_cases)} 个案例")
-        
+
         print("正在搜索 GitHub Issues...")
         gh_cases = self.search_github_issues()
         all_cases.extend(gh_cases)
         print(f"从 GitHub 发现 {len(gh_cases)} 个案例")
-        
+
         return all_cases
 
-    def get_recent_high_priority_cases(self, limit: int = 10) -> List[Dict]:
+    def get_recent_high_priority_cases(self, limit: int = 10) -> list[dict]:
         """获取最近发现的高优先级边缘案例
         
         Args:
@@ -330,16 +327,16 @@ class EdgeCaseCollector:
         """
         cases = list(self.existing_cases.values())
         high_priority = [c for c in cases if c['priority'] == 'high']
-        
+
         # 按发现时间倒序排序
         high_priority.sort(
             key=lambda x: x.get('discovered_at', ''),
             reverse=True
         )
-        
+
         return high_priority[:limit]
 
-    def get_recent_cases(self, max_count: int = 5) -> List[Dict]:
+    def get_recent_cases(self, max_count: int = 5) -> list[dict]:
         """返回最近发现的高优先级边缘案例
         
         Args:
@@ -350,7 +347,7 @@ class EdgeCaseCollector:
         """
         return self.get_recent_high_priority_cases(limit=max_count)
 
-    def convert_to_test_case(self, case: Dict) -> str:
+    def convert_to_test_case(self, case: dict) -> str:
         """将边缘案例转换为测试用例格式
         
         Args:
@@ -376,7 +373,7 @@ class EdgeCaseCollector:
                 test_case += f"{i}. {step}\n"
         else:
             test_case += "暂无详细步骤\n"
-        
+
         test_case += f"""
 ## 预期结果
 {case.get('expected', '待补充')}
@@ -400,10 +397,10 @@ class EdgeCaseCollector:
         """
         cases = self.get_recent_cases()
         test_cases = []
-        
+
         for case in cases:
             test_cases.append(self.convert_to_test_case(case))
-        
+
         return "\n\n" + "=" * 50 + "\n\n".join(test_cases)
 
     def run(self) -> None:
@@ -411,30 +408,30 @@ class EdgeCaseCollector:
         print("=" * 50)
         print("边缘案例自动发现工具")
         print("=" * 50)
-        
+
         new_cases = self.discover_edge_cases()
-        
+
         if not new_cases:
             print("未发现新的边缘案例")
             return
-        
+
         # 加载现有案例
         existing_list = list(self.existing_cases.values())
-        
+
         # 合并新旧案例
         all_cases = existing_list + new_cases
-        
+
         # 去重（以标题为键）
         unique_cases = {case['title']: case for case in all_cases}
         final_cases = list(unique_cases.values())
-        
+
         # 按优先级排序
         priority_order = {'high': 0, 'medium': 1, 'low': 2}
         final_cases.sort(key=lambda x: (priority_order.get(x['priority'], 3), -x['score']))
-        
+
         # 保存
         self._save_cases(final_cases)
-        
+
         print("=" * 50)
         print(f"总计: {len(final_cases)} 个边缘案例")
         print(f"新增: {len(new_cases)} 个案例")
@@ -473,16 +470,16 @@ def main():
         default='docs/edge_cases.json',
         help='输出文件路径（默认: docs/edge_cases.json）'
     )
-    
+
     args = parser.parse_args()
-    
+
     collector = EdgeCaseCollector(output_path=args.output)
-    
+
     if args.recent:
         cases = collector.get_recent_high_priority_cases(limit=args.limit)
         print(f"\n最近发现的高优先级边缘案例 ({len(cases)} 个):\n")
         print("=" * 50)
-        
+
         for i, case in enumerate(cases, 1):
             if args.format_test_cases:
                 print(collector.convert_to_test_case(case))
