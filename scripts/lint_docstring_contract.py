@@ -24,11 +24,11 @@ class DocstringValidator:
     """Validates docstring contracts against function signatures."""
 
     # Functions that require full Args/Parameters validation (explicit allowlist)
-    STRICT_FUNCTIONS = {'execute_advanced_sql_query'}
+    STRICT_FUNCTIONS = {"execute_advanced_sql_query"}
 
     # Functions that only need a docstring present (no Args check)
-    RELAXED_PREFIXES = ('register_',)
-    RELAXED_SUFFIXES = ('_resource',)
+    RELAXED_PREFIXES = ("register_",)
+    RELAXED_SUFFIXES = ("_resource",)
 
     def __init__(self):
         self.errors = []
@@ -42,7 +42,7 @@ class DocstringValidator:
     @staticmethod
     def is_relaxed_function(func_name: str) -> bool:
         """Check if a function only needs a docstring presence check."""
-        if func_name.startswith('_'):
+        if func_name.startswith("_"):
             return True
         if any(func_name.startswith(p) for p in DocstringValidator.RELAXED_PREFIXES):
             return True
@@ -60,7 +60,7 @@ class DocstringValidator:
             - param_names: ordered list of all parameter names
         """
         try:
-            with open(file_path, encoding='utf-8') as f:
+            with open(file_path, encoding="utf-8") as f:
                 content = f.read()
         except Exception as e:
             self.warnings.append(f"{file_path}: | 文件读取失败: {e}")
@@ -73,15 +73,15 @@ class DocstringValidator:
         class_def_nodes = [node for node in ast.walk(tree) if isinstance(node, ast.ClassDef)]
 
         for node in ast.walk(tree):
-            if isinstance(node, ast.FunctionDef) and not node.name.startswith('_'):
+            if isinstance(node, ast.FunctionDef) and not node.name.startswith("_"):
                 # Skip __init__ methods
-                if node.name == '__init__':
+                if node.name == "__init__":
                     continue
 
                 # Skip class methods (they start with __init__ or are in classes)
                 is_class_method = False
                 for class_node in class_def_nodes:
-                    if hasattr(class_node, 'body') and node in class_node.body:
+                    if hasattr(class_node, "body") and node in class_node.body:
                         is_class_method = True
                         break
 
@@ -97,7 +97,7 @@ class DocstringValidator:
                 defaults_count = len(node.args.defaults)
 
                 for i, arg in enumerate(all_args):
-                    if arg.arg != 'self':
+                    if arg.arg != "self":
                         params.append(arg.arg)
                         param_names.append(arg.arg)
 
@@ -126,25 +126,25 @@ class DocstringValidator:
         params = {}
 
         # Format 1: Args: section
-        if 'Args:' in docstring:
-            args_section = docstring.split('Args:')[1]
+        if "Args:" in docstring:
+            args_section = docstring.split("Args:")[1]
             # Stop at next major section
-            for next_section in ['Returns:', 'Yields:', 'Raises:', 'Note:', 'Example:']:
+            for next_section in ["Returns:", "Yields:", "Raises:", "Note:", "Example:"]:
                 if next_section in args_section:
                     args_section = args_section.split(next_section)[0]
-            if '\n\n' in args_section:
-                args_section = args_section.split('\n\n')[0]
+            if "\n\n" in args_section:
+                args_section = args_section.split("\n\n")[0]
 
             params.update(self._parse_param_lines(args_section))
 
         # Format 2: Parameters: section
-        elif 'Parameters:' in docstring:
-            params_section = docstring.split('Parameters:')[1]
-            for next_section in ['Returns:', 'Yields:', 'Raises:', 'Note:', 'Example:']:
+        elif "Parameters:" in docstring:
+            params_section = docstring.split("Parameters:")[1]
+            for next_section in ["Returns:", "Yields:", "Raises:", "Note:", "Example:"]:
                 if next_section in params_section:
                     params_section = params_section.split(next_section)[0]
-            if '\n\n' in params_section:
-                params_section = params_section.split('\n\n')[0]
+            if "\n\n" in params_section:
+                params_section = params_section.split("\n\n")[0]
 
             params.update(self._parse_param_lines(params_section))
 
@@ -153,34 +153,34 @@ class DocstringValidator:
     def _parse_param_lines(self, section: str) -> dict[str, str | None]:
         """Parse parameter lines from a docstring section."""
         params = {}
-        lines = section.strip().split('\n')
+        lines = section.strip().split("\n")
 
         for line in lines:
             line = line.strip()
-            if not line or line.startswith('#'):
+            if not line or line.startswith("#"):
                 continue
 
             # Extract parameter name and default value
-            if ':' in line:
-                param_part = line.split(':', 1)[0].strip()
+            if ":" in line:
+                param_part = line.split(":", 1)[0].strip()
 
                 # Extract default value from parentheses
                 default_value = None
-                if '(' in param_part and ')' in param_part:
-                    content = param_part[param_part.find('(')+1:param_part.rfind(')')]
+                if "(" in param_part and ")" in param_part:
+                    content = param_part[param_part.find("(") + 1 : param_part.rfind(")")]
 
-                    if 'default=' in content:
-                        default_value = content.split('default=', 1)[1].strip()
-                    elif content == 'optional':
-                        default_value = 'optional'
-                    elif '=' in content:
-                        default_value = content.split('=', 1)[1].strip()
+                    if "default=" in content:
+                        default_value = content.split("default=", 1)[1].strip()
+                    elif content == "optional":
+                        default_value = "optional"
+                    elif "=" in content:
+                        default_value = content.split("=", 1)[1].strip()
 
-                    param_name = param_part.split('(')[0].strip()
+                    param_name = param_part.split("(")[0].strip()
                 else:
                     param_name = param_part
 
-                if param_name and param_name not in ['Args', 'Parameters', 'Returns']:
+                if param_name and param_name not in ["Args", "Parameters", "Returns"]:
                     params[param_name] = default_value
 
         return params
@@ -192,7 +192,7 @@ class DocstringValidator:
             Dict mapping function name to dict of {param_name: default_value_or_None}
         """
         try:
-            with open(file_path, encoding='utf-8') as f:
+            with open(file_path, encoding="utf-8") as f:
                 content = f.read()
         except Exception as e:
             self.warnings.append(f"{file_path}: | 文件读取失败: {e}")
@@ -202,16 +202,12 @@ class DocstringValidator:
         docstring_params = {}
 
         for node in ast.walk(tree):
-            if isinstance(node, ast.FunctionDef) and not node.name.startswith('_'):
-                if node.name == '__init__':
+            if isinstance(node, ast.FunctionDef) and not node.name.startswith("_"):
+                if node.name == "__init__":
                     continue
 
                 # Get docstring
-                if (node.body and
-                    isinstance(node.body[0], ast.Expr) and
-                    isinstance(node.body[0].value, ast.Constant) and
-                    isinstance(node.body[0].value.value, str)):
-
+                if node.body and isinstance(node.body[0], ast.Expr) and isinstance(node.body[0].value, ast.Constant) and isinstance(node.body[0].value.value, str):
                     docstring = node.body[0].value.value
                     params = self.parse_docstring_args(docstring)
 
@@ -223,7 +219,7 @@ class DocstringValidator:
     def has_docstring(self, file_path: Path, func_name: str) -> bool:
         """Check if a function has any docstring at all."""
         try:
-            with open(file_path, encoding='utf-8') as f:
+            with open(file_path, encoding="utf-8") as f:
                 content = f.read()
         except Exception:
             return False
@@ -232,10 +228,7 @@ class DocstringValidator:
 
         for node in ast.walk(tree):
             if isinstance(node, ast.FunctionDef) and node.name == func_name:
-                if (node.body and
-                    isinstance(node.body[0], ast.Expr) and
-                    isinstance(node.body[0].value, ast.Constant) and
-                    isinstance(node.body[0].value.value, str)):
+                if node.body and isinstance(node.body[0], ast.Expr) and isinstance(node.body[0].value, ast.Constant) and isinstance(node.body[0].value.value, str):
                     return True
                 return False
 
@@ -247,7 +240,7 @@ class DocstringValidator:
         Returns:
             List of error messages for this file
         """
-        if '__pycache__' in str(file_path) or 'test_' in file_path.name:
+        if "__pycache__" in str(file_path) or "test_" in file_path.name:
             return []
 
         functions = self.get_function_signatures(file_path)
@@ -262,9 +255,7 @@ class DocstringValidator:
             if is_relaxed:
                 # Relaxed mode: only check that a docstring exists
                 if not self.has_docstring(file_path, func_name):
-                    errors.append(
-                        f"{file_path}:{func_name} | - | 函数缺少docstring"
-                    )
+                    errors.append(f"{file_path}:{func_name} | - | 函数缺少docstring")
                 continue
 
             if is_strict:
@@ -275,9 +266,7 @@ class DocstringValidator:
                     # Check for missing parameters in docstring
                     for param in signature_params:
                         if param not in doc_params:
-                            errors.append(
-                                f"{file_path}:{func_name} | {param} | docstring中缺失参数"
-                            )
+                            errors.append(f"{file_path}:{func_name} | {param} | docstring中缺失参数")
 
                     # Check for default value consistency
                     for param in doc_params:
@@ -285,7 +274,7 @@ class DocstringValidator:
                             doc_default = doc_params[param]
                             code_default = defaults.get(param)
 
-                            if doc_default == 'optional' and code_default is None:
+                            if doc_default == "optional" and code_default is None:
                                 continue
 
                             if doc_default and code_default:
@@ -293,23 +282,15 @@ class DocstringValidator:
                                 code_normalized = self._normalize_default_value(code_default)
 
                                 if doc_normalized != code_normalized:
-                                    errors.append(
-                                        f"{file_path}:{func_name} | {param} | 默认值不匹配: "
-                                        f"docstring='{doc_default}', code='{code_default}'"
-                                    )
+                                    errors.append(f"{file_path}:{func_name} | {param} | 默认值不匹配: docstring='{doc_default}', code='{code_default}'")
                 else:
                     # Function has parameters but no docstring with Args section
                     if signature_params:
-                        errors.append(
-                            f"{file_path}:{func_name} | 所有参数 | "
-                            f"函数有参数但缺少Args/Parameters段"
-                        )
+                        errors.append(f"{file_path}:{func_name} | 所有参数 | 函数有参数但缺少Args/Parameters段")
             else:
                 # Default: relaxed - just check docstring presence
                 if not self.has_docstring(file_path, func_name):
-                    errors.append(
-                        f"{file_path}:{func_name} | - | 函数缺少docstring"
-                    )
+                    errors.append(f"{file_path}:{func_name} | - | 函数缺少docstring")
 
         return errors
 
@@ -337,8 +318,8 @@ def lint_docstring_contract(src_dir: str) -> list[str]:
     validator = DocstringValidator()
     all_errors = []
 
-    for py_file in Path(src_dir).rglob('*.py'):
-        if '__pycache__' in str(py_file):
+    for py_file in Path(src_dir).rglob("*.py"):
+        if "__pycache__" in str(py_file):
             continue
 
         errors = validator.validate_file(py_file)
@@ -354,29 +335,11 @@ def lint_docstring_contract(src_dir: str) -> list[str]:
 
 def main():
     """Main entry point."""
-    parser = argparse.ArgumentParser(
-        description='Validate docstring contracts against function signatures'
-    )
-    parser.add_argument(
-        '--src-dir',
-        default='src',
-        help='Source directory to scan (default: src)'
-    )
-    parser.add_argument(
-        '--fix',
-        action='store_true',
-        help='Auto-fix simple issues (not yet implemented)'
-    )
-    parser.add_argument(
-        '--verbose',
-        action='store_true',
-        help='Show warnings in addition to errors'
-    )
-    parser.add_argument(
-        '--quiet',
-        action='store_true',
-        help='Suppress all output, exit code only'
-    )
+    parser = argparse.ArgumentParser(description="Validate docstring contracts against function signatures")
+    parser.add_argument("--src-dir", default="src", help="Source directory to scan (default: src)")
+    parser.add_argument("--fix", action="store_true", help="Auto-fix simple issues (not yet implemented)")
+    parser.add_argument("--verbose", action="store_true", help="Show warnings in addition to errors")
+    parser.add_argument("--quiet", action="store_true", help="Suppress all output, exit code only")
 
     args = parser.parse_args()
 
@@ -384,7 +347,7 @@ def main():
 
     # Filter warnings unless verbose mode
     if not args.verbose:
-        errors = [e for e in errors if not e.startswith('WARNING:')]
+        errors = [e for e in errors if not e.startswith("WARNING:")]
 
     if errors:
         if not args.quiet:
