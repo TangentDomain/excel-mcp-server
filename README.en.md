@@ -4,7 +4,7 @@
 
 [![PyPI](https://img.shields.io/pypi/v/excel-mcp-server-fastmcp.svg)](https://pypi.org/project/excel-mcp-server-fastmcp/v1.16.0)
 [![CI](https://github.com/TangentDomain/excel-mcp-server/actions/workflows/ci.yml/badge.svg)](https://github.com/TangentDomain/excel-mcp-server/actions/workflows/ci.yml)
-![Tests](https://img.shields.io/badge/tests-1869-brightgreen.svg)
+![Tests](https://img.shields.io/badge/tests-1880-brightgreen.svg)
 ![Tools](https://img.shields.io/badge/tools-26-green.svg)
 ![GitHub stars](https://img.shields.io/github/stars/TangentDomain/excel-mcp-server?style=social&label=Stars)
 
