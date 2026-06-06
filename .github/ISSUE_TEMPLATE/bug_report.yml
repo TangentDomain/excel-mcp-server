@@ -54,7 +54,7 @@ body:
     attributes:
       label: 环境信息
       description: 请提供您的环境信息
-      placeholder: "例如: Ubuntu 20.04, Python 3.9.0, excel-mcp-server v1.6.37"
+      placeholder: "例如: Ubuntu 20.04, Python 3.10+, excel-mcp-server v1.17.0"
     validations:
       required: true
 
