@@ -42,14 +42,23 @@ git checkout -b feature/您的功能名称
 
 ### 3. 开发和测试
 ```bash
-# 安装依赖
-pip install -e .
+# 安装依赖（推荐 uv）
+uv sync --extra dev
 
-# 运行测试
-python3 -m pytest tests/ -q --tb=no -n auto --timeout=30
+# 代码格式化
+uv run ruff format src/ tests/
 
-# 测试单个功能
-python3 -m pytest tests/test_excel_operations.py -v
+# 代码检查
+uv run ruff check src/ tests/
+
+# 运行全部测试
+uv run python -m pytest tests/ -q --tb=short --timeout=30
+
+# 并行运行（可选）
+uv run python -m pytest tests/ -q --tb=short -n auto --timeout=30
+
+# 测试单个文件
+uv run python -m pytest tests/test_core.py -v
 ```
 
 ### 4. 提交和推送
@@ -69,10 +78,11 @@ git push origin feature/您的功能名称
 
 ## 📋 代码规范
 
+
 ### Python 代码风格
 - 遵循 PEP 8
 - 使用 4 个空格缩进
-- 最大行长度 88 字符
+- 最大行长度 120 字符（见 ruff.toml）
 - 必须有类型注解
 - 函数和类必须有文档字符串
 
@@ -124,9 +134,9 @@ git push origin feature/您的功能名称
 描述实际发生了什么
 
 ## 环境信息
-- 操作系统: [例如: Ubuntu 20.04]
-- Python 版本: [例如: 3.9.0]
-- excel-mcp-server 版本: [例如: v1.6.37]
+- 操作系统: [例如: Ubuntu 24.04]
+- Python 版本: [例如: 3.12]
+- excel-mcp-server 版本: [例如: v1.17.0]
 - 游戏类型: [例如: RPG/MMO]
 ```
 
@@ -177,9 +187,7 @@ git push origin feature/您的功能名称
 
 ### Star 者福利
 - 📢 在贡献者名单中展示
-- 🎁 优先获得新功能测试资格
-- 🏆 累积贡献获得特殊徽章
-
+- 📧 [联系作者](https://github.com/TangentDomain/excel-mcp-server/issues)
 ### 活跃贡献者
 - 🎯 成为项目维护者
 - 📝 获得文档维护权限
