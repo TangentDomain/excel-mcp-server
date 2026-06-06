@@ -5,6 +5,7 @@ Simplified tests for Server MCP interfaces - more flexible to match actual API
 import pytest
 
 from excel_mcp_server_fastmcp.server import (
+    excel_copy_sheet,
     excel_create_file,
     excel_create_sheet,
     excel_delete_sheet,
@@ -14,6 +15,7 @@ from excel_mcp_server_fastmcp.server import (
     excel_get_range,
     excel_list_sheets,
     excel_query,
+    excel_rename_column,
     excel_rename_sheet,
     excel_search,
     excel_set_formula,
@@ -872,3 +874,29 @@ class TestExcelQuery:
         required_query_fields = ["original_rows", "filtered_rows", "query_applied", "columns_returned", "returned_columns", "available_tables", "data_types"]
         for field in required_query_fields:
             assert field in result["query_info"], f"Missing query_info field: {field}"
+
+
+class TestMCPToolCoverage:
+    """补充 MCP 层直接测试（对抗 R13 补漏）"""
+
+    def test_excel_copy_sheet_basic(self, sample_excel_file):
+        """excel_copy_sheet 复制工作表应成功"""
+        result = excel_copy_sheet(sample_excel_file, "Sheet1", "Sheet1_Copy")
+        assert result["success"] is True
+        # 验证新工作表存在
+        sheets = excel_list_sheets(sample_excel_file)
+        names = [s["name"] if isinstance(s, dict) else s for s in sheets["sheets"]]
+        assert "Sheet1_Copy" in names
+
+    def test_excel_copy_sheet_nonexistent_source(self, sample_excel_file):
+        """复制不存在的工作表应失败"""
+        result = excel_copy_sheet(sample_excel_file, "NoSuchSheet")
+        assert result["success"] is False
+
+    def test_excel_rename_column_basic(self, sample_excel_file):
+        """excel_rename_column 修改列名应成功"""
+        result = excel_rename_column(sample_excel_file, "Sheet1", "age", "年龄")
+        assert result["success"] is True
+        # 验证列名已修改
+        headers = excel_get_headers(sample_excel_file, "Sheet1")
+        assert "年龄" in headers["field_names"]
