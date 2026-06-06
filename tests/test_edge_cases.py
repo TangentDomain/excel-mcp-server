@@ -8,15 +8,12 @@ import shutil
 import pytest
 
 from excel_mcp_server_fastmcp.server import (
-    excel_create_backup,
+    excel_backup,
     excel_delete_sheet,
     excel_format_cells,
-    excel_list_backups,
     excel_rename_sheet,
-    excel_restore_backup,
-    excel_set_column_width,
     excel_set_formula,
-    excel_set_row_height,
+    excel_set_layout,
 )
 
 
@@ -26,16 +23,16 @@ class TestExcelBackupRestore:
     def test_create_and_list_backups(self, sample_excel_file, temp_dir):
         """Test creating a backup and listing it"""
         backup_dir = os.path.join(str(temp_dir), "backups")
-        result = excel_create_backup(sample_excel_file, backup_dir)
+        result = excel_backup(sample_excel_file, operation="create", backup_dir=backup_dir)
 
         assert result["success"] is True
         assert "backup_file" in result["data"]
         assert os.path.exists(result["data"]["backup_file"])
 
         # List backups
-        list_result = excel_list_backups(sample_excel_file, backup_dir)
+        list_result = excel_backup(sample_excel_file, operation="list", backup_dir=backup_dir)
         assert list_result["success"] is True
-        assert list_result["data"]["total_backups"] >= 1
+        assert len(list_result["data"]["backups"]) >= 1
 
     def test_restore_backup_roundtrip(self, sample_excel_file, temp_dir):
         """Test full backup → modify → restore cycle"""
@@ -43,34 +40,34 @@ class TestExcelBackupRestore:
         restore_path = os.path.join(str(temp_dir), "restored.xlsx")
 
         # Create backup
-        backup_result = excel_create_backup(sample_excel_file, backup_dir)
+        backup_result = excel_backup(sample_excel_file, operation="create", backup_dir=backup_dir)
         assert backup_result["success"] is True
 
         backup_path = backup_result["data"]["backup_file"]
         assert os.path.exists(backup_path)
 
         # Restore backup
-        restore_result = excel_restore_backup(backup_path, restore_path)
+        restore_result = excel_backup(sample_excel_file, operation="restore", backup_dir=backup_dir, backup_path=backup_path, target_path=restore_path)
         assert restore_result["success"] is True
         assert os.path.exists(restore_path)
 
     def test_restore_nonexistent_backup(self, temp_dir):
         """Test restoring from non-existent backup path"""
         restore_path = os.path.join(str(temp_dir), "restored.xlsx")
-        result = excel_restore_backup("/nonexistent/backup.xlsx", restore_path)
+        result = excel_backup(restore_path, operation="restore", backup_path="/nonexistent/backup.xlsx", target_path=restore_path)
 
         assert result["success"] is False
 
     def test_create_backup_nonexistent_file(self, temp_dir):
         """Test creating backup of non-existent file"""
-        result = excel_create_backup("/nonexistent/file.xlsx")
+        result = excel_backup("/nonexistent/file.xlsx", operation="create")
 
         assert result["success"] is False
 
     def test_list_backups_empty(self, sample_excel_file, temp_dir):
         """Test listing backups when none exist"""
         backup_dir = os.path.join(str(temp_dir), "empty_backups")
-        result = excel_list_backups(sample_excel_file, backup_dir)
+        result = excel_backup(sample_excel_file, operation="list", backup_dir=backup_dir)
 
         assert result["success"] is True
         assert len(result["data"]["backups"]) == 0
@@ -83,14 +80,14 @@ class TestExcelBackupRestore:
 
         # Create backups with delays to ensure unique timestamps
         for i in range(3):
-            result = excel_create_backup(sample_excel_file, backup_dir)
+            result = excel_backup(sample_excel_file, operation="create", backup_dir=backup_dir)
             assert result["success"] is True
             time.sleep(1.1)  # Ensure unique timestamp
 
         # List all
-        list_result = excel_list_backups(sample_excel_file, backup_dir)
+        list_result = excel_backup(sample_excel_file, operation="list", backup_dir=backup_dir)
         assert list_result["success"] is True
-        assert list_result["data"]["total_backups"] == 3
+        assert len(list_result["data"]["backups"]) == 3
 
 
 class TestExcelFormulas:

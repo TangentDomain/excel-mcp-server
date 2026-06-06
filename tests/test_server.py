@@ -7,20 +7,17 @@ import pytest
 from excel_mcp_server_fastmcp.server import (
     excel_create_file,
     excel_create_sheet,
-    excel_delete_columns,
-    excel_delete_rows,
     excel_delete_sheet,
     excel_find_last_row,
     excel_format_cells,
     excel_get_headers,
     excel_get_range,
-    excel_insert_columns,
-    excel_insert_rows,
     excel_list_sheets,
     excel_query,
     excel_rename_sheet,
     excel_search,
     excel_set_formula,
+    excel_structure,
     excel_update_range,
 )
 
@@ -452,35 +449,31 @@ class TestServerInterfaces:
         assert "message" in result
 
     def test_excel_insert_rows(self, sample_excel_file):
-        """Test excel_insert_rows interface"""
-        result = excel_insert_rows(sample_excel_file, "Sheet1", 2, 2)
+        """Test excel_structure insert_rows interface"""
+        result = excel_structure(sample_excel_file, "Sheet1", "insert_rows", 2, 2)
 
         assert result["success"] is True
-        # Should have response info
         assert "data" in result or "message" in result
 
     def test_excel_insert_columns(self, sample_excel_file):
-        """Test excel_insert_columns interface"""
-        result = excel_insert_columns(sample_excel_file, "Sheet1", 2, 1)
+        """Test excel_structure insert_columns interface"""
+        result = excel_structure(sample_excel_file, "Sheet1", "insert_columns", 2, 1)
 
         assert result["success"] is True
-        # Should have response info
         assert "data" in result or "message" in result
 
     def test_excel_delete_rows(self, sample_excel_file):
-        """Test excel_delete_rows interface"""
-        result = excel_delete_rows(sample_excel_file, "Sheet1", 2, 1)
+        """Test excel_structure delete_rows interface"""
+        result = excel_structure(sample_excel_file, "Sheet1", "delete_rows", 2, 1)
 
         assert result["success"] is True
-        # Should have response info
         assert "data" in result or "message" in result
 
     def test_excel_delete_columns(self, sample_excel_file):
-        """Test excel_delete_columns interface"""
-        result = excel_delete_columns(sample_excel_file, "Sheet1", 2, 1)
+        """Test excel_structure delete_columns interface"""
+        result = excel_structure(sample_excel_file, "Sheet1", "delete_columns", 2, 1)
 
         assert result["success"] is True
-        # Should have response info
         assert "data" in result or "message" in result
 
     def test_excel_format_cells_custom(self, sample_excel_file):

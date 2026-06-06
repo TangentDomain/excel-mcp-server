@@ -1,10 +1,6 @@
 """
 Tests for previously untested tools:
-- excel_compare_files
 - excel_compare_sheets
-- excel_convert_format
-- excel_export_to_csv
-- excel_import_from_csv
 - excel_search_directory
 """
 
@@ -13,94 +9,15 @@ import os
 import pytest
 
 from excel_mcp_server_fastmcp.server import (
-    excel_compare_files,
     excel_compare_sheets,
     excel_create_file,
-    excel_export_to_csv,
-    excel_import_from_csv,
     excel_search_directory,
     excel_update_range,
 )
 
 
-class TestExcelExportImportCSV:
-    """Test CSV export/import functionality"""
-
-    def test_export_to_csv_default(self, sample_excel_file, temp_dir):
-        """Test exporting to CSV with defaults"""
-        output_path = os.path.join(str(temp_dir), "export.csv")
-        result = excel_export_to_csv(sample_excel_file, output_path)
-
-        assert result["success"] is True
-        assert result["data"]["output_path"] == output_path
-        assert result["data"]["row_count"] > 0
-        assert os.path.exists(output_path)
-
-        # Verify CSV content
-        with open(output_path, encoding="utf-8") as f:
-            content = f.read()
-        assert "name" in content or "姓名" in content
-
-    def test_export_to_csv_specific_sheet(self, sample_excel_file, temp_dir):
-        """Test exporting a specific sheet to CSV"""
-        output_path = os.path.join(str(temp_dir), "sheet2.csv")
-        result = excel_export_to_csv(sample_excel_file, output_path, sheet_name="Sheet2")
-
-        assert result["success"] is True
-        assert os.path.exists(output_path)
-
-    def test_export_to_csv_nonexistent_sheet(self, sample_excel_file, temp_dir):
-        """Test exporting a non-existent sheet returns error"""
-        output_path = os.path.join(str(temp_dir), "fail.csv")
-        result = excel_export_to_csv(sample_excel_file, output_path, sheet_name="NoSuchSheet")
-
-        assert result["success"] is False
-
-    def test_export_to_csv_invalid_file(self, temp_dir):
-        """Test exporting a non-existent file returns error"""
-        output_path = os.path.join(str(temp_dir), "fail.csv")
-        result = excel_export_to_csv("/nonexistent/file.xlsx", output_path)
-
-        assert result["success"] is False
-
-    def test_import_from_csv(self, sample_excel_file, temp_dir):
-        """Test creating Excel from CSV"""
-        # First export to CSV
-        csv_path = os.path.join(str(temp_dir), "data.csv")
-        excel_export_to_csv(sample_excel_file, csv_path)
-
-        # Then import back
-        output_path = os.path.join(str(temp_dir), "imported.xlsx")
-        result = excel_import_from_csv(csv_path, output_path, sheet_name="Imported")
-
-        assert result["success"] is True
-        assert result["data"]["sheet_name"] == "Imported"
-        assert result["data"]["row_count"] > 0
-        assert os.path.exists(output_path)
-
-    def test_import_from_csv_no_header(self, temp_dir):
-        """Test importing CSV without header row"""
-        csv_path = os.path.join(str(temp_dir), "no_header.csv")
-        with open(csv_path, "w", encoding="utf-8") as f:
-            f.write("100,200,300\n")
-            f.write("400,500,600\n")
-
-        output_path = os.path.join(str(temp_dir), "no_header.xlsx")
-        result = excel_import_from_csv(csv_path, output_path, has_header=False)
-
-        assert result["success"] is True
-        assert result["data"]["row_count"] == 2
-
-    def test_import_from_csv_invalid_path(self, temp_dir):
-        """Test importing from non-existent CSV"""
-        output_path = os.path.join(str(temp_dir), "fail.xlsx")
-        result = excel_import_from_csv("/nonexistent.csv", output_path)
-
-        assert result["success"] is False
-
-
-class TestExcelConvertFormat:
-    """Test format conversion functionality"""
+class TestExcelSearchDirectory:
+    """Test directory search functionality"""
 
     def test_search_directory_basic(self, temp_dir_with_excel_files):
         """Test basic directory search"""
@@ -156,44 +73,6 @@ class TestExcelConvertFormat:
         result = excel_search_directory(str(temp_dir), "searchterm", file_extensions=[".xlsx"])
         assert result["success"] is True
         assert result["meta"]["total_matches"] > 0
-
-
-class TestExcelCompareFiles:
-    """Test file comparison functionality"""
-
-    def test_compare_identical_files(self, sample_excel_file, temp_dir):
-        """Test comparing identical files"""
-        import shutil
-
-        copy_path = os.path.join(str(temp_dir), "copy.xlsx")
-        shutil.copy2(sample_excel_file, copy_path)
-
-        result = excel_compare_files(sample_excel_file, copy_path)
-
-        assert result["success"] is True
-        assert result["data"]["identical"] is True
-        assert result["data"]["total_differences"] == 0
-
-    def test_compare_different_files(self, sample_excel_file, temp_dir):
-        """Test comparing different files"""
-        from openpyxl import Workbook
-
-        diff_path = os.path.join(str(temp_dir), "different.xlsx")
-        wb = Workbook()
-        ws = wb.active
-        ws["A1"] = "Different"
-        wb.save(diff_path)
-
-        result = excel_compare_files(sample_excel_file, diff_path)
-
-        assert result["success"] is True
-        assert result["data"]["identical"] is False
-
-    def test_compare_nonexistent_files(self, temp_dir):
-        """Test comparing non-existent files"""
-        result = excel_compare_files("/nonexistent1.xlsx", "/nonexistent2.xlsx")
-
-        assert result["success"] is False
 
 
 class TestExcelCompareSheets:

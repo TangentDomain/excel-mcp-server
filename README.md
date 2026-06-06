@@ -4,8 +4,8 @@
 
 [![PyPI](https://img.shields.io/pypi/v/excel-mcp-server-fastmcp.svg)](https://pypi.org/project/excel-mcp-server-fastmcp/v1.16.0)
 [![CI](https://github.com/TangentDomain/excel-mcp-server/actions/workflows/ci.yml/badge.svg)](https://github.com/TangentDomain/excel-mcp-server/actions/workflows/ci.yml)
-![Tests](https://img.shields.io/badge/tests-1876-brightgreen.svg)
-![Tools](https://img.shields.io/badge/tools-38-green.svg)
+![Tests](https://img.shields.io/badge/tests-1866-brightgreen.svg)
+![Tools](https://img.shields.io/badge/tools-26-green.svg)
 ![GitHub stars](https://img.shields.io/github/stars/TangentDomain/excel-mcp-server?style=social&label=Stars)
 
 > **🚀 游戏策划必备：用中文/SQL直接操作Excel，告别手动VBA！**
@@ -119,7 +119,7 @@ claude mcp add excelmcp -- uvx excel-mcp-server-fastmcp
 ## 🎮 游戏开发场景演示 (所见即所得！)
 
 ### 🎯 策划日常工作示例
-> 🎯 **真实案例**: 以下所有操作都已通过38个MCP工具验证
+> 🎯 **真实案例**: 以下所有操作都已通过26个MCP工具验证
 > 🎮 **支持游戏**: RPG、MMO、卡牌、塔防、射击、策略等各类游戏  
 > ⚡ **性能表现**: 支持10万+数据批量处理，响应时间 <1秒
 

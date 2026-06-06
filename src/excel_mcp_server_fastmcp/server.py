@@ -631,10 +631,10 @@ mcp = FastMCP(
     ✅ SQL无法表达的逻辑 → 纯Python自由操作
 
 ═══ 结构操作 ═══
-文件？                      → excel_create_file / excel_export_to_csv / excel_import_from_csv
-工作表？                    → excel_create_sheet / excel_delete_sheet / excel_rename_sheet / excel_copy_sheet
-行？                        → excel_insert_rows / excel_delete_rows / excel_set_row_height
-列？                        → excel_insert_columns / excel_delete_columns / excel_rename_column / excel_set_column_width
+文件？                      → excel_create_file
+工作表？                    → excel_list_sheets / excel_create_sheet / excel_delete_sheet / excel_rename_sheet / excel_copy_sheet
+行/列？                     → excel_structure（insert/delete rows+columns）
+行高/列宽？                 → excel_set_layout
 样式/合并/边框？            → excel_format_cells（字体+合并+边框+预设样式，一个工具全搞定）
 公式？                      → excel_set_formula（以=开头）
 末行定位？                  → excel_find_last_row（追加数据前必用）
@@ -1014,6 +1014,162 @@ def excel_list_sheets(file_path: str) -> dict[str, Any]:
 
 
 @mcp.tool()
+@_track_call
+def excel_create_sheet(file_path: str, sheet_name: str, index: int | None = None) -> dict[str, Any]:
+    """创建新工作表。可指定插入位置index（从0开始，0=最前面）。
+
+    Args:
+        file_path: Excel文件路径
+        sheet_name: 新工作表名称
+        index: 插入位置索引（从0开始，默认为None表示追加到末尾）
+    """
+    return _wrap(ExcelOperations.create_sheet(file_path, sheet_name, index))
+
+
+@mcp.tool()
+@_track_call
+def excel_delete_sheet(file_path: str, sheet_name: str) -> dict[str, Any]:
+    """删除指定工作表。
+
+    Args:
+        file_path: Excel文件路径
+        sheet_name: 要删除的工作表名称
+    """
+    # 开始操作会话
+    operation_logger.start_session(file_path)
+
+    # 记录删除工作表操作日志
+    operation_logger.log_operation("delete_sheet", {"sheet_name": sheet_name})
+
+    try:
+        result = ExcelOperations.delete_sheet(file_path, sheet_name)
+        result = _ensure_dict(result)
+        operation_logger.log_operation(
+            "operation_result",
+            {
+                "success": result.get("success", False),
+                "deleted_sheet": result.get("deleted_sheet", ""),
+                "remaining_sheets": result.get("remaining_sheets", 0),
+                "message": result.get("message", ""),
+            },
+        )
+
+        return _wrap(result)
+
+    except Exception as e:
+        # 记录错误
+        operation_logger.log_operation(
+            "operation_error",
+            {"error": str(e), "message": f"删除工作表操作失败: {str(e)}"},
+        )
+
+        return _fail(f"删除工作表操作失败: {str(e)}", meta={"error_code": "DELETE_SHEET_FAILED"})
+
+
+@mcp.tool()
+@_track_call
+def excel_rename_sheet(file_path: str, old_name: str, new_name: str) -> dict[str, Any]:
+    """重命名工作表。
+
+    Args:
+        file_path: Excel文件路径
+        old_name: 原工作表名称
+        new_name: 新工作表名称
+    """
+    return _wrap(ExcelOperations.rename_sheet(file_path, old_name, new_name))
+
+
+@mcp.tool()
+@_track_call
+def excel_copy_sheet(
+    file_path: str,
+    source_name: str,
+    new_name: str | None = None,
+    index: int | None = None,
+) -> dict[str, Any]:
+    """复制工作表（含数据和格式）。新工作表在同一文件内创建。
+
+    Args:
+        file_path: Excel文件路径
+        source_name: 源工作表名称
+        new_name: 新工作表名称，默认为None（自动命名为"源名_副本"）
+        index: 插入位置索引（从0开始），默认为None（追加到末尾）"""
+    return _wrap(ExcelOperations.copy_sheet(file_path, source_name, new_name, index, True))
+
+
+@mcp.tool()
+@_track_call
+def excel_backup(file_path: str, operation: str, backup_dir: str | None = None, **kwargs) -> dict[str, Any]:
+    """备份管理统一入口。
+
+    operation: 'create' | 'restore' | 'list'
+    create: 创建备份（可选 backup_dir）
+    restore: 恢复备份（需传 backup_path，可选 target_path）
+    list: 列出备份（可选 backup_dir）
+    """
+    if operation == "create":
+        if not os.path.exists(file_path):
+            return _fail(f"源文件不存在: {file_path}", meta={"error_code": "FILE_NOT_FOUND"})
+        try:
+            _bd = backup_dir or os.path.join(os.path.dirname(file_path), ".excel_mcp_backups")
+            os.makedirs(_bd, exist_ok=True)
+            timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+            filename = os.path.basename(file_path)
+            name, ext = os.path.splitext(filename)
+            backup_filename = f"{name}_backup_{timestamp}{ext}"
+            backup_path = os.path.join(_bd, backup_filename)
+            shutil.copy2(file_path, backup_path)
+
+            _ts = datetime.now().isoformat()
+            return _ok(f"备份创建成功: {backup_filename}", data={"backup_file": backup_path, "backup_directory": _bd, "timestamp": _ts}, meta={"file_path": file_path})
+        except Exception as e:
+            return _fail(f"备份创建失败: {e}", meta={"error_code": "BACKUP_FAILED"})
+
+    elif operation == "restore":
+        backup_path = kwargs.get("backup_path")
+        target_path = kwargs.get("target_path")
+        if not backup_path:
+            return _fail("restore 操作需要 backup_path 参数", meta={"error_code": "MISSING_PARAM"})
+        if not os.path.exists(backup_path):
+            return _fail(f"备份文件不存在: {backup_path}", meta={"error_code": "BACKUP_NOT_FOUND"})
+        try:
+            if target_path is None:
+                filename = os.path.basename(backup_path)
+                if "_backup_" in filename:
+                    parts = filename.split("_backup_")
+                    target_path = parts[0] + os.path.splitext(backup_path)[1]
+                else:
+                    target_path = filename.replace("_backup_", ".")
+            target_dir = os.path.dirname(target_path)
+            if target_dir:
+                os.makedirs(target_dir, exist_ok=True)
+            shutil.copy2(backup_path, target_path)
+            return _ok(f"文件恢复成功: {os.path.basename(target_path)}", data={"backup_file": backup_path, "target_file": target_path}, meta={"file_path": backup_path})
+        except Exception as e:
+            return _fail(f"恢复失败: {e}", meta={"error_code": "RESTORE_FAILED"})
+
+    elif operation == "list":
+        try:
+            _bd = backup_dir or os.path.join(os.path.dirname(file_path), ".excel_mcp_backups")
+            if not os.path.exists(_bd):
+                return _ok("备份目录不存在", data={"backups": []}, meta={"file_path": file_path})
+            filename = os.path.basename(file_path)
+            name, ext = os.path.splitext(filename)
+            backup_files = []
+            for fn in os.listdir(_bd):
+                if fn.startswith(f"{name}_backup_") and fn.endswith(ext):
+                    fp = os.path.join(_bd, fn)
+                    st = os.stat(fp)
+                    backup_files.append({"filename": fn, "path": fp, "size": st.st_size, "created_time": datetime.fromtimestamp(st.st_ctime).isoformat()})
+            backup_files.sort(key=lambda x: x["created_time"], reverse=True)
+            return _ok(f"找到 {len(backup_files)} 个备份", data={"backups": backup_files, "backup_directory": _bd}, meta={"file_path": file_path})
+        except Exception as e:
+            return _fail(f"列出备份失败: {e}", meta={"error_code": "LIST_BACKUPS_FAILED"})
+    else:
+        return _fail(f"不支持的operation: {operation}。可选: create, restore, list", meta={"error_code": "INVALID_OPERATION"})
+
+
+@mcp.tool()
 @_validate_file_path()
 @_track_call
 def excel_search(
@@ -1370,209 +1526,6 @@ def excel_update_range(
 
 @mcp.tool()
 @_track_call
-def excel_create_backup(file_path: str, backup_dir: str | None = None) -> dict[str, Any]:
-    """为Excel文件创建备份。备份存放在同级backup目录。
-
-    Args:
-        file_path: Excel文件路径
-        backup_dir: 备份目录路径，默认为None表示同级backup目录
-    """
-    if not os.path.exists(file_path):
-        return _fail(f"源文件不存在: {file_path}", meta={"error_code": "FILE_NOT_FOUND"})
-
-    try:
-        # 创建备份目录
-        if backup_dir is None:
-            base_dir = os.path.dirname(file_path)
-            backup_dir = os.path.join(base_dir, ".excel_mcp_backups")
-
-        os.makedirs(backup_dir, exist_ok=True)
-
-        # 生成备份文件名
-        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-        filename = os.path.basename(file_path)
-        name, ext = os.path.splitext(filename)
-        backup_filename = f"{name}_backup_{timestamp}{ext}"
-        backup_path = os.path.join(backup_dir, backup_filename)
-
-        # 创建备份
-        shutil.copy2(file_path, backup_path)
-
-        # 检查备份大小
-        original_size = os.path.getsize(file_path)
-        backup_size = os.path.getsize(backup_path)
-
-        return _ok(
-            f"备份创建成功: {backup_filename}",
-            data={
-                "backup_file": backup_path,
-                "backup_directory": backup_dir,
-                "file_size": {"original": original_size, "backup": backup_size},
-                "timestamp": timestamp,
-            },
-            meta={"file_path": file_path},
-        )
-
-    except Exception as e:
-        return _fail(f"备份创建失败: {str(e)}", meta={"error_code": "BACKUP_FAILED"})
-
-
-@mcp.tool()
-@_track_call
-def excel_restore_backup(backup_path: str, target_path: str | None = None) -> dict[str, Any]:
-    """从备份文件恢复Excel。target_path不传则覆盖原文件。
-
-    Args:
-        backup_path: 备份文件路径
-        target_path: 目标文件路径，默认为None表示覆盖原文件
-    """
-    _path_err = _validate_path(backup_path)
-    if _path_err:
-        return _path_err
-
-    if not os.path.exists(backup_path):
-        return _fail(f"备份文件不存在: {backup_path}", meta={"error_code": "BACKUP_NOT_FOUND"})
-
-    try:
-        # 确定目标路径
-        if target_path is None:
-            # 尝试从备份文件名推断原始文件名
-            filename = os.path.basename(backup_path)
-            if "_backup_" in filename:
-                # 移除备份时间戳
-                parts = filename.split("_backup_")
-                target_path = parts[0] + os.path.splitext(backup_path)[1]
-            else:
-                target_path = filename.replace("_backup_", ".")
-
-        # 创建目标目录
-        target_dir = os.path.dirname(target_path)
-        if target_dir:
-            os.makedirs(target_dir, exist_ok=True)
-
-        # 检查目标文件是否存在
-        target_exists = os.path.exists(target_path)
-
-        # 执行恢复
-        shutil.copy2(backup_path, target_path)
-
-        return _ok(
-            f"文件恢复成功: {os.path.basename(target_path)}",
-            data={
-                "backup_file": backup_path,
-                "target_file": target_path,
-                "target_existed": target_exists,
-            },
-            meta={"file_path": backup_path},
-        )
-
-    except Exception as e:
-        return _fail(f"恢复失败: {str(e)}", meta={"error_code": "RESTORE_FAILED"})
-
-
-@mcp.tool()
-@_track_call
-def excel_list_backups(file_path: str, backup_dir: str | None = None) -> dict[str, Any]:
-    """列出文件的所有备份版本及时间。
-
-    Args:
-        file_path: Excel文件路径
-        backup_dir: 备份目录路径，默认为None
-    """
-    try:
-        # 确定备份目录
-        if backup_dir is None:
-            base_dir = os.path.dirname(file_path)
-            backup_dir = os.path.join(base_dir, ".excel_mcp_backups")
-
-        if not os.path.exists(backup_dir):
-            return _ok("备份目录不存在", data={"backups": []}, meta={"file_path": file_path})
-
-        # 获取文件名
-        filename = os.path.basename(file_path)
-        name, ext = os.path.splitext(filename)
-        backup_pattern = f"{name}_backup_*{ext}"
-
-        # 查找备份文件
-        backup_files = []
-        for file in os.listdir(backup_dir):
-            if file.startswith(f"{name}_backup_") and file.endswith(ext):
-                full_path = os.path.join(backup_dir, file)
-                stat = os.stat(full_path)
-                backup_files.append(
-                    {
-                        "filename": file,
-                        "path": full_path,
-                        "size": stat.st_size,
-                        "created_time": datetime.fromtimestamp(stat.st_ctime),
-                        "modified_time": datetime.fromtimestamp(stat.st_mtime),
-                    }
-                )
-
-        # 按时间排序
-        backup_files.sort(key=lambda x: x["created_time"], reverse=True)
-
-        return _ok(
-            f"找到 {len(backup_files)} 个备份",
-            data={
-                "backups": backup_files,
-                "backup_directory": backup_dir,
-                "total_backups": len(backup_files),
-            },
-            meta={"file_path": file_path},
-        )
-
-    except Exception as e:
-        return _fail(f"列出备份失败: {str(e)}", meta={"error_code": "LIST_BACKUPS_FAILED"})
-
-
-@mcp.tool()
-@_track_call
-def excel_insert_rows(file_path: str, sheet_name: str, row_index: int, count: int = 1) -> dict[str, Any]:
-    """在指定位置插入空行。row_index从1开始（第1行前插入传1）。
-
-    Args:
-        file_path: Excel文件路径
-        sheet_name: 工作表名称
-        row_index: 插入位置的行索引（从1开始，在该行上方插入）
-        count: 插入的行数，默认为1"""
-    return _wrap(ExcelOperations.insert_rows(file_path, sheet_name, row_index, count, True))
-
-
-@mcp.tool()
-@_track_call
-def excel_insert_columns(file_path: str, sheet_name: str, column_index: int, count: int = 1) -> dict[str, Any]:
-    """在指定位置插入空列。column_index从1开始。
-
-    Args:
-        file_path: Excel文件路径
-        sheet_name: 工作表名称
-        column_index: 插入位置的列索引（从1开始）
-        count: 插入的列数，默认为1"""
-    return _wrap(ExcelOperations.insert_columns(file_path, sheet_name, column_index, count, True))
-
-
-@mcp.tool()
-@_track_call
-def excel_check_duplicate_ids(
-    file_path: str,
-    sheet_name: str,
-    id_column: int | str = 1,
-    header_row: int = 1,
-) -> dict[str, Any]:
-    """检查工作表中的ID重复情况。
-
-    Args:
-        file_path: Excel文件路径
-        sheet_name: 工作表名称
-        id_column: ID列名或列索引（从1开始）
-        header_row: 表头行号，默认为1
-    """
-    return _wrap(ExcelOperations.check_duplicate_ids(file_path, sheet_name, id_column, header_row))
-
-
-@mcp.tool()
-@_track_call
 def excel_find_last_row(file_path: str, sheet_name: str, column: str | int | None = None) -> dict[str, Any]:
     """查找工作表最后一行。可指定列来找该列最后一个有值的行。追加数据前必用。
 
@@ -1582,6 +1535,27 @@ def excel_find_last_row(file_path: str, sheet_name: str, column: str | int | Non
         column: 列名或列索引，默认为None
     """
     return _wrap(ExcelOperations.find_last_row(file_path, sheet_name, column))
+
+
+@mcp.tool()
+@_track_call
+def excel_structure(file_path: str, sheet_name: str, operation: str, index: int, count: int = 1) -> dict[str, Any]:
+    """行/列结构操作统一入口。
+
+    operation: 'insert_rows' | 'insert_columns' | 'delete_rows' | 'delete_columns'
+    index: 行/列索引（从1开始）
+    count: 操作数量，默认为1"""
+    ops_map = {
+        "insert_rows": ("insert_rows", True),
+        "insert_columns": ("insert_columns", True),
+        "delete_rows": ("delete_rows", True),
+        "delete_columns": ("delete_columns", True),
+    }
+    if operation not in ops_map:
+        return _fail(f"不支持的operation: {operation}。可选: {list(ops_map.keys())}", meta={"error_code": "INVALID_OPERATION"})
+    method_name, _ = ops_map[operation]
+    method = getattr(ExcelOperations, method_name)
+    return _wrap(method(file_path, sheet_name, index, count))
 
 
 @mcp.tool()
@@ -1595,173 +1569,6 @@ def excel_create_file(file_path: str, sheet_names: list[str] | None = None) -> d
         sheet_names: 初始工作表名称列表，默认为None
     """
     return _wrap(ExcelOperations.create_file(file_path, sheet_names))
-
-
-@mcp.tool()
-@_validate_file_path(["file_path", "output_path"])
-@_track_call
-def excel_export_to_csv(
-    file_path: str,
-    output_path: str,
-    sheet_name: str | None = None,
-    encoding: str = "utf-8",
-) -> dict[str, Any]:
-    """将工作表导出为CSV文件。
-
-    Args:
-        file_path: Excel文件路径
-        output_path: CSV输出路径
-        sheet_name: 工作表名称，默认为None
-        encoding: 编码格式，默认为"utf-8"
-    """
-    return _wrap(ExcelOperations.export_to_csv(file_path, output_path, sheet_name, encoding))
-
-
-@mcp.tool()
-@_validate_file_path(["csv_path", "output_path"])
-@_track_call
-def excel_import_from_csv(
-    csv_path: str,
-    output_path: str,
-    sheet_name: str = "Sheet1",
-    encoding: str = "utf-8",
-    has_header: bool = True,
-) -> dict[str, Any]:
-    """从CSV文件创建Excel工作表。
-
-    Args:
-        csv_path: CSV文件路径
-        output_path: Excel输出路径
-        sheet_name: 工作表名称，默认为"Sheet1"
-        encoding: 编码格式，默认为"utf-8"
-        has_header: CSV是否有表头，默认为True
-    """
-    for _p in [csv_path, output_path]:
-        _err = _validate_path(_p)
-        if _err:
-            return _err
-
-    return _wrap(ExcelOperations.import_from_csv(csv_path, output_path, sheet_name, encoding, has_header))
-
-
-@mcp.tool()
-@_track_call
-def excel_create_sheet(file_path: str, sheet_name: str, index: int | None = None) -> dict[str, Any]:
-    """创建新工作表。可指定插入位置index（从0开始，0=最前面）。
-
-    Args:
-        file_path: Excel文件路径
-        sheet_name: 新工作表名称
-        index: 插入位置索引（从0开始，默认为None表示追加到末尾）
-    """
-    return _wrap(ExcelOperations.create_sheet(file_path, sheet_name, index))
-
-
-@mcp.tool()
-@_validate_file_path()
-@_track_call
-def excel_create_chart(
-    file_path: str,
-    sheet_name: str,
-    chart_type: str,
-    data_range: str,
-    title: str = "",
-    chart_name: str = "",
-    position: str = "B15",
-) -> dict[str, Any]:
-    """在工作表中创建图表。chart_type: line/bar/column/pie/scatter/area等。支持'column'作为'bar'的别名。
-
-    Args:
-        file_path: Excel文件路径
-        sheet_name: 工作表名称
-        chart_type: 图表类型
-        data_range: 数据范围
-        title: 图表标题，默认为空字符串
-        chart_name: 图表名称，默认为空字符串
-        position: 图表位置，默认为"B15"
-    """
-    return _wrap(
-        ExcelOperations.create_chart(
-            file_path,
-            sheet_name,
-            chart_type,
-            data_range,
-            title=title,
-            chart_name=chart_name,
-            position=position,
-        )
-    )
-
-
-@mcp.tool()
-@_track_call
-def excel_delete_sheet(file_path: str, sheet_name: str) -> dict[str, Any]:
-    """删除指定工作表。
-
-    Args:
-        file_path: Excel文件路径
-        sheet_name: 要删除的工作表名称
-    """
-    # 开始操作会话
-    operation_logger.start_session(file_path)
-
-    # 记录删除工作表操作日志
-    operation_logger.log_operation("delete_sheet", {"sheet_name": sheet_name})
-
-    try:
-        result = ExcelOperations.delete_sheet(file_path, sheet_name)
-        result = _ensure_dict(result)
-        operation_logger.log_operation(
-            "operation_result",
-            {
-                "success": result.get("success", False),
-                "deleted_sheet": result.get("deleted_sheet", ""),
-                "remaining_sheets": result.get("remaining_sheets", 0),
-                "message": result.get("message", ""),
-            },
-        )
-
-        return _wrap(result)
-
-    except Exception as e:
-        # 记录错误
-        operation_logger.log_operation(
-            "operation_error",
-            {"error": str(e), "message": f"删除工作表操作失败: {str(e)}"},
-        )
-
-        return _fail(f"删除工作表操作失败: {str(e)}", meta={"error_code": "DELETE_SHEET_FAILED"})
-
-
-@mcp.tool()
-@_track_call
-def excel_rename_sheet(file_path: str, old_name: str, new_name: str) -> dict[str, Any]:
-    """重命名工作表。
-
-    Args:
-        file_path: Excel文件路径
-        old_name: 原工作表名称
-        new_name: 新工作表名称
-    """
-    return _wrap(ExcelOperations.rename_sheet(file_path, old_name, new_name))
-
-
-@mcp.tool()
-@_track_call
-def excel_copy_sheet(
-    file_path: str,
-    source_name: str,
-    new_name: str | None = None,
-    index: int | None = None,
-) -> dict[str, Any]:
-    """复制工作表（含数据和格式）。新工作表在同一文件内创建。
-
-    Args:
-        file_path: Excel文件路径
-        source_name: 源工作表名称
-        new_name: 新工作表名称，默认为None（自动命名为"源名_副本"）
-        index: 插入位置索引（从0开始），默认为None（追加到末尾）"""
-    return _wrap(ExcelOperations.copy_sheet(file_path, source_name, new_name, index, True))
 
 
 @mcp.tool()
@@ -1819,92 +1626,6 @@ def excel_upsert_row(
         header_row: 表头行号，默认为1
     """
     return _wrap(ExcelOperations.upsert_row(file_path, sheet_name, key_column, key_value, updates, header_row, True))
-
-
-@mcp.tool()
-@_track_call
-def excel_delete_rows(file_path: str, sheet_name: str, row_index: int, count: int = 1) -> dict[str, Any]:
-    """按行号删除行。row_index从1开始（第1行前删除传1）。
-
-    ⚠️ 按条件删除请用 excel_delete_query（SQL DELETE FROM ... WHERE ...）
-
-    Args:
-        file_path: Excel文件路径
-        sheet_name: 工作表名称
-        row_index: 要删除的起始行索引（从1开始，在该行位置删除）
-        count: 删除的行数，默认为1
-    """
-
-    # 开始操作会话
-    operation_logger.start_session(file_path)
-
-    # 记录删除操作日志
-    operation_logger.log_operation(
-        "delete_rows",
-        {"sheet_name": sheet_name, "row_index": row_index, "count": count},
-    )
-
-    try:
-        result = _ensure_dict(ExcelOperations.delete_rows(file_path, sheet_name, row_index, count, True))
-
-        # 记录操作结果
-        operation_logger.log_operation(
-            "operation_result",
-            {
-                "success": result.get("success", False),
-                "deleted_rows": result.get("deleted_rows", 0),
-                "message": result.get("message", ""),
-            },
-        )
-
-        return _wrap(result)
-
-    except Exception as e:
-        # 记录错误
-        operation_logger.log_operation("operation_error", {"error": str(e), "message": f"删除行操作失败: {str(e)}"})
-
-        return _fail(f"删除行操作失败: {str(e)}", meta={"error_code": "DELETE_ROWS_FAILED"})
-
-
-@mcp.tool()
-@_track_call
-def excel_delete_columns(file_path: str, sheet_name: str, column_index: int, count: int = 1) -> dict[str, Any]:
-    """删除指定位置开始的列。column_index从1开始。
-
-    Args:
-        file_path: Excel文件路径
-        sheet_name: 工作表名称
-        column_index: 起始列索引（从1开始）
-        count: 删除的列数，默认为1"""
-    # 开始操作会话
-    operation_logger.start_session(file_path)
-
-    # 记录删除列操作日志
-    operation_logger.log_operation(
-        "delete_columns",
-        {"sheet_name": sheet_name, "column_index": column_index, "count": count},
-    )
-
-    try:
-        result = _ensure_dict(ExcelOperations.delete_columns(file_path, sheet_name, column_index, count, True))
-
-        # 记录操作结果
-        operation_logger.log_operation(
-            "operation_result",
-            {
-                "success": result.get("success", False),
-                "deleted_columns": result.get("deleted_columns", 0),
-                "message": result.get("message", ""),
-            },
-        )
-
-        return _wrap(result)
-
-    except Exception as e:
-        # 记录错误
-        operation_logger.log_operation("operation_error", {"error": str(e), "message": f"删除列操作失败: {str(e)}"})
-
-        return _fail(f"删除列操作失败: {str(e)}", meta={"error_code": "DELETE_COLUMNS_FAILED"})
 
 
 @mcp.tool()
@@ -2620,48 +2341,27 @@ def excel_format_cells(
 @mcp.tool()
 @_validate_file_path()
 @_track_call
-def excel_set_row_height(file_path: str, sheet_name: str, row_index: int, height: float, count: int = 1) -> dict[str, Any]:
-    """设置行高（磅值）。"""
-    if row_index < 1:
-        return _fail("row_index 必须大于 0", meta={"error_code": "INVALID_PARAMETER"})
-    if height <= 0:
-        return _fail("height 必须大于 0", meta={"error_code": "INVALID_PARAMETER"})
-    return _wrap(ExcelOperations.set_row_height(file_path, sheet_name, row_index, height, count))
+def excel_set_layout(file_path: str, sheet_name: str, operation: str, index: int, value: float, count: int = 1) -> dict[str, Any]:
+    """布局设置统一入口：行高和列宽。
 
-
-@mcp.tool()
-@_validate_file_path()
-@_track_call
-def excel_set_column_width(file_path: str, sheet_name: str, column_index: int, width: float, count: int = 1) -> dict[str, Any]:
-    """设置列宽（字符单位）。"""
-    if column_index < 1:
-        return _fail("column_index 必须大于 0", meta={"error_code": "INVALID_PARAMETER"})
-    if width <= 0:
-        return _fail("width 必须大于 0", meta={"error_code": "INVALID_PARAMETER"})
-    return _wrap(ExcelOperations.set_column_width(file_path, sheet_name, column_index, width, count))
+    operation: 'row_height' | 'column_width'
+    index: 行/列索引（从1开始）
+    value: 行高（磅值）或列宽（字符单位）
+    count: 影响的行/列数，默认为1
+    """
+    if index < 1:
+        return _fail("index 必须大于 0", meta={"error_code": "INVALID_PARAMETER"})
+    if value <= 0:
+        return _fail("value 必须大于 0", meta={"error_code": "INVALID_PARAMETER"})
+    if operation == "row_height":
+        return _wrap(ExcelOperations.set_row_height(file_path, sheet_name, index, value, count))
+    elif operation == "column_width":
+        return _wrap(ExcelOperations.set_column_width(file_path, sheet_name, index, value, count))
+    else:
+        return _fail(f"不支持的operation: {operation}。可选: row_height, column_width", meta={"error_code": "INVALID_OPERATION"})
 
 
 # ==================== Excel比较功能 ====================
-
-
-@mcp.tool()
-@_validate_file_path(["file1_path", "file2_path"])
-@_track_call
-def excel_compare_files(file1_path: str, file2_path: str) -> dict[str, Any]:
-    """逐单元格比较两个Excel文件的所有工作表差异（单元格级对比）。
-
-    与 excel_compare_sheets 的区别：本工具逐个单元格比对值，返回每个不同单元格的位置和前后值。
-    适用于：精确找出哪些单元格被修改了。
-
-    Args:
-        file1_path: 第一个文件路径（基准/旧版本）
-        file2_path: 第二个文件路径（对比/新版本）
-    """
-    for _p in [file1_path, file2_path]:
-        _err = _validate_path(_p)
-        if _err:
-            return _err
-    return _wrap(ExcelOperations.compare_files(file1_path, file2_path))
 
 
 @mcp.tool()

@@ -14,9 +14,7 @@ import pytest
 from excel_mcp_server_fastmcp.api.excel_operations import ExcelOperations
 from excel_mcp_server_fastmcp.server import (
     OperationLogger,
-    excel_create_backup,
-    excel_list_backups,
-    excel_restore_backup,
+    excel_backup,
 )
 from excel_mcp_server_fastmcp.utils.validators import DataValidationError, ExcelValidator
 
@@ -149,13 +147,12 @@ class TestBackupSystem:
         with open(self.test_file, "w", encoding="utf-8") as f:
             f.write("test content")
 
-        result = excel_create_backup(self.test_file)
+        result = excel_backup(self.test_file, "create")
 
         assert result["success"] is True
         assert "backup_file" in result["data"]
         assert "timestamp" in result["data"]
         assert os.path.exists(result["data"]["backup_file"])
-        assert result["data"]["file_size"]["original"] == result["data"]["file_size"]["backup"]
 
     def test_list_backups(self):
         """测试列出备份文件"""
@@ -166,23 +163,21 @@ class TestBackupSystem:
             f.write("test content")
 
         # 创建多个备份，确保时间戳不同
-        excel_create_backup(self.test_file)
+        excel_backup(self.test_file, "create")
         time.sleep(0.1)  # 确保时间戳不同
-        excel_create_backup(self.test_file)
+        excel_backup(self.test_file, "create")
 
-        result = excel_list_backups(self.test_file)
+        result = excel_backup(self.test_file, "list")
 
-        assert result["success"] is True
-        assert result["data"]["total_backups"] >= 1  # 至少有一个备份
         assert len(result["data"]["backups"]) >= 1
         assert all("filename" in backup for backup in result["data"]["backups"])
 
     def test_list_backups_no_backups(self):
         """测试列出不存在的备份"""
-        result = excel_list_backups(self.test_file)
+        result = excel_backup(self.test_file, "list")
 
         assert result["success"] is True
-        assert result["data"].get("total_backups", 0) == 0
+        assert len(result["data"].get("backups", [])) == 0
         assert result["data"].get("backups", []) == []
 
 
