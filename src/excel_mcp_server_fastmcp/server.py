@@ -1099,12 +1099,18 @@ def excel_copy_sheet(
 @mcp.tool()
 @_track_call
 def excel_backup(file_path: str, operation: str, backup_dir: str | None = None, **kwargs) -> dict[str, Any]:
-    """备份管理统一入口。
+    """Excel 文件的备份与恢复。
 
-    operation: 'create' | 'restore' | 'list'
-    create: 创建备份（可选 backup_dir）
-    restore: 恢复备份（需传 backup_path，可选 target_path）
-    list: 列出备份（可选 backup_dir）
+    根据操作类型选择:
+      - 'create' — 创建备份副本到 .excel_mcp_backups/ 目录
+      - 'list'   — 查看已有备份列表
+      - 'restore' — 从备份恢复文件（需传 backup_path）
+
+    Args:
+        file_path: Excel文件路径
+        operation: 'create' | 'list' | 'restore'
+        backup_dir: 备份目录（默认同级 .excel_mcp_backups）
+        **kwargs: restore 时需传 backup_path（备份文件路径）, 可选 target_path
     """
     if operation == "create":
         if not os.path.exists(file_path):
@@ -1539,11 +1545,21 @@ def excel_find_last_row(file_path: str, sheet_name: str, column: str | int | Non
 @mcp.tool()
 @_track_call
 def excel_structure(file_path: str, sheet_name: str, operation: str, index: int, count: int = 1) -> dict[str, Any]:
-    """行/列结构操作统一入口。
+    """插入或删除工作表的行和列。
 
-    operation: 'insert_rows' | 'insert_columns' | 'delete_rows' | 'delete_columns'
-    index: 行/列索引（从1开始）
-    count: 操作数量，默认为1"""
+    根据操作类型选择:
+      - 'insert_rows'    — 在第 index 行上方插入空行
+      - 'insert_columns' — 在第 index 列左侧插入空列
+      - 'delete_rows'    — 从第 index 行开始删除行
+      - 'delete_columns' — 从第 index 列开始删除列
+
+    Args:
+        file_path: Excel文件路径
+        sheet_name: 工作表名称
+        operation: 'insert_rows' | 'insert_columns' | 'delete_rows' | 'delete_columns'
+        index: 行/列位置（从1开始）
+        count: 数量，默认为1
+    """
     ops_map = {
         "insert_rows": ("insert_rows", True),
         "insert_columns": ("insert_columns", True),
@@ -2341,12 +2357,19 @@ def excel_format_cells(
 @_validate_file_path()
 @_track_call
 def excel_set_layout(file_path: str, sheet_name: str, operation: str, index: int, value: float, count: int = 1) -> dict[str, Any]:
-    """布局设置统一入口：行高和列宽。
+    """设置行高或列宽。
 
-    operation: 'row_height' | 'column_width'
-    index: 行/列索引（从1开始）
-    value: 行高（磅值）或列宽（字符单位）
-    count: 影响的行/列数，默认为1
+    根据操作类型选择:
+      - 'row_height'    — 设置行高（单位: 磅值，如 20 表示 20 磅）
+      - 'column_width'  — 设置列宽（单位: 字符，如 15 表示 15 个字符宽）
+
+    Args:
+        file_path: Excel文件路径
+        sheet_name: 工作表名称
+        operation: 'row_height' | 'column_width'
+        index: 行号或列号（从1开始）
+        value: 行高（磅值）或列宽（字符单位）
+        count: 连续影响的行/列数，默认为1
     """
     if index < 1:
         return _fail("index 必须大于 0", meta={"error_code": "INVALID_PARAMETER"})
