@@ -8146,7 +8146,7 @@ class AdvancedSQLQueryEngine:
                     self._having_agg_alias_map[agg_sql] = temp_col_name
                     temp_columns.append(temp_col_name)
                 except Exception:
-                    pass  # 忽略计算失败的聚合
+                    logger.warning("HAVING聚合计算失败，跳过: %s", agg_sql)
 
         # HAVING子句处理类似于WHERE,但作用于聚合后的数据
         try:
