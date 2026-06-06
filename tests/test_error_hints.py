@@ -54,20 +54,20 @@ class TestCentralizedErrorHints:
     def test_fail_auto_appends_hint(self):
         """_fail自动附加error_code对应的提示"""
         result = _fail("文件不存在", meta={"error_code": "FILE_NOT_FOUND"})
-        assert "💡" in result["message"]
+        assert "[提示]" in result["message"]
         assert "excel_list_sheets" in result["message"]
 
     def test_fail_no_duplicate_hint(self):
         """message中已有💡提示时不重复添加"""
-        result = _fail("错误\n💡 已有提示", meta={"error_code": "FILE_NOT_FOUND"})
+        result = _fail("错误\n[提示] 已有提示", meta={"error_code": "FILE_NOT_FOUND"})
         # 只应出现一次💡
-        assert result["message"].count("💡") == 1
+        assert result["message"].count("[提示]") == 1
 
     def test_fail_unknown_code_no_crash(self):
         """未知的error_code不崩溃，不附加提示"""
         result = _fail("未知错误", meta={"error_code": "UNKNOWN_CODE_XYZ"})
         assert result["success"] is False
-        assert "💡" not in result["message"]
+        assert "[提示]" not in result["message"]
 
     def test_hint_content_useful(self):
         """提示内容应包含具体的修复建议"""
@@ -111,13 +111,13 @@ class TestWrapHints:
     def test_wrap_operations_error_gets_hint(self):
         """Operations层错误（无error_code）也应获得提示"""
         result = _wrap({"success": False, "message": "获取工作表列表失败: Excel文件不存在: test.xlsx", "data": None})
-        assert "💡" in result["message"]
+        assert "[提示]" in result["message"]
         assert result["meta"]["error_code"] == "FILE_NOT_FOUND"
 
     def test_wrap_success_no_hint(self):
         """成功结果不附加提示"""
         result = _wrap({"success": True, "message": "ok", "data": []})
-        assert "💡" not in result["message"]
+        assert "[提示]" not in result["message"]
 
     def test_wrap_existing_error_code_no_override(self):
         """已有error_code时不覆盖"""
@@ -126,8 +126,8 @@ class TestWrapHints:
 
     def test_wrap_existing_hint_no_duplicate(self):
         """已有💡时不重复"""
-        result = _wrap({"success": False, "message": "错误\n💡 已有提示", "data": None})
-        assert result["message"].count("💡") == 1
+        result = _wrap({"success": False, "message": "错误\n[提示] 已有提示", "data": None})
+        assert result["message"].count("[提示]") == 1
 
     def test_wrap_sql_query_info_preserved(self):
         """SQL查询的query_info不被破坏"""

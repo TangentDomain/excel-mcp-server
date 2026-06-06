@@ -3,7 +3,7 @@
 
 统一返回格式: {success: bool, message: str, data: Any, meta: dict}
 - 成功: success=true, data含实际数据
-- 失败: success=false, message含错误描述+💡修复建议
+- 失败: success=false, message含错误描述+修复建议
 """
 
 # 标准库导入
@@ -158,7 +158,7 @@ class ToolCallTracker:
 
     # 错误分类规则：按优先级匹配（前缀/关键词 → 错误类型）
     _ERROR_RULES = [
-        ("🔒", "security"),
+        ("安全验证失败", "security"),
         ("文件不存在", "file_not_found"),
         ("无法加载文件", "file_load"),
         ("文件路径", "validation"),
@@ -430,7 +430,7 @@ def _validate_path(file_path: str) -> dict[str, Any] | None:
     result = SecurityValidator.validate_file_path(file_path)
     if not result["valid"]:
         return _fail(
-            f"🔒 安全验证失败: {result['error']}",
+            f"安全验证失败: {result['error']}",
             meta={"error_code": "PATH_VALIDATION_FAILED"},
         )
     # 文件存在时额外检查大小
@@ -438,7 +438,7 @@ def _validate_path(file_path: str) -> dict[str, Any] | None:
         size_result = SecurityValidator.validate_file_size(file_path)
         if not size_result["valid"]:
             return _fail(
-                f"🔒 安全验证失败: {size_result['error']}",
+                f"安全验证失败: {size_result['error']}",
                 meta={"error_code": "FILE_SIZE_EXCEEDED"},
             )
     return None
@@ -566,69 +566,69 @@ if _cleaned:
 # 创建FastMCP服务器实例，开启调试模式和详细日志
 mcp = FastMCP(
     name="excel-mcp",
-    instructions=r"""🎮 游戏开发Excel配置表管理专家 — 35个工具
+    instructions=r""" 游戏开发Excel配置表管理专家 — 35个工具
 
-## 🔥 核心原则：SQL优先
+##  核心原则：SQL优先
 
 **优先使用 `excel_query`** - 所有数据查询分析任务
-- 复杂条件筛选 ✅ WHERE, LIKE, IN, BETWEEN, 子查询
-- 聚合统计分析 ✅ COUNT, SUM, AVG, MAX, MIN, GROUP BY, HAVING
-- 高级查询 ✅ CASE WHEN, CTE(WITH), EXISTS, JOIN(5种)
-- 排序限制 ✅ ORDER BY, LIMIT, OFFSET
-- 字符串函数 ✅ UPPER, LOWER, TRIM, LENGTH, CONCAT, REPLACE, SUBSTRING
-- 结果合并 ✅ UNION, UNION ALL
-- 窗口函数 ✅ ROW_NUMBER, RANK, DENSE_RANK
+- 复杂条件筛选  WHERE, LIKE, IN, BETWEEN, 子查询
+- 聚合统计分析  COUNT, SUM, AVG, MAX, MIN, GROUP BY, HAVING
+- 高级查询  CASE WHEN, CTE(WITH), EXISTS, JOIN(5种)
+- 排序限制  ORDER BY, LIMIT, OFFSET
+- 字符串函数  UPPER, LOWER, TRIM, LENGTH, CONCAT, REPLACE, SUBSTRING
+- 结果合并  UNION, UNION ALL
+- 窗口函数  ROW_NUMBER, RANK, DENSE_RANK
 
-## 📊 工具选择决策树
+##  工具选择决策树
 ```
 ═══ 读数据 ═══
-🔥 首选：所有数据查询/分析任务 → excel_query（SQL引擎，批量分析首选）
-│   ✅ 复杂条件筛选 → WHERE, LIKE, IN, BETWEEN, 子查询
-│   ✅ 聚合统计 → COUNT, SUM, AVG, MAX, MIN, GROUP BY, HAVING
-│   ✅ 多表关联 → 5种JOIN类型，支持跨文件查询
-│   ✅ 窗口函数 → ROW_NUMBER, RANK, DENSE_RANK
-│   ✅ 字符串函数 → UPPER, LOWER, TRIM, LENGTH, CONCAT, REPLACE, SUBSTRING
+ 首选：所有数据查询/分析任务 → excel_query（SQL引擎，批量分析首选）
+│    复杂条件筛选 → WHERE, LIKE, IN, BETWEEN, 子查询
+│    聚合统计 → COUNT, SUM, AVG, MAX, MIN, GROUP BY, HAVING
+│    多表关联 → 5种JOIN类型，支持跨文件查询
+│    窗口函数 → ROW_NUMBER, RANK, DENSE_RANK
+│    字符串函数 → UPPER, LOWER, TRIM, LENGTH, CONCAT, REPLACE, SUBSTRING
 │
-├─ 📍 已知精确坐标（如A1:C10）────────────→ excel_get_range
+├─  已知精确坐标（如A1:C10）────────────→ excel_get_range
 │
-├─ 📊 快速了解表结构（列名+类型+样本值）───→ excel_describe_table
+├─  快速了解表结构（列名+类型+样本值）───→ excel_describe_table
 │
-├─ 📋 只需表头信息（中文+英文）───────────→ excel_get_headers（更轻量）
+├─  只需表头信息（中文+英文）───────────→ excel_get_headers（更轻量）
 │
-├─ 🔍 定位文本位置───────────────────────→ excel_search（返回row/column）
+├─  定位文本位置───────────────────────→ excel_search（返回row/column）
 │
-└─ 🌐 跨文件搜索─────────────────────────→ excel_search_directory
+└─  跨文件搜索─────────────────────────→ excel_search_directory
 
 ═══ 写数据（重要！选对工具） ═══
-┌─ 🔥 批量修改多行？（改10行以上/按条件改）──→ excel_update_query（SQL UPDATE）
+┌─  批量修改多行？（改10行以上/按条件改）──→ excel_update_query（SQL UPDATE）
 │   例: UPDATE 怪物表 SET 血量=血量*2 WHERE 等级>5
-│   ✅ 需要计算表达式 → SET 血量=血量*2
-│   ✅ 需要预览变更 → dry_run=True
-│   ✅ 条件复杂 → WHERE 等级>5 AND 稀有度='传说'
+│    需要计算表达式 → SET 血量=血量*2
+│    需要预览变更 → dry_run=True
+│    条件复杂 → WHERE 等级>5 AND 稀有度='传说'
 │
-├─ 📍 精确坐标写入（知道具体A1:C10）───────→ excel_update_range
-│   ⚠️⚠️⚠️ 默认覆盖模式！insert_mode=True 才是插入！
-│   🟢 安全追加数据？→ 先 find_last_row → 再 update_range(..., insert_mode=True)
-│   🔴 直接覆盖数据？→ update_range(..., insert_mode=False) 【默认，危险】
+├─  精确坐标写入（知道具体A1:C10）───────→ excel_update_range
+│    默认覆盖模式！insert_mode=True 才是插入！
+│    安全追加数据？→ 先 find_last_row → 再 update_range(..., insert_mode=True)
+│    直接覆盖数据？→ update_range(..., insert_mode=False) 【默认，危险】
 │
-├─ 👍 按ID改单行（知道 key_column + key_value）→ excel_upsert_row
+├─  按ID改单行（知道 key_column + key_value）→ excel_upsert_row
 │   例: upsert_row(file, sheet, "ID", 3, {"血量": 900, "攻击力": 70})
-│   ✅ 优点：不会误改其他行、行不存在自动插入、参数自文档化
-│   ✅ 只改2-3个字段、dict传参方便、幂等安全
+│    优点：不会误改其他行、行不存在自动插入、参数自文档化
+│    只改2-3个字段、dict传参方便、幂等安全
 │
-├─ ➕ 批量插入新行────────────────────────→ excel_insert_query（SQL INSERT）
+├─  批量插入新行────────────────────────→ excel_insert_query（SQL INSERT）
 │   例: INSERT INTO 怪物表 (ID,名称,血量) VALUES (6,'Boss',9999)
 │
-└─ 🗑️ 删行？
+└─  删行？
     按条件删？────────────────────────────→ excel_delete_query（SQL DELETE，必须WHERE）
     按行号删？────────────────────────────→ excel_structure(file, sheet, 'delete_rows', row_index, count)
 
 ═══ 高级脚本 ═══
-🐍 循环/复杂逻辑/重复操作？──────────────→ excel_run_python（直接执行Python代码）
+ 循环/复杂逻辑/重复操作？──────────────→ excel_run_python（直接执行Python代码）
     可用变量: query(sql), update(sql), insert(sql), delete(sql), ExcelOperations
-    ✅ query()直接返回[[headers],[row1],...] 无需再取["data"]
-    ✅ 批量循环修改 → for循环遍历行
-    ✅ SQL无法表达的逻辑 → 纯Python自由操作
+     query()直接返回[[headers],[row1],...] 无需再取["data"]
+     批量循环修改 → for循环遍历行
+     SQL无法表达的逻辑 → 纯Python自由操作
 
 ═══ 结构操作 ═══
 文件？                      → excel_create_file
@@ -644,7 +644,7 @@ mcp = FastMCP(
 备份恢复？                   → excel_backup（create/restore/list）
 ```
 
-## 🔥 LLM 防错自查清单（调用前速查）
+##  LLM 防错自查清单（调用前速查）
 
 > 选完工具后、调用前，花3秒检查这5项，避免90%的错误：
 
@@ -656,30 +656,30 @@ mcp = FastMCP(
 | 4 | SQL语句类型对吗？ | 把 SELECT 传给 update_query 或 UPDATE 传给 query | 查询→query / 改→update_query / 增→insert_query / 删→delete_query |
 | 5 | 写入后验证了吗？ | 写完就结束，没确认实际效果 | 安全链路：写入 → query验证 → 有备份可恢复 |
 
-**错误信号速认**：返回值含 `覆盖模式` → 你可能忘了 insert_mode=True；含 `💡` → 按提示修复即可
+**错误信号速认**：返回值含 `覆盖模式` → 你可能忘了 insert_mode=True；含 `` → 按提示修复即可
 
-## ⚠️ 双行表头列名注意事项
+##  双行表头列名注意事项
 
 当 Excel 有双行表头（第1行中文 + 第2行英文）时：
-- **SQL工具**（query/update_query/insert_query/delete_query）：中英文名都 ✅ 能用
+- **SQL工具**（query/update_query/insert_query/delete_query）：中英文名都  能用
 - **describe_table 返回的列名**：是第2行英文名（如 skill_id, equip_name）
-- **upsert_row 的 key_column**：✅ 中英文名都能用（自动检测双行表头，自动兼容）
+- **upsert_row 的 key_column**： 中英文名都能用（自动检测双行表头，自动兼容）
 - **建议**：直接用 describe_table 返回的英文名即可，无需额外确认原始列名
 
 ## ⚡ SQL vs Direct 选择原则
 ```
-✅ 用 SQL (query/update_query/insert_query/delete_query)：
+ 用 SQL (query/update_query/insert_query/delete_query)：
    - 需要条件筛选(WHERE)、聚合(GROUP BY)、JOIN、排序(ORDER BY)
    - 批量操作（影响10行以上）
    - 需要预览效果(dry_run)
 
-✅ 用 Direct (get_range/update_range/upsert_row)：
+ 用 Direct (get_range/update_range/upsert_row)：
    - 精确坐标操作（知道具体是A1还是C5）
    - 单行或少量行的精确读写
    - 需要保持格式/公式的精确区域写入
 ```
 
-## ✅ SQL已支持功能
+##  SQL已支持功能
 基础: SELECT, DISTINCT, 别名(AS), 数学表达式(+-*/%)
 条件: WHERE, 比较运算(=/></≤/≥/≠), LIKE, NOT LIKE, IN, NOT IN, BETWEEN, AND, OR, IS NULL, IS NOT NULL, NOT
 高级: WHERE子查询, FROM子查询(FROM (SELECT ...) AS alias), CASE WHEN, COALESCE, EXISTS, CTE(WITH ... AS ...)
@@ -691,37 +691,37 @@ mcp = FastMCP(
 窗口: ROW_NUMBER, RANK, DENSE_RANK, LAG, LEAD, FIRST_VALUE, LAST_VALUE, NTILE, PERCENT_RANK, CUME_DIST, AVG/SUM/COUNT/MIN/MAX OVER
 数据修改: INSERT INTO ... VALUES (...), DELETE FROM ... WHERE ..., UPDATE ... SET ... WHERE ...
 
-## ❌ SQL不支持
+##  SQL不支持
 NATURAL JOIN, WITH RECURSIVE, LATERAL JOIN(请改用子查询或CTE), 跨文件JOIN需使用@'path'语法
 
-## ✅ 跨文件JOIN
+##  跨文件JOIN
 使用@'path'语法引用其他Excel文件的工作表：
 ```sql
 SELECT a.*, b.掉落物品 FROM 技能表@'./data/技能配置.xlsx' a JOIN 掉落表@'./data/掉落配置.xlsx' b ON a.id = b.skill_id
 ```
 
-## ✅ FROM子查询
+##  FROM子查询
 支持多层嵌套FROM子查询：`FROM (SELECT ...) AS alias`。
 ```sql
 SELECT * FROM (SELECT skill_name, damage FROM 技能配置 WHERE damage > 100) AS 高伤技能
 ```
 
-## ✅ UNION / UNION ALL
+##  UNION / UNION ALL
 合并多个SELECT查询结果。支持ORDER BY和LIMIT。
 ```sql
 SELECT name FROM 技能配置 WHERE 类型='法师' UNION ALL SELECT name FROM 技能配置 WHERE 类型='战士' ORDER BY name LIMIT 10
 ```
 
-## ⚠️ 重要原则
+##  重要原则
 - 双行表头: 第1行中文描述+第2行英文字段名，中英文列名均可查询
 - **统一1-based索引: 第1行=1, 第1列=1（所有工具一致，含insert_rows/delete_rows）**
 - **范围格式(cell_range参数): 优先使用 "工作表名!A1:C10"；不含!时单工作表文件自动推断**
-- **🔴🔴🔴 update_range 默认覆盖模式（insert_mode=False）！目标区域数据会被直接替换！**
-  - ✅ 追加/插入数据：必须设置 `insert_mode=True` + 先用 `find_last_row` 定位末行
-  - ✅ 确实要覆盖：不用改参数，但返回消息会标注 `[覆盖模式]`
-  - 🟢 安全链路：`find_last_row` → `update_range(..., insert_mode=True)` → `query` 验证
+- ** update_range 默认覆盖模式（insert_mode=False）！目标区域数据会被直接替换！**
+  -  追加/插入数据：必须设置 `insert_mode=True` + 先用 `find_last_row` 定位末行
+  -  确实要覆盖：不用改参数，但返回消息会标注 `[覆盖模式]`
+  -  安全链路：`find_last_row` → `update_range(..., insert_mode=True)` → `query` 验证
 
-## 🎮 典型用法示例
+##  典型用法示例
 ```sql
 -- 聚合统计
 SELECT 技能类型, AVG(伤害), COUNT(*) FROM 技能表 GROUP BY 技能类型
@@ -733,13 +733,13 @@ SELECT * FROM 技能表 WHERE 伤害 > (SELECT AVG(伤害) FROM 技能表)
 SELECT a.*, b.掉落物品 FROM 技能表@'./data/技能配置.xlsx' a JOIN 掉落表@'./data/掉落配置.xlsx' b ON a.id = b.skill_id
 ```
 
-## 📦 统一返回格式
+##  统一返回格式
 所有工具返回统一JSON结构：`{success, message, data, meta}`
 - 成功时 `success=true`，`data` 为实际数据
 - 失败时 `success=false`，`meta.error_code` 为机器可读错误码
-- 所有错误均包含💡修复提示
+- 所有错误均包含修复提示
 
-## 🔄 常用工作流
+##  常用工作流
 ```
 了解结构 → describe_table → 查询分析 → query → 修改数据 → update_query/update_range → 验证结果 → compare_sheets
 ```
@@ -822,23 +822,23 @@ def _fail(message: str, meta: dict = None) -> dict:
         dict: 统一的错误响应格式 {success: false, message: str, meta: dict}
 
     Note:
-        当meta中包含error_code时，会自动添加对应的💡修复提示到message中
+        当meta中包含error_code时，会自动添加对应的修复提示到message中
     """
     r: dict = {"success": False, "message": message}
     if meta:
         r["meta"] = meta
-    # 自动附加集中式错误提示（仅当message中还没有💡提示时）
+    # 自动附加集中式错误提示（仅当message中还没有提示时）
     error_code = (meta or {}).get("error_code", "")
     hint = _ERROR_HINTS.get(error_code, "")
-    if hint and "💡" not in message:
-        r["message"] = message + f"\n💡 {hint}"
+    if hint and "[提示]" not in message:
+        r["message"] = message + f"\n[提示] {hint}"
     return r
 
 
 def _strip_defaults(obj: Any, depth: int = 0) -> Any:
     """递归移除默认值和空值以减少token消耗。
 
-    ⚠️ LLM注意：以下字段若缺失表示其值为默认值（False/0），并非字段不存在：
+     LLM注意：以下字段若缺失表示其值为默认值（False/0），并非字段不存在：
     bold, italic, underline, wrap_text, border_top/bottom/left/right,
     horizontal_alignment, vertical_alignment, text_rotation, merge_cells
 
@@ -964,13 +964,13 @@ def _wrap(result, meta: dict = None) -> dict:
     if result.get("success") is False:
         msg = result.get("message", "")
         existing_code = (result.get("meta") or {}).get("error_code", "")
-        if not existing_code and "💡" not in msg:
+        if not existing_code and "[提示]" not in msg:
             # 根据消息内容推断error_code并附加提示
             inferred = _infer_error_code(msg)
             if inferred:
                 hint = _ERROR_HINTS.get(inferred, "")
                 if hint:
-                    result["message"] = msg + f"\n💡 {hint}"
+                    result["message"] = msg + f"\n[提示] {hint}"
                     if "meta" not in result:
                         result["meta"] = {}
                     result["meta"]["error_code"] = inferred
@@ -1276,13 +1276,13 @@ def excel_get_range(
     include_formatting: bool = False,
     sheet_name: str | None = None,
 ) -> dict[str, Any]:
-    """📍 **精确读取**：已知单元格坐标时使用（如A1:C10）。
+    """已知单元格坐标时使用（如A1:C10）。
 
-    💡 **使用场景**：
+     **使用场景**：
     • 已知精确坐标 → excel_get_range（精确读取，如 "Sheet1!A1:C10"）
     • 需要单元格格式信息 → include_formatting=True
 
-    ⚠️ **不推荐用于**：
+     **不推荐用于**：
     • 需要筛选/聚合/JOIN/排序 → 使用 excel_query（SQL引擎）
     • 快速了解表结构 → 使用 excel_describe_table（列名+类型+样本值）
     • 只需表头信息 → 使用 excel_get_headers
@@ -1308,7 +1308,7 @@ def excel_get_range(
             f"参数顺序可能错误：cell_range参数值 '{cell_range}' 看起来不像有效的单元格范围。\n"
             f"请检查参数顺序：第二个参数应该是范围表达式（如 'A1:C10' 或 'Sheet1!A1:C10'），\n"
             f"如果要以默认工作表读取，请明确指定: excel_get_range('{file_path}', 'A1:C10')\n"
-            f"💡 正确示例: excel_get_range('文件.xlsx', 'Sheet1!A1:E10') 或 excel_get_range('文件.xlsx', 'A1:E10', sheet_name='Sheet1')",
+            f" 正确示例: excel_get_range('文件.xlsx', 'Sheet1!A1:E10') 或 excel_get_range('文件.xlsx', 'A1:E10', sheet_name='Sheet1')",
             meta={
                 "error_code": "PARAMETER_ORDER_ERROR",
                 "received_range": cell_range,
@@ -1389,14 +1389,14 @@ def excel_get_headers(
     header_row: int = 1,
     max_columns: int | None = None,
 ) -> dict[str, Any]:
-    """📋 **表头信息**：轻量级获取列名（中文+英文）。
+    """轻量级获取列名（中文+英文）。
 
-    💡 **使用场景**：
+     **使用场景**：
     • 只需表头信息 → excel_get_headers（更轻量）
     • 需要双行表头（中文+英文）→ 自动识别
     • 获取所有表的表头 → 不传sheet_name参数
 
-    ⚠️ **不推荐用于**：
+     **不推荐用于**：
     • 需要数据类型/样本值 → 使用 excel_describe_table（完整分析）
     • 需要筛选/聚合 → 使用 excel_query（SQL引擎）
 
@@ -1425,18 +1425,18 @@ def excel_update_range(
     insert_mode: bool = False,
     sheet_name: str | None = None,
 ) -> dict[str, Any]:
-    """📍 **精确坐标写入**：知道具体单元格范围时使用。
+    """知道具体单元格范围时使用。
 
-    💡 **使用场景**：
-    • 🔴 精确覆盖指定区域（知道具体A1:C10）→ excel_update_range
-    • 🟢 安全追加数据 → 先 find_last_row → 再 update_range(..., insert_mode=True)
-    • 🔴 直接覆盖数据 → update_range(..., insert_mode=False)【默认，危险】
+     **使用场景**：
+    •  精确覆盖指定区域（知道具体A1:C10）→ excel_update_range
+    •  安全追加数据 → 先 find_last_row → 再 update_range(..., insert_mode=True)
+    •  直接覆盖数据 → update_range(..., insert_mode=False)【默认，危险】
 
-    ⚠️ **不推荐用于**：
+     **不推荐用于**：
     • 批量修改多行（改10行以上/按条件改）→ 使用 excel_update_query（SQL UPDATE）
     • 按ID改单行（知道 key_column + key_value）→ 使用 excel_upsert_row
 
-    ⚠️ **重要**：默认为覆盖模式(insert_mode=False)，会直接替换目标区域数据！
+     **重要**：默认为覆盖模式(insert_mode=False)，会直接替换目标区域数据！
        如需保留原有数据并插入新行，必须显式设置 insert_mode=True
 
     Args:
@@ -1507,9 +1507,9 @@ def excel_update_range(
         )
 
         result = _wrap(result)
-        # 🔴 覆盖模式安全警告：在返回值中明确标注操作模式，防止LLM误判
+        #  覆盖模式安全警告：在返回值中明确标注操作模式，防止LLM误判
         if insert_mode is False and result.get("success"):
-            _mode_note = "⚠️ [覆盖模式] 目标区域原有数据已被替换。如需保留原数据并插入新行，请设置 insert_mode=True"
+            _mode_note = " [覆盖模式] 目标区域原有数据已被替换。如需保留原数据并插入新行，请设置 insert_mode=True"
             result["message"] = f"{result.get('message', '')} | {_mode_note}"
             if "meta" not in result:
                 result["meta"] = {}
@@ -1617,18 +1617,18 @@ def excel_upsert_row(
     updates: dict[str, Any],
     header_row: int = 1,
 ) -> dict[str, Any]:
-    """👍 **按ID更新单行首选**：知道key_column+key_value时使用。
+    """知道key_column+key_value时使用。
 
-    💡 **使用场景**：
+     **使用场景**：
     • 按ID改单行（知道 key_column + key_value）→ excel_upsert_row
     • 只改2-3个字段、dict传参方便 → 更安全
     • 需要幂等操作（行不存在自动插入）
 
-    ⚠️ **不推荐用于**：
+     **不推荐用于**：
     • 批量修改多行 → 使用 excel_update_query（SQL UPDATE）
     • 精确覆盖指定区域 → 使用 excel_update_range
 
-    ✅ **优点**：不会误改其他行、行不存在自动插入、参数自文档化、双行表头兼容
+     **优点**：不会误改其他行、行不存在自动插入、参数自文档化、双行表头兼容
 
     按key_column+key_value查找行，存在则更新，不存在则插入。
 
@@ -1657,13 +1657,13 @@ def excel_set_formula(file_path: str, sheet_name: str, cell_address: str, formul
     # 参数验证：formula 不能为空
     if not formula or not formula.strip():
         return _fail(
-            "📝 公式参数缺失：excel_set_formula() 需要一个有效的Excel公式。\n"
-            '✅ 正确用法：excel_set_formula("file.xlsx", "Sheet1", "A1", "=SUM(B1:C1)")\n'
-            "🔧 支持的公式类型：\n"
+            " 公式参数缺失：excel_set_formula() 需要一个有效的Excel公式。\n"
+            ' 正确用法：excel_set_formula("file.xlsx", "Sheet1", "A1", "=SUM(B1:C1)")\n'
+            " 支持的公式类型：\n"
             '  - 数学公式: "=A1+B1", "=SUM(A1:A10)"\n'
             '  - 引用公式: "=B2", "=Sheet2!A1"\n'
             '  - 函数公式: "=VLOOKUP(A1, Sheet2!A:B, 2, FALSE)"\n'
-            '❌ 不要只传单元格地址，公式必须以等号 "=" 开头',
+            ' 不要只传单元格地址，公式必须以等号 "=" 开头',
             meta={
                 "error_code": "MISSING_FORMULA",
                 "received_formula": formula,
@@ -1675,7 +1675,7 @@ def excel_set_formula(file_path: str, sheet_name: str, cell_address: str, formul
     _formula_err = SecurityValidator.validate_formula(formula)
     if not _formula_err["valid"]:
         return _fail(
-            f"🔒 安全验证失败: {_formula_err['error']}",
+            f"安全验证失败: {_formula_err['error']}",
             meta={"error_code": "FORMULA_SECURITY_FAILED"},
         )
     return _wrap(ExcelOperations.set_formula(file_path, sheet_name, cell_address, formula))
@@ -1689,9 +1689,9 @@ def excel_query(
     include_headers: bool = True,
     output_format: str = "table",
 ) -> dict[str, Any]:
-    """🔥 **首选工具**：所有数据查询/分析任务，优先使用此工具。
+    """所有数据查询/分析任务，优先使用此工具。
 
-    💡 **使用场景**：
+     **使用场景**：
     • 需要筛选/聚合/JOIN/排序 → excel_query（SQL引擎，批量分析首选）
     • 复杂条件筛选 → WHERE, LIKE, IN, BETWEEN, 子查询
     • 聚合统计 → COUNT, SUM, AVG, MAX, MIN, GROUP BY, HAVING
@@ -1699,7 +1699,7 @@ def excel_query(
     • 窗口函数 → ROW_NUMBER, RANK, DENSE_RANK
     • 字符串函数 → UPPER, LOWER, TRIM, LENGTH, CONCAT, REPLACE, SUBSTRING
 
-    ⚠️ **不推荐用于**：
+     **不推荐用于**：
     • 已知精确坐标（如A1:C10）→ 使用 excel_get_range
     • 只需表头信息 → 使用 excel_get_headers 或 excel_describe_table
 
@@ -1748,7 +1748,7 @@ def excel_query(
     except ImportError:
         hint = (
             "SQLGlot未安装，无法使用高级SQL功能。请运行: pip install sqlglot\n\n"
-            "💡 智能降级建议：\n"
+            " 智能降级建议：\n"
             '• 对于简单数据读取：尝试使用 excel_get_range("文件路径", "工作表名!A1:Z100")\n'
             '• 对于文本搜索：尝试使用 excel_search("文件路径", "关键词", "工作表名")\n'
             '• 对于表头信息：尝试使用 excel_get_headers("文件路径", "工作表名")'
@@ -1762,16 +1762,16 @@ def excel_query(
 @mcp.tool()
 @_track_call
 def excel_update_query(file_path: str, update_expression: str, dry_run: bool = False) -> dict[str, Any]:
-    """🔥 **批量修改首选**：按条件批量修改多行数据。
+    """按条件批量修改多行数据。
 
-    💡 **使用场景**：
+     **使用场景**：
     • 批量修改多行（改10行以上/按条件改）→ excel_update_query（SQL UPDATE）
     • 需要计算表达式 → SET 血量=血量*2
     • 需要预览变更 → dry_run=True
     • 条件复杂 → WHERE 等级>5 AND 稀有度='传说'
 
-    ⚠️ **不推荐用于**：
-    • 🔴 精确覆盖指定区域（知道具体A1:C10）→ 使用 excel_update_range
+     **不推荐用于**：
+    •  精确覆盖指定区域（知道具体A1:C10）→ 使用 excel_update_range
     • 按ID改单行（只改2-3个字段）→ 使用 excel_upsert_row（更安全）
 
     SQL批量修改。dry_run=True预览变更不实际写入。
@@ -2095,14 +2095,14 @@ def _cell_str(c):
 @_validate_file_path()
 @_track_call
 def excel_describe_table(file_path: str, sheet_name: str = None) -> dict[str, Any]:
-    """📊 **表结构分析**：快速了解表的列名、类型、样本值。
+    """快速了解表的列名、类型、样本值。
 
-    💡 **使用场景**：
+     **使用场景**：
     • 快速了解表结构 → excel_describe_table（列名+类型+样本值+行数）
     • 数据操作前了解表结构 → 避免列名错误
     • 需要数据类型和非空统计 → 自动推断类型、非空比例
 
-    ⚠️ **不推荐用于**：
+     **不推荐用于**：
     • 只需表头信息 → 使用 excel_get_headers（更轻量）
     • 已知精确坐标读取数据 → 使用 excel_get_range
     • 需要筛选/聚合 → 使用 excel_query（SQL引擎）
@@ -2222,7 +2222,7 @@ def _check_merge_data_loss(file_path: str, sheet_name: str, cell_range: str) -> 
         if non_empty_cells:
             sample = non_empty_cells[:3]
             more = f" 等{len(non_empty_cells)}个" if len(non_empty_cells) > 3 else ""
-            return f"⚠️ 合并将清除以下单元格的数据: {', '.join(sample)}{more}。Excel合并后只有左上角单元格保留值。如需保留数据请先备份或改用加粗+背景色代替合并。"
+            return f" 合并将清除以下单元格的数据: {', '.join(sample)}{more}。Excel合并后只有左上角单元格保留值。如需保留数据请先备份或改用加粗+背景色代替合并。"
         return None
     except Exception:
         return None  # 检查失败不阻塞合并操作
@@ -2237,15 +2237,15 @@ def excel_format_cells(
     formatting: dict[str, Any] | None = None,
     preset: str | None = None,
 ) -> dict[str, Any]:
-    """单元格样式统一入口：字体样式 + 合并/拆分 + 边框，一个工具完成所有外观操作。
+    """设置单元格样式：字体、合并/拆分、边框、对齐、填充等，支持单次调用组合多个操作。
 
     支持的操作类别（可在单次调用中组合使用）：
-      📝 字体: bold, italic, underline('single'/'double'/'singleAccounting'), strikethrough,
+       字体: bold, italic, underline('single'/'double'/'singleAccounting'), strikethrough,
               font_size, font_color, font_name
-      🎨 单元格: bg_color(背景), fill_type(solid/gradient/pattern), gradient_colors, alignment,
+       单元格: bg_color(背景), fill_type(solid/gradient/pattern), gradient_colors, alignment,
               wrap_text, text_rotation, indent, shrink_to_fit, number_format
-      🔗 结构: merge(True=合并), unmerge(True=取消合并)
-      📦 边框: border_style(thin/thick/double/dotted/dashed) 或 border{left/right/top/bottom+color}
+       结构: merge(True=合并), unmerge(True=取消合并)
+       边框: border_style(thin/thick/double/dotted/dashed) 或 border{left/right/top/bottom+color}
 
     常用示例:
       加粗表头:           {"bold": True}
@@ -2259,7 +2259,7 @@ def excel_format_cells(
       合并+边框+背景色:     {"merge": True, "border_style": "thin", "bg_color": "FFFF00"}
       预设样式:           preset="header"（等价于 bold + center + bg_color）
 
-    ⚠️ 合并警告：merge=True 会清除合并区域内非左上角单元格的值！Excel合并后只有左上角单元格保留数据。
+     合并警告：merge=True 会清除合并区域内非左上角单元格的值！Excel合并后只有左上角单元格保留数据。
        例如合并 A1:E1 后，B1~E1 的值会丢失。如需保留数据，请先复制到其他位置或改用加粗+背景色代替合并。
 
     Args:
@@ -2426,7 +2426,7 @@ def excel_run_python(
     sheet_name: str | None = None,
     timeout: int = 30,
 ) -> dict[str, Any]:
-    """🐍 直接执行Python代码操作Excel文件，适用于循环/复杂逻辑/重复操作。
+    """直接执行Python代码操作Excel文件，适用于循环/复杂逻辑/重复操作。
 
     当SQL无法表达你的逻辑（如逐行循环、复杂条件、自定义函数）时，用此工具直接写Python代码。
     比多次调用MCP工具更节省token。直接调用现有API，file_path已预绑定。
