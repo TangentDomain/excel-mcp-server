@@ -9,6 +9,7 @@
 # 标准库导入
 import functools
 import glob
+import inspect
 import json
 import logging
 import os
@@ -457,11 +458,8 @@ def _validate_file_path(param="file_path"):
 
     Example:
         @_validate_file_path()          # 验证 file_path 参数
-@_track_call
         @_validate_file_path('backup_path')  # 验证 backup_path 参数
-@_track_call
         @_validate_file_path(['csv_path', 'output_path'])  # 验证多个参数
-@_track_call
     """
 
     def decorator(func):
@@ -473,24 +471,21 @@ def _validate_file_path(param="file_path"):
 
         @functools.wraps(func)
         def wrapper(*args, **kwargs):
-            """包装函数，在调用前验证文件路径参数
+            """包装函数，在调用前验证文件路径参数。
 
-            Args:
-                *args: 传递给被装饰函数的位置参数
-                **kwargs: 传递给被装饰函数的关键字参数，包含需要验证的路径参数
-
-            Returns:
-                如果验证通过，返回被装饰函数的执行结果
-                如果验证失败，返回错误信息
-
-            Note:
-                根据@param_list指定的参数名，从kwargs中获取对应的路径值
-                对每个路径值调用_validate_path进行验证
-                参数值为None时跳过验证
+            从kwargs和位置参数两种方式获取参数值，
+            确保无论MCP以何种方式调用工具都能拦截非法路径。
             """
+            # 使用 inspect.signature 获取参数名（兼容 functools.wraps）
+            sig_params = list(inspect.signature(func).parameters)
             params = [param] if isinstance(param, str) else param
             for p_name in params:
                 p_value = kwargs.get(p_name)
+                # 如果kwargs中没有，尝试从位置参数获取
+                if p_value is None and p_name in sig_params:
+                    p_idx = sig_params.index(p_name)
+                    if p_idx < len(args):
+                        p_value = args[p_idx]
                 if p_value is None:
                     continue
                 err = _validate_path(p_value)
