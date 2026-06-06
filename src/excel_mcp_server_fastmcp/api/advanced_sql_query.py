@@ -156,7 +156,6 @@ except ImportError:
 
 # 配置常量
 from ..utils.config import (
-    CACHE_TARGET_MEMORY_MB,
     MARKDOWN_TABLE_MAX_ROWS,
     MAX_CACHE_SIZE,
     MAX_QUERY_CACHE_SIZE,
@@ -671,17 +670,7 @@ class AdvancedSQLQueryEngine:
         self._current_file_path = None
 
     def clear_cache(self):
-        """清除DataFrame缓存,释放内存
-
-        清除DataFrame缓存和查询结果缓存,释放内存占用.
-        下次查询会重新加载Excel数据.
-
-        Args:
-            无
-
-        Returns:
-            None
-        """
+        """清除所有缓存，释放内存。"""
         self._df_cache.clear()
         self._query_result_cache.clear()
 
@@ -716,35 +705,6 @@ class AdvancedSQLQueryEngine:
             if c_lower.startswith(col_lower + "("):
                 return c
         return None
-
-    def _get_query_cache_key(self, sql: str, file_path: str, sheet_name: str | None = None) -> str:
-        """生成查询缓存键"""
-        # hashlib already imported at top level
-
-        cache_data = f"{sql}|{file_path}|{sheet_name or ''}"
-        return hashlib.md5(cache_data.encode()).hexdigest()
-
-    def _get_cached_query_result(self, cache_key: str, file_mtime: float) -> pd.DataFrame | None:
-        """获取缓存的查询结果"""
-        if cache_key in self._query_result_cache:
-            cached_time, cached_df, cached_mtime = self._query_result_cache[cache_key]
-            # 检查缓存是否过期(文件是否被修改)
-            current_time = time.time()
-            if current_time - cached_time < self._query_cache_ttl and cached_mtime == file_mtime:
-                return cached_df
-            else:
-                # 缓存过期,删除
-                del self._query_result_cache[cache_key]
-        return None
-
-    def _cache_query_result(self, cache_key: str, result_df: pd.DataFrame, file_mtime: float):
-        """缓存查询结果"""
-        # LRU淘汰:超过最大缓存数时删除最早的缓存
-        if len(self._query_result_cache) >= self._max_query_cache_size:
-            oldest_key = next(iter(self._query_result_cache))
-            del self._query_result_cache[oldest_key]
-
-        self._query_result_cache[cache_key] = (time.time(), result_df, file_mtime)
 
     def execute_sql_query(
         self,
@@ -1186,17 +1146,12 @@ class AdvancedSQLQueryEngine:
                 total += df.memory_usage(deep=True).sum() / 1024 / 1024
         return total
 
-    def evict_cache_by_memory(self, target_mb: float = None):
-        """内存感知缓存淘汰:当缓存总内存超过阈值时,淘汰最早的缓存项
-
-        Args:
-            target_mb: 目标最大缓存内存(MB),默认使用 CACHE_TARGET_MEMORY_MB
-        """
-        if target_mb is None:
-            target_mb = CACHE_TARGET_MEMORY_MB
+    def evict_cache_by_memory(self, target_mb: float = 50.0):
+        """按内存目标驱逐缓存条目"""
         while self._estimate_cache_memory_mb() > target_mb and self._df_cache:
-            self._df_cache.pop(next(iter(self._df_cache)))
-            logger.info(f"缓存内存淘汰后剩余: {self._estimate_cache_memory_mb():.1f}MB")
+            evicted_key = next(iter(self._df_cache))
+            self._df_cache.pop(evicted_key)
+            self._col_map_cache.pop(evicted_key, None)
 
     def _load_excel_data(self, file_path: str, sheet_name: str | None = None) -> dict[str, pd.DataFrame]:
         """
@@ -1749,170 +1704,6 @@ class AdvancedSQLQueryEngine:
             else:
                 i += 1
         return False
-
-    def _execute_multi_statement(
-        self,
-        sql: str,
-        file_path: str,
-        worksheets_data: dict,
-        include_headers: bool,
-        output_format: str,
-        limit: int,
-    ) -> dict:
-        """
-        执行多语句SQL（分号分隔的多条语句）。
-
-        将 SQL 按分号拆分为多条独立语句，逐条执行，合并结果返回。
-        支持混合 SELECT / UPDATE / INSERT / DELETE 语句的组合。
-
-        Args:
-            sql: 原始多语句 SQL（包含分号分隔符）
-            file_path: Excel 文件路径
-            worksheets_data: 工作表数据字典
-            include_headers: 是否包含表头
-            output_format: 输出格式
-            limit: 行数限制
-
-        Returns:
-            dict: 合并后的结果，格式与单条查询一致
-        """
-        # time already imported at top level
-
-        _start = time.time()
-
-        # Fix: P0-2 分号多语句注入防御（纵深防御）
-        # 即使各入口已拦截，此函数内部也应拒绝多语句执行
-        # 智能检测：按分号分割（尊重字符串内分号），若产生多条语句则拒绝
-        raw_parts = []
-        current = []
-        in_single_quote = False
-        in_double_quote = False
-        for ch in sql:
-            if ch == "'" and not in_double_quote:
-                in_single_quote = not in_single_quote
-                current.append(ch)
-            elif ch == '"' and not in_single_quote:
-                in_double_quote = not in_double_quote
-                current.append(ch)
-            elif ch == ";" and not in_single_quote and not in_double_quote:
-                raw_parts.append("".join(current))
-                current = []
-            else:
-                current.append(ch)
-        if current:
-            raw_parts.append("".join(current))
-
-        statements = [s.strip() for s in raw_parts if s.strip()]
-
-        # 安全策略: 禁止多语句执行（覆盖 P0-2/P0-4/P0-5/P0-6）
-        if len(statements) > 1:
-            return {
-                "success": False,
-                "message": "SQL语法错误: 不支持分号分隔的多语句执行(安全限制).💡 请将每条SQL语句分开执行",
-                "data": [],
-                "columns": None,
-                "row_count": 0,
-                "query_info": {
-                    "error_type": "multi_statement_rejected",
-                    "reason": "semicolon_injection_blocked",
-                    "statement_count": len(statements),
-                    "execution_time_ms": round((time.time() - _start) * 1000, 1),
-                },
-            }
-
-        # 单语句情况：正常走后续流程（保留原有逻辑兼容性）
-        all_results = []  # 所有 SELECT 查询的结果行
-        all_columns = []  # 所有 SELECT 查询的列名
-        affected_total = 0  # 写入操作影响的总行数
-        statements_executed = 0
-        errors = []
-        for idx, stmt in enumerate(statements):
-            try:
-                # 根据语句类型路由到对应的执行方法
-                stmt_upper = stmt.strip().upper()
-                if stmt_upper.startswith(("SELECT ", "WITH ", "(", "SELECT\n", "SELECT\r")):
-                    result = self._execute_single_select(
-                        stmt,
-                        file_path,
-                        worksheets_data,
-                        include_headers,
-                        output_format,
-                        limit,
-                    )
-                    statements_executed += 1
-                    if result.get("success") and result.get("data"):
-                        all_results.extend(result["data"])
-                        if "columns" in result:
-                            all_columns.extend(result["columns"]) if isinstance(result["columns"], list) else None
-                    else:
-                        errors.append(f"语句{idx + 1}: {result.get('message', '未知错误')[:80]}")
-                elif stmt_upper.startswith("UPDATE "):
-                    result = execute_advanced_update_query(file_path, stmt)
-                    statements_executed += 1
-                    if result.get("success"):
-                        affected_total += result.get("affected_rows", 0)
-                    else:
-                        errors.append(f"语句{idx + 1}(UPDATE): {result.get('message', '')[:80]}")
-                elif stmt_upper.startswith("INSERT "):
-                    result = execute_advanced_insert_query(file_path, stmt)
-                    statements_executed += 1
-                    if result.get("success"):
-                        affected_total += result.get("affected_rows", 1)
-                    else:
-                        errors.append(f"语句{idx + 1}(INSERT): {result.get('message', '')[:80]}")
-                elif stmt_upper.startswith("DELETE "):
-                    result = execute_advanced_delete_query(file_path, stmt)
-                    statements_executed += 1
-                    if result.get("success"):
-                        affected_total += result.get("affected_rows", 0)
-                    else:
-                        errors.append(f"语句{idx + 1}(DELETE): {result.get('message', '')[:80]}")
-                else:
-                    # 尝试作为 SELECT 执行
-                    result = self._execute_single_select(
-                        stmt,
-                        file_path,
-                        worksheets_data,
-                        include_headers,
-                        output_format,
-                        limit,
-                    )
-                    statements_executed += 1
-                    if result.get("success") and result.get("data"):
-                        all_results.extend(result["data"])
-                    else:
-                        errors.append(f"语句{idx + 1}: {result.get('message', '未知错误')[:80]}")
-
-            except Exception as e:
-                errors.append(f"语句{idx + 1}异常: {self._sanitize_error_message(str(e))[:100]}")
-
-        _elapsed = (time.time() - _start) * 1000
-
-        # 构建合并结果
-        has_query_data = len(all_results) > 0
-        has_write_ops = affected_total > 0
-
-        return {
-            "success": len(errors) < len(statements),  # 部分成功也算 success
-            "message": (
-                f"多语句执行完成: {statements_executed}/{len(statements)} 条成功"
-                + (f", 返回 {len(all_results)} 行" if has_query_data else "")
-                + (f", 影响 {affected_total} 行" if has_write_ops else "")
-                + (f"\n⚠️ 错误: {'; '.join(errors)}" if errors else "")
-            ),
-            "data": all_results,
-            "columns": all_columns if all_columns else None,
-            "row_count": len(all_results),
-            "query_info": {
-                "statement_count": len(statements),
-                "statements_executed": statements_executed,
-                "query_rows": len(all_results),
-                "affected_rows_total": affected_total,
-                "errors": errors,
-                "execution_time_ms": round(_elapsed, 1),
-                "multi_statement": True,
-            },
-        }
 
     def _execute_single_select(
         self,
@@ -2608,36 +2399,6 @@ class AdvancedSQLQueryEngine:
             else:
                 return expr.name, None
         return None, None
-
-    def _resolve_column_name(self, col_name: str, df) -> str:
-        """解析列名,支持表别名格式(如 r.名称)"""
-        if "." in col_name:
-            # 处理表别名格式,如 r.名称
-            table_part, col_part = col_name.split(".", 1)
-            # 从 _table_aliases 获取真实的表名
-            resolved_table = self._table_aliases.get(table_part, table_part)
-
-            # 优先检查用户使用的别名格式是否直接存在
-            alias_col = f"{table_part}.{col_part}"
-            if alias_col in df.columns:
-                return alias_col
-
-            # 检查JOIN后pandas添加的后缀格式(table_part_列名)
-            pandas_suffix_col = f"{table_part}_{col_part}"
-            if pandas_suffix_col in df.columns:
-                return pandas_suffix_col
-
-            # 尝试其他可能的别名格式
-            # 如果用户使用的是原始表名,检查原始表名+列名
-            original_col = f"{resolved_table}_{col_part}"
-            if original_col in df.columns:
-                return original_col
-
-            # 最后尝试原始列名
-            if col_part in df.columns:
-                return col_part
-
-        return col_name
 
     def _extract_literal_value(self, expr):
         """从表达式中提取字面值(委托_parse_literal_value统一处理)"""
