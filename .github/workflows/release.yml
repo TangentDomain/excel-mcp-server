@@ -6,6 +6,9 @@ on:
       - "v*"
 
 permissions:
+  # Requires PyPI Trusted Publisher configured at:
+  # https://pypi.org/manage/project/excel-mcp-server-fastmcp/settings/publishing/
+  # with: owner=TangentDomain, repo=excel-mcp-server, workflow=release.yml
   id-token: write  # For PyPI trusted publishing
 
 jobs:
@@ -48,7 +51,6 @@ jobs:
     name: Publish to PyPI
     runs-on: ubuntu-latest
     needs: [test]
-    environment: release
     steps:
       - uses: actions/download-artifact@v4
         with:
