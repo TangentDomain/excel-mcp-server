@@ -81,6 +81,7 @@ markers = [
 norecursedirs = [
     ".git", ".tox", "dist", "build", "*.egg",
     ".venv", "venv", "env", "__pycache__", ".pytest_cache", "htmlcov",
+    "_legacy",
 ]
 filterwarnings = [
     # openpyxl 内部未关闭文件句柄

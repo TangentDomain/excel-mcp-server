@@ -10,6 +10,7 @@ import logging
 import math
 import os
 import re
+import threading
 import time
 from collections import Counter
 from datetime import date, datetime
@@ -65,6 +66,25 @@ def _sanitize_cell_value(value: Any) -> Any:
     return value
 
 
+# 每个文件的写锁，防止多线程并发写同一文件
+_file_locks: dict[str, threading.Lock] = {}
+_file_locks_lock = threading.Lock()
+
+
+def _get_file_write_lock(file_path: str) -> threading.Lock:
+    """获取文件级写锁，每个文件独立锁定"""
+    with _file_locks_lock:
+        if file_path not in _file_locks:
+            _file_locks[file_path] = threading.Lock()
+        return _file_locks[file_path]
+
+
+def _release_file_lock(file_path: str) -> None:
+    """清理不再使用的文件锁"""
+    with _file_locks_lock:
+        _file_locks.pop(file_path, None)
+
+
 class ExcelWriter:
     """Excel文件写入器"""
 
@@ -98,7 +118,7 @@ class ExcelWriter:
             raise
 
     def _safe_save_workbook(self, workbook, operation_name: str = "保存文件") -> None:
-        """安全保存工作簿，包含文件锁定检测和错误处理
+        """安全保存工作簿，包含文件级并发锁 + 文件锁定检测和错误处理
 
         Args:
             workbook: openpyxl工作簿对象
@@ -109,21 +129,23 @@ class ExcelWriter:
             IOError: 保存文件时发生IO错误
             Exception: 其他保存错误
         """
-        # 检查文件锁定
-        self._check_file_lock()
+        lock = _get_file_write_lock(self.file_path)
+        with lock:
+            # 检查文件锁定
+            self._check_file_lock()
 
-        try:
-            workbook.save(self.file_path)
-            logger.info(f"{operation_name}成功: {self.file_path}")
-        except PermissionError as e:
-            logger.error(f"{operation_name}失败 - 权限错误: {e}")
-            raise PermissionError(f"文件保存失败，权限不足或文件被锁定: {self.file_path}") from e
-        except OSError as e:
-            logger.error(f"{operation_name}失败 - IO错误: {e}")
-            raise OSError(f"文件保存失败，IO错误: {e}") from e
-        except Exception as e:
-            logger.error(f"{operation_name}失败 - 未知错误: {e}")
-            raise Exception(f"文件保存失败: {str(e)}") from e
+            try:
+                workbook.save(self.file_path)
+                logger.info(f"{operation_name}成功: {self.file_path}")
+            except PermissionError as e:
+                logger.error(f"{operation_name}失败 - 权限错误: {e}")
+                raise PermissionError(f"文件保存失败，权限不足或文件被锁定: {self.file_path}") from e
+            except OSError as e:
+                logger.error(f"{operation_name}失败 - IO错误: {e}")
+                raise OSError(f"文件保存失败，IO错误: {e}") from e
+            except Exception as e:
+                logger.error(f"{operation_name}失败 - 未知错误: {e}")
+                raise Exception(f"文件保存失败: {str(e)}") from e
 
     def update_range(
         self,

@@ -44,6 +44,7 @@ pytestdebug.log
 .ceo-active
 .ceo-directives.md
 .ceo-plan.md
+/.omp/
 memory:
 
 # Runtime logs

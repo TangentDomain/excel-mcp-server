@@ -3,6 +3,7 @@
 暴露现有API函数给用户代码，复用已测试的业务逻辑。
 """
 
+import builtins
 import io
 import logging
 import signal
@@ -10,6 +11,98 @@ import threading
 import traceback
 from contextlib import redirect_stdout
 from functools import partial
+
+# 安全限制：禁止用户代码访问的危险模块和函数
+_SAFE_BUILTINS = {
+    "abs": builtins.abs,
+    "all": builtins.all,
+    "any": builtins.any,
+    "bool": builtins.bool,
+    "chr": builtins.chr,
+    "dict": builtins.dict,
+    "divmod": builtins.divmod,
+    "enumerate": builtins.enumerate,
+    "filter": builtins.filter,
+    "float": builtins.float,
+    "format": builtins.format,
+    "frozenset": builtins.frozenset,
+    "getattr": builtins.getattr,
+    "hasattr": builtins.hasattr,
+    "hash": builtins.hash,
+    "hex": builtins.hex,
+    "id": builtins.id,
+    "int": builtins.int,
+    "isinstance": builtins.isinstance,
+    "issubclass": builtins.issubclass,
+    "iter": builtins.iter,
+    "len": builtins.len,
+    "list": builtins.list,
+    "map": builtins.map,
+    "max": builtins.max,
+    "min": builtins.min,
+    "next": builtins.next,
+    "object": builtins.object,
+    "oct": builtins.oct,
+    "ord": builtins.ord,
+    "pow": builtins.pow,
+    "print": builtins.print,
+    "range": builtins.range,
+    "repr": builtins.repr,
+    "reversed": builtins.reversed,
+    "round": builtins.round,
+    "set": builtins.set,
+    "slice": builtins.slice,
+    "sorted": builtins.sorted,
+    "str": builtins.str,
+    "sum": builtins.sum,
+    "tuple": builtins.tuple,
+    "type": builtins.type,
+    "zip": builtins.zip,
+    "True": True,
+    "False": False,
+    "None": None,
+    # 安全的异常
+    "Exception": builtins.Exception,
+    "ValueError": builtins.ValueError,
+    "TypeError": builtins.TypeError,
+    "IndexError": builtins.IndexError,
+    "KeyError": builtins.KeyError,
+    "StopIteration": builtins.StopIteration,
+}
+_DANGEROUS_MODULES = {
+    "os",
+    "subprocess",
+    "shutil",
+    "sys",
+    "ctypes",
+    "signal",
+    "socket",
+    "http",
+    "urllib",
+    "requests",
+    "aiohttp",
+    "httpx",
+    "importlib",
+    "imp",
+    "pkgutil",
+    "pkg_resources",
+    "pickle",
+    "cPickle",
+    "shelve",
+    "marshal",
+    "tempfile",
+    "zipfile",
+    "tarfile",
+    "gzip",
+    "bz2",
+    "lzma",
+    "ctypes",
+    "cffi",
+    "pycparser",
+    "webbrowser",
+    "tkinter",
+    "curses",
+}
 from typing import Any
 
 logger = logging.getLogger(__name__)
@@ -93,8 +186,10 @@ def execute_python_script(
     result_value = None
 
     try:
-        # 构建执行环境：预绑定file_path的便捷函数
+        # 构建安全执行环境：受限 builtins + 预绑定 API
         user_globals = {
+            "__builtins__": _SAFE_BUILTINS,
+            "__name__": "<sandbox>",
             "file_path": file_path,
             "sheet_name": sheet_name,
             # SQL快捷函数（file_path已预绑定）
@@ -105,27 +200,39 @@ def execute_python_script(
             # 完整API类（所有操作）
             "ExcelOperations": ExcelOperations,
         }
+        # 禁止用户代码 import 危险模块（防御深度，尽管__builtins__已移除__import__）
+        # 如果 __builtins__ 被绕过，第二道防线检查 import 目标
+        _orig_import = builtins.__import__
 
-        # 执行代码（带超时控制）
-        with redirect_stdout(stdout_buf):
-            # 设置信号超时（仅主线程支持 signal.alarm）
-            is_main_thread = threading.current_thread() is threading.main_thread()
-            if is_main_thread:
-                old_handler = signal.signal(signal.SIGALRM, _timeout_handler)
-                signal.alarm(timeout)
-            try:
-                compiled = compile(code, "<user_script>", "eval")
-                result_value = eval(compiled, user_globals)
-            except SyntaxError:
-                compiled = compile(code, "<user_script>", "exec")
-                exec(compiled, user_globals)
-                result_value = user_globals.get("result", None)
-            finally:
+        def _safe_import(name, *args, **kwargs):
+            if name.split(".")[0] in _DANGEROUS_MODULES:
+                raise ImportError(f"禁止导入危险模块: {name}")
+            return _orig_import(name, *args, **kwargs)
+
+        builtins.__import__ = _safe_import
+        try:
+            # 执行代码（带超时控制）
+            with redirect_stdout(stdout_buf):
+                # 设置信号超时（仅主线程支持 signal.alarm）
+                is_main_thread = threading.current_thread() is threading.main_thread()
                 if is_main_thread:
-                    # 取消超时信号，恢复原处理函数
-                    signal.alarm(0)
-                    signal.signal(signal.SIGALRM, old_handler)
-
+                    old_handler = signal.signal(signal.SIGALRM, _timeout_handler)
+                    signal.alarm(timeout)
+                try:
+                    compiled = compile(code, "<user_script>", "eval")
+                    result_value = eval(compiled, user_globals)
+                except SyntaxError:
+                    compiled = compile(code, "<user_script>", "exec")
+                    exec(compiled, user_globals)
+                    result_value = user_globals.get("result", None)
+                finally:
+                    if is_main_thread:
+                        # 取消超时信号，恢复原处理函数
+                        signal.alarm(0)
+                        signal.signal(signal.SIGALRM, old_handler)
+        finally:
+            # 恢复全局 __import__，防止污染
+            builtins.__import__ = _orig_import
         return {
             "success": True,
             "message": "脚本执行成功",
