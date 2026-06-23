@@ -11,7 +11,16 @@ version: "2.0.0"
 
 ## 调用方式
 
-所有操作通过 CLI 可执行文件调用，输出 JSON：
+所有操作通过 CLI 可执行文件调用，输出 JSON。
+
+**优先使用打包二进制**（无需 Python 环境）：
+
+```bash
+# 打包后的独立可执行文件（ZIP 包内 bin/excel-cli.exe 或 bin/excel-cli）
+excel-cli <command> [options]
+```
+
+**回退到 Python 源码**（开发环境）：
 
 ```bash
 python scripts/excel-cli.py <command> [options]
