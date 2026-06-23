@@ -1,0 +1,30 @@
+[
+  {
+    "id": "ruff-check",
+    "type": "deterministic",
+    "command": "uv run ruff check src/ tests/",
+    "protected": true,
+    "description": "ruff lint 检查器"
+  },
+  {
+    "id": "ruff-format",
+    "type": "deterministic",
+    "command": "uv run ruff format --check src/ tests/",
+    "protected": true,
+    "description": "ruff 格式检查器"
+  },
+  {
+    "id": "invariant-tests",
+    "type": "deterministic",
+    "command": "python -m pytest tests/invariants/ -q --tb=short",
+    "protected": true,
+    "description": "不变量测试套件 INV-1~32"
+  },
+  {
+    "id": "docstring-contract",
+    "type": "deterministic",
+    "command": "python3 scripts/lint_docstring_contract.py --quiet",
+    "protected": false,
+    "description": "docstring 契约检查"
+  }
+]

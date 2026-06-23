@@ -1,0 +1,21 @@
+{
+  "log": [
+    {
+      "proposalId": "L5P-20260623-001",
+      "action": "propose",
+      "timestamp": "2026-06-23T03:58:55.017Z",
+      "reason": "添加 L5 进化引擎维护说明",
+      "expected": "quality-gates.md 描述更清晰，判定命令不变",
+      "riskLevel": "auto_commit",
+      "rollbackTarget": "42fab07ed87207835eb92bc6ff21d90a3f557c3e"
+    },
+    {
+      "proposalId": "L5P-20260623-001",
+      "action": "evaluate",
+      "timestamp": "2026-06-23T03:58:55.217Z",
+      "passed": true,
+      "failures": [],
+      "needsHumanReview": false
+    }
+  ]
+}

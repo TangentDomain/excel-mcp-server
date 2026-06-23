@@ -1,0 +1,13 @@
+{
+  "type": "rule",
+  "path": ".omp/rules/quality-gates.md",
+  "reason": "添加 L5 进化引擎维护说明",
+  "expected": "quality-gates.md 描述更清晰，判定命令不变",
+  "changes": [
+    {
+      "file": ".omp/rules/quality-gates.md",
+      "operation": "text",
+      "content": "# Quality Gates\n\n> 机器可判定的质量规则。每条规则定义判定命令和执行时机。\n> 本文件由 Harness L5 进化引擎维护，修改请遵循 L5 提案流程。\n\n---\n\n## ruff-format\n\n- description: Ruff 格式检查，确保代码风格一致\n- alwaysApply: true\n- globs: [\"src/**/*.py\", \"tests/**/*.py\"]\n- version: \"1.0.0\"\n\n判定:\n\n```bash\nruff format --check src/ tests/\n```\n\n执行: pre-commit gate (block)\n\n---\n\n## ruff-check\n\n- description: Ruff lint 检查，捕获代码质量问题\n- alwaysApply: true\n- globs: [\"src/**/*.py\", \"tests/**/*.py\"]\n- version: \"1.0.0\"\n\n判定:\n\n```bash\nruff check src/ tests/\n```\n\n执行: pre-commit gate (block)\n\n---\n\n## invariant-tests\n\n- description: 不变量测试套件（INV-1~32），154 个测试用例\n- alwaysApply: true\n- globs: [\"tests/invariants/**/*.py\"]\n- version: \"1.0.0\"\n\n判定:\n\n```bash\nuv run python -m pytest tests/invariants/ -q --timeout=30\n```\n\n执行: pre-commit gate (block)\n\n---\n\n## docstring-contract\n\n- description: Docstring 契约验证，确保工具描述与签名一致\n- alwaysApply: true\n- globs: [\"src/**/*.py\"]\n- version: \"1.0.0\"\n\n判定:\n\n```bash\npython3 scripts/lint_docstring_contract.py --quiet\n```\n\n执行: pre-commit gate (block)\n\n---\n\n## no-conflict-markers\n\n- description: 检测 staged diff 中未解决的合并冲突标记\n- alwaysApply: true\n- globs: [\"**/*.py\", \"**/*.md\", \"**/*.yml\", \"**/*.yaml\", \"**/*.json\", \"**/*.toml\"]\n- version: \"1.0.0\"\n\n判定: `git diff --cached` 中无 `<<<<<<<` 行\n\n执行: pre-commit gate (block)\n\n---\n\n## no-secrets\n\n- description: 检测 staged diff 中可能的密钥/凭证泄露\n- alwaysApply: true\n- globs: [\"**/*.py\", \"**/*.md\", \"**/*.yml\", \"**/*.yaml\", \"**/*.json\", \"**/*.toml\"]\n- version: \"1.0.0\"\n\n判定: `git diff --cached` 中无 `AKIA`、`LTAI`、`ft522` 等密钥模式\n\n执行: pre-commit gate (block)\n"
+    }
+  ]
+}

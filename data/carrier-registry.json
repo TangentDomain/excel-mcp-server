@@ -1,0 +1,62 @@
+[
+  {
+    "id": "axioms",
+    "type": "rule",
+    "path": ".omp/rules/axioms.md",
+    "version": "1.0.0",
+    "axioms": ["AX-001", "AX-002", "AX-003", "AX-004"],
+    "description": "4 条顶层公理及推导关系（AX-001 SQL真值, AX-002 写安全, AX-003 失败诊断, AX-004 幂等查询）"
+  },
+  {
+    "id": "quality-gates",
+    "type": "rule",
+    "path": ".omp/rules/quality-gates.md",
+    "version": "1.0.0",
+    "axioms": ["AX-002", "AX-003", "AX-004"],
+    "description": "质量门禁：ruff-format, ruff-check, invariant-tests, docstring-contract, no-conflict-markers, no-secrets"
+  },
+  {
+    "id": "invariants",
+    "type": "rule",
+    "variant": "invariant",
+    "path": ".omp/memory/invariants.md",
+    "version": "1.0.0",
+    "axioms": ["AX-001", "AX-002", "AX-003", "AX-004"],
+    "description": "32 条不变量定义（INV-1~32），AX->INV 推导链映射"
+  },
+  {
+    "id": "invariant-tests",
+    "type": "test",
+    "path": "tests/invariants/",
+    "version": "1.0.0",
+    "axioms": ["AX-001", "AX-002", "AX-003", "AX-004"],
+    "description": "不变量测试套件：覆盖 INV-1~32"
+  },
+  {
+    "id": "pre-commit-gate",
+    "type": "hook",
+    "variant": "gate",
+    "path": ".githooks/pre-commit",
+    "version": "1.0.0",
+    "axioms": ["AX-002", "AX-003"],
+    "description": "Git pre-commit 门禁：质量门禁检查"
+  },
+  {
+    "id": "agents-md",
+    "type": "memory",
+    "variant": "identity",
+    "path": "AGENTS.md",
+    "version": "1.0.0",
+    "axioms": [],
+    "description": "Agent 身份声明"
+  },
+  {
+    "id": "harness-index",
+    "type": "memory",
+    "variant": "index",
+    "path": ".omp/HARNESS-INDEX.md",
+    "version": "1.0.0",
+    "axioms": [],
+    "description": "Harness 载体索引"
+  }
+]
