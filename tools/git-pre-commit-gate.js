@@ -1,10 +1,11 @@
 #!/usr/bin/env node
 // tools/git-pre-commit-gate.js — pre-commit 门禁
-// 检查: 冲突标记、敏感信息、ruff format、ruff check、pytest invariants、docstring 契约
+// 检查: 冲突标记、敏感信息、ruff format、ruff check、pytest invariants、docstring 契约、量化退化
 
 "use strict";
 
 const { execSync } = require("child_process");
+const path = require("path");
 
 const options = { encoding: "utf-8", windowsHide: true };
 
@@ -114,5 +115,16 @@ if (pyFiles.length > 0) {
   console.log("✅ docstring 契约检查通过");
 }
 
+// 9. 量化指标退化检查
+try {
+  execSync('node "' + path.join(__dirname, "quantification-gate.js") + '"', {
+    ...options,
+    stdio: "inherit",
+  });
+  console.log("✅ 量化指标退化检查通过");
+} catch (e) {
+  // quantification-gate.js 自身输出退化详情并 exit(1)
+  process.exit(1);
+}
 console.log("\n✅ 所有门禁检查通过");
 process.exit(0);
