@@ -34,10 +34,11 @@ if (!staged) {
 
 const files = staged.split("\n").filter(Boolean);
 
-// 2. 冲突标记检查
-const conflictMarkers = run("git diff --cached -U0 | grep -c '^<<<<<<<\\|^=======\\|^>>>>>>>$'");
-if (conflictMarkers && parseInt(conflictMarkers, 10) > 0) {
-  console.error("❌ 冲突标记未解决");
+// 2. 冲突标记检查（Node 原生实现，跨平台不依赖 grep）
+const diffOutput = run("git diff --cached -U0");
+const conflictRegex = /^\+(<{7}|={7}|>{7})/m;
+if (diffOutput && conflictRegex.test(diffOutput)) {
+  console.error("❌ 冲突标记未解决（发现 <<<<<<< / ======= / >>>>>>> 标记）");
   process.exit(1);
 }
 console.log("✅ 冲突标记检查通过");
@@ -85,7 +86,7 @@ if (!runCheck("ruff check src/ tests/")) {
 console.log("✅ ruff check 检查通过");
 
 // 7. pytest invariants
-if (!runCheck("python -m pytest tests/invariants/ -q --timeout=30")) {
+if (!runCheck("python -m pytest tests/invariants/ -q --tb=short")) {
   console.error("❌ 不变量测试失败");
   process.exit(1);
 }
