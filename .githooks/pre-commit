@@ -1,0 +1,4 @@
+#!/bin/bash
+# .githooks/pre-commit
+set -e
+node tools/git-pre-commit-gate.js

@@ -44,7 +44,9 @@ pytestdebug.log
 .ceo-active
 .ceo-directives.md
 .ceo-plan.md
-/.omp/
+# OMP harness (carrier files are tracked; only runtime dirs ignored)
+/.omp/sessions/
+/.omp/notepads/
 memory:
 
 # Runtime logs

@@ -1,7 +1,7 @@
 {
   "id": "L5P-20260623-001",
   "type": "rule",
-  "status": "committing",
+  "status": "committed",
   "propose": {
     "input": {
       "type": "rule",
@@ -31,7 +31,11 @@
     }
   },
   "commit": {
-    "output": null
+    "output": {
+      "committed": true,
+      "commitHash": "[evolve-tmp 915f605] evolve: L5P-2026062",
+      "rollbackTarget": "42fab07ed87207835eb92bc6ff21d90a3f557c3e"
+    }
   },
   "rollback": {
     "output": null
@@ -42,6 +46,6 @@
   "riskLevel": "auto_commit",
   "riskReason": "",
   "createdAt": "2026-06-23T03:58:55.013Z",
-  "updatedAt": "2026-06-23T03:58:55.513Z",
+  "updatedAt": "2026-06-23T03:58:57.813Z",
   "ttl": 2592000
 }

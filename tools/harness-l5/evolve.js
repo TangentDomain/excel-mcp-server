@@ -451,10 +451,14 @@ function commitProposal(proposalId) {
     }
 
     // 3. 暂存并提交（--no-verify: evolve 引擎自身已运行评估器，不重复跑 pre-commit gate）
-    run("git add -A");
+    // 只暂存提案中的文件，不用 git add -A（避免误提交其他未跟踪文件）
+    const filesToStage = changes.filter(c => c.operation !== "binary").map(c => c.file);
+    if (filesToStage.length > 0) {
+      run(`git add -- ${filesToStage.map(f => JSON.stringify(f)).join(" ")}`);
+    }
     const commitMsg = `evolve: ${proposalId} ${proposal.propose.input.reason || ""}`.trim();
-    const commitHash = run(`git commit --no-verify -m ${JSON.stringify(commitMsg)}`);
-    console.log(`  ✅ 提交: ${commitHash.substring(0, 8)}`);
+    run(`git commit --no-verify -m ${JSON.stringify(commitMsg)}`);
+    const commitHash = run("git rev-parse HEAD");
 
     // 4. 合并回原分支
     run(`git checkout ${branch}`);
@@ -569,7 +573,18 @@ function rollbackProposal(proposalId) {
   try {
     proposal.status = "rolling_back";
     writeProposal(proposal);
-    run(`git reset --hard ${target}`);
+    // 用 --mixed 而非 --hard：只移动 HEAD 指针，不清除工作区未跟踪文件
+    // 然后只 checkout 提案涉及的文件到目标状态
+    run(`git reset --mixed ${target}`);
+    const rollbackFiles = (proposal.propose.input.changes || [])
+      .filter((c) => c.operation !== "binary")
+      .map((c) => c.file);
+    if (rollbackFiles.length > 0) {
+      try {
+        run(`git checkout ${target} -- ${rollbackFiles.map((f) => JSON.stringify(f)).join(" ")}`);
+      } catch { /* 文件可能在目标版本不存在，忽略 */ }
+    }
+    run("git checkout -- . 2>nul || git checkout -- .");
     console.log(`✅ 已回滚到: ${target.substring(0, 8)}`);
 
     proposal.status = "rolled_back";
