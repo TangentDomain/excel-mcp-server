@@ -63,7 +63,11 @@ def get_version() -> str:
 
 
 def build_executable() -> Path:
-    """用 PyInstaller 构建单文件可执行文件，返回产物路径。"""
+    """用 PyInstaller --onedir 构建可执行文件，返回产物目录路径。
+
+    --onedir 模式：产物是一个目录（excel-cli/），包含 exe + _internal/ 依赖。
+    启动快（无需每次解压），适合日常 CLI 使用。
+    """
     build_dir = ROOT_DIR / "build" / "pyinstaller"
     dist_dir = build_dir / "dist"
     spec_dir = build_dir
@@ -87,7 +91,7 @@ def build_executable() -> Path:
     ]
     cmd = [
         sys.executable, "-m", "PyInstaller",
-        "--onefile",
+        "--onedir",
         "--name", exe_name,
         "--noconfirm",
         "--paths", str(SRC_DIR),
@@ -105,7 +109,7 @@ def build_executable() -> Path:
         str(CLI_SOURCE),
     ]
 
-    print(f"  🔨 PyInstaller 构建中...")
+    print(f"  🔨 PyInstaller 构建中（--onedir 模式）...")
     result = subprocess.run(
         cmd,
         cwd=str(build_dir),
@@ -114,22 +118,23 @@ def build_executable() -> Path:
     if result.returncode != 0:
         print("❌ PyInstaller 构建失败 (见上方日志)")
         sys.exit(1)
-    if sys.platform.startswith("win"):
-        exe_path = dist_dir / f"{exe_name}.exe"
-    else:
-        exe_path = dist_dir / exe_name
 
-    if not exe_path.exists():
-        print(f"❌ 构建产物未找到: {exe_path}")
+    # --onedir 产物是一个目录：dist/excel-cli/
+    app_dir = dist_dir / exe_name
+    if not app_dir.is_dir():
+        print(f"❌ 构建产物目录未找到: {app_dir}")
         sys.exit(1)
 
-    size_mb = exe_path.stat().st_size / (1024 * 1024)
-    print(f"  ✅ 可执行文件: {exe_path.name} ({size_mb:.1f} MB)")
-    return exe_path
+    # 统计总大小和文件数
+    total_size = sum(f.stat().st_size for f in app_dir.rglob("*") if f.is_file())
+    size_mb = total_size / (1024 * 1024)
+    file_count = sum(1 for f in app_dir.rglob("*") if f.is_file())
+    print(f"  ✅ 构建完成: {app_dir.name}/ ({size_mb:.1f} MB, {file_count} 文件)")
+    return app_dir
 
 
-def package_zip(exe_path: Path, output_dir: Path) -> Path:
-    """将 SKILL.md + 可执行文件打包成 ZIP。"""
+def package_zip(app_dir: Path, output_dir: Path) -> Path:
+    """将 SKILL.md + onedir 产物目录打包成 ZIP。"""
     pf, arch = detect_platform()
     version = get_version()
 
@@ -153,10 +158,12 @@ def package_zip(exe_path: Path, output_dir: Path) -> Path:
         else:
             print(f"  ⚠️ SKILL.md 未找到: {skill_md}")
 
-        # 可执行文件 — 放在 excel-skill/bin/
-        exe_name_in_zip = exe_path.name
-        zf.write(exe_path, f"excel-skill/bin/{exe_name_in_zip}")
-        print(f"  + excel-skill/bin/{exe_name_in_zip}")
+        # 递归写入 onedir 产物目录（exe + _internal/ 依赖）
+        for file_path in app_dir.rglob("*"):
+            if file_path.is_file():
+                arcname = f"excel-skill/bin/{file_path.relative_to(app_dir)}"
+                zf.write(file_path, arcname)
+                print(f"  + {arcname}")
 
         # 版本信息
         import json
@@ -165,7 +172,7 @@ def package_zip(exe_path: Path, output_dir: Path) -> Path:
             "version": version,
             "platform": pf,
             "arch": arch,
-            "executable": exe_name_in_zip,
+            "executable": "excel-cli.exe" if pf == "windows" else "excel-cli",
             "python_version": sys.version.split()[0],
         }
         zf.writestr(
@@ -230,7 +237,7 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument(
         "--exe",
         default=None,
-        help="指定已有可执行文件路径（配合 --no-build 使用）",
+        help="指定已有 onedir 目录路径（配合 --no-build 使用，指向 excel-cli/ 目录）",
     )
     args = parser.parse_args(argv)
 
@@ -247,24 +254,24 @@ def main(argv: list[str] | None = None) -> int:
     # 1. 构建可执行文件（或使用已有的）
     if args.no_build:
         if args.exe:
-            exe_path = Path(args.exe)
+            app_dir = Path(args.exe)
         else:
-            # 查找默认路径
-            exe_name = "excel-cli.exe" if pf == "windows" else "excel-cli"
-            exe_path = ROOT_DIR / "build" / "pyinstaller" / "dist" / exe_name
+            # 查找默认 onedir 目录
+            exe_name = "excel-cli"
+            app_dir = ROOT_DIR / "build" / "pyinstaller" / "dist" / exe_name
 
-        if not exe_path.exists():
-            print(f"❌ 可执行文件未找到: {exe_path}")
+        if not app_dir.is_dir():
+            print(f"❌ onedir 产物目录未找到: {app_dir}")
             print(f"   去掉 --no-build 重新构建，或用 --exe 指定路径")
             return 1
-        print(f"  📎 使用已有可执行文件: {exe_path}")
+        print(f"  📎 使用已有产物目录: {app_dir}")
     else:
-        exe_path = build_executable()
+        app_dir = build_executable()
 
     print()
 
     # 2. 打包 ZIP
-    zip_path = package_zip(exe_path, output_dir)
+    zip_path = package_zip(app_dir, output_dir)
 
     print()
 
@@ -277,7 +284,5 @@ def main(argv: list[str] | None = None) -> int:
     print(f"✅ 打包完成: {zip_path}")
     print(f"   安装方式: 解压到 ~/.omp/agent/skills/，skill 自动发现")
     return 0
-
-
 if __name__ == "__main__":
     raise SystemExit(main())
