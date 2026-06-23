@@ -1666,14 +1666,16 @@ class AdvancedSQLQueryEngine:
                     elif col_min > -2147483648 and col_max < 2147483647:
                         df[col] = df[col].astype("int32")
             elif col_type == "float64":
-                # 浮点列降级为 float32(精度足够)，但需检查溢出风险
-                # float32 范围约 ±3.4e38，超出会变成 inf 导致后续 int() 转换崩溃
-                with warnings.catch_warnings():
-                    warnings.filterwarnings("ignore", "overflow", RuntimeWarning)
-                    test_series = df[col].astype("float32")
-                if not (test_series.isin([float("inf"), float("-inf")]).any() or test_series.isna().any()):
-                    df[col] = test_series
-                # 否则保持 float64，避免 inf 值导致崩溃
+                # 浮点列降级为 float32，但必须验证精度无损
+                # float32 只有 ~7 位有效十进制数字，超过即精度丢失
+                # (如 999.99→999.989990234375, 9999999999→10000000000)
+                # 安全降级条件：float64→float32→float64 round-trip 后值完全一致
+                test_series = df[col].astype("float32")
+                rt_series = test_series.astype("float64")
+                if not test_series.isin([float("inf"), float("-inf")]).any():
+                    if np.array_equal(rt_series.values, df[col].values, equal_nan=True):
+                        df[col] = test_series  # 精度无损，安全降级
+                    # 否则精度有损，保持 float64
 
         end_mem = df.memory_usage(deep=True).sum() / 1024 / 1024
         reduction = (1 - end_mem / start_mem) * 100 if start_mem > 0 else 0
