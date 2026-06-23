@@ -36,7 +36,7 @@ where = ["src"]
 
 [project.scripts]
 excel-mcp-server-fastmcp = "excel_mcp_server_fastmcp:main"
-excel-mcp-verify = "excel_mcp_server_fastmcp.verification.cli:main"
+excel-cli = "excel_mcp_server_fastmcp.cli:main"
 
 [project.urls]
 Homepage = "https://github.com/TangentDomain/excel-mcp-server"
