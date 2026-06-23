@@ -125,6 +125,9 @@ class ScriptTimeoutError(Exception):
 def _timeout_handler(signum, frame):
     """信号处理函数：超时时抛出 ScriptTimeoutError。"""
     raise ScriptTimeoutError(f"脚本执行超过时间限制 ({signum})")
+# signal.SIGALRM 是 POSIX 专属，Windows 没有。
+# 模块加载时检测一次，后续超时逻辑据此决定是否启用信号保护。
+_HAS_SIGALRM = hasattr(signal, "SIGALRM")
 
 
 def _query_wrapper(file_path: str, sql: str) -> list:
@@ -187,8 +190,8 @@ def execute_python_script(
 
     try:
         # 构建安全执行环境：受限 builtins + 预绑定 API
+        # 注意：__import__ 在下面注入 _safe_import 后补上，让用户代码能 import 安全模块
         user_globals = {
-            "__builtins__": _SAFE_BUILTINS,
             "__name__": "<sandbox>",
             "file_path": file_path,
             "sheet_name": sheet_name,
@@ -200,8 +203,7 @@ def execute_python_script(
             # 完整API类（所有操作）
             "ExcelOperations": ExcelOperations,
         }
-        # 禁止用户代码 import 危险模块（防御深度，尽管__builtins__已移除__import__）
-        # 如果 __builtins__ 被绕过，第二道防线检查 import 目标
+        # 禁止用户代码 import 危险模块
         _orig_import = builtins.__import__
 
         def _safe_import(name, *args, **kwargs):
@@ -209,13 +211,16 @@ def execute_python_script(
                 raise ImportError(f"禁止导入危险模块: {name}")
             return _orig_import(name, *args, **kwargs)
 
+        # 把 _safe_import 注入沙箱 builtins，用户代码的 import 走过滤钩子
+        user_globals["__builtins__"] = {**_SAFE_BUILTINS, "__import__": _safe_import}
         builtins.__import__ = _safe_import
         try:
             # 执行代码（带超时控制）
             with redirect_stdout(stdout_buf):
-                # 设置信号超时（仅主线程支持 signal.alarm）
+                # 设置信号超时（仅 POSIX 主线程支持 SIGALRM；Windows 无此信号，跳过信号保护）
                 is_main_thread = threading.current_thread() is threading.main_thread()
-                if is_main_thread:
+                use_sigalrm = is_main_thread and _HAS_SIGALRM
+                if use_sigalrm:
                     old_handler = signal.signal(signal.SIGALRM, _timeout_handler)
                     signal.alarm(timeout)
                 try:
@@ -226,7 +231,7 @@ def execute_python_script(
                     exec(compiled, user_globals)
                     result_value = user_globals.get("result", None)
                 finally:
-                    if is_main_thread:
+                    if use_sigalrm:
                         # 取消超时信号，恢复原处理函数
                         signal.alarm(0)
                         signal.signal(signal.SIGALRM, old_handler)
