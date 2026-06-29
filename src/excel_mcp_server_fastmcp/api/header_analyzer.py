@@ -187,6 +187,17 @@ class HeaderAnalyzer:
         return info
 
     @classmethod
+    def _set_cached(cls, file_path: str, sheet_name: str, info: HeaderInfo) -> None:
+        """把已计算好的 HeaderInfo 直接写入缓存, 避免重复打开文件分析。
+
+        供 _load_excel_data 复用已打开的 workbook 时回填缓存使用。
+        """
+        cache_key = str(Path(file_path).resolve())
+        if cache_key not in _cache:
+            _cache[cache_key] = {}
+        _cache[cache_key][sheet_name] = info
+
+    @classmethod
     def _do_analyze(cls, file_path: str, sheet_name: str) -> HeaderInfo:
         """执行实际的表头分析（内部方法）"""
         from openpyxl import load_workbook

@@ -755,43 +755,58 @@ class AdvancedSQLQueryEngine:
             else:
                 sheets_to_load = all_sheet_names
 
-            # 使用 HeaderAnalyzer 统一检测所有sheet的双行表头（毫秒级）
+            # 表头检测: 直接复用已打开的 cal_wb 读取前 2 行, 调用 detect_from_rows 判定双行表头.
+            # 避免对每个 sheet 调用 HeaderAnalyzer.analyze 二次打开文件 (P0 冷加载瓶颈).
+            # 同时把结果写回 HeaderAnalyzer 缓存, 保持其它调用方的缓存一致性.
+            from .header_analyzer import HeaderInfo, _cell_str, detect_from_rows
+
             header_info = {}  # {sheet: (is_dual_header, first_row_values, second_row_values)}
             for sheet in sheets_to_load:
                 try:
+                    cal_ws = cal_wb.get_sheet_by_name(sheet)
+                    if cal_ws.height == 0 or not hasattr(cal_ws, "iter_rows"):
+                        header_info[sheet] = (False, None, None)
+                        continue
+                    rows_iter = cal_ws.iter_rows()
+                    first_row = list(next(rows_iter, []))
+                    second_row = list(next(rows_iter, []))
+                    first_row_values = [_cell_str(c) or "" for c in first_row]
+                    second_row_values = [_cell_str(c) or "" for c in second_row]
+                    # 用与 HeaderAnalyzer 完全相同的 detect_from_rows 判定语义
+                    is_dual_header, _header_row_idx, _desc = detect_from_rows([first_row, second_row])
+
+                    header_info[sheet] = (
+                        is_dual_header,
+                        first_row_values,
+                        second_row_values,
+                    )
+
+                    # 回填 HeaderAnalyzer 缓存 (供 upsert_row / get_data_start_row 等调用方复用)
                     if HeaderAnalyzer is not None:
-                        # 用统一的 HeaderAnalyzer 检测
-                        info = HeaderAnalyzer.analyze(file_path, sheet)
-                        header_info[sheet] = (
-                            info.is_dual,
-                            info.raw_first_row,
-                            info.raw_second_row,
-                        )
-                    else:
-                        # fallback：手动检测
-                        cal_ws = cal_wb.get_sheet_by_name(sheet)
-                        if cal_ws.height == 0:
-                            header_info[sheet] = (False, None, None)
-                            continue
-                        rows_iter = cal_ws.iter_rows()
-                        first_row = list(next(rows_iter, []))
-                        second_row = list(next(rows_iter, []))
-                        is_dual_header = False
-                        if first_row and second_row:
-                            second_row_values = [str(v).strip() if v is not None else "" for v in second_row]
-                            first_row_values = [str(v).strip() if v is not None else "" for v in first_row]
-                            non_empty_second = [v for v in second_row_values if v]
-                            non_empty_first = [v for v in first_row_values if v]
-                            if len(non_empty_second) >= 2:
-                                second_all_field = all(re.match(r"^[a-zA-Z_][a-zA-Z0-9_.#]*$", v) for v in non_empty_second)
-                                first_all_field = all(re.match(r"^[a-zA-Z_][a-zA-Z0-9_#]*$", v) for v in non_empty_first) if non_empty_first else False
-                                if second_all_field and not first_all_field:
-                                    is_dual_header = True
-                        header_info[sheet] = (
-                            is_dual_header,
-                            first_row_values,
-                            second_row_values,
-                        )
+                        info = HeaderInfo()
+                        info.raw_first_row = first_row
+                        info.raw_second_row = second_row
+                        info.is_dual = is_dual_header
+                        if is_dual_header:
+                            info.header_rows = [1, 2]
+                            info.data_start_row = 3
+                            info.descriptions = first_row_values
+                            info.column_names = second_row_values
+                        else:
+                            info.header_rows = [1]
+                            info.data_start_row = 2
+                            info.descriptions = []
+                            info.column_names = first_row_values
+                        _non_empty_cols = [i for i, v in enumerate(info.column_names) if v]
+                        info.total_columns = max(_non_empty_cols) + 1 if _non_empty_cols else 0
+                        for _i, _name in enumerate(info.column_names):
+                            if _name:
+                                info.name_to_index[_name] = _i
+                        if is_dual_header:
+                            for _i, (_d, _e) in enumerate(zip(info.descriptions, info.column_names)):
+                                if _d and _e:
+                                    info.column_map[_d] = _e
+                        HeaderAnalyzer._set_cached(file_path, sheet, info)
                 except Exception:
                     header_info[sheet] = (False, None, None)
 
