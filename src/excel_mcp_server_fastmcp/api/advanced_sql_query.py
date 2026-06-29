@@ -5600,11 +5600,16 @@ class AdvancedSQLQueryEngine:
         if condition_str:
             try:
                 result_df = df.query(condition_str)
-                # Fix(R46/R52): 清理 WHERE 子句中 CAST/函数预计算产生的临时列
-                # 使用 .copy() 确保 result_df 不受后续 del 操作影响（防止 view 问题）
-                result_df = result_df.copy()
-                self._cleanup_tmp_columns(df)
-                return result_df
+                # Fix(R46/R52/autoresearch): 清理 WHERE 子句中 CAST/函数预计算产生的临时列
+                # query() 返回的 result_df 包含 temp 列，两个 df 都需清理
+                tmp_cols = list(getattr(self, "_pending_tmp_cols", []))
+                for tc in tmp_cols:
+                    if tc in df.columns:
+                        del df[tc]
+                    if tc in result_df.columns:
+                        del result_df[tc]
+                self._pending_tmp_cols = []
+                return result_df.copy()
             except Exception:
                 # 如果查询失败,尝试逐行过滤
                 # 同时清理可能已添加的临时列

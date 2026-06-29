@@ -514,9 +514,17 @@ def build_test_cases() -> list[dict]:
 
     # ── 扩展批9: JOIN 高级 ──
     cases.append({"f": "join", "sql": "SELECT 技能.skill_name, 掉落.item_name FROM 技能 LEFT JOIN 掉落 ON 技能.skill_id = 掉落.skill_ref", "cat": "left_join"})
-    cases.append({"f": "join", "sql": "SELECT 技能.skill_name, COUNT(掉落.item_name) AS drop_count FROM 技能 LEFT JOIN 掉落 ON 技能.skill_id = 掉落.skill_ref GROUP BY 技能.skill_name", "cat": "join_count"})
+    cases.append(
+        {"f": "join", "sql": "SELECT 技能.skill_name, COUNT(掉落.item_name) AS drop_count FROM 技能 LEFT JOIN 掉落 ON 技能.skill_id = 掉落.skill_ref GROUP BY 技能.skill_name", "cat": "join_count"}
+    )
     cases.append({"f": "join", "sql": "SELECT skill_id FROM 技能 WHERE damage > 90 UNION ALL SELECT skill_id FROM 技能 WHERE damage = 0", "cat": "union_all"})
-    cases.append({"f": "join", "sql": "SELECT 技能.skill_name, SUM(掉落.qty) AS total_qty FROM 技能 JOIN 掉落 ON 技能.skill_id = 掉落.skill_ref GROUP BY 技能.skill_name HAVING SUM(掉落.qty) > 3", "cat": "join_having"})
+    cases.append(
+        {
+            "f": "join",
+            "sql": "SELECT 技能.skill_name, SUM(掉落.qty) AS total_qty FROM 技能 JOIN 掉落 ON 技能.skill_id = 掉落.skill_ref GROUP BY 技能.skill_name HAVING SUM(掉落.qty) > 3",
+            "cat": "join_having",
+        }
+    )
     # NOTE: SELECT 中的关联标量子查询暂不支持（引擎限制），不纳入差分测试
     # cases.append({"f": "join", "sql": "SELECT skill_name, (SELECT COUNT(*) FROM 掉落 WHERE 掉落.skill_ref = 技能.skill_id) AS drops FROM 技能", "cat": "scalar_subquery"})
 
@@ -529,6 +537,26 @@ def build_test_cases() -> list[dict]:
     cases.append({"f": "simple", "sql": "SELECT DISTINCT Active, Tags FROM 数据", "cat": "distinct_multi"})
     # COUNT with expression argument
     cases.append({"f": "simple", "sql": "SELECT COUNT(Price * 2) FROM 数据", "cat": "count_expr"})
+
+    # ── 扩展批11: 窗口函数扩展 + 嵌套CASE + COALESCE链 ──
+    cases.append({"f": "numbers", "sql": "SELECT id, SUM(val) OVER () AS total FROM 数值", "cat": "window_global"})
+    cases.append({"f": "numbers", "sql": "SELECT id, AVG(val) OVER (PARTITION BY grp) AS grp_avg FROM 数值", "cat": "window_partition"})
+    cases.append(
+        {"f": "simple", "sql": "SELECT Name, CASE WHEN Price IS NULL THEN 'N/A' WHEN Price > 100 THEN 'high' WHEN Price > 50 THEN 'mid' ELSE 'low' END AS grade FROM 数据", "cat": "nested_case"}
+    )
+    cases.append({"f": "simple", "sql": "SELECT ID, COALESCE(Price, -1, 0) AS safe FROM 数据", "cat": "coalesce_chain"})
+    cases.append({"f": "simple", "sql": "SELECT Tags, COUNT(DISTINCT Active) FROM 数据 GROUP BY Tags", "cat": "count_distinct_group"})
+    cases.append({"f": "numbers", "sql": "SELECT MAX(val), MIN(val), AVG(val), SUM(val) FROM 数值 WHERE grp = 'A'", "cat": "filtered_agg"})
+    cases.append({"f": "numbers", "sql": "SELECT t.id, t.dbl FROM (SELECT id, val*2 AS dbl FROM 数值) AS t WHERE t.dbl > 20", "cat": "from_subquery_filter"})
+    cases.append({"f": "numbers", "sql": "SELECT grp, COUNT(*) FROM 数值 GROUP BY grp HAVING COUNT(*) > 1 AND AVG(val) > 10", "cat": "having_multi"})
+    cases.append({"f": "numbers", "sql": "SELECT id, val FROM 数值 ORDER BY val DESC LIMIT 2 OFFSET 1", "cat": "order_limit_offset"})
+    cases.append({"f": "simple", "sql": "SELECT Tags, COUNT(*) AS cnt FROM 数据 GROUP BY Tags ORDER BY cnt", "cat": "groupby_order_agg"})
+    cases.append({"f": "simple", "sql": "SELECT * FROM 数据 WHERE NOT EXISTS (SELECT 1 FROM 数据 d2 WHERE d2.ID = 数据.ID AND d2.Price > 150)", "cat": "not_exists"})
+    cases.append({"f": "simple", "sql": "SELECT * FROM 数据 WHERE CAST(Price AS INT) > 60", "cat": "cast_where"})
+    cases.append({"f": "simple", "sql": "SELECT ID, UPPER(TRIM(Name)) AS clean FROM 数据", "cat": "string_chain"})
+    # NOTE: GROUP BY COALESCE(expr) 导致 GROUP BY 提取原始列(Price)进入结果，暂不纳入
+    # cases.append({"f": "simple", "sql": "SELECT COALESCE(Price, 0) AS safe_price, COUNT(*) FROM 数据 GROUP BY COALESCE(Price, 0)", "cat": "coalesce_group"})
+    cases.append({"f": "simple", "sql": "SELECT * FROM 数据 WHERE Name LIKE '%剑%' OR Name LIKE '%杖%'", "cat": "like_multi"})
 
     return cases
 
