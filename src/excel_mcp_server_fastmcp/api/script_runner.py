@@ -125,6 +125,8 @@ class ScriptTimeoutError(Exception):
 def _timeout_handler(signum, frame):
     """信号处理函数：超时时抛出 ScriptTimeoutError。"""
     raise ScriptTimeoutError(f"脚本执行超过时间限制 ({signum})")
+
+
 # signal.SIGALRM 是 POSIX 专属，Windows 没有。
 # 模块加载时检测一次，后续超时逻辑据此决定是否启用信号保护。
 _HAS_SIGALRM = hasattr(signal, "SIGALRM")

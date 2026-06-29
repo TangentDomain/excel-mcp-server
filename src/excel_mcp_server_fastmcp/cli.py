@@ -4,18 +4,17 @@
 pip install 后通过 `excel-cli` 命令调用。
 用法: excel-cli <command> [options]
 """
+
 from __future__ import annotations
 
-import sys
-import os
-import json
 import argparse
-import urllib.request
-import tempfile
+import json
+import os
 import re
 import shutil
+import sys
+import urllib.request
 from datetime import datetime
-from typing import Any
 
 VERSION = "1.0.0"
 GITHUB_REPO = "TangentDomain/excel-mcp-server"
@@ -70,6 +69,7 @@ def _self_update_url() -> str:
 
 # ==================== 统一响应格式（复现 server.py 的 _wrap/_ok/_fail） ====================
 
+
 def _ok(message: str = "", data=None, meta: dict = None) -> dict:
     r = {"success": True}
     if message:
@@ -93,6 +93,7 @@ def _ensure_dict(result) -> dict:
         return result
     if hasattr(result, "__dataclass_fields__"):
         from dataclasses import asdict
+
         return asdict(result)
     return result
 
@@ -101,14 +102,31 @@ def _strip_defaults(obj, depth=0):
     if depth > 5 or not isinstance(obj, dict):
         return obj
     excel_default_fields = {
-        "bold", "italic", "underline", "wrap_text", "auto_filter",
-        "border_top", "border_bottom", "border_left", "border_right",
-        "horizontal_alignment", "vertical_alignment", "text_rotation",
-        "indent", "shrink_to_fit", "merge_cells",
+        "bold",
+        "italic",
+        "underline",
+        "wrap_text",
+        "auto_filter",
+        "border_top",
+        "border_bottom",
+        "border_left",
+        "border_right",
+        "horizontal_alignment",
+        "vertical_alignment",
+        "text_rotation",
+        "indent",
+        "shrink_to_fit",
+        "merge_cells",
     }
     semantic_list_fields = {
-        "headers", "sheets", "sheets_with_headers", "field_names",
-        "descriptions", "data", "columns", "rows",
+        "headers",
+        "sheets",
+        "sheets_with_headers",
+        "field_names",
+        "descriptions",
+        "data",
+        "columns",
+        "rows",
     }
     cell_semantic_fields = {"value"}
     _is_cell_info = "coordinate" in obj
@@ -165,6 +183,7 @@ def output(result):
 
 # ==================== JSON 参数解析辅助 ====================
 
+
 def parse_json(s, default=None):
     """安全解析 JSON 字符串"""
     if s is None:
@@ -177,8 +196,11 @@ def parse_json(s, default=None):
 
 # ==================== 查询类子命令 (9) ====================
 
+
 def cmd_list_sheets(args):
+    """列出工作表。"""
     from excel_mcp_server_fastmcp.api.excel_operations import ExcelOperations
+
     try:
         result = ExcelOperations.list_sheets(args.file)
         return output(wrap_result(result))
@@ -187,10 +209,15 @@ def cmd_list_sheets(args):
 
 
 def cmd_get_headers(args):
+    """获取表头。"""
     from excel_mcp_server_fastmcp.api.excel_operations import ExcelOperations
+
     try:
         result = ExcelOperations.get_headers(
-            args.file, args.sheet, args.header_row, args.max_columns,
+            args.file,
+            args.sheet,
+            args.header_row,
+            args.max_columns,
         )
         return output(wrap_result(result))
     except Exception as e:
@@ -198,7 +225,9 @@ def cmd_get_headers(args):
 
 
 def cmd_get_range(args):
+    """读取单元格范围数据。"""
     from excel_mcp_server_fastmcp.api.excel_operations import ExcelOperations
+
     try:
         cell_range = args.range
         if args.sheet and "!" not in cell_range:
@@ -211,10 +240,12 @@ def cmd_get_range(args):
 
 
 def cmd_describe_table(args):
+    """描述工作表结构。"""
     try:
         # describe_table 在 server.py 中是内联实现，需要直接调用
         # 这里简化为调用 ExcelOperations 的底层（如果有的话）或用 query 替代
         from openpyxl import load_workbook
+
         wb = load_workbook(args.file, read_only=True, data_only=True)
         sheet_name = args.sheet or wb.sheetnames[0]
         ws = wb[sheet_name]
@@ -253,7 +284,9 @@ def cmd_describe_table(args):
 
 
 def cmd_search(args):
+    """搜索单元格文本。"""
     from excel_mcp_server_fastmcp.api.excel_operations import ExcelOperations
+
     try:
         _range_arg = args.range
         if _range_arg and "!" not in _range_arg and args.sheet:
@@ -262,9 +295,14 @@ def cmd_search(args):
         if use_regex is None:
             use_regex = bool(re.match(r".*[\[\](){}*+?|^$\\.]", args.pattern))
         result = ExcelOperations.search(
-            args.file, args.pattern, args.sheet,
-            args.case_sensitive, args.whole_word, use_regex,
-            include_values=True, include_formulas=False,
+            args.file,
+            args.pattern,
+            args.sheet,
+            args.case_sensitive,
+            args.whole_word,
+            use_regex,
+            include_values=True,
+            include_formulas=False,
             range=_range_arg,
         )
         return output(wrap_result(result))
@@ -273,16 +311,22 @@ def cmd_search(args):
 
 
 def cmd_search_directory(args):
+    """跨文件搜索。"""
     from excel_mcp_server_fastmcp.api.excel_operations import ExcelOperations
+
     try:
         use_regex = args.regex
         if use_regex is None:
             use_regex = bool(re.match(r".*[\[\](){}*+?|^$\\.]", args.pattern))
         extensions = parse_json(args.extensions, None)
         result = ExcelOperations.search_directory(
-            args.dir, args.pattern,
-            args.case_sensitive, args.whole_word, use_regex,
-            True, False,
+            args.dir,
+            args.pattern,
+            args.case_sensitive,
+            args.whole_word,
+            use_regex,
+            True,
+            False,
             recursive=args.recursive,
             file_extensions=extensions,
             file_pattern=None,
@@ -294,7 +338,9 @@ def cmd_search_directory(args):
 
 
 def cmd_find_last_row(args):
+    """定位数据末行。"""
     from excel_mcp_server_fastmcp.api.excel_operations import ExcelOperations
+
     try:
         result = ExcelOperations.find_last_row(args.file, args.sheet, args.column)
         return output(wrap_result(result))
@@ -303,7 +349,9 @@ def cmd_find_last_row(args):
 
 
 def cmd_query(args):
+    """执行 SQL 查询。"""
     from excel_mcp_server_fastmcp.api.advanced_sql_query import execute_advanced_sql_query
+
     try:
         result = execute_advanced_sql_query(
             file_path=args.file,
@@ -322,11 +370,17 @@ def cmd_query(args):
 
 
 def cmd_compare_sheets(args):
+    """对比两个工作表差异。"""
     from excel_mcp_server_fastmcp.api.excel_operations import ExcelOperations
+
     try:
         result = ExcelOperations.compare_sheets(
-            args.file1, args.sheet1, args.file2, args.sheet2,
-            args.id_column, args.header_row,
+            args.file1,
+            args.sheet1,
+            args.file2,
+            args.sheet2,
+            args.id_column,
+            args.header_row,
         )
         return output(wrap_result(result))
     except Exception as e:
@@ -335,16 +389,22 @@ def cmd_compare_sheets(args):
 
 # ==================== 写入类子命令 (7) ====================
 
+
 def cmd_update_range(args):
+    """写入单元格范围数据。"""
     from excel_mcp_server_fastmcp.api.excel_operations import ExcelOperations
+
     try:
         cell_range = args.range
         if args.sheet and "!" not in cell_range:
             cell_range = f"{args.sheet}!{cell_range}"
         data = parse_json(args.data, [])
         result = ExcelOperations.update_range(
-            args.file, cell_range, data,
-            args.preserve_formulas, args.insert_mode,
+            args.file,
+            cell_range,
+            data,
+            args.preserve_formulas,
+            args.insert_mode,
         )
         result = _ensure_dict(result)
         return output(wrap_result(result))
@@ -353,13 +413,19 @@ def cmd_update_range(args):
 
 
 def cmd_upsert_row(args):
+    """按主键插入或更新行。"""
     from excel_mcp_server_fastmcp.api.excel_operations import ExcelOperations
+
     try:
         updates = parse_json(args.updates, {})
         result = ExcelOperations.upsert_row(
-            args.file, args.sheet,
-            args.key_column, args.key_value,
-            updates, args.header_row, True,
+            args.file,
+            args.sheet,
+            args.key_column,
+            args.key_value,
+            updates,
+            args.header_row,
+            True,
         )
         return output(wrap_result(result))
     except Exception as e:
@@ -367,10 +433,15 @@ def cmd_upsert_row(args):
 
 
 def cmd_set_formula(args):
+    """设置单元格公式。"""
     from excel_mcp_server_fastmcp.api.excel_operations import ExcelOperations
+
     try:
         result = ExcelOperations.set_formula(
-            args.file, args.sheet, args.cell, args.formula,
+            args.file,
+            args.sheet,
+            args.cell,
+            args.formula,
         )
         return output(wrap_result(result))
     except Exception as e:
@@ -378,10 +449,14 @@ def cmd_set_formula(args):
 
 
 def cmd_update_query(args):
+    """执行 SQL UPDATE。"""
     from excel_mcp_server_fastmcp.api.advanced_sql_query import execute_advanced_update_query
+
     try:
         result = execute_advanced_update_query(
-            file_path=args.file, sql=args.sql, dry_run=args.dry_run,
+            file_path=args.file,
+            sql=args.sql,
+            dry_run=args.dry_run,
         )
         return output(wrap_result(result))
     except Exception as e:
@@ -389,10 +464,14 @@ def cmd_update_query(args):
 
 
 def cmd_insert_query(args):
+    """执行 SQL INSERT。"""
     from excel_mcp_server_fastmcp.api.advanced_sql_query import execute_advanced_insert_query
+
     try:
         result = execute_advanced_insert_query(
-            file_path=args.file, sql=args.sql, dry_run=args.dry_run,
+            file_path=args.file,
+            sql=args.sql,
+            dry_run=args.dry_run,
         )
         return output(wrap_result(result))
     except Exception as e:
@@ -400,10 +479,14 @@ def cmd_insert_query(args):
 
 
 def cmd_delete_query(args):
+    """执行 SQL DELETE。"""
     from excel_mcp_server_fastmcp.api.advanced_sql_query import execute_advanced_delete_query
+
     try:
         result = execute_advanced_delete_query(
-            file_path=args.file, sql=args.sql, dry_run=args.dry_run,
+            file_path=args.file,
+            sql=args.sql,
+            dry_run=args.dry_run,
         )
         return output(wrap_result(result))
     except Exception as e:
@@ -411,7 +494,9 @@ def cmd_delete_query(args):
 
 
 def cmd_run_python(args):
+    """执行 Python 脚本。"""
     from excel_mcp_server_fastmcp.api.script_runner import execute_python_script
+
     try:
         result = execute_python_script(args.file, args.code, args.sheet, args.timeout)
         return output(wrap_result(result))
@@ -421,8 +506,11 @@ def cmd_run_python(args):
 
 # ==================== 结构操作类子命令 (6) ====================
 
+
 def cmd_create_sheet(args):
+    """创建工作表。"""
     from excel_mcp_server_fastmcp.api.excel_operations import ExcelOperations
+
     try:
         result = ExcelOperations.create_sheet(args.file, args.name, args.index)
         return output(wrap_result(result))
@@ -431,7 +519,9 @@ def cmd_create_sheet(args):
 
 
 def cmd_delete_sheet(args):
+    """删除工作表。"""
     from excel_mcp_server_fastmcp.api.excel_operations import ExcelOperations
+
     try:
         result = ExcelOperations.delete_sheet(args.file, args.name)
         return output(wrap_result(result))
@@ -440,7 +530,9 @@ def cmd_delete_sheet(args):
 
 
 def cmd_rename_sheet(args):
+    """重命名工作表。"""
     from excel_mcp_server_fastmcp.api.excel_operations import ExcelOperations
+
     try:
         result = ExcelOperations.rename_sheet(args.file, args.old_name, args.new_name)
         return output(wrap_result(result))
@@ -449,10 +541,16 @@ def cmd_rename_sheet(args):
 
 
 def cmd_copy_sheet(args):
+    """复制工作表。"""
     from excel_mcp_server_fastmcp.api.excel_operations import ExcelOperations
+
     try:
         result = ExcelOperations.copy_sheet(
-            args.file, args.source, args.new_name, args.index, True,
+            args.file,
+            args.source,
+            args.new_name,
+            args.index,
+            True,
         )
         return output(wrap_result(result))
     except Exception as e:
@@ -460,7 +558,9 @@ def cmd_copy_sheet(args):
 
 
 def cmd_structure(args):
+    """增删行列结构。"""
     from excel_mcp_server_fastmcp.api.excel_operations import ExcelOperations
+
     try:
         ops_map = {
             "insert_rows": "insert_rows",
@@ -472,11 +572,12 @@ def cmd_structure(args):
         }
         method_name = ops_map.get(args.operation)
         if not method_name:
-            return output(_fail(
-                f"不支持的operation: {args.operation}。"
-                f"可选: {', '.join(ops_map.keys())}",
-                meta={"error_code": "INVALID_OPERATION"},
-            ))
+            return output(
+                _fail(
+                    f"不支持的operation: {args.operation}。可选: {', '.join(ops_map.keys())}",
+                    meta={"error_code": "INVALID_OPERATION"},
+                )
+            )
         method = getattr(ExcelOperations, method_name)
         result = method(args.file, args.sheet, args.index, args.count)
         return output(wrap_result(result))
@@ -485,11 +586,15 @@ def cmd_structure(args):
 
 
 def cmd_rename_column(args):
+    """重命名列。"""
     from excel_mcp_server_fastmcp.api.excel_operations import ExcelOperations
+
     try:
         result = ExcelOperations.rename_column(
-            args.file, args.sheet,
-            args.old_header, args.new_header,
+            args.file,
+            args.sheet,
+            args.old_header,
+            args.new_header,
             args.header_row,
         )
         return output(wrap_result(result))
@@ -499,8 +604,11 @@ def cmd_rename_column(args):
 
 # ==================== 格式化类子命令 (2) ====================
 
+
 def cmd_format_cells(args):
+    """格式化单元格。"""
     from excel_mcp_server_fastmcp.api.excel_operations import ExcelOperations
+
     try:
         cell_range = args.range
         if "!" not in cell_range:
@@ -515,10 +623,12 @@ def cmd_format_cells(args):
         _border_style = formatting.pop("border_style", None) if formatting else None
 
         if not formatting and not preset and _do_merge is None and _do_unmerge is None and _border_style is None:
-            return output(_fail(
-                '未提供样式参数。示例: {"bold": True} 或 {"merge": True} 或 {"border_style": "thin"}',
-                meta={"error_code": "MISSING_FORMATTING_PARAMS"},
-            ))
+            return output(
+                _fail(
+                    '未提供样式参数。示例: {"bold": True} 或 {"merge": True} 或 {"border_style": "thin"}',
+                    meta={"error_code": "MISSING_FORMATTING_PARAMS"},
+                )
+            )
 
         _ops_result = []
         _merge_warning = None
@@ -549,10 +659,12 @@ def cmd_format_cells(args):
         _ops_fail = [name for name, ok, _ in _ops_result if not ok]
 
         if _ops_fail and not _ops_ok:
-            return output(_fail(
-                f"格式化操作全部失败: {', '.join(_ops_fail)}",
-                meta={"error_code": "FORMAT_FAILED", "operations": _ops_result},
-            ))
+            return output(
+                _fail(
+                    f"格式化操作全部失败: {', '.join(_ops_fail)}",
+                    meta={"error_code": "FORMAT_FAILED", "operations": _ops_result},
+                )
+            )
 
         _msg = f"已完成格式化: {', '.join(_ops_ok)}"
         if _ops_fail:
@@ -565,7 +677,9 @@ def cmd_format_cells(args):
 
 
 def cmd_set_layout(args):
+    """设置行高列宽。"""
     from excel_mcp_server_fastmcp.api.excel_operations import ExcelOperations
+
     try:
         op_map = {
             "set_row_height": "set_row_height",
@@ -575,10 +689,12 @@ def cmd_set_layout(args):
         }
         method_name = op_map.get(args.operation)
         if not method_name:
-            return output(_fail(
-                f"不支持的operation: {args.operation}。可选: set_row_height, set_column_width",
-                meta={"error_code": "INVALID_OPERATION"},
-            ))
+            return output(
+                _fail(
+                    f"不支持的operation: {args.operation}。可选: set_row_height, set_column_width",
+                    meta={"error_code": "INVALID_OPERATION"},
+                )
+            )
         if args.index < 1:
             return output(_fail("index 必须大于 0", meta={"error_code": "INVALID_PARAMETER"}))
         if args.value <= 0:
@@ -592,8 +708,11 @@ def cmd_set_layout(args):
 
 # ==================== 文件操作类子命令 (2) ====================
 
+
 def cmd_create_file(args):
+    """创建 Excel 文件。"""
     from excel_mcp_server_fastmcp.api.excel_operations import ExcelOperations
+
     try:
         sheets = parse_json(args.sheets, None)
         result = ExcelOperations.create_file(args.file, sheets)
@@ -603,6 +722,7 @@ def cmd_create_file(args):
 
 
 def cmd_backup(args):
+    """备份或恢复文件。"""
     try:
         if args.operation == "create":
             if not os.path.exists(args.file):
@@ -616,11 +736,13 @@ def cmd_backup(args):
             backup_path = os.path.join(_bd, backup_filename)
             shutil.copy2(args.file, backup_path)
             _ts = datetime.now().isoformat()
-            return output(_ok(
-                f"备份创建成功: {backup_filename}",
-                data={"backup_file": backup_path, "backup_directory": _bd, "timestamp": _ts},
-                meta={"file_path": args.file},
-            ))
+            return output(
+                _ok(
+                    f"备份创建成功: {backup_filename}",
+                    data={"backup_file": backup_path, "backup_directory": _bd, "timestamp": _ts},
+                    meta={"file_path": args.file},
+                )
+            )
 
         elif args.operation == "list":
             _bd = args.backup_dir or os.path.join(os.path.dirname(args.file), ".excel_mcp_backups")
@@ -633,16 +755,22 @@ def cmd_backup(args):
                 if fn.startswith(f"{name}_backup_") and fn.endswith(ext):
                     fp = os.path.join(_bd, fn)
                     st = os.stat(fp)
-                    backup_files.append({
-                        "filename": fn, "path": fp, "size": st.st_size,
-                        "created_time": datetime.fromtimestamp(st.st_ctime).isoformat(),
-                    })
+                    backup_files.append(
+                        {
+                            "filename": fn,
+                            "path": fp,
+                            "size": st.st_size,
+                            "created_time": datetime.fromtimestamp(st.st_ctime).isoformat(),
+                        }
+                    )
             backup_files.sort(key=lambda x: x["created_time"], reverse=True)
-            return output(_ok(
-                f"找到 {len(backup_files)} 个备份",
-                data={"backups": backup_files, "backup_directory": _bd},
-                meta={"file_path": args.file},
-            ))
+            return output(
+                _ok(
+                    f"找到 {len(backup_files)} 个备份",
+                    data={"backups": backup_files, "backup_directory": _bd},
+                    meta={"file_path": args.file},
+                )
+            )
 
         elif args.operation == "restore":
             if not args.backup_id:
@@ -657,21 +785,26 @@ def cmd_backup(args):
             else:
                 target_path = args.file
             shutil.copy2(backup_path, target_path)
-            return output(_ok(
-                f"文件恢复成功: {os.path.basename(target_path)}",
-                data={"backup_file": backup_path, "target_file": target_path},
-                meta={"file_path": backup_path},
-            ))
+            return output(
+                _ok(
+                    f"文件恢复成功: {os.path.basename(target_path)}",
+                    data={"backup_file": backup_path, "target_file": target_path},
+                    meta={"file_path": backup_path},
+                )
+            )
         else:
-            return output(_fail(
-                f"不支持的operation: {args.operation}。可选: create, list, restore",
-                meta={"error_code": "INVALID_OPERATION"},
-            ))
+            return output(
+                _fail(
+                    f"不支持的operation: {args.operation}。可选: create, list, restore",
+                    meta={"error_code": "INVALID_OPERATION"},
+                )
+            )
     except Exception as e:
         return output(_fail(f"备份操作失败: {e}"))
 
 
 # ==================== self-update 子命令 ====================
+
 
 def cmd_self_update(args):
     """检查/更新 CLI 到最新版本。"""
@@ -683,10 +816,10 @@ def cmd_self_update(args):
 
         # check_result 的 data 里有 need_update, local_version, remote_version, local_sha, remote_sha
         data = json.loads(check_result)
-        if not data.get('success'):
+        if not data.get("success"):
             return check_result
 
-        if not data['data'].get('need_update'):
+        if not data["data"].get("need_update"):
             return check_result
 
         return _do_update()
@@ -699,8 +832,8 @@ def _check_update():
     try:
         # 本地 SHA（从 .last-update 文件读取）
         script_dir = os.path.dirname(os.path.abspath(__file__))
-        version_file = os.path.join(script_dir, '.last-update')
-        local_sha = ''
+        version_file = os.path.join(script_dir, ".last-update")
+        local_sha = ""
         if os.path.exists(version_file):
             with open(version_file) as f:
                 local_sha = f.read().strip()
@@ -711,25 +844,27 @@ def _check_update():
             headers={"User-Agent": f"excel-cli/{VERSION}", "Accept": "application/vnd.github.v3+json"},
         )
         with urllib.request.urlopen(req, timeout=15) as resp:
-            data = json.loads(resp.read().decode('utf-8'))
+            data = json.loads(resp.read().decode("utf-8"))
 
-        remote_sha = data.get('sha', '')[:12]
-        commit_message = data.get('commit', {}).get('message', '').split('\n')[0]
-        commit_date = data.get('commit', {}).get('committer', {}).get('date', '')[:10]
+        remote_sha = data.get("sha", "")[:12]
+        commit_message = data.get("commit", {}).get("message", "").split("\n")[0]
+        commit_date = data.get("commit", {}).get("committer", {}).get("date", "")[:10]
 
         need_update = not local_sha or (remote_sha and remote_sha != local_sha)
 
-        return output(_ok(
-            f"有新版本" if need_update else f"已是最新版 ({VERSION})",
-            data={
-                "local_version": VERSION,
-                "need_update": need_update,
-                "local_sha": local_sha or '(首次检查)',
-                "remote_sha": remote_sha,
-                "commit_message": commit_message,
-                "commit_date": commit_date,
-            },
-        ))
+        return output(
+            _ok(
+                "有新版本" if need_update else f"已是最新版 ({VERSION})",
+                data={
+                    "local_version": VERSION,
+                    "need_update": need_update,
+                    "local_sha": local_sha or "(首次检查)",
+                    "remote_sha": remote_sha,
+                    "commit_message": commit_message,
+                    "commit_date": commit_date,
+                },
+            )
+        )
     except urllib.error.HTTPError as e:
         return output(_fail(f"检查更新失败: HTTP {e.code}", meta={"error": "HTTP_ERROR"}))
     except Exception as e:
@@ -738,15 +873,18 @@ def _check_update():
 
 def _do_update():
     """执行更新。优先用 uv/venv 模式，回退到传统下载替换。"""
-    is_venv = hasattr(sys, 'real_prefix') or (hasattr(sys, 'base_prefix') and sys.base_prefix != sys.prefix)
+    is_venv = hasattr(sys, "real_prefix") or (hasattr(sys, "base_prefix") and sys.base_prefix != sys.prefix)
 
     if is_venv:
         # venv 模式：pip install --upgrade
         import subprocess
+
         try:
             result = subprocess.run(
-                [sys.executable, '-m', 'pip', 'install', '--upgrade', f'git+https://github.com/{GITHUB_REPO}'],
-                capture_output=True, text=True, timeout=120,
+                [sys.executable, "-m", "pip", "install", "--upgrade", f"git+https://github.com/{GITHUB_REPO}"],
+                capture_output=True,
+                text=True,
+                timeout=120,
             )
             if result.returncode != 0:
                 return output(_fail(f"pip 安装失败: {result.stderr}", meta={"error": "PIP_INSTALL_FAILED"}))
@@ -758,10 +896,10 @@ def _do_update():
                     headers={"User-Agent": f"excel-cli/{VERSION}", "Accept": "application/vnd.github.v3+json"},
                 )
                 with urllib.request.urlopen(req, timeout=15) as resp:
-                    remote_data = json.loads(resp.read().decode('utf-8'))
+                    remote_data = json.loads(resp.read().decode("utf-8"))
                 script_dir = os.path.dirname(os.path.abspath(__file__))
-                with open(os.path.join(script_dir, '.last-update'), 'w') as f:
-                    f.write(remote_data.get('sha', '')[:12])
+                with open(os.path.join(script_dir, ".last-update"), "w") as f:
+                    f.write(remote_data.get("sha", "")[:12])
             except Exception:
                 pass
 
@@ -788,10 +926,12 @@ def _legacy_update():
         )
         with urllib.request.urlopen(req, timeout=60) as resp:
             if resp.status != 200:
-                return output(_fail(
-                    f"下载失败: HTTP {resp.status} {resp.reason}",
-                    meta={"error_code": "UPDATE_CHECK_FAILED", "url": download_url},
-                ))
+                return output(
+                    _fail(
+                        f"下载失败: HTTP {resp.status} {resp.reason}",
+                        meta={"error_code": "UPDATE_CHECK_FAILED", "url": download_url},
+                    )
+                )
             new_content = resp.read()
 
         # 检测新版本号（源码模式从文件内容提取）
@@ -800,6 +940,7 @@ def _legacy_update():
             try:
                 new_text = new_content.decode("utf-8")
                 import ast
+
                 for line in new_text.splitlines():
                     if line.startswith("VERSION = "):
                         new_version = ast.literal_eval(line.split("=", 1)[1].strip())
@@ -814,70 +955,84 @@ def _legacy_update():
         try:
             os.replace(new_path, self_path)
         except PermissionError:
-            return output(_ok(
-                f"文件被占用，已写入: {new_path}。请手动替换 {self_path} 后重启。",
-                data={
-                    "current_version": VERSION,
-                    "new_version": new_version,
-                    "temp_file": new_path,
-                    "platform": platform,
-                    "arch": arch,
-                    "mode": "binary" if _IS_FROZEN else "source",
-                    "status": "file_locked",
-                },
-            ))
+            return output(
+                _ok(
+                    f"文件被占用，已写入: {new_path}。请手动替换 {self_path} 后重启。",
+                    data={
+                        "current_version": VERSION,
+                        "new_version": new_version,
+                        "temp_file": new_path,
+                        "platform": platform,
+                        "arch": arch,
+                        "mode": "binary" if _IS_FROZEN else "source",
+                        "status": "file_locked",
+                    },
+                )
+            )
 
         # 更新成功后写 .last-update
         try:
             script_dir = os.path.dirname(os.path.abspath(__file__))
-            version_file = os.path.join(script_dir, '.last-update')
+            version_file = os.path.join(script_dir, ".last-update")
             req2 = urllib.request.Request(
                 f"https://api.github.com/repos/{GITHUB_REPO}/commits/main",
                 headers={"User-Agent": f"excel-cli/{VERSION}", "Accept": "application/vnd.github.v3+json"},
             )
             with urllib.request.urlopen(req2, timeout=15) as resp2:
-                sha_data = json.loads(resp2.read().decode('utf-8'))
-            with open(version_file, 'w') as f:
-                f.write(sha_data.get('sha', '')[:12])
+                sha_data = json.loads(resp2.read().decode("utf-8"))
+            with open(version_file, "w") as f:
+                f.write(sha_data.get("sha", "")[:12])
         except Exception:
             pass
 
-        return output(_ok(
-            f"更新成功: {VERSION} -> {new_version}",
-            data={
-                "current_version": VERSION,
-                "new_version": new_version,
-                "platform": platform,
-                "arch": arch,
-                "mode": "binary" if _IS_FROZEN else "source",
-                "status": "updated",
-            },
-        ))
+        return output(
+            _ok(
+                f"更新成功: {VERSION} -> {new_version}",
+                data={
+                    "current_version": VERSION,
+                    "new_version": new_version,
+                    "platform": platform,
+                    "arch": arch,
+                    "mode": "binary" if _IS_FROZEN else "source",
+                    "status": "updated",
+                },
+            )
+        )
     except Exception as e:
         return output(_fail(f"legacy update 失败: {e}"))
 
 
 # ==================== 版本子命令 ====================
 
+
 def cmd_version(args):
-    print(json.dumps({
-        "success": True,
-        "data": {"version": VERSION, "python": sys.version.split()[0]},
-    }, ensure_ascii=False, indent=2))
+    """输出版本信息。"""
+    print(
+        json.dumps(
+            {
+                "success": True,
+                "data": {"version": VERSION, "python": sys.version.split()[0]},
+            },
+            ensure_ascii=False,
+            indent=2,
+        )
+    )
     return 0
 
 
 # ==================== argparse 定义 ====================
 
+
 def build_parser():
+    """构建 argparse 命令行解析器。"""
     parser = argparse.ArgumentParser(
         prog="excel-cli",
         description="ExcelMCP CLI — 将 26 个 MCP 工具转为 CLI 子命令，输出 JSON。",
         epilog="示例:\n"
-               "  excel-cli list-sheets --file data.xlsx\n"
-               "  excel-cli query --file data.xlsx --sql \"SELECT * FROM Sheet1 LIMIT 5\"\n"
-               "  excel-cli update-query --file data.xlsx --sql \"UPDATE Sheet1 SET Col=1 WHERE ID>5\"\n"
-               "  excel-cli self-update",
+        "  excel-cli list-sheets --file data.xlsx\n"
+        '  excel-cli query --file data.xlsx --sql "SELECT * FROM Sheet1 LIMIT 5"\n'
+        '  excel-cli update-query --file data.xlsx --sql "UPDATE Sheet1 SET Col=1 WHERE ID>5"\n'
+        "  excel-cli self-update",
         formatter_class=argparse.RawDescriptionHelpFormatter,
     )
     parser.add_argument("--version", action="version", version=f"%(prog)s {VERSION}")
@@ -927,7 +1082,7 @@ def build_parser():
     p.add_argument("--dir", required=True, help="搜索目录")
     p.add_argument("--pattern", required=True, help="搜索模式")
     p.add_argument("--recursive", type=lambda x: x.lower() in ("true", "1", "yes"), default=True, help="递归子目录")
-    p.add_argument("--extensions", default=None, help="扩展名过滤 JSON（如 [\".xlsx\"]）")
+    p.add_argument("--extensions", default=None, help='扩展名过滤 JSON（如 [".xlsx"]）')
     p.add_argument("--max-files", type=int, default=100, help="最大搜索文件数")
     p.set_defaults(func=cmd_search_directory)
 
@@ -1048,9 +1203,7 @@ def build_parser():
     p = subparsers.add_parser("structure", help="插入或删除行和列")
     p.add_argument("--file", required=True, help="Excel 文件路径")
     p.add_argument("--sheet", required=True, help="工作表名称")
-    p.add_argument("--operation", required=True,
-                   choices=["insert_rows", "delete_rows", "insert_columns", "insert_cols", "delete_columns", "delete_cols"],
-                   help="操作类型")
+    p.add_argument("--operation", required=True, choices=["insert_rows", "delete_rows", "insert_columns", "insert_cols", "delete_columns", "delete_cols"], help="操作类型")
     p.add_argument("--index", type=int, required=True, help="行/列位置（从1开始）")
     p.add_argument("--count", type=int, default=1, help="数量（默认1）")
     p.set_defaults(func=cmd_structure)
@@ -1071,16 +1224,14 @@ def build_parser():
     p.add_argument("--sheet", required=True, help="工作表名称")
     p.add_argument("--range", required=True, help="单元格范围")
     p.add_argument("--formatting", default=None, help='样式 JSON（如 {"bold": true}）')
-    p.add_argument("--preset", default=None, help='预设样式（header/title/data 等）')
+    p.add_argument("--preset", default=None, help="预设样式（header/title/data 等）")
     p.set_defaults(func=cmd_format_cells)
 
     # set-layout
     p = subparsers.add_parser("set-layout", help="设置行高或列宽")
     p.add_argument("--file", required=True, help="Excel 文件路径")
     p.add_argument("--sheet", required=True, help="工作表名称")
-    p.add_argument("--operation", required=True,
-                   choices=["set_row_height", "set_column_width", "row_height", "column_width"],
-                   help="操作类型")
+    p.add_argument("--operation", required=True, choices=["set_row_height", "set_column_width", "row_height", "column_width"], help="操作类型")
     p.add_argument("--index", type=int, required=True, help="行号或列号（从1开始）")
     p.add_argument("--value", type=float, required=True, help="行高（磅）或列宽（字符）")
     p.add_argument("--count", type=int, default=1, help="连续影响数量")
@@ -1110,6 +1261,7 @@ def build_parser():
 
 
 def main():
+    """CLI 入口：解析参数并分发到对应子命令。"""
     parser = build_parser()
     args = parser.parse_args()
     if not args.command:

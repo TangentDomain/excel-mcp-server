@@ -104,7 +104,16 @@ if (pyFiles.length > 0) {
     for (let i = 0; i < lines.length; i++) {
       const m = lines[i].match(/^def ([a-z]\w+)\(/);
       if (m) {
-        const nextNonBlank = lines.slice(i + 1).find((l) => l.trim().length > 0);
+        // 跳过多行签名: 若 def 行未在同一行闭合 (不以 ): 或 ): 结尾),
+        // 向后扫描直到签名结束行 (缩进的 ) 开头)
+        let bodyStart = i + 1;
+        if (!/:\s*$/.test(lines[i]) && !/:\s*#/.test(lines[i])) {
+          while (bodyStart < lines.length && !/^\s*\)/.test(lines[bodyStart])) {
+            bodyStart++;
+          }
+          bodyStart++; // 跳过签名结束行
+        }
+        const nextNonBlank = lines.slice(bodyStart).find((l) => l.trim().length > 0);
         if (!nextNonBlank || (!nextNonBlank.trim().startsWith('"""') && !nextNonBlank.trim().startsWith("'"))) {
           console.error(`❌ ${file}:${i + 1} — 公共函数 ${m[1]}() 缺少 docstring`);
           process.exit(1);

@@ -34,7 +34,6 @@ import shutil
 import tempfile
 import threading
 import time
-import warnings
 from collections.abc import Generator
 from contextlib import contextmanager
 from decimal import Decimal, InvalidOperation

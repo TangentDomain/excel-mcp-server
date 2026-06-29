@@ -6,8 +6,10 @@ __version__ = "1.17.0"
 
 __all__ = ["main", "__version__"]
 
+
 def __getattr__(name):
     if name == "main":
         from .server import main
+
         return main
     raise AttributeError(f"module {__name__!r} has no attribute {name!r}")

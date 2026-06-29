@@ -78,10 +78,7 @@ def _create_oracle_db() -> sqlite3.Connection:
     直接建表保持与 ExcelMCP 的 SQL 引擎相同结构。
     """
     conn = sqlite3.connect(":memory:")
-    col_defs = ", ".join(
-        f"[{col}] {'REAL' if col == 'Price' else 'TEXT' if col == 'Name' or col == 'Active' else 'INTEGER'}"
-        for col in SEED_COLUMNS
-    )
+    col_defs = ", ".join(f"[{col}] {'REAL' if col == 'Price' else 'TEXT' if col == 'Name' or col == 'Active' else 'INTEGER'}" for col in SEED_COLUMNS)
     conn.execute(f"CREATE TABLE [{SEED_TABLE}] ({col_defs})")
     placeholders = ", ".join(["?"] * len(SEED_COLUMNS))
     for row in SEED_DATA:
@@ -186,29 +183,17 @@ def assert_query_match(
     tol: float = 0.01,
 ):
     """断言 ExcelMCP 查询结果与 SQLite 结果一致"""
-    assert excel_result["success"], (
-        f"ExcelMCP query failed for SQL: {sql}\n"
-        f"Message: {excel_result.get('message', 'N/A')}"
-    )
+    assert excel_result["success"], f"ExcelMCP query failed for SQL: {sql}\nMessage: {excel_result.get('message', 'N/A')}"
 
     excel_data = excel_result["data"]
     if len(excel_data) <= 1:
         # ExcelMCP 返回只有表头（或空），检查 SQLite 也为空
-        assert len(sqlite_rows) == 0, (
-            f"ExcelMCP returned {len(excel_data)} rows (header only), "
-            f"but SQLite returned {len(sqlite_rows)} rows\n"
-            f"SQL: {sql}\n"
-            f"SQLite rows: {sqlite_rows}"
-        )
+        assert len(sqlite_rows) == 0, f"ExcelMCP returned {len(excel_data)} rows (header only), but SQLite returned {len(sqlite_rows)} rows\nSQL: {sql}\nSQLite rows: {sqlite_rows}"
         return
 
     excel_rows = excel_data[1:]  # 跳过表头
     assert len(excel_rows) == len(sqlite_rows), (
-        f"Row count mismatch for SQL: {sql}\n"
-        f"ExcelMCP: {len(excel_rows)} rows\n"
-        f"SQLite: {len(sqlite_rows)} rows\n"
-        f"ExcelMCP data: {excel_rows}\n"
-        f"SQLite data: {sqlite_rows}"
+        f"Row count mismatch for SQL: {sql}\nExcelMCP: {len(excel_rows)} rows\nSQLite: {len(sqlite_rows)} rows\nExcelMCP data: {excel_rows}\nSQLite data: {sqlite_rows}"
     )
 
     mismatches = []
@@ -216,13 +201,8 @@ def assert_query_match(
         if not rows_match(erow, srow, tol):
             mismatches.append((i, erow, srow))
 
-    assert len(mismatches) == 0, (
-        f"Data mismatch for SQL: {sql}\n"
-        f"Mismatched rows ({len(mismatches)}/{len(excel_rows)}):\n"
-        + "\n".join(
-            f"  Row {idx}: ExcelMCP={erow} vs SQLite={srow}"
-            for idx, erow, srow in mismatches
-        )
+    assert len(mismatches) == 0, f"Data mismatch for SQL: {sql}\nMismatched rows ({len(mismatches)}/{len(excel_rows)}):\n" + "\n".join(
+        f"  Row {idx}: ExcelMCP={erow} vs SQLite={srow}" for idx, erow, srow in mismatches
     )
 
 
@@ -232,16 +212,9 @@ def assert_affected_rows_match(
     sql: str,
 ):
     """断言 ExcelMCP affected_rows 与 SQLite rowcount 一致"""
-    assert excel_result["success"], (
-        f"ExcelMCP write failed for SQL: {sql}\n"
-        f"Message: {excel_result.get('message', 'N/A')}"
-    )
+    assert excel_result["success"], f"ExcelMCP write failed for SQL: {sql}\nMessage: {excel_result.get('message', 'N/A')}"
     excel_affected = excel_result.get("affected_rows", -1)
-    assert excel_affected == sqlite_affected, (
-        f"affected_rows mismatch for SQL: {sql}\n"
-        f"ExcelMCP: {excel_affected}\n"
-        f"SQLite: {sqlite_affected}"
-    )
+    assert excel_affected == sqlite_affected, f"affected_rows mismatch for SQL: {sql}\nExcelMCP: {excel_affected}\nSQLite: {sqlite_affected}"
 
 
 # ============================================================
@@ -304,15 +277,17 @@ class ScoreCollector:
         actual: Any = None,
         error_msg: str = "",
     ):
-        self.results.append({
-            "category": category,
-            "sub_category": sub_category,
-            "sql": sql,
-            "passed": passed,
-            "expected": expected,
-            "actual": actual,
-            "error_msg": error_msg,
-        })
+        self.results.append(
+            {
+                "category": category,
+                "sub_category": sub_category,
+                "sql": sql,
+                "passed": passed,
+                "expected": expected,
+                "actual": actual,
+                "error_msg": error_msg,
+            }
+        )
 
     def summary(self) -> dict:
         total = len(self.results)

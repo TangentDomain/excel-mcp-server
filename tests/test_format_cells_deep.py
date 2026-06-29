@@ -572,7 +572,7 @@ class TestFormatCellsDeep:
         assert result == {"fill": {"color": "FFFF00"}}
 
     def test_normalize_flat_alignment(self):
-        """扁平 alignment: "center" → nested alignment.horizontal: "center\" """
+        """扁平 alignment: "center" → nested alignment.horizontal: "center\""""
         result = ExcelOperations._normalize_formatting({"alignment": "center"})
         assert result == {"alignment": {"horizontal": "center"}}
 
