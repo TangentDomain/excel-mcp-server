@@ -427,6 +427,37 @@ def build_test_cases() -> list[dict]:
     # ── 扩展批4: 多表 JOIN + WHERE ──
     cases.append({"f": "join", "sql": "SELECT 技能.skill_name FROM 技能 WHERE 技能.skill_id IN (SELECT skill_ref FROM 掉落)", "cat": "join_subquery"})
 
+    # ── 扩展批5: 数学表达式嵌套 ──
+    cases.append({"f": "numbers", "sql": "SELECT id, val * 2 + 1 AS expr FROM 数值", "cat": "nested_expr"})
+    cases.append({"f": "numbers", "sql": "SELECT id, (val + 1) * 2 AS expr FROM 数值", "cat": "nested_expr"})
+    cases.append({"f": "numbers", "sql": "SELECT id, val - val AS zero FROM 数值", "cat": "nested_expr"})
+
+    # ── 扩展批5: NULL 传播 ──
+    cases.append({"f": "simple", "sql": "SELECT ID, Price + 100 AS adjusted FROM 数据", "cat": "null_propagation"})
+    cases.append({"f": "simple", "sql": "SELECT ID, Price * 2 AS doubled FROM 数据", "cat": "null_propagation"})
+
+    # ── 扩展批5: WHERE 复杂逻辑 ──
+    cases.append({"f": "simple", "sql": "SELECT * FROM 数据 WHERE (Price > 50 AND Tags = '武器') OR (Price IS NULL)", "cat": "complex_where"})
+    cases.append({"f": "numbers", "sql": "SELECT * FROM 数值 WHERE grp = 'A' AND val BETWEEN 15 AND 25", "cat": "complex_where"})
+
+    # ── 扩展批5: 字符串函数更多 ──
+    cases.append({"f": "special", "sql": "SELECT ID, LENGTH(文本) AS tlen FROM 特殊字符", "cat": "string"})
+    cases.append({"f": "special", "sql": "SELECT ID, UPPER(备注) AS u_note FROM 特殊字符 WHERE 备注 IS NOT NULL", "cat": "string"})
+
+    # ── 扩展批5: COUNT 变体 ──
+    cases.append({"f": "simple", "sql": "SELECT COUNT(*) AS total, COUNT(Price) AS non_null FROM 数据", "cat": "count_variants"})
+    cases.append({"f": "simple", "sql": "SELECT Tags, COUNT(Price) AS priced FROM 数据 GROUP BY Tags", "cat": "count_variants"})
+
+    # ── 扩展批5: GROUP BY 排序 ──
+    cases.append({"f": "numbers", "sql": "SELECT grp, SUM(val) AS total FROM 数值 GROUP BY grp ORDER BY total DESC", "cat": "groupby_orderby"})
+
+    # ── 扩展批5: 子查询 EXISTS 否定 ──
+    cases.append({"f": "simple", "sql": "SELECT * FROM 数据 WHERE NOT EXISTS (SELECT 1 FROM 数据 d2 WHERE d2.ID = 数据.ID AND d2.Price > 150)", "cat": "not_exists"})
+
+    # ── 扩展批5: LIMIT 边界 ──
+    cases.append({"f": "numbers", "sql": "SELECT * FROM 数值 LIMIT 100", "cat": "limit_boundary"})
+    cases.append({"f": "simple", "sql": "SELECT COUNT(*) FROM 数据 LIMIT 1", "cat": "limit_boundary"})
+
     return cases
 
 
