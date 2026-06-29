@@ -4092,6 +4092,9 @@ class AdvancedSQLQueryEngine:
         elif isinstance(expr, exp.Cast):
             # CAST 嵌入数学表达式 (如 CAST(col AS FLOAT) * 100)
             return self._evaluate_cast_expression(expr, df)
+        elif self._is_string_function(expr):
+            # Fix(autoresearch): 字符串函数嵌入数学表达式 (如 LENGTH(Name) * 2)
+            return pd.to_numeric(self._evaluate_string_function(expr, df), errors="coerce")
         elif isinstance(expr, exp.DPipe):
             # || 字符串拼接嵌入表达式
             left = self._evaluate_math_expression(expr.this, df).astype(str)
@@ -6535,6 +6538,13 @@ class AdvancedSQLQueryEngine:
 
         elif isinstance(expr, exp.Coalesce):
             return self._evaluate_coalesce_for_row(expr, row)
+        elif isinstance(expr, exp.Nullif):
+            # Fix(autoresearch): NULLIF in WHERE clause row evaluation
+            left = self._get_row_value(expr.this, row)
+            right = self._get_row_value(expr.expression, row)
+            if left is None or right is None:
+                return None
+            return None if str(left) == str(right) else left
 
         elif isinstance(expr, exp.Case):
             return self._evaluate_case_expression(expr, None, row=row)

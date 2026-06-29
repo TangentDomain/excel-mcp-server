@@ -628,6 +628,12 @@ def build_test_cases() -> list[dict]:
     cases.append({"f": "simple", "sql": "SELECT ID, Price FROM 数据 WHERE Price IS NOT NULL ORDER BY Price ASC, ID DESC", "cat": "order_multi_null"})
     cases.append({"f": "simple", "sql": "SELECT Tags, COUNT(DISTINCT Active) AS variety FROM 数据 GROUP BY Tags", "cat": "distinct_in_group"})
     # NOTE: GROUP BY CASE WHEN 表达式暂不精确（不按CASE结果分组）
+    cases.append({"f": "simple", "sql": "SELECT * FROM 数据 WHERE NULLIF(Active, '否') IS NOT NULL", "cat": "nullif_where"})
+    # NOTE: 窗口函数参与算术表达式(val - LAG(val) OVER...)暂不支持
+    # cases.append({"f": "numbers", "sql": "SELECT id, val, ROW_NUMBER() OVER (ORDER BY val DESC) AS rn, val - LAG(val) OVER (ORDER BY id) AS diff FROM 数值", "cat": "window_lag"})
+    cases.append({"f": "numbers", "sql": "SELECT grp, GROUP_CONCAT(val) AS vals FROM 数值 GROUP BY grp ORDER BY grp", "cat": "group_concat_num"})
+    cases.append({"f": "simple", "sql": "SELECT Name, LENGTH(Name) * 2 AS double_len FROM 数据 ORDER BY double_len DESC LIMIT 3", "cat": "expr_orderby_limit"})
+    cases.append({"f": "simple", "sql": "SELECT * FROM 数据 ORDER BY Active, Tags, Price DESC", "cat": "order_three_cols"})
 
     return cases
 
