@@ -400,6 +400,33 @@ def build_test_cases() -> list[dict]:
     # ── 扩展批3: 多条件排序 + LIMIT ──
     cases.append({"f": "numbers", "sql": "SELECT id, grp, val FROM 数值 ORDER BY grp, val DESC LIMIT 3", "cat": "orderby_limit"})
 
+    # ── 扩展批4: COALESCE 在 WHERE ──
+    cases.append({"f": "simple", "sql": "SELECT * FROM 数据 WHERE COALESCE(Price, 0) > 40", "cat": "coalesce_where"})
+
+    # ── 扩展批4: 字符串函数组合 ──
+    cases.append({"f": "simple", "sql": "SELECT Name, UPPER(Name) AS uname FROM 数据 WHERE LENGTH(Name) > 2", "cat": "string_combo"})
+
+    # ── 扩展批4: 嵌套聚合表达式 ──
+    cases.append({"f": "numbers", "sql": "SELECT grp, SUM(val) + MAX(val) FROM 数值 GROUP BY grp", "cat": "groupby_arith"})
+    cases.append({"f": "numbers", "sql": "SELECT grp, MAX(val) * 2 AS dbl_max FROM 数值 GROUP BY grp", "cat": "groupby_arith"})
+
+    # ── 扩展批4: 负数运算 ──
+    cases.append({"f": "numbers", "sql": "SELECT id, -val AS neg FROM 数值", "cat": "neg_expr"})
+    cases.append({"f": "numbers", "sql": "SELECT id, val - 100 AS below FROM 数值", "cat": "expr"})
+
+    # ── 扩展批4: NULL 在聚合 ──
+    cases.append({"f": "simple", "sql": "SELECT COUNT(*), COUNT(Price) FROM 数据", "cat": "null_agg"})
+    cases.append({"f": "simple", "sql": "SELECT AVG(Price) FROM 数据 WHERE Price IS NOT NULL", "cat": "null_agg"})
+
+    # ── 扩展批4: 子查询 IN 多值 ──
+    cases.append({"f": "simple", "sql": "SELECT * FROM 数据 WHERE Tags IN (SELECT Tags FROM 数据 WHERE Price > 60)", "cat": "subquery"})
+
+    # ── 扩展批4: GROUP BY + ORDER BY 别名 ──
+    cases.append({"f": "numbers", "sql": "SELECT grp, COUNT(*) AS cnt FROM 数值 GROUP BY grp ORDER BY cnt DESC", "cat": "orderby_alias"})
+
+    # ── 扩展批4: 多表 JOIN + WHERE ──
+    cases.append({"f": "join", "sql": "SELECT 技能.skill_name FROM 技能 WHERE 技能.skill_id IN (SELECT skill_ref FROM 掉落)", "cat": "join_subquery"})
+
     return cases
 
 

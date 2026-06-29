@@ -3911,7 +3911,15 @@ class AdvancedSQLQueryEngine:
 
     def _is_mathematical_expression(self, expr) -> bool:
         """检查是否为数学表达式"""
-        return isinstance(expr, (exp.Add, exp.Sub, exp.Mul, exp.Div, exp.Mod, exp.Nullif))
+        return isinstance(expr, (exp.Add, exp.Sub, exp.Mul, exp.Div, exp.Mod, exp.Nullif, exp.Neg))
+
+    @staticmethod
+    def _safe_numeric_series(series: pd.Series) -> pd.Series:
+        """Fix(autoresearch): uint 类型在减法时下溢（如 uint8: 10-100=166），
+        提升为 int64 防止无符号整数下溢。"""
+        if hasattr(series, "dtype") and series.dtype.kind == "u":
+            return series.astype("int64")
+        return series
 
     # 数学运算符分发表:二元运算符统一处理
     _MATH_BINARY_OPS = {
@@ -4019,15 +4027,15 @@ class AdvancedSQLQueryEngine:
 
             # 先尝试直接使用qualified列名
             if qualified and qualified in df.columns:
-                return df[qualified]
+                return self._safe_numeric_series(df[qualified])
             # 大小写不敏感列名查找
             actual_col = self._find_column_name(col_name, df)
             if actual_col:
-                return df[actual_col]
+                return self._safe_numeric_series(df[actual_col])
             elif qualified:
                 actual_qualified = self._find_column_name(qualified, df)
                 if actual_qualified:
-                    return df[actual_qualified]
+                    return self._safe_numeric_series(df[actual_qualified])
             raise ValueError(f"列 '{qualified or col_name}' 不存在")
         elif isinstance(expr, exp.Literal):
             return self._expression_to_value(expr, df)
