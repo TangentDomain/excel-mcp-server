@@ -7136,19 +7136,34 @@ class AdvancedSQLQueryEngine:
         """
         ifs = case_expr.args.get("ifs", [])
         default_value = case_expr.args.get("default")
+        # 简单 CASE: CASE expr WHEN val1 THEN res1 WHEN val2 THEN res2 ...
+        # (case_expr.this = expr, 需要先算出 expr 再逐个匹配 val)
+        simple_case_tester = case_expr.args.get("this")
 
         if row is not None:
             # 逐行评估模式
-            for if_clause in ifs:
-                condition = if_clause.this
-                if self._evaluate_condition_for_row(condition, row):
-                    return self._get_expression_value(if_clause.args.get("true"), row)
-            # 没有匹配的WHEN,返回ELSE默认值
+            if simple_case_tester is not None:
+                # 简单 CASE: 评估 expr, 逐个与 WHEN 值比较
+                base_value = self._get_row_value(simple_case_tester, row)
+                for if_clause in ifs:
+                    when_value = self._get_row_value(if_clause.this, row)
+                    # NULL-safe 比较
+                    if base_value is None and when_value is None:
+                        return self._get_expression_value(if_clause.args.get("true"), row)
+                    if base_value is not None and when_value is not None and base_value == when_value:
+                        return self._get_expression_value(if_clause.args.get("true"), row)
+            else:
+                # 搜索 CASE: CASE WHEN cond THEN val ...
+                for if_clause in ifs:
+                    condition = if_clause.this
+                    if self._evaluate_condition_for_row(condition, row):
+                        return self._get_expression_value(if_clause.args.get("true"), row)
+            # 没有匹配的 WHEN
             if default_value is not None:
                 return self._get_expression_value(default_value, row)
             return None
         else:
-            # 向量化模式 - 复用逐行评估
+            # 向量化模式 — 复用逐行评估
             return pd.Series(
                 [self._evaluate_case_expression(case_expr, df, df.iloc[i]) for i in range(len(df))],
                 index=df.index,
