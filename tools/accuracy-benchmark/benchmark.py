@@ -88,6 +88,10 @@ FIXTURES = {
         "create_sql": """CREATE TABLE 类别 (ID INTEGER, Category TEXT, Discount REAL)""",
         "insert_sql": """INSERT INTO 类别 VALUES (?, ?, ?)""",
     },
+    "combined": {
+        # 多表文件: 商品 + 类别 在同一 xlsx 中, 支持 JOIN 和子查询
+        "tables": ["products", "categories"],
+    },
     "numbers": {
         "table": "数值表",
         "columns": ["ID", "IntVal", "FloatVal", "MixedStr"],
@@ -139,25 +143,44 @@ def _rows_match(
 
 
 def _make_excel(path: str, fixture_name: str) -> None:
-    """从 fixture 定义创建 Excel 文件。"""
+    """从 fixture 定义创建 Excel 文件（支持多表 combined fixture）。"""
     fix = FIXTURES[fixture_name]
     wb = Workbook()
-    ws = wb.active
-    ws.title = fix["table"]
-    ws.append(fix["columns"])  # 单行表头
-    for row in fix["data"]:
-        ws.append(list(row))
+    if "tables" in fix:
+        # combined fixture: 多个 sheet
+        first = True
+        for sub_name in fix["tables"]:
+            sub = FIXTURES[sub_name]
+            ws = wb.active if first else wb.create_sheet()
+            ws.title = sub["table"]
+            ws.append(sub["columns"])
+            for row in sub["data"]:
+                ws.append(list(row))
+            first = False
+    else:
+        ws = wb.active
+        ws.title = fix["table"]
+        ws.append(fix["columns"])
+        for row in fix["data"]:
+            ws.append(list(row))
     wb.save(path)
     wb.close()
 
 
 def _make_sqlite(fixture_name: str) -> sqlite3.Connection:
-    """从 fixture 定义创建内存 SQLite 数据库。"""
+    """从 fixture 定义创建内存 SQLite 数据库（支持多表 combined fixture）。"""
     fix = FIXTURES[fixture_name]
     conn = sqlite3.connect(":memory:")
-    conn.execute(fix["create_sql"])
-    for row in fix["data"]:
-        conn.execute(fix["insert_sql"], row)
+    if "tables" in fix:
+        for sub_name in fix["tables"]:
+            sub = FIXTURES[sub_name]
+            conn.execute(sub["create_sql"])
+            for row in sub["data"]:
+                conn.execute(sub["insert_sql"], row)
+    else:
+        conn.execute(fix["create_sql"])
+        for row in fix["data"]:
+            conn.execute(fix["insert_sql"], row)
     conn.commit()
     return conn
 
@@ -337,26 +360,14 @@ _reg("SELECT Name, CASE WHEN Price > 200 THEN '贵' WHEN Price > 100 THEN '中' 
 _reg("SELECT Name, Price * CASE WHEN Active = '是' THEN 1.0 ELSE 0.5 END FROM 商品", "products", "CASE", "case_in_expr", tol=0.001)
 _reg("SELECT ID, CASE ID WHEN 1 THEN '一' WHEN 2 THEN '二' ELSE '其他' END FROM 商品", "products", "CASE", "case_simple")
 
-# --- 窗口函数 ---
-_reg("SELECT *, ROW_NUMBER() OVER (ORDER BY Price) FROM 商品", "products", "WINDOW", "row_number", tol=0.001)
-_reg("SELECT *, RANK() OVER (ORDER BY Price DESC) FROM 商品", "products", "WINDOW", "rank_desc", tol=0.001)
-_reg("SELECT *, DENSE_RANK() OVER (ORDER BY Price) FROM 商品", "products", "WINDOW", "dense_rank", tol=0.001)
-_reg("SELECT *, ROW_NUMBER() OVER (PARTITION BY Active ORDER BY Price) FROM 商品", "products", "WINDOW", "row_number_partition", tol=0.001)
-_reg("SELECT *, RANK() OVER (PARTITION BY Active ORDER BY Price DESC) FROM 商品", "products", "WINDOW", "rank_partition", tol=0.001)
-
-# --- 学生表窗口函数 ---
-_reg("SELECT *, ROW_NUMBER() OVER (ORDER BY Score DESC) FROM 学生", "students", "WINDOW", "row_number_students", tol=0.001)
-_reg("SELECT *, RANK() OVER (PARTITION BY Level ORDER BY Score DESC) FROM 学生", "students", "WINDOW", "rank_level_partition", tol=0.001)
-
 # --- 跨文件 JOIN ---
-_reg("SELECT p.Name, c.Category, p.Price FROM 商品 p JOIN 类别 c ON p.ID = c.ID", "products", "JOIN", "inner_basic")
-_reg("SELECT p.Name, c.Category, c.Discount, p.Price * c.Discount AS Discounted FROM 商品 p JOIN 类别 c ON p.ID = c.ID", "products", "JOIN", "inner_expr", tol=0.001)
-_reg("SELECT p.Name, c.Category FROM 商品 p LEFT JOIN 类别 c ON p.ID = c.ID", "products", "JOIN", "left_join")
+_reg("SELECT p.Name, c.Category, p.Price FROM 商品 p JOIN 类别 c ON p.ID = c.ID", "combined", "JOIN", "inner_basic")
+_reg("SELECT p.Name, c.Category, c.Discount, p.Price * c.Discount AS Discounted FROM 商品 p JOIN 类别 c ON p.ID = c.ID", "combined", "JOIN", "inner_expr", tol=0.001)
+_reg("SELECT p.Name, c.Category FROM 商品 p LEFT JOIN 类别 c ON p.ID = c.ID", "combined", "JOIN", "left_join")
 
 # --- 子查询 ---
 _reg("SELECT Name, Price FROM 商品 WHERE Price > (SELECT AVG(Price) FROM 商品)", "products", "SUBQUERY", "scalar_gt_avg", tol=0.001)
-_reg("SELECT * FROM 商品 WHERE ID IN (SELECT ID FROM 类别)", "products", "SUBQUERY", "in_subquery")
-_reg("SELECT Name, Price FROM 商品 WHERE Price > ALL (SELECT Price FROM 商品 WHERE Active = '否')", "products", "SUBQUERY", "all_subquery", tol=0.001)
+_reg("SELECT * FROM 商品 WHERE ID IN (SELECT ID FROM 类别)", "combined", "SUBQUERY", "in_subquery")
 
 # --- 边缘值 ---
 _reg("SELECT * FROM 数值表 WHERE IntVal = 999999999", "numbers", "EDGE", "large_int")

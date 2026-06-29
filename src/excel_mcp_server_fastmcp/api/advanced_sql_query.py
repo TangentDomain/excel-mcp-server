@@ -4043,6 +4043,15 @@ class AdvancedSQLQueryEngine:
         elif isinstance(expr, exp.Cast):
             # CAST 嵌入数学表达式 (如 CAST(col AS FLOAT) * 100)
             return self._evaluate_cast_expression(expr, df)
+        elif isinstance(expr, exp.Neg):
+            # 一元负号 (如 IntVal * -1)
+            inner = self._evaluate_math_expression(expr.this, df)
+            if isinstance(inner, pd.Series):
+                return -pd.to_numeric(inner, errors="coerce")
+            return -inner
+        elif isinstance(expr, exp.Case):
+            # CASE 表达式嵌入数学运算 (如 Price * CASE WHEN ... THEN 1.0 ELSE 0.5 END)
+            return pd.to_numeric(self._evaluate_case_expression(expr, df), errors="coerce")
         elif isinstance(expr, exp.DPipe):
             # || 字符串拼接嵌入表达式
             left = self._evaluate_math_expression(expr.this, df).astype(str)
@@ -8043,15 +8052,16 @@ class AdvancedSQLQueryEngine:
                             df[temp_col_name] = col_data.astype(str)
                             sort_columns = [temp_col_name if c == col else c for c in sort_columns]
                             temp_sort_cols.append(temp_col_name)
-
             # SQLite 兼容: ORDER BY 中 NULL 排最前 (ASC) / 最后 (DESC)
             na_pos = "first" if all(ascending) or (ascending is True) else "last"
+            # 检测 NULLS LAST / NULLS FIRST 显式指定
+            for oe in order_clause.expressions:
+                oe_str = str(oe).strip().upper()
+                if "NULLS LAST" in oe_str:
+                    na_pos = "last"
+                elif "NULLS FIRST" in oe_str:
+                    na_pos = "first"
             sorted_df = df.sort_values(by=sort_columns, ascending=ascending, na_position=na_pos)
-
-            # Clean up temporary columns
-            for tc in temp_sort_cols:
-                if tc in sorted_df.columns:
-                    sorted_df.drop(columns=[tc], inplace=True)
 
             return sorted_df
 
