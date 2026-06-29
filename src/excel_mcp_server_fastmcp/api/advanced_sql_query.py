@@ -8004,7 +8004,9 @@ class AdvancedSQLQueryEngine:
                             sort_columns = [temp_col_name if c == col else c for c in sort_columns]
                             temp_sort_cols.append(temp_col_name)
 
-            sorted_df = df.sort_values(by=sort_columns, ascending=ascending)
+            # SQLite 兼容: ORDER BY 中 NULL 排最前 (ASC) / 最后 (DESC)
+            na_pos = "first" if all(ascending) or (ascending is True) else "last"
+            sorted_df = df.sort_values(by=sort_columns, ascending=ascending, na_position=na_pos)
 
             # Clean up temporary columns
             for tc in temp_sort_cols:
