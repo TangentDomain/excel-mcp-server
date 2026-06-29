@@ -635,6 +635,17 @@ def build_test_cases() -> list[dict]:
     cases.append({"f": "simple", "sql": "SELECT Name, LENGTH(Name) * 2 AS double_len FROM 数据 ORDER BY double_len DESC LIMIT 3", "cat": "expr_orderby_limit"})
     cases.append({"f": "simple", "sql": "SELECT * FROM 数据 ORDER BY Active, Tags, Price DESC", "cat": "order_three_cols"})
 
+    # ── 扩展批20(最终): 综合高级场景 ──
+    cases.append({"f": "simple", "sql": "SELECT ID, REPLACE(Name, '剑', '刀') AS new_name FROM 数据 ORDER BY new_name", "cat": "replace_orderby"})
+    cases.append({"f": "simple", "sql": "SELECT COUNT(NULLIF(Active, '否')) AS non_inactive FROM 数据", "cat": "count_nullif"})
+    cases.append({"f": "simple", "sql": "SELECT * FROM 数据 WHERE COALESCE(Price, 0) BETWEEN 40 AND 100", "cat": "coalesce_between"})
+    cases.append({"f": "simple", "sql": "SELECT Name, (SELECT COUNT(*) FROM 数据) AS total FROM 数据 LIMIT 2", "cat": "scalar_count"})
+    cases.append({"f": "simple", "sql": "SELECT Tags, COUNT(*) AS c FROM 数据 GROUP BY Tags ORDER BY Tags ASC, c DESC", "cat": "group_multi_order"})
+    cases.append({"f": "simple", "sql": "SELECT * FROM 数据 WHERE Price IS NULL AND Active = '是'", "cat": "null_and"})
+    cases.append({"f": "simple", "sql": "SELECT DISTINCT Tags FROM 数据 ORDER BY Tags LIMIT 1", "cat": "distinct_order_limit"})
+    cases.append({"f": "simple", "sql": "SELECT ID, ROW_NUMBER() OVER (PARTITION BY Tags ORDER BY Price DESC) AS rn FROM 数据 WHERE Price IS NOT NULL ORDER BY rn", "cat": "window_partition_order"})
+    cases.append({"f": "simple", "sql": "SELECT Tags, SUM(CASE WHEN Price > 50 THEN Price ELSE 0 END) AS high_sum FROM 数据 GROUP BY Tags", "cat": "case_sum_group"})
+
     return cases
 
 
