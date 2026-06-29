@@ -619,6 +619,16 @@ def build_test_cases() -> list[dict]:
     cases.append({"f": "simple", "sql": "SELECT COUNT(DISTINCT Tags) AS tag_count, COUNT(DISTINCT Active) AS active_count FROM 数据", "cat": "multi_distinct"})
     # NOTE: NULLIF in WHERE 暂不支持，关联子查询 WHERE d1.x = (SELECT MAX FROM d2 WHERE d2.t = d1.t) 暂不精确
 
+    # ── 扩展批18: CASE IS NULL + COALESCE嵌套 + GROUP多聚合 ──
+    cases.append({"f": "simple", "sql": "SELECT ID, CASE WHEN Price IS NULL THEN 'unknown' ELSE 'known' END AS s FROM 数据", "cat": "case_is_null"})
+    cases.append({"f": "simple", "sql": "SELECT ID, COALESCE(Price, NULL, 0) AS v FROM 数据", "cat": "coalesce_nested"})
+    cases.append({"f": "simple", "sql": "SELECT Tags, Active, MIN(Price), MAX(Price) FROM 数据 GROUP BY Tags, Active", "cat": "group_multi_agg"})
+    cases.append({"f": "simple", "sql": "SELECT * FROM 数据 WHERE NOT EXISTS (SELECT 1 FROM 数据 d2 WHERE d2.ID = 数据.ID AND d2.Price > 250)", "cat": "not_exists_safe"})
+    cases.append({"f": "simple", "sql": "SELECT Tags, COUNT(*) FROM 数据 GROUP BY Tags HAVING COUNT(*) > 2 OR AVG(Price) > 100", "cat": "having_or"})
+    cases.append({"f": "simple", "sql": "SELECT ID, Price FROM 数据 WHERE Price IS NOT NULL ORDER BY Price ASC, ID DESC", "cat": "order_multi_null"})
+    cases.append({"f": "simple", "sql": "SELECT Tags, COUNT(DISTINCT Active) AS variety FROM 数据 GROUP BY Tags", "cat": "distinct_in_group"})
+    # NOTE: GROUP BY CASE WHEN 表达式暂不精确（不按CASE结果分组）
+
     return cases
 
 
