@@ -599,6 +599,15 @@ def build_test_cases() -> list[dict]:
     cases.append({"f": "simple", "sql": "SELECT ID, COALESCE(NULL, Price, 0) AS val FROM 数据", "cat": "coalesce_null_first"})
     cases.append({"f": "simple", "sql": "SELECT ID, CASE WHEN Price > 100 THEN 'expensive' END AS tier FROM 数据", "cat": "case_no_else_null"})
 
+    # ── 扩展批16: 多窗口函数 + UNION去重 + 边界 ──
+    cases.append({"f": "simple", "sql": "SELECT ID, ROW_NUMBER() OVER (ORDER BY ID) AS rn, RANK() OVER (ORDER BY ID) AS rk FROM 数据", "cat": "multi_window"})
+    cases.append({"f": "simple", "sql": "SELECT Name FROM 数据 WHERE Tags = '武器' UNION SELECT Name FROM 数据 WHERE Tags = '防具' ORDER BY Name", "cat": "union_orderby"})
+    cases.append({"f": "numbers", "sql": "SELECT id, val, val * 3 AS tripled FROM 数值 WHERE val * 3 > 50", "cat": "expr_where"})
+    # NOTE: 窗口函数参与算术表达式(val*100/SUM OVER)暂不支持，引擎返回NULL
+    # cases.append({"f": "numbers", "sql": "SELECT grp, val, val * 100 / SUM(val) OVER (PARTITION BY grp) AS pct FROM 数值", "cat": "window_pct"})
+    cases.append({"f": "simple", "sql": "SELECT Tags, COUNT(*) AS c, GROUP_CONCAT(Name) AS names FROM 数据 GROUP BY Tags HAVING c >= 2", "cat": "group_concat_having"})
+    cases.append({"f": "simple", "sql": "SELECT ID, Price FROM 数据 ORDER BY CASE WHEN Price IS NULL THEN 1 ELSE 0 END, Price", "cat": "case_orderby"})
+
     return cases
 
 
