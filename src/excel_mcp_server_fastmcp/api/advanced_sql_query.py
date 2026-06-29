@@ -1646,7 +1646,7 @@ class AdvancedSQLQueryEngine:
         Returns:
             pd.DataFrame: 类型优化后的DataFrame
         """
-        start_mem = df.memory_usage(deep=True).sum() / 1024 / 1024
+        start_mem = df.memory_usage(deep=True).sum() / 1024 / 1024 if logger.isEnabledFor(logging.DEBUG) else 0.0
 
         for col in df.columns:
             col_type = df[col].dtype
@@ -1691,9 +1691,10 @@ class AdvancedSQLQueryEngine:
                         df[col] = test_series  # 精度无损，安全降级
                     # 否则精度有损，保持 float64
 
-        end_mem = df.memory_usage(deep=True).sum() / 1024 / 1024
-        reduction = (1 - end_mem / start_mem) * 100 if start_mem > 0 else 0
-        logger.debug(f"dtype优化: {start_mem:.1f}MB -> {end_mem:.1f}MB (节省{reduction:.0f}%)")
+        if logger.isEnabledFor(logging.DEBUG) and start_mem > 0:
+            end_mem = df.memory_usage(deep=True).sum() / 1024 / 1024
+            reduction = (1 - end_mem / start_mem) * 100
+            logger.debug(f"dtype优化: {start_mem:.1f}MB -> {end_mem:.1f}MB (节省{reduction:.0f}%)")
 
         return df
 
