@@ -589,6 +589,16 @@ def build_test_cases() -> list[dict]:
     cases.append({"f": "simple", "sql": "SELECT * FROM 数据 WHERE ID IN (SELECT ID FROM 数据 WHERE Price > 40) AND Tags = '武器'", "cat": "in_subquery_extra"})
     cases.append({"f": "simple", "sql": "SELECT COUNT(COALESCE(Price, 0)) FROM 数据", "cat": "count_coalesce"})
 
+    # ── 扩展批15: ORDER BY 位置 + 标量子查询 + 边界 ──
+    cases.append({"f": "simple", "sql": "SELECT ID, Name FROM 数据 ORDER BY 1", "cat": "orderby_position"})
+    cases.append({"f": "simple", "sql": "SELECT ID, Name FROM 数据 ORDER BY 2 DESC", "cat": "orderby_position"})
+    cases.append({"f": "simple", "sql": "SELECT ID, (SELECT MAX(Price) FROM 数据) AS max_price FROM 数据", "cat": "scalar_subquery_noncorr"})
+    cases.append({"f": "simple", "sql": "SELECT Tags, GROUP_CONCAT(Name, ', ') AS names FROM 数据 GROUP BY Tags", "cat": "group_concat_sep"})
+    cases.append({"f": "simple", "sql": "SELECT Tags, COUNT(*) FROM 数据 WHERE Active = '是' GROUP BY Tags ORDER BY Tags", "cat": "count_where_group"})
+    cases.append({"f": "simple", "sql": "SELECT * FROM 数据 WHERE ID NOT IN (SELECT ID FROM 数据 WHERE Price > 60)", "cat": "not_in_subquery"})
+    cases.append({"f": "simple", "sql": "SELECT ID, COALESCE(NULL, Price, 0) AS val FROM 数据", "cat": "coalesce_null_first"})
+    cases.append({"f": "simple", "sql": "SELECT ID, CASE WHEN Price > 100 THEN 'expensive' END AS tier FROM 数据", "cat": "case_no_else_null"})
+
     return cases
 
 

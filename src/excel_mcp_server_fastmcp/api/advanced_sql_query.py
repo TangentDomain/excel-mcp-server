@@ -7584,6 +7584,10 @@ class AdvancedSQLQueryEngine:
                 # 简单算术表达式作为常量值(如 COALESCE(col, 1+1))
                 fallback = True  # 暂时fallback,后续可优化为常量折叠
                 break
+            elif isinstance(val_expr, exp.Null):
+                # Fix(autoresearch): COALESCE(NULL, col, 0) — NULL 字面量
+                # 作为全 NaN Series 参与combine_first，不影响后续参数
+                series = pd.Series([np.nan] * len(df), index=df.index, dtype=object)
             else:
                 fallback = True
                 break
@@ -8148,6 +8152,22 @@ class AdvancedSQLQueryEngine:
                 # 函数表达式: ORDER BY UPPER(name), ORDER BY LENGTH(name) 等
                 col_expr = order_expr
                 is_desc = False
+
+            # Fix(autoresearch): ORDER BY 位置编号 (ORDER BY 1, ORDER BY 2 DESC)
+            # SQL 标准允许用整数引用 SELECT 列的位置
+            if isinstance(col_expr, exp.Literal):
+                try:
+                    pos = int(col_expr.this)
+                    if pos >= 1 and pos <= len(parsed_sql.expressions):
+                        # 获取第 pos 个 SELECT 表达式的别名
+                        select_expr_at_pos = parsed_sql.expressions[pos - 1]
+                        alias_at_pos, _ = self._extract_select_alias(select_expr_at_pos, pos - 1)
+                        if alias_at_pos in df.columns:
+                            sort_columns.append(alias_at_pos)
+                            ascending.append(not is_desc if is_desc is not None else True)
+                            continue
+                except (ValueError, TypeError):
+                    pass
 
             col_name = col_expr.name
             table_part = col_expr.table if hasattr(col_expr, "table") and col_expr.table else None
