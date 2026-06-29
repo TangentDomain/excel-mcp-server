@@ -7673,6 +7673,28 @@ class AdvancedSQLQueryEngine:
 
                 return grouped.apply(count_non_null, include_groups=False)
 
+            # Fix(autoresearch): COUNT(表达式) 如 COUNT(Price * 2)
+            # 先计算表达式为临时列，再统计非空值
+            if not isinstance(expr.this, (exp.Column, exp.Star, exp.Distinct)):
+                temp_col = f"_count_expr_{id(expr)}"
+                if temp_col not in df.columns:
+                    try:
+                        if self._is_mathematical_expression(expr.this):
+                            df[temp_col] = self._evaluate_math_expression(expr.this, df)
+                        elif isinstance(expr.this, (exp.Case, exp.Coalesce)):
+                            df[temp_col] = self._evaluate_case_expression(expr.this, df) if isinstance(expr.this, exp.Case) else self._evaluate_coalesce_vectorized(expr.this, df)
+                        else:
+                            df[temp_col] = self._expr_to_series(expr.this, df)
+                    except Exception:
+                        # 回退到提取列名
+                        col_name = self._extract_agg_column(expr.this, "COUNT")
+                        return grouped[col_name].count()
+
+                def count_expr_non_null(group):
+                    return group[temp_col].notna().sum()
+
+                return grouped.apply(count_expr_non_null, include_groups=False)
+
             col_name = self._extract_agg_column(expr.this, "COUNT")
             return grouped[col_name].count()
 

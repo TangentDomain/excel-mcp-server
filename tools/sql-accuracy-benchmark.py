@@ -520,6 +520,16 @@ def build_test_cases() -> list[dict]:
     # NOTE: SELECT 中的关联标量子查询暂不支持（引擎限制），不纳入差分测试
     # cases.append({"f": "join", "sql": "SELECT skill_name, (SELECT COUNT(*) FROM 掉落 WHERE 掉落.skill_ref = 技能.skill_id) AS drops FROM 技能", "cat": "scalar_subquery"})
 
+    # ── 扩展批10: GROUP_CONCAT / NULLIF / 多列GROUP BY ──
+    cases.append({"f": "simple", "sql": "SELECT Tags, GROUP_CONCAT(Name) AS names FROM 数据 GROUP BY Tags", "cat": "group_concat"})
+    cases.append({"f": "simple", "sql": "SELECT GROUP_CONCAT(Name, '; ') AS all_names FROM 数据", "cat": "group_concat"})
+    cases.append({"f": "simple", "sql": "SELECT ID, NULLIF(Active, '是') AS inactive FROM 数据", "cat": "nullif"})
+    cases.append({"f": "simple", "sql": "SELECT Tags, Active, COUNT(*) FROM 数据 GROUP BY Tags, Active", "cat": "multi_groupby"})
+    cases.append({"f": "simple", "sql": "SELECT * FROM 数据 WHERE ID IN (SELECT ID FROM 数据 WHERE Price > (SELECT AVG(Price) FROM 数据))", "cat": "nested_subquery"})
+    cases.append({"f": "simple", "sql": "SELECT DISTINCT Active, Tags FROM 数据", "cat": "distinct_multi"})
+    # COUNT with expression argument
+    cases.append({"f": "simple", "sql": "SELECT COUNT(Price * 2) FROM 数据", "cat": "count_expr"})
+
     return cases
 
 
