@@ -743,9 +743,12 @@ class AdvancedSQLQueryEngine:
             elif file_size_mb > 10:
                 logger.info(f"加载较大文件: {file_path} ({file_size_mb:.1f}MB)")
 
-            # 性能优化:用calamine替代openpyxl读取(Rust引擎,速度提升10-50倍)
-            # calamine一次性读取所有sheet数据,无需二次打开文件
+            # 单次读取优化 (P1): 每个 sheet 只读一次 pd.read_excel(header=None),
+            # 从结果的前 2 行检测双行表头并切片, 彻底消除 cal_wb 物化 + pd.read_excel 二次读取.
+            # 类型推断仍由 pandas _convert_cell 完成 (float→int), 不手写类型逻辑 (P1 失败教训).
             from python_calamine import CalamineWorkbook
+
+            from .header_analyzer import HeaderInfo, _cell_str, detect_from_rows
 
             cal_wb = CalamineWorkbook.from_path(file_path)
             all_sheet_names = cal_wb.sheet_names
@@ -755,31 +758,29 @@ class AdvancedSQLQueryEngine:
             else:
                 sheets_to_load = all_sheet_names
 
-            # 表头检测: 直接复用已打开的 cal_wb 读取前 2 行, 调用 detect_from_rows 判定双行表头.
-            # 避免对每个 sheet 调用 HeaderAnalyzer.analyze 二次打开文件 (P0 冷加载瓶颈).
-            # 同时把结果写回 HeaderAnalyzer 缓存, 保持其它调用方的缓存一致性.
-            from .header_analyzer import HeaderInfo, _cell_str, detect_from_rows
-
-            header_info = {}  # {sheet: (is_dual_header, first_row_values, second_row_values)}
             for sheet in sheets_to_load:
                 try:
-                    cal_ws = cal_wb.get_sheet_by_name(sheet)
-                    if cal_ws.height == 0 or not hasattr(cal_ws, "iter_rows"):
-                        header_info[sheet] = (False, None, None)
+                    # 单次读取: header=None 拿到所有行 (含表头行) 作为数据
+                    raw_df = pd.read_excel(
+                        file_path,
+                        sheet_name=sheet,
+                        engine="calamine",
+                        header=None,
+                        keep_default_na=False,
+                        na_values=[""],
+                    )
+
+                    if len(raw_df) == 0:
+                        # 空表
+                        worksheets_data[sheet] = self._optimize_dtypes(self._clean_dataframe(pd.DataFrame()))
                         continue
-                    rows_iter = cal_ws.iter_rows()
-                    first_row = list(next(rows_iter, []))
-                    second_row = list(next(rows_iter, []))
+
+                    # 从前 2 行检测双行表头 (与 HeaderAnalyzer 完全相同的语义)
+                    first_row = raw_df.iloc[0].tolist()
+                    second_row = raw_df.iloc[1].tolist() if len(raw_df) > 1 else []
                     first_row_values = [_cell_str(c) or "" for c in first_row]
                     second_row_values = [_cell_str(c) or "" for c in second_row]
-                    # 用与 HeaderAnalyzer 完全相同的 detect_from_rows 判定语义
-                    is_dual_header, _header_row_idx, _desc = detect_from_rows([first_row, second_row])
-
-                    header_info[sheet] = (
-                        is_dual_header,
-                        first_row_values,
-                        second_row_values,
-                    )
+                    is_dual_header, _hri, _desc = detect_from_rows([first_row, second_row])
 
                     # 回填 HeaderAnalyzer 缓存 (供 upsert_row / get_data_start_row 等调用方复用)
                     if HeaderAnalyzer is not None:
@@ -797,8 +798,8 @@ class AdvancedSQLQueryEngine:
                             info.data_start_row = 2
                             info.descriptions = []
                             info.column_names = first_row_values
-                        _non_empty_cols = [i for i, v in enumerate(info.column_names) if v]
-                        info.total_columns = max(_non_empty_cols) + 1 if _non_empty_cols else 0
+                        _nec = [i for i, v in enumerate(info.column_names) if v]
+                        info.total_columns = max(_nec) + 1 if _nec else 0
                         for _i, _name in enumerate(info.column_names):
                             if _name:
                                 info.name_to_index[_name] = _i
@@ -807,59 +808,48 @@ class AdvancedSQLQueryEngine:
                                 if _d and _e:
                                     info.column_map[_d] = _e
                         HeaderAnalyzer._set_cached(file_path, sheet, info)
-                except Exception:
-                    header_info[sheet] = (False, None, None)
 
-            # 批量读取所有sheet数据(pd.read_excel + calamine引擎)
-            for sheet, (
-                is_dual_header,
-                first_row_values,
-                second_row_values,
-            ) in header_info.items():
-                if is_dual_header:
-                    df = pd.read_excel(
-                        file_path,
-                        sheet_name=sheet,
-                        engine="calamine",
-                        header=1,
-                        keep_default_na=False,
-                        na_values=[""],
-                    )
-                    # 注意:desc_map 在 _clean_dataframe 之后构建(列名可能被清洗)
-                    # 先记录原始映射关系,后面清洗后再构建最终映射
-                    raw_desc_pairs = []
-                    if second_row_values and first_row_values:
+                    # 切片: 双表头取第2行做列名+第3行起数据; 单表头取第1行做列名+第2行起数据
+                    if is_dual_header:
+                        header_row = second_row_values
+                        raw_desc_pairs = []
                         for col_idx, fname in enumerate(second_row_values):
                             fname = fname.strip() if fname else ""
                             desc = first_row_values[col_idx].strip() if col_idx < len(first_row_values) else ""
                             if fname and desc and desc != fname:
                                 raw_desc_pairs.append((col_idx, fname, desc))
+                        df = raw_df.iloc[2:].copy()
+                    else:
+                        header_row = first_row_values
+                        raw_desc_pairs = []
+                        df = raw_df.iloc[1:].copy()
 
-                else:
-                    df = pd.read_excel(
-                        file_path,
-                        sheet_name=sheet,
-                        engine="calamine",
-                        keep_default_na=False,
-                        na_values=[""],
-                    )
-                    raw_desc_pairs = []
+                    df.columns = header_row
+                    df = df.reset_index(drop=True)
+                    # 类型推断: header=None 读取后数值列是 object 类型,
+                    # 需转回 int64/float64 (复刻 pd.read_excel(header=N) 的推断行为, 保障除零等运算语义)
+                    for col in df.columns:
+                        if df[col].dtype == "object":
+                            try:
+                                df[col] = pd.to_numeric(df[col], errors="raise")
+                            except (ValueError, TypeError):
+                                pass  # 含非数字, 保持 object (字符串列)
 
-                # 清洗 DataFrame(列名中的特殊字符会被替换)
-                original_columns = list(df.columns)
-                df = self._clean_dataframe(df)
-                cleaned_columns = list(df.columns)
+                    # 清洗 + dtype 优化 (与原逻辑一致)
+                    df = self._clean_dataframe(df)
+                    cleaned_columns = list(df.columns)
+                    if raw_desc_pairs:
+                        desc_map = {}
+                        for col_idx, _fname, desc in raw_desc_pairs:
+                            if col_idx < len(cleaned_columns):
+                                desc_map[cleaned_columns[col_idx]] = desc
+                        self._header_descriptions[sheet] = desc_map
+                    df = self._optimize_dtypes(df)
+                    worksheets_data[sheet] = df
 
-                # 构建中文描述映射(用清洗后的列名)
-                if raw_desc_pairs:
-                    desc_map = {}
-                    for col_idx, fname, desc in raw_desc_pairs:
-                        if col_idx < len(cleaned_columns):
-                            desc_map[cleaned_columns[col_idx]] = desc
-                    self._header_descriptions[sheet] = desc_map
-
-                df = self._optimize_dtypes(df)
-                worksheets_data[sheet] = df
+                except Exception:
+                    # 兜底: 该 sheet 失败时跳过 (不影响其它 sheet)
+                    logger.debug(f"加载工作表 {sheet} 时出错, 跳过")
 
         except Exception as e:
             logger.error(f"加载Excel数据失败: {e}")
