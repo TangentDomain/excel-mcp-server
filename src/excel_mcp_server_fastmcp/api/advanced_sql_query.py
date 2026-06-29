@@ -2446,25 +2446,23 @@ class AdvancedSQLQueryEngine:
             original_expr = select_expr.this if isinstance(select_expr, exp.Alias) else select_expr
             if isinstance(original_expr, exp.Window):
                 order = original_expr.args.get("order")
+                sort_cols = []
+                sort_asc = []
                 if order:
-                    order_cols = []
-                    ascending = []
                     for item in order.expressions:
                         col = item.this.name if hasattr(item.this, "name") else str(item.this)
-                        # 跳过聚合表达式列（GROUP BY后的场景，排序列可能不存在）
                         if col not in df.columns:
                             continue
                         desc = item.args.get("desc", False)
-                        order_cols.append(col)
-                        ascending.append(not desc)
-                    if order_cols:
-                        # [FIX] 确保排序列为数值类型，避免 object 列混合类型导致 sort_values 崩溃
-                        for oc in order_cols:
-                            if oc in df.columns and df[oc].dtype == object:
-                                df[oc] = pd.to_numeric(df[oc], errors="coerce")
-                        df = df.sort_values(order_cols, ascending=ascending, kind="mergesort")
+                        sort_cols.append(col)
+                        sort_asc.append(not desc)
+                if sort_cols:
+                    for oc in sort_cols:
+                        if oc in df.columns and df[oc].dtype == object:
+                            df[oc] = pd.to_numeric(df[oc], errors="coerce")
+                    # 窗口函数输出排序
+                    df = df.sort_values(sort_cols, ascending=sort_asc, kind="mergesort")
                 break  # 只按第一个窗口函数排序
-
         return df
 
     def _compute_window_function(
@@ -3585,6 +3583,11 @@ class AdvancedSQLQueryEngine:
             if isinstance(inner_expr, exp.Subquery):
                 continue
 
+            # 跳过窗口函数: RANK/ROW_NUMBER/DENSE_RANK 等在 sqlglot 中继承 AggFunc,
+            # 但它们不是 GROUP BY 意义上的聚合函数，由 _apply_window_functions 独立处理
+            if isinstance(inner_expr, exp.Window):
+                continue
+
             # 情况1: 顶层是聚合函数(含别名包裹)
             if self._is_aggregate_function(select_expr):
                 return True
@@ -3738,7 +3741,17 @@ class AdvancedSQLQueryEngine:
                     if alias_name in df.columns:
                         result_data[alias_name] = df[alias_name]
                     else:
-                        raise ValueError(f"窗口函数结果列 '{alias_name}' 未找到")
+                        # 无别名的窗口函数(如 SELECT *, ROW_NUMBER() OVER(...))
+                        # 预计算时存储为 _window_N, 找第一个尚未使用的
+                        used_wc = {k for k in result_data if isinstance(k, str) and k.startswith("_window_")}
+                        found = False
+                        for wc in df.columns:
+                            if isinstance(wc, str) and wc.startswith("_window_") and wc not in used_wc:
+                                result_data[alias_name] = df[wc]
+                                found = True
+                                break
+                        if not found:
+                            raise ValueError(f"窗口函数结果列 '{alias_name}' 未找到")
 
                 elif self._is_mathematical_expression(original_expr):
                     # 数学表达式
@@ -4089,6 +4102,10 @@ class AdvancedSQLQueryEngine:
             return None
         if isinstance(expr, exp.AggFunc):
             return expr
+        # 窗口函数不是聚合: RANK/ROW_NUMBER/DENSE_RANK 在 sqlglot 中继承 AggFunc,
+        # 但 RANK() OVER (...) 不是 GROUP BY 意义上的聚合
+        if isinstance(expr, exp.Window):
+            return None
         # 递归检查子节点: this 和 expression (二元操作数)
         for child_attr in ("this", "expression"):
             child = getattr(expr, child_attr, None)
