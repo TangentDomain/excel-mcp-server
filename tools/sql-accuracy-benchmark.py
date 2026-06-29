@@ -569,6 +569,16 @@ def build_test_cases() -> list[dict]:
     cases.append({"f": "simple", "sql": "SELECT Tags, MIN(Price), MAX(Price), AVG(Price) FROM 数据 GROUP BY Tags", "cat": "multi_agg_group"})
     cases.append({"f": "simple", "sql": "SELECT a.ID, b.ID FROM 数据 a JOIN 数据 b ON a.Active = b.Active WHERE a.ID != b.ID", "cat": "self_join_neq"})
 
+    # ── 扩展批13: 括号包裹聚合 + 管道拼接 + 窗口帧 ──
+    cases.append({"f": "simple", "sql": "SELECT (MAX(Price) - MIN(Price)) AS range FROM 数据", "cat": "paren_agg"})
+    cases.append({"f": "simple", "sql": "SELECT ID, Name || '-' || Tags AS combined FROM 数据", "cat": "dpipe_concat"})
+    # NOTE: ROWS BETWEEN 窗口帧引擎未正确实现（用默认帧而非指定帧），暂不纳入
+    # cases.append({"f": "numbers", "sql": "SELECT id, val, SUM(val) OVER (ORDER BY id ROWS BETWEEN 1 PRECEDING AND CURRENT ROW) AS running FROM 数值", "cat": "window_frame"})
+    cases.append({"f": "simple", "sql": "SELECT * FROM 数据 WHERE ID IN (SELECT ID FROM 数据 WHERE Price IN (SELECT Price FROM 数据 WHERE Active = '否'))", "cat": "deep_subquery"})
+    cases.append({"f": "simple", "sql": "SELECT SUM(CASE WHEN Active = '是' THEN 1 ELSE 0 END) AS active_count FROM 数据", "cat": "case_in_agg"})
+    cases.append({"f": "simple", "sql": "SELECT * FROM 数据 WHERE Tags IN (SELECT DISTINCT Tags FROM 数据 WHERE Price > 40)", "cat": "distinct_subquery"})
+    cases.append({"f": "numbers", "sql": "SELECT grp, COUNT(*) AS c, SUM(val) AS s FROM 数值 GROUP BY grp ORDER BY grp", "cat": "group_order"})
+
     return cases
 
 

@@ -6665,6 +6665,9 @@ class AdvancedSQLQueryEngine:
 
         # 检查聚合函数（包括标量函数包裹聚合的情况，如 ROUND(AVG(col))）
         for alias_name, expr in select_exprs.items():
+            # Fix(autoresearch): 解包 Paren: (MAX(x) - MIN(y)) → MAX(x) - MIN(y)
+            while isinstance(expr, exp.Paren):
+                expr = expr.this
             if self._is_aggregate_function(expr):
                 aggregations[alias_name] = expr
             elif self._is_scalar_num_function(expr) and self._find_inner_aggregate(expr) is not None:
@@ -6809,6 +6812,9 @@ class AdvancedSQLQueryEngine:
         # 按SELECT表达式顺序处理列
         for i, select_expr in enumerate(parsed_sql.expressions):
             alias_name, original_expr = self._extract_select_alias(select_expr, i)
+            # Fix(autoresearch): 解包 Paren: (MAX(x) - MIN(y)) → MAX(x) - MIN(y)
+            while isinstance(original_expr, exp.Paren):
+                original_expr = original_expr.this
 
             # 跳过SELECT *，它会在循环后单独处理
             if isinstance(original_expr, exp.Star):
