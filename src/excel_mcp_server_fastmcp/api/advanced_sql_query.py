@@ -1669,17 +1669,9 @@ class AdvancedSQLQueryEngine:
                         df[col] = df[col].astype("int16")
                     elif col_min > -2147483648 and col_max < 2147483647:
                         df[col] = df[col].astype("int32")
-            elif col_type == "float64":
-                # 浮点列降级为 float32，但必须验证精度无损
-                # float32 只有 ~7 位有效十进制数字，超过即精度丢失
-                # (如 999.99→999.989990234375, 9999999999→10000000000)
-                # 安全降级条件：float64→float32→float64 round-trip 后值完全一致
-                test_series = df[col].astype("float32")
-                rt_series = test_series.astype("float64")
-                if not test_series.isin([float("inf"), float("-inf")]).any():
-                    if np.array_equal(rt_series.values, df[col].values, equal_nan=True):
-                        df[col] = test_series  # 精度无损，安全降级
-                    # 否则精度有损，保持 float64
+            # R58: 移除 float64→float32 降级 — float32 聚合计算精度不足
+            # (如 AVG(float32) → float32 → ROUND 后产生 87.62000274658203 而非 87.63)
+            # 保留 float64 保障聚合精度
 
         if logger.isEnabledFor(logging.DEBUG) and start_mem > 0:
             end_mem = df.memory_usage(deep=True).sum() / 1024 / 1024
@@ -4148,7 +4140,7 @@ class AdvancedSQLQueryEngine:
         if func_type == exp.Round:
             decimals_arg = scalar_expr.args.get("decimals")
             decimals = int(self._literal_value(decimals_arg)) if decimals_arg is not None else 0
-            return numeric_series.round(decimals)
+            return self._round_half_up_series(numeric_series, decimals)
         elif func_type == exp.Abs:
             return numeric_series.abs()
         elif func_type == exp.Ceil:
@@ -4283,6 +4275,28 @@ class AdvancedSQLQueryEngine:
             return val[-n:] if n > 0 else ""
         return val
 
+    @staticmethod
+    def _round_half_up_series(series: pd.Series, decimals: int) -> pd.Series:
+        """SQLite 兼容的四舍五入 (round half away from zero).
+
+        pandas/numpy 的 round() 使用 banker's rounding (四舍六入五留双),
+        而 SQLite 的 round() 使用 round half up。此函数实现后者。
+        仅在小数部分恰好为 0.5 时才有差异 (如 87.625 → 87.63 而非 87.62)。
+        """
+        import math
+
+        multiplier = 10**decimals
+
+        def _r(x):
+            if pd.isna(x):
+                return x
+            if x >= 0:
+                return math.floor(x * multiplier + 0.5) / multiplier
+            else:
+                return math.ceil(x * multiplier - 0.5) / multiplier
+
+        return series.apply(_r)
+
     def _evaluate_scalar_num_function(self, expr, df) -> pd.Series:
         """计算标量数值函数,返回pd.Series(向量化)
 
@@ -4300,17 +4314,26 @@ class AdvancedSQLQueryEngine:
             decimals = int(self._literal_value(decimals_arg)) if decimals_arg is not None else 0
             try:
                 numeric_series = pd.to_numeric(val_series, errors="coerce")
-                return numeric_series.round(decimals)
+                return self._round_half_up_series(numeric_series, decimals)
             except Exception:
 
                 def _round_val(v):
+                    """Fallback round with SQLite-compatible half-up rounding."""
+                    import math
+
                     try:
-                        return round(float(v), decimals)
+                        x = float(v)
+                        if pd.isna(x):
+                            return x
+                        multiplier = 10**decimals
+                        if x >= 0:
+                            return math.floor(x * multiplier + 0.5) / multiplier
+                        else:
+                            return math.ceil(x * multiplier - 0.5) / multiplier
                     except (TypeError, ValueError):
                         return None
 
                 return val_series.apply(_round_val)
-
         elif func_type == exp.Abs:
             # ABS(value) - 绝对值
             try:
