@@ -6321,13 +6321,32 @@ class AdvancedSQLQueryEngine:
             return False
 
         inner_from, _ = self._get_from_table(inner_select)
+        # Fix(autoresearch): 获取内层别名，用于区分内外表引用
+        # 例: FROM 数据 d2 — 内部用 d2 引用，外部用 数据 引用
+        # 关键: 若内层有别名，基础表名归外部引用（内层通过别名引用）
+        inner_from_node = inner_select.args.get("from")
+        inner_alias = None
+        if inner_from_node and hasattr(inner_from_node, "this"):
+            inner_tbl = inner_from_node.this
+            if hasattr(inner_tbl, "alias") and inner_tbl.alias:
+                inner_alias = inner_tbl.alias
+
+        # 内部引用标识集合:
+        # - 有别名时: 只含别名（基础表名归外部，因为外部用基础表名引用）
+        # - 无别名时: 含基础表名
+        if inner_alias:
+            inner_identifiers = {inner_alias}
+        else:
+            inner_identifiers = {inner_from}
+
         has_correlation = False
         for col in inner_select.find_all(exp.Column):
             col_name = col.name
             table_part = col.table if hasattr(col, "table") and col.table else None
             if table_part:
+                # 带 table_part 的引用：若 table_part 不在内层标识集合中 → 外部引用(关联)
                 resolved = self._table_aliases.get(table_part, table_part)
-                if resolved != inner_from:
+                if resolved not in inner_identifiers and table_part not in inner_identifiers:
                     has_correlation = True
                     break
             else:
@@ -6350,17 +6369,28 @@ class AdvancedSQLQueryEngine:
         if inner_from in self._current_worksheets:
             inner_from_cols = set(self._current_worksheets[inner_from].columns)
 
+        # Fix(autoresearch): 获取内层别名，用于区分内外引用
+        inner_from_node = inner_select.args.get("from")
+        inner_alias = None
+        if inner_from_node and hasattr(inner_from_node, "this"):
+            inner_tbl = inner_from_node.this
+            if hasattr(inner_tbl, "alias") and inner_tbl.alias:
+                inner_alias = inner_tbl.alias
+        if inner_alias:
+            inner_identifiers = {inner_alias}
+        else:
+            inner_identifiers = {inner_from}
+
         for col in inner_select.find_all(exp.Column):
             col_name = col.name
             table_part = col.table if hasattr(col, "table") and col.table else None
             should_substitute = False
 
             if table_part:
+                # 带 table_part 的引用：若不在内层标识集合中 → 外部引用(需替换)
                 resolved = self._table_aliases.get(table_part, table_part)
-                for tbl_name in self._current_worksheets:
-                    if tbl_name != inner_from and (resolved == tbl_name or table_part == tbl_name):
-                        should_substitute = True
-                        break
+                if resolved not in inner_identifiers and table_part not in inner_identifiers:
+                    should_substitute = True
             else:
                 for tbl_name, tbl_df in self._current_worksheets.items():
                     if tbl_name != inner_from and col_name in tbl_df.columns and col_name not in inner_from_cols:
@@ -6371,8 +6401,6 @@ class AdvancedSQLQueryEngine:
                 val = row.get(col_name)
                 if val is not None:
                     # [FIX R55-BUG-03] SQL 标准转义：单引号 → 双单引号
-                    # 避免 repr() 对含引号字符串(如 O'Brien)产生转义反斜杠
-                    # 导致 sqlglot 解析失败后静默返回 False
                     if isinstance(val, str):
                         safe_val = "'" + val.replace("'", "''") + "'"
                     else:
