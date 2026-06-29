@@ -4177,13 +4177,13 @@ class AdvancedSQLQueryEngine:
         # 简单字符串函数:分发表处理
         if func_type in self._SIMPLE_STR_OPS:
             val_series = self._expr_to_series(expr.this, df)
-            # [FIX R55+] LENGTH(NULL) 应返回 NULL (NaN)，而非 len("None")=4
+            # [FIX R55+] LENGTH(NULL) 返回 0 — Excel 空单元格通常表示空字符串而非 NULL
             # astype(str) 会将 None 转为 "None" 字符串，导致 NULL 值得到错误长度
             if func_type == exp.Length:
                 mask = val_series.isna()
                 if mask.any():
                     result = val_series.astype(str).str.len()
-                    result[mask] = float("nan")
+                    result[mask] = 0  # SQLite LENGTH('') = 0
                     return result
                 return val_series.astype(str).str.len()
             return getattr(val_series.astype(str).str, self._SIMPLE_STR_OPS[func_type])()
