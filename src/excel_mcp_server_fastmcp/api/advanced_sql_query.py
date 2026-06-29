@@ -6872,6 +6872,15 @@ class AdvancedSQLQueryEngine:
             result_data = {k: v.reset_index(drop=True) for k, v in result_data.items()}
             result_df = pd.DataFrame(result_data, columns=ordered_columns).reset_index(drop=True)
 
+        # SQLite 兼容: GROUP BY 结果中 NULL 值排最前
+        # (pandas groupby(sort=True) 把 NaN 视为最大值排在最后, 而 SQLite NULL 最前)
+        if group_by_columns and valid_group_cols:
+            if not parsed_sql.args.get("order"):
+                try:
+                    result_df = result_df.sort_values(valid_group_cols, na_position="first").reset_index(drop=True)
+                except Exception:
+                    pass
+
         return result_df
 
     def _is_aggregate_function(self, expr: exp.Expression) -> bool:
