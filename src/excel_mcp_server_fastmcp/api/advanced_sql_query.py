@@ -4189,13 +4189,6 @@ class AdvancedSQLQueryEngine:
             power_arg = scalar_expr.args.get("expression") or scalar_expr.args.get("this")
             if power_arg is not None and isinstance(power_arg, (exp.Literal,)):
                 exp_val = float(self._literal_value(power_arg))
-                return np.power(numeric_series, exp_val)
-            else:
-                return numeric_series
-        else:
-            # 未知标量函数，原样返回
-            logger.warning("_apply_scalar_to_agg_result: 未知的标量函数类型 %s", func_type.__name__)
-            return agg_series
 
     def _evaluate_string_function(self, expr, df) -> pd.Series:
         """计算字符串函数,返回pd.Series"""
@@ -4204,13 +4197,13 @@ class AdvancedSQLQueryEngine:
         # 简单字符串函数:分发表处理
         if func_type in self._SIMPLE_STR_OPS:
             val_series = self._expr_to_series(expr.this, df)
-            # [FIX R55+] LENGTH(NULL) 返回 0 — Excel 空单元格通常表示空字符串而非 NULL
+            # [FIX R55+] LENGTH(NULL) 返回 NULL 匹配 SQLite LENGTH(NULL)=NULL
             # astype(str) 会将 None 转为 "None" 字符串，导致 NULL 值得到错误长度
             if func_type == exp.Length:
                 mask = val_series.isna()
                 if mask.any():
                     result = val_series.astype(str).str.len()
-                    result[mask] = 0  # SQLite LENGTH('') = 0
+                    result[mask] = float("nan")  # SQLite LENGTH(NULL) = NULL
                     return result
                 return val_series.astype(str).str.len()
             return getattr(val_series.astype(str).str, self._SIMPLE_STR_OPS[func_type])()

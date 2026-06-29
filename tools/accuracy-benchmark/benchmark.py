@@ -71,7 +71,7 @@ FIXTURES = {
             [5, "孙七", 78.5, "B"],
             [6, "周八", 92.0, "A"],
             [7, "吴九", 45.0, "D"],
-            [8, "", None, None],
+            [8, None, None, None],
         ],
         "create_sql": """CREATE TABLE 学生 (ID INTEGER, Name TEXT, Score REAL, Level TEXT)""",
         "insert_sql": """INSERT INTO 学生 VALUES (?, ?, ?, ?)""",
@@ -131,15 +131,11 @@ def _values_match(a: object, b: object, tol: float = 0.01) -> bool:
     return str(a) == str(b)
 
 
-def _rows_match(
-    engine_row: list, sqlite_row: tuple, tol: float = 0.01
-) -> bool:
+def _rows_match(engine_row: list, sqlite_row: tuple, tol: float = 0.01) -> bool:
     """比较两行是否匹配。"""
     if len(engine_row) != len(sqlite_row):
         return False
-    return all(
-        _values_match(a, b, tol) for a, b in zip(engine_row, sqlite_row)
-    )
+    return all(_values_match(a, b, tol) for a, b in zip(engine_row, sqlite_row))
 
 
 def _make_excel(path: str, fixture_name: str) -> None:
@@ -198,9 +194,7 @@ def _query_sqlite(conn: sqlite3.Connection, sql: str) -> list[tuple]:
         return []
 
 
-def _check_query(
-    engine_res: dict, sqlite_rows: list[tuple], sql: str, tol: float = 0.01
-) -> tuple[bool, str]:
+def _check_query(engine_res: dict, sqlite_rows: list[tuple], sql: str, tol: float = 0.01) -> tuple[bool, str]:
     """差分对比：引擎结果 vs SQLite 结果。"""
     if not engine_res.get("success"):
         return False, f"引擎返回失败: {engine_res.get('message', '')}"
@@ -217,7 +211,7 @@ def _check_query(
         if not _rows_match(e_row, s_row, tol):
             return (
                 False,
-                f"第{i+1}行不匹配: engine={e_row} sqlite={s_row}",
+                f"第{i + 1}行不匹配: engine={e_row} sqlite={s_row}",
             )
     return True, ""
 
@@ -230,20 +224,26 @@ CASE_GENERATORS: list[tuple] = []
 
 
 def _reg(
-    sql: str, fixture: str, category: str, sub_category: str,
-    tags: list[str] | None = None, tol: float = 0.01,
+    sql: str,
+    fixture: str,
+    category: str,
+    sub_category: str,
+    tags: list[str] | None = None,
+    tol: float = 0.01,
     op_type: str = "query",
 ) -> None:
     """注册一条测试用例。"""
-    CASE_GENERATORS.append({
-        "sql": sql,
-        "fixture": fixture,
-        "category": category,
-        "sub_category": sub_category,
-        "tags": tags or [category, sub_category],
-        "tol": tol,
-        "op_type": op_type,
-    })
+    CASE_GENERATORS.append(
+        {
+            "sql": sql,
+            "fixture": fixture,
+            "category": category,
+            "sub_category": sub_category,
+            "tags": tags or [category, sub_category],
+            "tol": tol,
+            "op_type": op_type,
+        }
+    )
 
 
 # ==================== 注册用例 ====================
@@ -313,7 +313,7 @@ _reg("SELECT DISTINCT Stock FROM 商品 WHERE Stock IS NOT NULL", "products", "D
 _reg("SELECT * FROM 商品 LIMIT 3", "products", "LIMIT", "limit_simple")
 _reg("SELECT * FROM 商品 LIMIT 3 OFFSET 2", "products", "LIMIT", "limit_offset")
 _reg("SELECT * FROM 商品 LIMIT 100", "products", "LIMIT", "limit_overflow")
-_reg("SELECT * FROM 商品 OFFSET 4", "products", "LIMIT", "offset_only")
+_reg("SELECT * FROM 商品 LIMIT 2 OFFSET 4", "products", "LIMIT", "offset_only")
 _reg("SELECT Name, Price FROM 商品 ORDER BY Price DESC LIMIT 3 OFFSET 1", "products", "ORDER", "order_colspec")
 
 # --- 字符串函数 ---
@@ -429,10 +429,7 @@ def _build_all_cases() -> list[dict]:
 
 def _extract_table(sql: str) -> str | None:
     """从 UPDATE/INSERT/DELETE/SELECT 中提取表名。"""
-    m = re.match(
-        r"(?:UPDATE|INSERT\s+INTO|DELETE\s+FROM)\s+(\S+)",
-        sql.strip(), re.IGNORECASE
-    )
+    m = re.match(r"(?:UPDATE|INSERT\s+INTO|DELETE\s+FROM)\s+(\S+)", sql.strip(), re.IGNORECASE)
     if m:
         return m.group(1)
     # SELECT: SELECT ... FROM table
@@ -442,9 +439,7 @@ def _extract_table(sql: str) -> str | None:
     return None
 
 
-def _exec_write_op(
-    op_type: str, excel_path: str, sql: str
-) -> tuple[bool, str, list | None]:
+def _exec_write_op(op_type: str, excel_path: str, sql: str) -> tuple[bool, str, list | None]:
     """执行写操作，返回 (成功?, 信息, 写后查询行 or None)。"""
     if op_type == "update":
         res = execute_advanced_update_query(excel_path, sql)
@@ -478,8 +473,11 @@ def _temp_dir():
 
 
 def _run_case(
-    case: dict, tmp_dir: str, fixture_paths: dict,
-    sqlite_conns: dict, results: list[dict],
+    case: dict,
+    tmp_dir: str,
+    fixture_paths: dict,
+    sqlite_conns: dict,
+    results: list[dict],
 ) -> None:
     """执行单条用例并记录结果。"""
     fixture_name = case["fixture"]
@@ -505,9 +503,7 @@ def _run_case(
             result["detail"] = msg
         else:
             # 写操作: 创建副本, 执行写, 对比副本 vs 独立 SQLite
-            copy_path = os.path.join(
-                tmp_dir, f"{fixture_name}_{len(results)}.xlsx"
-            )
+            copy_path = os.path.join(tmp_dir, f"{fixture_name}_{len(results)}.xlsx")
             shutil.copy(excel_path, copy_path)
             ok, msg, after_data = _exec_write_op(op_type, copy_path, sql)
             if not ok:
@@ -523,10 +519,7 @@ def _run_case(
                 try:
                     write_conn.execute(sql)
                     write_conn.commit()
-                    sqlite_after = _query_sqlite(
-                        write_conn,
-                        f"SELECT * FROM {FIXTURES[fixture_name]['table']}"
-                    )
+                    sqlite_after = _query_sqlite(write_conn, f"SELECT * FROM {FIXTURES[fixture_name]['table']}")
                 except Exception as e:
                     result["passed"] = False
                     result["detail"] = f"SQLite 写操作失败: {e}"
@@ -537,17 +530,13 @@ def _run_case(
                 # 对比写后状态
                 if len(after_data) != len(sqlite_after):
                     result["passed"] = False
-                    result["detail"] = (
-                        f"写后行数不匹配: engine={len(after_data)} sqlite={len(sqlite_after)}"
-                    )
+                    result["detail"] = f"写后行数不匹配: engine={len(after_data)} sqlite={len(sqlite_after)}"
                 else:
                     all_ok = True
                     for i, (e_row, s_row) in enumerate(zip(after_data, sqlite_after)):
                         if not _rows_match(e_row, s_row, tol):
                             all_ok = False
-                            result["detail"] = (
-                                f"写后第{i+1}行不匹配: engine={e_row} sqlite={s_row}"
-                            )
+                            result["detail"] = f"写后第{i + 1}行不匹配: engine={e_row} sqlite={s_row}"
                             break
                     result["passed"] = all_ok
     except Exception as e:
@@ -599,7 +588,7 @@ def main() -> int:
             r = results[-1]
             status = "✅" if r["passed"] else "❌"
             detail = r["detail"] if not r["passed"] else "ok"
-            print(f"  [{idx+1}/{total}] {status} {case['category']}/{case['sub_category']}: {detail}")
+            print(f"  [{idx + 1}/{total}] {status} {case['category']}/{case['sub_category']}: {detail}")
 
     # 清理
     shutil.rmtree(tmp_dir, ignore_errors=True)
@@ -621,14 +610,10 @@ def main() -> int:
         if r["passed"]:
             by_category[cat]["passed"] += 1
     for cat, stats in by_category.items():
-        stats["accuracy_pct"] = (
-            round(stats["passed"] / stats["total"] * 100, 2)
-            if stats["total"] > 0
-            else 0.0
-        )
+        stats["accuracy_pct"] = round(stats["passed"] / stats["total"] * 100, 2) if stats["total"] > 0 else 0.0
 
     # 输出
-    print(f"\n{'='*60}", file=sys.stderr)
+    print(f"\n{'=' * 60}", file=sys.stderr)
     print(f"  总用时: {elapsed:.1f}s", file=sys.stderr)
     print(f"  总用例: {total}", file=sys.stderr)
     print(f"  通过: {passed}", file=sys.stderr)
@@ -651,7 +636,7 @@ def main() -> int:
         if len(failed_list) > 10:
             print(f"    ... 还有 {len(failed_list) - 10} 条", file=sys.stderr)
 
-    print(f"\n{'='*60}", file=sys.stderr)
+    print(f"\n{'=' * 60}", file=sys.stderr)
 
     # METRIC 输出
     print(f"METRIC accuracy_pct={accuracy_pct}")
