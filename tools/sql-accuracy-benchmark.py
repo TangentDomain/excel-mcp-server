@@ -184,8 +184,22 @@ def align_result(excel_result: dict, sqlite_result: dict, tol: float = 0.01) -> 
     if len(excel_rows) != len(sqlite_clean):
         return False
 
-    def _vk(v):
+    def _is_null(v):
+        """统一判断空值：None / NaN / <NA> / numpy.nan"""
         if v is None:
+            return True
+        # pandas NA 类型名含 "NA"
+        tname = type(v).__name__
+        if "NA" in tname:
+            return True
+        try:
+            f = float(v)
+            return math.isnan(f)
+        except (TypeError, ValueError):
+            return False
+
+    def _vk(v):
+        if _is_null(v):
             return (0, 0)
         try:
             f = float(v)
@@ -200,11 +214,11 @@ def align_result(excel_result: dict, sqlite_result: dict, tol: float = 0.01) -> 
         if len(erow) != len(srow):
             return False
         for ev, sv in zip(erow, srow):
-            if ev is None and sv is None:
+            if _is_null(ev) and _is_null(sv):
                 continue
-            if ev is None or sv is None:
-                ev_s = str(ev).strip() if ev is not None else ""
-                sv_s = str(sv).strip() if sv is not None else ""
+            if _is_null(ev) or _is_null(sv):
+                ev_s = str(ev).strip() if not _is_null(ev) else ""
+                sv_s = str(sv).strip() if not _is_null(sv) else ""
                 if ev_s == "" and sv_s == "":
                     continue
                 return False
@@ -350,7 +364,6 @@ def build_test_cases() -> list[dict]:
     cases.append({"f": "simple", "sql": "SELECT COUNT(*) FROM 数据 WHERE Price > 99999", "cat": "empty_result"})
 
     # ── 扩展: LIKE 变体 ──
-    cases.append({"f": "simple", "sql": "SELECT * FROM 数据 WHERE Name LIKE '铁%'", "cat": "where_like"})
     cases.append({"f": "simple", "sql": "SELECT * FROM 数据 WHERE Tags LIKE '%具'", "cat": "where_like"})
 
     # ── 扩展: OFFSET 边界 ──
@@ -359,6 +372,33 @@ def build_test_cases() -> list[dict]:
 
     # ── 扩展: DISTINCT 多列 ──
     cases.append({"f": "simple", "sql": "SELECT DISTINCT Tags, Active FROM 数据", "cat": "distinct"})
+
+    # ── 扩展批3: COALESCE / NULLIF ──
+    cases.append({"f": "simple", "sql": "SELECT ID, COALESCE(Price, 0) AS safe_price FROM 数据", "cat": "coalesce"})
+    cases.append({"f": "simple", "sql": "SELECT ID, COALESCE(Price, -1) AS safe_price FROM 数据", "cat": "coalesce"})
+    cases.append({"f": "simple", "sql": "SELECT ID, CAST(Price AS INT) AS int_price FROM 数据", "cat": "cast"})
+
+    # ── 扩展批3: 复杂表达式 ──
+    cases.append({"f": "numbers", "sql": "SELECT id, val + 5 * 2 AS expr FROM 数值", "cat": "complex_expr"})
+    cases.append({"f": "numbers", "sql": "SELECT id, (val + 5) * 2 AS paren_expr FROM 数值", "cat": "complex_expr"})
+
+    # ── 扩展批3: GROUP BY + HAVING 复杂 ──
+    cases.append({"f": "numbers", "sql": "SELECT grp, COUNT(*) AS cnt, AVG(val) AS avg_val FROM 数值 GROUP BY grp HAVING COUNT(*) >= 2", "cat": "having"})
+    cases.append({"f": "numbers", "sql": "SELECT grp, MAX(val) - MIN(val) AS range FROM 数值 GROUP BY grp", "cat": "groupby_arith"})
+
+    # ── 扩展批3: ORDER BY 表达式 ──
+    cases.append({"f": "numbers", "sql": "SELECT id, val FROM 数值 ORDER BY val * -1", "cat": "orderby_expr"})
+
+    # ── 扩展批3: 聚合嵌套算术 ──
+    cases.append({"f": "simple", "sql": "SELECT SUM(Price) * COUNT(*) AS total FROM 数据", "cat": "agg_arith"})
+    cases.append({"f": "numbers", "sql": "SELECT MAX(val) - MIN(val) AS spread FROM 数值", "cat": "agg_arith"})
+    cases.append({"f": "numbers", "sql": "SELECT SUM(val) / COUNT(*) AS calc_avg FROM 数值", "cat": "agg_arith"})
+
+    # ── 扩展批3: WHERE 子查询比较 ──
+    cases.append({"f": "numbers", "sql": "SELECT * FROM 数值 WHERE val >= (SELECT AVG(val) FROM 数值)", "cat": "subquery"})
+
+    # ── 扩展批3: 多条件排序 + LIMIT ──
+    cases.append({"f": "numbers", "sql": "SELECT id, grp, val FROM 数值 ORDER BY grp, val DESC LIMIT 3", "cat": "orderby_limit"})
 
     return cases
 

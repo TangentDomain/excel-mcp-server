@@ -4086,6 +4086,12 @@ class AdvancedSQLQueryEngine:
             left = self._evaluate_math_expression(expr.this, df).astype(str)
             right = self._evaluate_math_expression(expr.expression, df).astype(str)
             return left + right
+        elif isinstance(expr, exp.Neg):
+            # Fix(autoresearch): 负号表达式 (如 -1, -col)
+            inner = self._evaluate_math_expression(expr.this, df)
+            if isinstance(inner, pd.Series):
+                return -pd.to_numeric(inner, errors="coerce")
+            return -inner
         else:
             raise ValueError(f"不支持的数学运算: {expr}。💡 WHERE子句暂不支持算术运算，建议用子查询替代")
 
@@ -7382,21 +7388,24 @@ class AdvancedSQLQueryEngine:
                     col_name = self._extract_agg_column(node.this, f"{func_name}()")
                 if func_name == "count":
                     if col_name == "*":
-                        return float(len(group_df))
+                        return int(len(group_df))  # COUNT(*) 始终返回整数
                     if col_name in group_df.columns:
-                        return float(group_df[col_name].count())
-                    return 0.0
+                        return int(group_df[col_name].count())
+                    return 0
                 # sum/avg/max/min 等数值聚合
                 if col_name in group_df.columns:
-                    series = pd.to_numeric(group_df[col_name], errors="coerce")
+                    series = group_df[col_name]
+                    # Fix(autoresearch): 保留 dtype 信息用于整数除法判断
+                    is_int_col = series.dtype.kind in "iu"
+                    num_series = pd.to_numeric(series, errors="coerce")
                     if func_name == "sum":
-                        return float(series.sum())
+                        return int(num_series.sum()) if is_int_col else float(num_series.sum())
                     elif func_name == "avg":
-                        return float(series.mean())
+                        return float(num_series.mean())
                     elif func_name == "max":
-                        return float(series.max())
+                        return int(num_series.max()) if is_int_col else float(num_series.max())
                     elif func_name == "min":
-                        return float(series.min())
+                        return int(num_series.min()) if is_int_col else float(num_series.min())
                 return None
             # 算术运算 → 递归左右子树
             if isinstance(node, (exp.Add, exp.Sub, exp.Mul, exp.Div, exp.Mod)):
@@ -7404,6 +7413,9 @@ class AdvancedSQLQueryEngine:
                 right = _eval_node(node.right if hasattr(node, "right") else node.expression, group_df)
                 if left is None or right is None:
                     return None
+                # Fix(autoresearch): Div 用 SQL 语义（整数除法对齐 SQLite）
+                if isinstance(node, exp.Div):
+                    return _sql_div(left, right)
                 try:
                     left = float(left)
                     right = float(right)
@@ -7415,10 +7427,6 @@ class AdvancedSQLQueryEngine:
                     return left - right
                 elif isinstance(node, exp.Mul):
                     return left * right
-                elif isinstance(node, exp.Div):
-                    if right == 0:
-                        return None  # SQL 标准: 除零返回 NULL
-                    return left / right
                 elif isinstance(node, exp.Mod):
                     if right == 0:
                         return None
