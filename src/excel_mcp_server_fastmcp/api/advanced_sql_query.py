@@ -5793,6 +5793,13 @@ class AdvancedSQLQueryEngine:
                 if right is None:
                     return "False"
 
+                # Fix(autoresearch): SQL 三值逻辑 — NULL 与任何值比较均为 UNKNOWN(WHERE中视FALSE)
+                # pandas 的 NaN != value 返回 True，但 SQL 应排除 NULL 行
+                col_raw = left_expr.name
+                actual_col = self._find_column_name(col_raw, df) or col_raw
+                if actual_col in df.columns and df[actual_col].isna().any():
+                    # 列含 NULL: 添加 NOT NULL 条件（IS NULL/IS NOT NULL 除外）
+                    return f"`{actual_col}`.notna() and {left} {self._PANDAS_OPS[op_type]} {right}"
                 return f"{left} {self._PANDAS_OPS[op_type]} {right}"
             else:
                 # 非列表达式(CAST/函数/嵌套表达式/HAVING聚合): 预计算为临时列

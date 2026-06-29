@@ -146,6 +146,23 @@ def _make_join_wb() -> Workbook:
     return wb
 
 
+def _make_edge_values_wb() -> Workbook:
+    """边界值表：零/负数/NULL/空字符串/大数"""
+    wb = Workbook()
+    ws = wb.active
+    ws.title = "边界"
+    ws.append(["id", "name", "qty", "price"])
+    for r in [
+        [1, "item_a", 0, 10.5],
+        [2, "item_b", -5, 0.0],
+        [3, "item_c", 100, 99.99],
+        [4, "", None, None],
+        [5, "item_e", 999999, -0.01],
+    ]:
+        ws.append(r)
+    return wb
+
+
 def _save(wb: Workbook, directory: Path, name: str) -> str:
     p = directory / name
     wb.save(str(p))
@@ -458,6 +475,18 @@ def build_test_cases() -> list[dict]:
     cases.append({"f": "numbers", "sql": "SELECT * FROM 数值 LIMIT 100", "cat": "limit_boundary"})
     cases.append({"f": "simple", "sql": "SELECT COUNT(*) FROM 数据 LIMIT 1", "cat": "limit_boundary"})
 
+    # ── 扩展批6: 边界值 (零/负数/NULL/空字符串) ──
+    cases.append({"f": "edge", "sql": "SELECT * FROM 边界", "cat": "edge_values"})
+    cases.append({"f": "edge", "sql": "SELECT * FROM 边界 WHERE qty = 0", "cat": "edge_values"})
+    cases.append({"f": "edge", "sql": "SELECT * FROM 边界 WHERE qty < 0", "cat": "edge_values"})
+    cases.append({"f": "edge", "sql": "SELECT * FROM 边界 WHERE qty != 0", "cat": "null_3vl"})
+    cases.append({"f": "edge", "sql": "SELECT * FROM 边界 WHERE price IS NULL", "cat": "edge_values"})
+    cases.append({"f": "edge", "sql": "SELECT * FROM 边界 WHERE name = ''", "cat": "edge_values"})
+    cases.append({"f": "edge", "sql": "SELECT SUM(qty) FROM 边界", "cat": "edge_values"})
+    cases.append({"f": "edge", "sql": "SELECT MAX(price), MIN(price) FROM 边界", "cat": "edge_values"})
+    cases.append({"f": "edge", "sql": "SELECT * FROM 边界 ORDER BY qty", "cat": "edge_values"})
+    cases.append({"f": "edge", "sql": "SELECT COUNT(name) FROM 边界", "cat": "edge_values"})
+
     return cases
 
 
@@ -467,6 +496,7 @@ FIXTURE_BUILDERS = {
     "dual": _make_dual_header_wb,
     "special": _make_special_char_wb,
     "join": _make_join_wb,
+    "edge": _make_edge_values_wb,
 }
 
 
