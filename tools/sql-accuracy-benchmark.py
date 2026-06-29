@@ -579,6 +579,16 @@ def build_test_cases() -> list[dict]:
     cases.append({"f": "simple", "sql": "SELECT * FROM 数据 WHERE Tags IN (SELECT DISTINCT Tags FROM 数据 WHERE Price > 40)", "cat": "distinct_subquery"})
     cases.append({"f": "numbers", "sql": "SELECT grp, COUNT(*) AS c, SUM(val) AS s FROM 数值 GROUP BY grp ORDER BY grp", "cat": "group_order"})
 
+    # ── 扩展批14: REPLACE WHERE + LENGTH ORDERBY + COALESCE表达式 + CASE NULL ──
+    cases.append({"f": "simple", "sql": "SELECT * FROM 数据 WHERE REPLACE(Name, '剑', '') != Name", "cat": "replace_where"})
+    cases.append({"f": "simple", "sql": "SELECT Name FROM 数据 ORDER BY LENGTH(Name) DESC", "cat": "length_orderby"})
+    cases.append({"f": "simple", "sql": "SELECT ID, COALESCE(Price, 0) + 100 AS adjusted FROM 数据", "cat": "coalesce_expr"})
+    cases.append({"f": "simple", "sql": "SELECT ID, CASE WHEN Price IS NULL THEN NULL ELSE Price END AS maybe_null FROM 数据", "cat": "case_null_then"})
+    cases.append({"f": "simple", "sql": "SELECT DISTINCT Active FROM 数据 WHERE Price IS NOT NULL", "cat": "distinct_filtered"})
+    cases.append({"f": "simple", "sql": "SELECT Tags, SUM(CASE WHEN Active = '是' THEN 1 ELSE 0 END) AS yes_count FROM 数据 GROUP BY Tags", "cat": "sum_case_group"})
+    cases.append({"f": "simple", "sql": "SELECT * FROM 数据 WHERE ID IN (SELECT ID FROM 数据 WHERE Price > 40) AND Tags = '武器'", "cat": "in_subquery_extra"})
+    cases.append({"f": "simple", "sql": "SELECT COUNT(COALESCE(Price, 0)) FROM 数据", "cat": "count_coalesce"})
+
     return cases
 
 
