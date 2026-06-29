@@ -3972,6 +3972,15 @@ class AdvancedSQLQueryEngine:
         if op_type in self._MATH_BINARY_OPS:
             left = self._evaluate_math_expression(expr.left, df)
             right = self._evaluate_math_expression(expr.right, df)
+            # SQLite 兼容: 整数 ÷ 整数 = 整数除法 (截断向零, 即 int(a/b))
+            if op_type == exp.Div:
+                left_is_int = isinstance(left, (int, np.integer)) or (isinstance(left, pd.Series) and pd.api.types.is_integer_dtype(left))
+                right_is_int = isinstance(right, (int, np.integer)) or (isinstance(right, pd.Series) and pd.api.types.is_integer_dtype(right))
+                if left_is_int and right_is_int:
+                    if isinstance(left, pd.Series) or isinstance(right, pd.Series):
+                        return np.trunc(pd.to_numeric(left, errors="coerce") / pd.to_numeric(right, errors="coerce")).astype("int64")
+                    # 标量整数除法: 截断向零 (SQLite 语义)
+                    return int(left / right) if right != 0 else None
             return self._MATH_BINARY_OPS[op_type](left, right)
         elif isinstance(expr, exp.Column):
             # 处理列引用，支持表限定符（如 t.column_name）+ 大小写不敏感
