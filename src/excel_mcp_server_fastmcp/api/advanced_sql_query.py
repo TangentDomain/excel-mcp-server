@@ -65,6 +65,49 @@ from .query_helpers import (
 from .query_helpers import (
     sanitize_float_for_excel as _sanitize_float_for_excel,
 )
+
+
+def _sql_div(left, right):
+    """SQL 标准除法: 两操作数均为整数时执行整数除法（截断向零），对齐 SQLite 语义。
+
+    SQLite: 5 / 2 = 2 (int),  5.0 / 2 = 2.5 (float),  5 / 2.0 = 2.5 (float)
+    判断依据: 操作数的存储类型（dtype.kind），不是值。
+    """
+
+    # 判断是否为整数类型
+    def _is_int_dtype(v):
+        if isinstance(v, pd.Series):
+            return v.dtype.kind in "iu"  # int/uint
+        return isinstance(v, (int, np.integer))
+
+    # Series 场景
+    if isinstance(left, pd.Series) or isinstance(right, pd.Series):
+        if not isinstance(left, pd.Series):
+            left = pd.Series([left] * len(right), index=right.index)
+        if not isinstance(right, pd.Series):
+            right = pd.Series([right] * len(left), index=left.index)
+        ln = pd.to_numeric(left, errors="coerce")
+        rn = pd.to_numeric(right, errors="coerce")
+        if _is_int_dtype(left) and _is_int_dtype(right):
+            # 整数除法: 截断向零
+            with np.errstate(divide="ignore", invalid="ignore"):
+                result = np.trunc(ln / rn)
+            result[(rn == 0) | rn.isna()] = np.nan  # 除零 → NULL
+            return result
+        return ln / rn
+    # 标量场景
+    try:
+        ln = float(left)
+        rn = float(right)
+    except (ValueError, TypeError):
+        return None
+    if rn == 0:
+        return None  # 除零返回 NULL
+    if _is_int_dtype(left) and _is_int_dtype(right):
+        return float(int(ln / rn)) if (ln >= 0) == (rn >= 0) else -float(int(abs(ln) / abs(rn)))
+    return ln / rn
+
+
 from .query_helpers import (
     unsupported_error_hint as _unsupported_error_hint,
 )
@@ -813,11 +856,12 @@ class AdvancedSQLQueryEngine:
                     if is_dual_header:
                         header_row = second_row_values
                         raw_desc_pairs = []
-                        for col_idx, fname in enumerate(second_row_values):
-                            fname = fname.strip() if fname else ""
-                            desc = first_row_values[col_idx].strip() if col_idx < len(first_row_values) else ""
-                            if fname and desc and desc != fname:
-                                raw_desc_pairs.append((col_idx, fname, desc))
+                        if second_row_values and first_row_values:
+                            for col_idx, fname in enumerate(second_row_values):
+                                fname = fname.strip() if fname else ""
+                                desc = first_row_values[col_idx].strip() if col_idx < len(first_row_values) else ""
+                                if fname and desc and desc != fname:
+                                    raw_desc_pairs.append((col_idx, fname, desc))
                         df = raw_df.iloc[2:].copy()
                     else:
                         header_row = first_row_values
@@ -825,6 +869,12 @@ class AdvancedSQLQueryEngine:
                         df = raw_df.iloc[1:].copy()
 
                     df.columns = header_row
+                    # P10: 英文字段名为空时(列名 Unnamed: N), 回退用中文描述做列名
+                    for col_idx in range(len(df.columns)):
+                        col_name = str(df.columns[col_idx])
+                        if "unnamed" in col_name.lower():
+                            if col_idx < len(first_row_values) and first_row_values[col_idx]:
+                                df.rename(columns={df.columns[col_idx]: first_row_values[col_idx]}, inplace=True)
                     df = df.reset_index(drop=True)
                     # 类型推断: header=None 读取后数值列是 object 类型,
                     # 需转回 int64/float64 (复刻 pd.read_excel(header=N) 的推断行为, 保障除零等运算语义)
@@ -3705,20 +3755,21 @@ class AdvancedSQLQueryEngine:
                                             "available_columns": list(df.columns),
                                         },
                                     )
-                    actual_col = self._find_column_name(column_name, df)
-                    if actual_col:
-                        result_data[alias_name] = df[actual_col]
                     else:
-                        suggestion = self._suggest_column_name(column_name, list(df.columns))
-                        raise StructuredSQLError(
-                            "column_not_found",
-                            f"列 '{qualified or column_name}' 不存在.可用列: {list(df.columns)}.{suggestion}",
-                            hint="请检查列名拼写,或用excel_get_headers查看所有可用列名.",
-                            context={
-                                "column_requested": qualified or column_name,
-                                "available_columns": list(df.columns),
-                            },
-                        )
+                        actual_col = self._find_column_name(column_name, df)
+                        if actual_col:
+                            result_data[alias_name] = df[actual_col]
+                        else:
+                            suggestion = self._suggest_column_name(column_name, list(df.columns))
+                            raise StructuredSQLError(
+                                "column_not_found",
+                                f"列 '{qualified or column_name}' 不存在.可用列: {list(df.columns)}.{suggestion}",
+                                hint="请检查列名拼写,或用excel_get_headers查看所有可用列名.",
+                                context={
+                                    "column_requested": qualified or column_name,
+                                    "available_columns": list(df.columns),
+                                },
+                            )
 
                 elif isinstance(original_expr, exp.Case):
                     # CASE WHEN表达式
@@ -3873,14 +3924,22 @@ class AdvancedSQLQueryEngine:
 
     def _is_mathematical_expression(self, expr) -> bool:
         """检查是否为数学表达式"""
-        return isinstance(expr, (exp.Add, exp.Sub, exp.Mul, exp.Div, exp.Mod, exp.Nullif))
+        return isinstance(expr, (exp.Add, exp.Sub, exp.Mul, exp.Div, exp.Mod, exp.Nullif, exp.Neg))
+
+    @staticmethod
+    def _safe_numeric_series(series: pd.Series) -> pd.Series:
+        """Fix(autoresearch): uint 类型在减法时下溢（如 uint8: 10-100=166），
+        提升为 int64 防止无符号整数下溢。"""
+        if hasattr(series, "dtype") and series.dtype.kind == "u":
+            return series.astype("int64")
+        return series
 
     # 数学运算符分发表:二元运算符统一处理
     _MATH_BINARY_OPS = {
         exp.Add: operator.add,
         exp.Sub: operator.sub,
         exp.Mul: operator.mul,
-        exp.Div: operator.truediv,
+        exp.Div: lambda l, r: _sql_div(l, r),
         exp.Mod: operator.mod,
     }
 
@@ -3990,18 +4049,20 @@ class AdvancedSQLQueryEngine:
 
             # 先尝试直接使用qualified列名
             if qualified and qualified in df.columns:
-                return df[qualified]
+                return self._safe_numeric_series(df[qualified])
             # 大小写不敏感列名查找
             actual_col = self._find_column_name(col_name, df)
             if actual_col:
-                return df[actual_col]
+                return self._safe_numeric_series(df[actual_col])
             elif qualified:
                 actual_qualified = self._find_column_name(qualified, df)
                 if actual_qualified:
-                    return df[actual_qualified]
+                    return self._safe_numeric_series(df[actual_qualified])
             raise ValueError(f"列 '{qualified or col_name}' 不存在")
         elif isinstance(expr, exp.Literal):
-            return self._expression_to_value(expr, df)
+            # Fix(autoresearch): 返回原始值而非带引号的query字符串
+            # _expression_to_value 会包裹引号用于 pandas query()，但 math 表达式需要原始值
+            return self._parse_literal_value(expr)
         elif isinstance(expr, exp.Boolean):
             # SQL布尔字面量(TRUE/FALSE) → int(1/0)，与Excel存储格式一致
             return int(expr.this)
@@ -4061,11 +4122,20 @@ class AdvancedSQLQueryEngine:
         elif isinstance(expr, exp.Case):
             # CASE 表达式嵌入数学运算 (如 Price * CASE WHEN ... THEN 1.0 ELSE 0.5 END)
             return pd.to_numeric(self._evaluate_case_expression(expr, df), errors="coerce")
+        elif self._is_string_function(expr):
+            # Fix(autoresearch): 字符串函数嵌入数学表达式 (如 LENGTH(Name) * 2)
+            return pd.to_numeric(self._evaluate_string_function(expr, df), errors="coerce")
         elif isinstance(expr, exp.DPipe):
             # || 字符串拼接嵌入表达式
             left = self._evaluate_math_expression(expr.this, df).astype(str)
             right = self._evaluate_math_expression(expr.expression, df).astype(str)
             return left + right
+        elif isinstance(expr, exp.Neg):
+            # Fix(autoresearch): 负号表达式 (如 -1, -col)
+            inner = self._evaluate_math_expression(expr.this, df)
+            if isinstance(inner, pd.Series):
+                return -pd.to_numeric(inner, errors="coerce")
+            return -inner
         else:
             raise ValueError(f"不支持的数学运算: {expr}。💡 WHERE子句暂不支持算术运算，建议用子查询替代")
 
@@ -5591,11 +5661,16 @@ class AdvancedSQLQueryEngine:
         if condition_str:
             try:
                 result_df = df.query(condition_str)
-                # Fix(R46/R52): 清理 WHERE 子句中 CAST/函数预计算产生的临时列
-                # 使用 .copy() 确保 result_df 不受后续 del 操作影响（防止 view 问题）
-                result_df = result_df.copy()
-                self._cleanup_tmp_columns(df)
-                return result_df
+                # Fix(R46/R52/autoresearch): 清理 WHERE 子句中 CAST/函数预计算产生的临时列
+                # query() 返回的 result_df 包含 temp 列，两个 df 都需清理
+                tmp_cols = list(getattr(self, "_pending_tmp_cols", []))
+                for tc in tmp_cols:
+                    if tc in df.columns:
+                        del df[tc]
+                    if tc in result_df.columns:
+                        del result_df[tc]
+                self._pending_tmp_cols = []
+                return result_df.copy()
             except Exception:
                 # 如果查询失败,尝试逐行过滤
                 # 同时清理可能已添加的临时列
@@ -5781,12 +5856,26 @@ class AdvancedSQLQueryEngine:
             if isinstance(left_expr, exp.Column):
                 # 普通列引用: 走原有快速路径
                 left = self._expression_to_column_reference(left_expr, df)
-                right = self._expression_to_value(condition.right, df)
+
+                # Fix(autoresearch): 列对列比较 (a.ID < b.ID) 时右侧也是列引用
+                # 需用 _expression_to_column_reference 解析表别名，否则 a.ID < b.ID 变成 ID < ID
+                right_expr = condition.right
+                if isinstance(right_expr, exp.Column):
+                    right = self._expression_to_column_reference(right_expr, df)
+                else:
+                    right = self._expression_to_value(right_expr, df)
 
                 # SQL标准: 任何与NULL的比较都返回UNKNOWN(在WHERE中视为FALSE)
                 if right is None:
                     return "False"
 
+                # Fix(autoresearch): SQL 三值逻辑 — NULL 与任何值比较均为 UNKNOWN(WHERE中视FALSE)
+                # pandas 的 NaN != value 返回 True，但 SQL 应排除 NULL 行
+                col_raw = left_expr.name
+                actual_col = self._find_column_name(col_raw, df) or col_raw
+                if actual_col in df.columns and df[actual_col].isna().any():
+                    # 列含 NULL: 添加 NOT NULL 条件（IS NULL/IS NOT NULL 除外）
+                    return f"`{actual_col}`.notna() and {left} {self._PANDAS_OPS[op_type]} {right}"
                 return f"{left} {self._PANDAS_OPS[op_type]} {right}"
             else:
                 # 非列表达式(CAST/函数/嵌套表达式/HAVING聚合): 预计算为临时列
@@ -6329,13 +6418,32 @@ class AdvancedSQLQueryEngine:
             return False
 
         inner_from, _ = self._get_from_table(inner_select)
+        # Fix(autoresearch): 获取内层别名，用于区分内外表引用
+        # 例: FROM 数据 d2 — 内部用 d2 引用，外部用 数据 引用
+        # 关键: 若内层有别名，基础表名归外部引用（内层通过别名引用）
+        inner_from_node = inner_select.args.get("from")
+        inner_alias = None
+        if inner_from_node and hasattr(inner_from_node, "this"):
+            inner_tbl = inner_from_node.this
+            if hasattr(inner_tbl, "alias") and inner_tbl.alias:
+                inner_alias = inner_tbl.alias
+
+        # 内部引用标识集合:
+        # - 有别名时: 只含别名（基础表名归外部，因为外部用基础表名引用）
+        # - 无别名时: 含基础表名
+        if inner_alias:
+            inner_identifiers = {inner_alias}
+        else:
+            inner_identifiers = {inner_from}
+
         has_correlation = False
         for col in inner_select.find_all(exp.Column):
             col_name = col.name
             table_part = col.table if hasattr(col, "table") and col.table else None
             if table_part:
+                # 带 table_part 的引用：若 table_part 不在内层标识集合中 → 外部引用(关联)
                 resolved = self._table_aliases.get(table_part, table_part)
-                if resolved != inner_from:
+                if resolved not in inner_identifiers and table_part not in inner_identifiers:
                     has_correlation = True
                     break
             else:
@@ -6358,17 +6466,28 @@ class AdvancedSQLQueryEngine:
         if inner_from in self._current_worksheets:
             inner_from_cols = set(self._current_worksheets[inner_from].columns)
 
+        # Fix(autoresearch): 获取内层别名，用于区分内外引用
+        inner_from_node = inner_select.args.get("from")
+        inner_alias = None
+        if inner_from_node and hasattr(inner_from_node, "this"):
+            inner_tbl = inner_from_node.this
+            if hasattr(inner_tbl, "alias") and inner_tbl.alias:
+                inner_alias = inner_tbl.alias
+        if inner_alias:
+            inner_identifiers = {inner_alias}
+        else:
+            inner_identifiers = {inner_from}
+
         for col in inner_select.find_all(exp.Column):
             col_name = col.name
             table_part = col.table if hasattr(col, "table") and col.table else None
             should_substitute = False
 
             if table_part:
+                # 带 table_part 的引用：若不在内层标识集合中 → 外部引用(需替换)
                 resolved = self._table_aliases.get(table_part, table_part)
-                for tbl_name in self._current_worksheets:
-                    if tbl_name != inner_from and (resolved == tbl_name or table_part == tbl_name):
-                        should_substitute = True
-                        break
+                if resolved not in inner_identifiers and table_part not in inner_identifiers:
+                    should_substitute = True
             else:
                 for tbl_name, tbl_df in self._current_worksheets.items():
                     if tbl_name != inner_from and col_name in tbl_df.columns and col_name not in inner_from_cols:
@@ -6379,8 +6498,6 @@ class AdvancedSQLQueryEngine:
                 val = row.get(col_name)
                 if val is not None:
                     # [FIX R55-BUG-03] SQL 标准转义：单引号 → 双单引号
-                    # 避免 repr() 对含引号字符串(如 O'Brien)产生转义反斜杠
-                    # 导致 sqlglot 解析失败后静默返回 False
                     if isinstance(val, str):
                         safe_val = "'" + val.replace("'", "''") + "'"
                     else:
@@ -6479,6 +6596,13 @@ class AdvancedSQLQueryEngine:
 
         elif isinstance(expr, exp.Coalesce):
             return self._evaluate_coalesce_for_row(expr, row)
+        elif isinstance(expr, exp.Nullif):
+            # Fix(autoresearch): NULLIF in WHERE clause row evaluation
+            left = self._get_row_value(expr.this, row)
+            right = self._get_row_value(expr.expression, row)
+            if left is None or right is None:
+                return None
+            return None if str(left) == str(right) else left
 
         elif isinstance(expr, exp.Case):
             return self._evaluate_case_expression(expr, None, row=row)
@@ -6609,11 +6733,18 @@ class AdvancedSQLQueryEngine:
 
         # 检查聚合函数（包括标量函数包裹聚合的情况，如 ROUND(AVG(col))）
         for alias_name, expr in select_exprs.items():
+            # Fix(autoresearch): 解包 Paren: (MAX(x) - MIN(y)) → MAX(x) - MIN(y)
+            while isinstance(expr, exp.Paren):
+                expr = expr.this
             if self._is_aggregate_function(expr):
                 aggregations[alias_name] = expr
             elif self._is_scalar_num_function(expr) and self._find_inner_aggregate(expr) is not None:
                 # 标量函数(ROUND/ABS/FLOOR/CEIL等)包裹聚合函数 → 视为聚合
                 # 在后续主循环中会走 _apply_scalar_to_agg_result 分支处理
+                aggregations[alias_name] = expr
+            # Fix(autoresearch): 算术表达式(Add/Sub/Mul/Div)包含聚合函数 → 视为聚合
+            # 例: MAX(Price) - MIN(Price), SUM(x) / COUNT(y), AVG(x) * 2
+            elif isinstance(expr, (exp.Add, exp.Sub, exp.Mul, exp.Div, exp.Mod)) and self._find_inner_aggregate(expr) is not None:
                 aggregations[alias_name] = expr
             # Fix(R47): CASE/COALESCE 内包含聚合函数时也视为聚合表达式
             elif isinstance(expr, (exp.Case, exp.Coalesce)) and self._find_inner_aggregate(expr) is not None:
@@ -6749,6 +6880,9 @@ class AdvancedSQLQueryEngine:
         # 按SELECT表达式顺序处理列
         for i, select_expr in enumerate(parsed_sql.expressions):
             alias_name, original_expr = self._extract_select_alias(select_expr, i)
+            # Fix(autoresearch): 解包 Paren: (MAX(x) - MIN(y)) → MAX(x) - MIN(y)
+            while isinstance(original_expr, exp.Paren):
+                original_expr = original_expr.this
 
             # 跳过SELECT *，它会在循环后单独处理
             if isinstance(original_expr, exp.Star):
@@ -6840,6 +6974,15 @@ class AdvancedSQLQueryEngine:
                     result_data[alias_name] = grouped[alias_name].first().reset_index(drop=True)
                 elif alias_name.startswith("_window_") and alias_name in df.columns:
                     result_data[alias_name] = grouped[alias_name].first().reset_index(drop=True)
+            # Fix(autoresearch): 处理包含聚合函数的算术表达式 (如 MAX(x)-MIN(y), SUM(x)/COUNT(y))
+            elif isinstance(original_expr, (exp.Add, exp.Sub, exp.Mul, exp.Div, exp.Mod)) and self._find_inner_aggregate(original_expr) is not None:
+                try:
+                    arith_result = self._evaluate_arithmetic_with_aggregates(original_expr, grouped, df)
+                    result_data[alias_name] = arith_result
+                except Exception as e:
+                    logger.warning("算术+聚合计算失败 %s: %s", alias_name, e)
+                    logger.debug("算术+聚合计算详细错误: %s", e, exc_info=True)
+                    result_data[alias_name] = pd.Series([None])
 
         # 处理SELECT *的情况：添加所有GROUP BY列
         has_star = any(isinstance(self._extract_select_alias(expr, 0)[1], exp.Star) for expr in parsed_sql.expressions)
@@ -7348,6 +7491,101 @@ class AdvancedSQLQueryEngine:
 
         return pd.Series(results, index=range(len(group_names)))
 
+    def _evaluate_arithmetic_with_aggregates(self, arith_expr: exp.Expression, grouped, df) -> pd.Series:
+        """评估包含聚合函数的算术表达式 (如 MAX(x)-MIN(y), SUM(x)/COUNT(y))。
+
+        策略: 递归遍历表达式树，对每个 AggFunc 子节点调用 _apply_aggregation_function
+        得到标量结果，然后按算术运算符合并。
+        无 GROUP BY 时对整个 df 计算；有 GROUP BY 时逐组计算。
+        """
+
+        group_names = list(grouped.groups.keys())
+
+        def _eval_node(node, group_df):
+            """递归评估节点，返回标量值。"""
+            # 聚合函数 → 直接在 group_df 上计算标量
+            if isinstance(node, exp.AggFunc):
+                func_name = type(node).__name__.lower()
+                # 提取列名
+                if isinstance(node.this, exp.Star):
+                    col_name = "*"
+                elif isinstance(node.this, exp.Distinct):
+                    col_name = self._extract_agg_column(node.this.expressions[0], f"{func_name}(DISTINCT)")
+                else:
+                    col_name = self._extract_agg_column(node.this, f"{func_name}()")
+                if func_name == "count":
+                    if col_name == "*":
+                        return int(len(group_df))  # COUNT(*) 始终返回整数
+                    if col_name in group_df.columns:
+                        return int(group_df[col_name].count())
+                    return 0
+                # sum/avg/max/min 等数值聚合
+                if col_name in group_df.columns:
+                    series = group_df[col_name]
+                    # Fix(autoresearch): 保留 dtype 信息用于整数除法判断
+                    is_int_col = series.dtype.kind in "iu"
+                    num_series = pd.to_numeric(series, errors="coerce")
+                    if func_name == "sum":
+                        return int(num_series.sum()) if is_int_col else float(num_series.sum())
+                    elif func_name == "avg":
+                        return float(num_series.mean())
+                    elif func_name == "max":
+                        return int(num_series.max()) if is_int_col else float(num_series.max())
+                    elif func_name == "min":
+                        return int(num_series.min()) if is_int_col else float(num_series.min())
+                return None
+            # 算术运算 → 递归左右子树
+            if isinstance(node, (exp.Add, exp.Sub, exp.Mul, exp.Div, exp.Mod)):
+                left = _eval_node(node.left if hasattr(node, "left") else node.this, group_df)
+                right = _eval_node(node.right if hasattr(node, "right") else node.expression, group_df)
+                if left is None or right is None:
+                    return None
+                # Fix(autoresearch): Div 用 SQL 语义（整数除法对齐 SQLite）
+                if isinstance(node, exp.Div):
+                    return _sql_div(left, right)
+                try:
+                    left = float(left)
+                    right = float(right)
+                except (ValueError, TypeError):
+                    return None
+                if isinstance(node, exp.Add):
+                    return left + right
+                elif isinstance(node, exp.Sub):
+                    return left - right
+                elif isinstance(node, exp.Mul):
+                    return left * right
+                elif isinstance(node, exp.Mod):
+                    if right == 0:
+                        return None
+                    return left % right
+            # 列引用 → 取组内值（非聚合场景）
+            if isinstance(node, exp.Column):
+                col = node.name
+                if col in group_df.columns:
+                    vals = group_df[col]
+                    return vals.iloc[0] if len(vals) > 0 else None
+                return None
+            # 字面量
+            if isinstance(node, exp.Literal):
+                try:
+                    return float(node.this)
+                except (ValueError, TypeError):
+                    return node.this
+            # 其他表达式 → 尝试标量求值
+            try:
+                val = self._get_expression_value(node, pd.Series(dtype=object))
+                return val
+            except Exception:
+                return None
+
+        results = []
+        for group_name in group_names:
+            group_df = grouped.get_group(group_name)
+            val = _eval_node(arith_expr, group_df)
+            results.append(val)
+
+        return pd.Series(results, index=range(len(group_names)))
+
     def _get_expression_value(self, expr: exp.Expression, row: pd.Series) -> Any:
         """获取表达式在指定行的值(委托给_get_row_value,两者功能完全重叠)"""
         return self._get_row_value(expr, row)
@@ -7437,6 +7675,10 @@ class AdvancedSQLQueryEngine:
                 # 简单算术表达式作为常量值(如 COALESCE(col, 1+1))
                 fallback = True  # 暂时fallback,后续可优化为常量折叠
                 break
+            elif isinstance(val_expr, exp.Null):
+                # Fix(autoresearch): COALESCE(NULL, col, 0) — NULL 字面量
+                # 作为全 NaN Series 参与combine_first，不影响后续参数
+                series = pd.Series([np.nan] * len(df), index=df.index, dtype=object)
             else:
                 fallback = True
                 break
@@ -7538,6 +7780,28 @@ class AdvancedSQLQueryEngine:
                     return group[temp_col].notna().sum()
 
                 return grouped.apply(count_non_null, include_groups=False)
+
+            # Fix(autoresearch): COUNT(表达式) 如 COUNT(Price * 2)
+            # 先计算表达式为临时列，再统计非空值
+            if not isinstance(expr.this, (exp.Column, exp.Star, exp.Distinct)):
+                temp_col = f"_count_expr_{id(expr)}"
+                if temp_col not in df.columns:
+                    try:
+                        if self._is_mathematical_expression(expr.this):
+                            df[temp_col] = self._evaluate_math_expression(expr.this, df)
+                        elif isinstance(expr.this, (exp.Case, exp.Coalesce)):
+                            df[temp_col] = self._evaluate_case_expression(expr.this, df) if isinstance(expr.this, exp.Case) else self._evaluate_coalesce_vectorized(expr.this, df)
+                        else:
+                            df[temp_col] = self._expr_to_series(expr.this, df)
+                    except Exception:
+                        # 回退到提取列名
+                        col_name = self._extract_agg_column(expr.this, "COUNT")
+                        return grouped[col_name].count()
+
+                def count_expr_non_null(group):
+                    return group[temp_col].notna().sum()
+
+                return grouped.apply(count_expr_non_null, include_groups=False)
 
             col_name = self._extract_agg_column(expr.this, "COUNT")
             return grouped[col_name].count()
@@ -7979,6 +8243,22 @@ class AdvancedSQLQueryEngine:
                 # 函数表达式: ORDER BY UPPER(name), ORDER BY LENGTH(name) 等
                 col_expr = order_expr
                 is_desc = False
+
+            # Fix(autoresearch): ORDER BY 位置编号 (ORDER BY 1, ORDER BY 2 DESC)
+            # SQL 标准允许用整数引用 SELECT 列的位置
+            if isinstance(col_expr, exp.Literal):
+                try:
+                    pos = int(col_expr.this)
+                    if pos >= 1 and pos <= len(parsed_sql.expressions):
+                        # 获取第 pos 个 SELECT 表达式的别名
+                        select_expr_at_pos = parsed_sql.expressions[pos - 1]
+                        alias_at_pos, _ = self._extract_select_alias(select_expr_at_pos, pos - 1)
+                        if alias_at_pos in df.columns:
+                            sort_columns.append(alias_at_pos)
+                            ascending.append(not is_desc if is_desc is not None else True)
+                            continue
+                except (ValueError, TypeError):
+                    pass
 
             col_name = col_expr.name
             table_part = col_expr.table if hasattr(col_expr, "table") and col_expr.table else None
@@ -9074,9 +9354,13 @@ class AdvancedSQLQueryEngine:
                     matched_sheet = s
                     break
             if not matched_sheet:
+                suggestions = list(worksheets_data.keys())
+                hint = ""
+                if suggestions:
+                    hint = f"💡 先用 excel list-sheets --file 文件路径 查看所有可用表: {suggestions}"
                 return {
                     "success": False,
-                    "message": f"工作表 '{table_name}' 不存在.可用: {list(worksheets_data.keys())}",
+                    "message": f"工作表 '{table_name}' 不存在.{hint}",
                 }
 
             df = worksheets_data[matched_sheet].copy()

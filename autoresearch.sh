@@ -1,22 +1,24 @@
 #!/usr/bin/env bash
-# autoresearch.sh — Excel MCP Server 准确率/正确性优化实验入口
+#!/usr/bin/env bash
+# autoresearch.sh — ExcelMCP SQL 准确率差分测试基准入口
 #
-# 被 init_experiment/run_experiment 调用。执行 accuracy-benchmark/benchmark.py
-# 并产出 autoresearch 约定格式的指标行 (METRIC / ASI), 供 harness 自动解析。
+# 主指标: accuracy (ExcelMCP SQL 引擎 vs SQLite oracle 对齐率)
+# 确定性: 固定 fixture、固定 SQL 集，无网络/时间依赖。
 #
-# 退出码: 0=成功, 非0=失败
-set -eu
+set -euo pipefail
 
-# autoresearch 框架已将工作目录设为项目根; 不需要 cd
+cd "$(dirname "$0")"
 
-# 项目依赖装在 Windows Python. cmd.exe interop 是可靠通道.
-if [ -n "${PYTHON:-}" ]; then
-    echo "[autoresearch] running accuracy benchmark (PYTHON=$PYTHON)..." >&2
-    "$PYTHON" tools/accuracy-benchmark/benchmark.py
-elif command -v cmd.exe >/dev/null 2>&1; then
-    echo "[autoresearch] running accuracy benchmark via cmd.exe python..." >&2
-    cmd.exe /c "python tools/accuracy-benchmark/benchmark.py"
+# 选择 Python 解释器（优先级: uv run > .venv > python3 > python）
+if command -v uv >/dev/null 2>&1; then
+    PY="uv run python"
+elif [ -x ".venv/Scripts/python.exe" ]; then
+    PY=".venv/Scripts/python.exe"
+elif command -v python3 >/dev/null 2>&1; then
+    PY="python3"
 else
-    echo "[autoresearch] running accuracy benchmark via python3..." >&2
-    python3 tools/accuracy-benchmark/benchmark.py
+    PY="python"
 fi
+
+# 运行差分测试基准
+$PY tools/sql-accuracy-benchmark.py "$@"

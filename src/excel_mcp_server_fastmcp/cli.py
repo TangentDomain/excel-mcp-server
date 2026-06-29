@@ -240,40 +240,54 @@ def cmd_get_range(args):
 
 
 def cmd_describe_table(args):
-    """描述工作表结构。"""
+    """查看表结构（列名+类型+样本值），支持双行表头自动检测。"""
     try:
-        # describe_table 在 server.py 中是内联实现，需要直接调用
-        # 这里简化为调用 ExcelOperations 的底层（如果有的话）或用 query 替代
         from openpyxl import load_workbook
+
+        from excel_mcp_server_fastmcp.api.header_analyzer import _cell_str, detect_from_rows
 
         wb = load_workbook(args.file, read_only=True, data_only=True)
         sheet_name = args.sheet or wb.sheetnames[0]
         ws = wb[sheet_name]
 
         # 读取前几行来推断结构
-        rows = list(ws.iter_rows(max_row=min(ws.max_row or 10, 50), values_only=False))
-        if not rows:
+        all_rows = list(ws.iter_rows(max_row=min(ws.max_row or 10, 50), values_only=True))
+        if not all_rows:
             return output(_fail("工作表为空"))
 
-        # 表头
-        headers_row = rows[0] if rows else []
-        headers = [cell.value for cell in headers_row]
-        sample_row = rows[1] if len(rows) > 1 else None
-        samples = [cell.value for cell in sample_row] if sample_row else []
+        # 双行表头检测
+        raw_first = list(all_rows[0]) if len(all_rows) > 0 else []
+        raw_second = list(all_rows[1]) if len(all_rows) > 1 else []
+        is_dual, header_row_idx, descriptions = detect_from_rows([raw_first, raw_second] if len(all_rows) >= 2 else [raw_first])
+
+        # 根据检测结果取表头和数据行
+        if is_dual:
+            headers = [_cell_str(c) or "" for c in raw_second]
+            sample_row = all_rows[2] if len(all_rows) > 2 else []
+            header_type = "dual"
+            data_start = 3  # Excel 行号
+        else:
+            headers = [_cell_str(c) or "" for c in raw_first]
+            sample_row = list(all_rows[1]) if len(all_rows) > 1 else []
+            header_type = "single"
+            data_start = 2
 
         columns = []
         for i, h in enumerate(headers):
-            col_info = {
-                "name": h,
-                "type": type(samples[i]).__name__ if i < len(samples) and samples[i] is not None else "null",
-                "sample": samples[i] if i < len(samples) else None,
-            }
-            columns.append(col_info)
+            sample = sample_row[i] if i < len(sample_row) else None
+            col_type = type(sample).__name__ if sample is not None else "null"
+            columns.append(
+                {
+                    "name": h,
+                    "type": col_type,
+                    "sample": sample,
+                }
+            )
 
         data = {
             "sheet_name": sheet_name,
-            "header_type": "single",
-            "row_count": ws.max_row or 0,
+            "header_type": header_type,
+            "row_count": (ws.max_row or 0) - (data_start - 1),
             "column_count": ws.max_column or 0,
             "columns": columns,
         }
@@ -356,7 +370,7 @@ def cmd_query(args):
         result = execute_advanced_sql_query(
             file_path=args.file,
             sql=args.sql,
-            sheet_name=None,
+            sheet_name=getattr(args, "sheet", None),
             limit=None,
             include_headers=not args.no_headers,
             output_format=args.format or "table",
@@ -1006,7 +1020,7 @@ def _legacy_update():
 
 
 def cmd_version(args):
-    """输出版本信息。"""
+
     print(
         json.dumps(
             {
@@ -1081,6 +1095,9 @@ def build_parser():
     p = subparsers.add_parser("search-directory", help="在目录下搜索 Excel 文件")
     p.add_argument("--dir", required=True, help="搜索目录")
     p.add_argument("--pattern", required=True, help="搜索模式")
+    p.add_argument("--case-sensitive", action="store_true", help="区分大小写")
+    p.add_argument("--whole-word", action="store_true", help="全字匹配")
+    p.add_argument("--regex", default=None, help="正则模式 (None=自动检测)")
     p.add_argument("--recursive", type=lambda x: x.lower() in ("true", "1", "yes"), default=True, help="递归子目录")
     p.add_argument("--extensions", default=None, help='扩展名过滤 JSON（如 [".xlsx"]）')
     p.add_argument("--max-files", type=int, default=100, help="最大搜索文件数")
@@ -1091,12 +1108,10 @@ def build_parser():
     p.add_argument("--file", required=True, help="Excel 文件路径")
     p.add_argument("--sheet", required=True, help="工作表名称")
     p.add_argument("--column", default=None, help="列名或列号")
-    p.set_defaults(func=cmd_find_last_row)
-
-    # query
     p = subparsers.add_parser("query", help="SQL 查询（优先使用）")
     p.add_argument("--file", required=True, help="Excel 文件路径")
     p.add_argument("--sql", required=True, help="SQL 查询语句")
+    p.add_argument("--sheet", default=None, help="工作表名称（可选，多表文件时指定）")
     p.add_argument("--no-headers", action="store_true", help="不包含表头")
     p.add_argument("--format", default=None, choices=["table", "json", "csv"], help="输出格式")
     p.set_defaults(func=cmd_query)
