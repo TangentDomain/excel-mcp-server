@@ -34,7 +34,6 @@ import shutil
 import tempfile
 import threading
 import time
-import warnings
 from collections.abc import Generator
 from contextlib import contextmanager
 from decimal import Decimal, InvalidOperation
@@ -811,6 +810,12 @@ class AdvancedSQLQueryEngine:
                         keep_default_na=False,
                         na_values=[""],
                     )
+                    # P10: 英文字段名为空时(列名 Unnamed: N), 回退用中文描述做列名
+                    for col_idx in range(len(df.columns)):
+                        col_name = str(df.columns[col_idx])
+                        if "unnamed" in col_name.lower():
+                            if col_idx < len(first_row_values) and first_row_values[col_idx]:
+                                df.rename(columns={df.columns[col_idx]: first_row_values[col_idx]}, inplace=True)
                     # 注意:desc_map 在 _clean_dataframe 之后构建(列名可能被清洗)
                     # 先记录原始映射关系,后面清洗后再构建最终映射
                     raw_desc_pairs = []
@@ -8991,9 +8996,13 @@ class AdvancedSQLQueryEngine:
                     matched_sheet = s
                     break
             if not matched_sheet:
+                suggestions = list(worksheets_data.keys())
+                hint = ""
+                if suggestions:
+                    hint = f"💡 先用 excel list-sheets --file 文件路径 查看所有可用表: {suggestions}"
                 return {
                     "success": False,
-                    "message": f"工作表 '{table_name}' 不存在.可用: {list(worksheets_data.keys())}",
+                    "message": f"工作表 '{table_name}' 不存在.{hint}",
                 }
 
             df = worksheets_data[matched_sheet].copy()
