@@ -3753,20 +3753,21 @@ class AdvancedSQLQueryEngine:
                                             "available_columns": list(df.columns),
                                         },
                                     )
-                    actual_col = self._find_column_name(column_name, df)
-                    if actual_col:
-                        result_data[alias_name] = df[actual_col]
                     else:
-                        suggestion = self._suggest_column_name(column_name, list(df.columns))
-                        raise StructuredSQLError(
-                            "column_not_found",
-                            f"列 '{qualified or column_name}' 不存在.可用列: {list(df.columns)}.{suggestion}",
-                            hint="请检查列名拼写,或用excel_get_headers查看所有可用列名.",
-                            context={
-                                "column_requested": qualified or column_name,
-                                "available_columns": list(df.columns),
-                            },
-                        )
+                        actual_col = self._find_column_name(column_name, df)
+                        if actual_col:
+                            result_data[alias_name] = df[actual_col]
+                        else:
+                            suggestion = self._suggest_column_name(column_name, list(df.columns))
+                            raise StructuredSQLError(
+                                "column_not_found",
+                                f"列 '{qualified or column_name}' 不存在.可用列: {list(df.columns)}.{suggestion}",
+                                hint="请检查列名拼写,或用excel_get_headers查看所有可用列名.",
+                                context={
+                                    "column_requested": qualified or column_name,
+                                    "available_columns": list(df.columns),
+                                },
+                            )
 
                 elif isinstance(original_expr, exp.Case):
                     # CASE WHEN表达式
@@ -5787,7 +5788,14 @@ class AdvancedSQLQueryEngine:
             if isinstance(left_expr, exp.Column):
                 # 普通列引用: 走原有快速路径
                 left = self._expression_to_column_reference(left_expr, df)
-                right = self._expression_to_value(condition.right, df)
+
+                # Fix(autoresearch): 列对列比较 (a.ID < b.ID) 时右侧也是列引用
+                # 需用 _expression_to_column_reference 解析表别名，否则 a.ID < b.ID 变成 ID < ID
+                right_expr = condition.right
+                if isinstance(right_expr, exp.Column):
+                    right = self._expression_to_column_reference(right_expr, df)
+                else:
+                    right = self._expression_to_value(right_expr, df)
 
                 # SQL标准: 任何与NULL的比较都返回UNKNOWN(在WHERE中视为FALSE)
                 if right is None:

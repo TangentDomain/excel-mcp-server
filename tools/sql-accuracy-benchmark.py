@@ -499,6 +499,19 @@ def build_test_cases() -> list[dict]:
     cases.append({"f": "edge", "sql": "SELECT * FROM 边界 WHERE qty != 0 AND price IS NOT NULL", "cat": "compound_null"})
     cases.append({"f": "edge", "sql": "SELECT name, COUNT(*) FROM 边界 GROUP BY name", "cat": "groupby_null"})
 
+    # ── 扩展批8: 字符串函数 + 数学函数 ──
+    cases.append({"f": "simple", "sql": "SELECT ID, SUBSTRING(Name, 1, 2) AS prefix FROM 数据", "cat": "string_func"})
+    cases.append({"f": "simple", "sql": "SELECT ID, REPLACE(Name, '剑', '刀') AS replaced FROM 数据", "cat": "string_func"})
+    cases.append({"f": "simple", "sql": "SELECT ID, TRIM(Name) AS trimmed FROM 数据", "cat": "string_func"})
+    cases.append({"f": "simple", "sql": "SELECT ID, CONCAT(Name, '_', Tags) AS combined FROM 数据", "cat": "string_func"})
+    cases.append({"f": "simple", "sql": "SELECT ID, ROUND(Price, 1) AS rounded FROM 数据", "cat": "math_func"})
+    cases.append({"f": "simple", "sql": "SELECT ID, ABS(Price - 100) AS diff FROM 数据", "cat": "math_func"})
+    cases.append({"f": "simple", "sql": "SELECT Name FROM 数据 WHERE Tags = '武器' UNION SELECT Name FROM 数据 WHERE Tags = '防具'", "cat": "union"})
+    cases.append({"f": "simple", "sql": "SELECT t.Name FROM (SELECT * FROM 数据 WHERE Price > 40) AS t", "cat": "derived_table"})
+
+    # ── 扩展批8: Self-Join (同表别名JOIN) ──
+    cases.append({"f": "simple", "sql": "SELECT a.Name, b.Name AS other FROM 数据 a JOIN 数据 b ON a.Tags = b.Tags WHERE a.ID < b.ID", "cat": "self_join"})
+
     return cases
 
 
