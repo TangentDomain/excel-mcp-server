@@ -558,6 +558,17 @@ def build_test_cases() -> list[dict]:
     # cases.append({"f": "simple", "sql": "SELECT COALESCE(Price, 0) AS safe_price, COUNT(*) FROM 数据 GROUP BY COALESCE(Price, 0)", "cat": "coalesce_group"})
     cases.append({"f": "simple", "sql": "SELECT * FROM 数据 WHERE Name LIKE '%剑%' OR Name LIKE '%杖%'", "cat": "like_multi"})
 
+    # ── 扩展批12: 更多边界场景 ──
+    cases.append({"f": "simple", "sql": "SELECT * FROM 数据 WHERE Name LIKE '%之%'", "cat": "like_special"})
+    cases.append({"f": "simple", "sql": "SELECT ID, SUBSTRING(Name, 2, 2) AS mid FROM 数据", "cat": "substring_mid"})
+    cases.append({"f": "simple", "sql": "SELECT * FROM 数据 WHERE COALESCE(Price, 0) = 0", "cat": "coalesce_where_null"})
+    cases.append({"f": "simple", "sql": "SELECT Tags, COUNT(*) AS c FROM 数据 GROUP BY Tags HAVING c > 2", "cat": "having_alias"})
+    cases.append({"f": "simple", "sql": "SELECT DISTINCT Tags FROM 数据 ORDER BY Tags DESC", "cat": "distinct_orderby_desc"})
+    cases.append({"f": "simple", "sql": "SELECT ID, Price - Price AS zero FROM 数据", "cat": "null_arith"})
+    cases.append({"f": "simple", "sql": "SELECT Tags, CASE WHEN COUNT(*) > 2 THEN 'many' ELSE 'few' END AS freq FROM 数据 GROUP BY Tags", "cat": "case_agg"})
+    cases.append({"f": "simple", "sql": "SELECT Tags, MIN(Price), MAX(Price), AVG(Price) FROM 数据 GROUP BY Tags", "cat": "multi_agg_group"})
+    cases.append({"f": "simple", "sql": "SELECT a.ID, b.ID FROM 数据 a JOIN 数据 b ON a.Active = b.Active WHERE a.ID != b.ID", "cat": "self_join_neq"})
+
     return cases
 
 
