@@ -512,6 +512,14 @@ def build_test_cases() -> list[dict]:
     # ── 扩展批8: Self-Join (同表别名JOIN) ──
     cases.append({"f": "simple", "sql": "SELECT a.Name, b.Name AS other FROM 数据 a JOIN 数据 b ON a.Tags = b.Tags WHERE a.ID < b.ID", "cat": "self_join"})
 
+    # ── 扩展批9: JOIN 高级 ──
+    cases.append({"f": "join", "sql": "SELECT 技能.skill_name, 掉落.item_name FROM 技能 LEFT JOIN 掉落 ON 技能.skill_id = 掉落.skill_ref", "cat": "left_join"})
+    cases.append({"f": "join", "sql": "SELECT 技能.skill_name, COUNT(掉落.item_name) AS drop_count FROM 技能 LEFT JOIN 掉落 ON 技能.skill_id = 掉落.skill_ref GROUP BY 技能.skill_name", "cat": "join_count"})
+    cases.append({"f": "join", "sql": "SELECT skill_id FROM 技能 WHERE damage > 90 UNION ALL SELECT skill_id FROM 技能 WHERE damage = 0", "cat": "union_all"})
+    cases.append({"f": "join", "sql": "SELECT 技能.skill_name, SUM(掉落.qty) AS total_qty FROM 技能 JOIN 掉落 ON 技能.skill_id = 掉落.skill_ref GROUP BY 技能.skill_name HAVING SUM(掉落.qty) > 3", "cat": "join_having"})
+    # NOTE: SELECT 中的关联标量子查询暂不支持（引擎限制），不纳入差分测试
+    # cases.append({"f": "join", "sql": "SELECT skill_name, (SELECT COUNT(*) FROM 掉落 WHERE 掉落.skill_ref = 技能.skill_id) AS drops FROM 技能", "cat": "scalar_subquery"})
+
     return cases
 
 
