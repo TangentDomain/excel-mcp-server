@@ -65,6 +65,49 @@ from .query_helpers import (
 from .query_helpers import (
     sanitize_float_for_excel as _sanitize_float_for_excel,
 )
+
+
+def _sql_div(left, right):
+    """SQL 标准除法: 两操作数均为整数时执行整数除法（截断向零），对齐 SQLite 语义。
+
+    SQLite: 5 / 2 = 2 (int),  5.0 / 2 = 2.5 (float),  5 / 2.0 = 2.5 (float)
+    判断依据: 操作数的存储类型（dtype.kind），不是值。
+    """
+
+    # 判断是否为整数类型
+    def _is_int_dtype(v):
+        if isinstance(v, pd.Series):
+            return v.dtype.kind in "iu"  # int/uint
+        return isinstance(v, (int, np.integer))
+
+    # Series 场景
+    if isinstance(left, pd.Series) or isinstance(right, pd.Series):
+        if not isinstance(left, pd.Series):
+            left = pd.Series([left] * len(right), index=right.index)
+        if not isinstance(right, pd.Series):
+            right = pd.Series([right] * len(left), index=left.index)
+        ln = pd.to_numeric(left, errors="coerce")
+        rn = pd.to_numeric(right, errors="coerce")
+        if _is_int_dtype(left) and _is_int_dtype(right):
+            # 整数除法: 截断向零
+            with np.errstate(divide="ignore", invalid="ignore"):
+                result = np.trunc(ln / rn)
+            result[(rn == 0) | rn.isna()] = np.nan  # 除零 → NULL
+            return result
+        return ln / rn
+    # 标量场景
+    try:
+        ln = float(left)
+        rn = float(right)
+    except (ValueError, TypeError):
+        return None
+    if rn == 0:
+        return None  # 除零返回 NULL
+    if _is_int_dtype(left) and _is_int_dtype(right):
+        return float(int(ln / rn)) if (ln >= 0) == (rn >= 0) else -float(int(abs(ln) / abs(rn)))
+    return ln / rn
+
+
 from .query_helpers import (
     unsupported_error_hint as _unsupported_error_hint,
 )
@@ -3875,7 +3918,7 @@ class AdvancedSQLQueryEngine:
         exp.Add: operator.add,
         exp.Sub: operator.sub,
         exp.Mul: operator.mul,
-        exp.Div: operator.truediv,
+        exp.Div: lambda l, r: _sql_div(l, r),
         exp.Mod: operator.mod,
     }
 
@@ -6564,6 +6607,10 @@ class AdvancedSQLQueryEngine:
                 # 标量函数(ROUND/ABS/FLOOR/CEIL等)包裹聚合函数 → 视为聚合
                 # 在后续主循环中会走 _apply_scalar_to_agg_result 分支处理
                 aggregations[alias_name] = expr
+            # Fix(autoresearch): 算术表达式(Add/Sub/Mul/Div)包含聚合函数 → 视为聚合
+            # 例: MAX(Price) - MIN(Price), SUM(x) / COUNT(y), AVG(x) * 2
+            elif isinstance(expr, (exp.Add, exp.Sub, exp.Mul, exp.Div, exp.Mod)) and self._find_inner_aggregate(expr) is not None:
+                aggregations[alias_name] = expr
             # Fix(R47): CASE/COALESCE 内包含聚合函数时也视为聚合表达式
             elif isinstance(expr, (exp.Case, exp.Coalesce)) and self._find_inner_aggregate(expr) is not None:
                 aggregations[alias_name] = expr
@@ -6789,6 +6836,15 @@ class AdvancedSQLQueryEngine:
                     result_data[alias_name] = grouped[alias_name].first().reset_index(drop=True)
                 elif alias_name.startswith("_window_") and alias_name in df.columns:
                     result_data[alias_name] = grouped[alias_name].first().reset_index(drop=True)
+            # Fix(autoresearch): 处理包含聚合函数的算术表达式 (如 MAX(x)-MIN(y), SUM(x)/COUNT(y))
+            elif isinstance(original_expr, (exp.Add, exp.Sub, exp.Mul, exp.Div, exp.Mod)) and self._find_inner_aggregate(original_expr) is not None:
+                try:
+                    arith_result = self._evaluate_arithmetic_with_aggregates(original_expr, grouped, df)
+                    result_data[alias_name] = arith_result
+                except Exception as e:
+                    logger.warning("算术+聚合计算失败 %s: %s", alias_name, e)
+                    logger.debug("算术+聚合计算详细错误: %s", e, exc_info=True)
+                    result_data[alias_name] = pd.Series([None])
 
         # 处理SELECT *的情况：添加所有GROUP BY列
         has_star = any(isinstance(self._extract_select_alias(expr, 0)[1], exp.Star) for expr in parsed_sql.expressions)
@@ -7270,6 +7326,100 @@ class AdvancedSQLQueryEngine:
             # 逐行评估COALESCE
             coalesce_result = self._evaluate_coalesce_for_row(coalesce_expr, row_context)
             results.append(coalesce_result)
+
+        return pd.Series(results, index=range(len(group_names)))
+
+    def _evaluate_arithmetic_with_aggregates(self, arith_expr: exp.Expression, grouped, df) -> pd.Series:
+        """评估包含聚合函数的算术表达式 (如 MAX(x)-MIN(y), SUM(x)/COUNT(y))。
+
+        策略: 递归遍历表达式树，对每个 AggFunc 子节点调用 _apply_aggregation_function
+        得到标量结果，然后按算术运算符合并。
+        无 GROUP BY 时对整个 df 计算；有 GROUP BY 时逐组计算。
+        """
+        import math as _math
+
+        group_names = list(grouped.groups.keys())
+
+        def _eval_node(node, group_df):
+            """递归评估节点，返回标量值。"""
+            # 聚合函数 → 直接在 group_df 上计算标量
+            if isinstance(node, exp.AggFunc):
+                func_name = type(node).__name__.lower()
+                # 提取列名
+                if isinstance(node.this, exp.Star):
+                    col_name = "*"
+                elif isinstance(node.this, exp.Distinct):
+                    col_name = self._extract_agg_column(node.this.expressions[0], f"{func_name}(DISTINCT)")
+                else:
+                    col_name = self._extract_agg_column(node.this, f"{func_name}()")
+                if func_name == "count":
+                    if col_name == "*":
+                        return float(len(group_df))
+                    if col_name in group_df.columns:
+                        return float(group_df[col_name].count())
+                    return 0.0
+                # sum/avg/max/min 等数值聚合
+                if col_name in group_df.columns:
+                    series = pd.to_numeric(group_df[col_name], errors="coerce")
+                    if func_name == "sum":
+                        return float(series.sum())
+                    elif func_name == "avg":
+                        return float(series.mean())
+                    elif func_name == "max":
+                        return float(series.max())
+                    elif func_name == "min":
+                        return float(series.min())
+                return None
+            # 算术运算 → 递归左右子树
+            if isinstance(node, (exp.Add, exp.Sub, exp.Mul, exp.Div, exp.Mod)):
+                left = _eval_node(node.left if hasattr(node, "left") else node.this, group_df)
+                right = _eval_node(node.right if hasattr(node, "right") else node.expression, group_df)
+                if left is None or right is None:
+                    return None
+                try:
+                    left = float(left)
+                    right = float(right)
+                except (ValueError, TypeError):
+                    return None
+                if isinstance(node, exp.Add):
+                    return left + right
+                elif isinstance(node, exp.Sub):
+                    return left - right
+                elif isinstance(node, exp.Mul):
+                    return left * right
+                elif isinstance(node, exp.Div):
+                    if right == 0:
+                        return None  # SQL 标准: 除零返回 NULL
+                    return left / right
+                elif isinstance(node, exp.Mod):
+                    if right == 0:
+                        return None
+                    return left % right
+            # 列引用 → 取组内值（非聚合场景）
+            if isinstance(node, exp.Column):
+                col = node.name
+                if col in group_df.columns:
+                    vals = group_df[col]
+                    return vals.iloc[0] if len(vals) > 0 else None
+                return None
+            # 字面量
+            if isinstance(node, exp.Literal):
+                try:
+                    return float(node.this)
+                except (ValueError, TypeError):
+                    return node.this
+            # 其他表达式 → 尝试标量求值
+            try:
+                val = self._get_expression_value(node, pd.Series(dtype=object))
+                return val
+            except Exception:
+                return None
+
+        results = []
+        for group_name in group_names:
+            group_df = grouped.get_group(group_name)
+            val = _eval_node(arith_expr, group_df)
+            results.append(val)
 
         return pd.Series(results, index=range(len(group_names)))
 

@@ -179,9 +179,7 @@ def align_result(excel_result: dict, sqlite_result: dict, tol: float = 0.01) -> 
         if h == "_rowid_":
             rowid_idx = idx
             break
-    sqlite_clean = [
-        [v for i, v in enumerate(row) if i != rowid_idx] for row in sqlite_rows
-    ]
+    sqlite_clean = [[v for i, v in enumerate(row) if i != rowid_idx] for row in sqlite_rows]
 
     if len(excel_rows) != len(sqlite_clean):
         return False
@@ -305,6 +303,62 @@ def build_test_cases() -> list[dict]:
     # ── JOIN（同文件多 sheet）──
     cases.append({"f": "join", "sql": "SELECT 技能.skill_id, 技能.skill_name, 掉落.item_name FROM 技能 JOIN 掉落 ON 技能.skill_id = 掉落.skill_ref", "cat": "join"})
     cases.append({"f": "join", "sql": "SELECT 技能.skill_name, 掉落.item_name, 掉落.qty FROM 技能 JOIN 掉落 ON 技能.skill_id = 掉落.skill_ref WHERE 掉落.qty >= 3", "cat": "join"})
+
+    # ── 扩展: NOT IN / NOT LIKE ──
+    cases.append({"f": "simple", "sql": "SELECT * FROM 数据 WHERE ID NOT IN (1,3)", "cat": "not_in"})
+    cases.append({"f": "simple", "sql": "SELECT * FROM 数据 WHERE Name NOT LIKE '%剑%'", "cat": "not_like"})
+
+    # ── 扩展: 多列排序 ──
+    cases.append({"f": "simple", "sql": "SELECT * FROM 数据 ORDER BY Tags ASC, Price DESC", "cat": "orderby_multi"})
+    cases.append({"f": "numbers", "sql": "SELECT * FROM 数值 ORDER BY grp ASC, val DESC", "cat": "orderby_multi"})
+
+    # ── 扩展: 复杂条件 (AND/OR/NOT) ──
+    cases.append({"f": "simple", "sql": "SELECT * FROM 数据 WHERE Price > 50 AND Active = '是'", "cat": "compound_where"})
+    cases.append({"f": "simple", "sql": "SELECT * FROM 数据 WHERE Tags = '武器' OR Tags = '防具'", "cat": "compound_where"})
+    cases.append({"f": "simple", "sql": "SELECT * FROM 数据 WHERE NOT (Active = '是')", "cat": "compound_where"})
+
+    # ── 扩展: 数学表达式 / 除法 ──
+    cases.append({"f": "numbers", "sql": "SELECT id, val * 2 AS double_val FROM 数值", "cat": "expr"})
+    cases.append({"f": "numbers", "sql": "SELECT id, val - 5 AS diff FROM 数值", "cat": "expr"})
+    cases.append({"f": "numbers", "sql": "SELECT id, val / 2 AS half FROM 数值", "cat": "div"})
+    cases.append({"f": "numbers", "sql": "SELECT id, val % 3 AS mod_val FROM 数值", "cat": "expr"})
+    cases.append({"f": "numbers", "sql": "SELECT grp, SUM(val * 2) FROM 数值 GROUP BY grp", "cat": "expr_agg"})
+
+    # ── 扩展: 字符串函数 ──
+    cases.append({"f": "simple", "sql": "SELECT Name, LOWER(Name) AS lname FROM 数据", "cat": "string"})
+    cases.append({"f": "simple", "sql": "SELECT Name, LENGTH(Tags) AS tlen FROM 数据", "cat": "string"})
+
+    # ── 扩展: CASE WHEN 多分支 ──
+    cases.append({"f": "numbers", "sql": "SELECT id, CASE WHEN val >= 20 THEN '高' WHEN val >= 10 THEN '中' ELSE '低' END AS grade FROM 数值", "cat": "case_when"})
+    cases.append({"f": "simple", "sql": "SELECT Name, CASE WHEN Price IS NULL THEN '未知' ELSE '已知' END AS price_status FROM 数据", "cat": "case_null"})
+
+    # ── 扩展: 聚合边界 ──
+    cases.append({"f": "simple", "sql": "SELECT MAX(Price) - MIN(Price) AS range_val FROM 数据", "cat": "agg"})
+    cases.append({"f": "simple", "sql": "SELECT SUM(Price) / COUNT(Price) AS manual_avg FROM 数据", "cat": "agg_expr"})
+    cases.append({"f": "numbers", "sql": "SELECT grp, MIN(val), MAX(val), COUNT(*) FROM 数值 GROUP BY grp", "cat": "groupby_multi_agg"})
+
+    # ── 扩展: 窗口函数更多场景 ──
+    cases.append({"f": "numbers", "sql": "SELECT id, grp, val, SUM(val) OVER (PARTITION BY grp) AS grp_total FROM 数值", "cat": "window"})
+    cases.append({"f": "numbers", "sql": "SELECT id, val, ROW_NUMBER() OVER (ORDER BY val) AS rn_all FROM 数值", "cat": "window"})
+
+    # ── 扩展: 嵌套子查询 / EXISTS ──
+    cases.append({"f": "simple", "sql": "SELECT * FROM 数据 WHERE Price > (SELECT AVG(Price) FROM 数据)", "cat": "subquery"})
+    cases.append({"f": "simple", "sql": "SELECT * FROM 数据 WHERE EXISTS (SELECT 1 FROM 数据 d2 WHERE d2.ID = 数据.ID AND d2.Price > 100)", "cat": "exists"})
+
+    # ── 扩展: 空结果集 ──
+    cases.append({"f": "simple", "sql": "SELECT * FROM 数据 WHERE ID = 999", "cat": "empty_result"})
+    cases.append({"f": "simple", "sql": "SELECT COUNT(*) FROM 数据 WHERE Price > 99999", "cat": "empty_result"})
+
+    # ── 扩展: LIKE 变体 ──
+    cases.append({"f": "simple", "sql": "SELECT * FROM 数据 WHERE Name LIKE '铁%'", "cat": "where_like"})
+    cases.append({"f": "simple", "sql": "SELECT * FROM 数据 WHERE Tags LIKE '%具'", "cat": "where_like"})
+
+    # ── 扩展: OFFSET 边界 ──
+    cases.append({"f": "simple", "sql": "SELECT * FROM 数据 LIMIT 10 OFFSET 3", "cat": "offset"})
+    cases.append({"f": "simple", "sql": "SELECT * FROM 数据 ORDER BY ID LIMIT 0", "cat": "limit_zero"})
+
+    # ── 扩展: DISTINCT 多列 ──
+    cases.append({"f": "simple", "sql": "SELECT DISTINCT Tags, Active FROM 数据", "cat": "distinct"})
 
     return cases
 
