@@ -4039,7 +4039,9 @@ class AdvancedSQLQueryEngine:
                     return self._safe_numeric_series(df[actual_qualified])
             raise ValueError(f"列 '{qualified or col_name}' 不存在")
         elif isinstance(expr, exp.Literal):
-            return self._expression_to_value(expr, df)
+            # Fix(autoresearch): 返回原始值而非带引号的query字符串
+            # _expression_to_value 会包裹引号用于 pandas query()，但 math 表达式需要原始值
+            return self._parse_literal_value(expr)
         elif isinstance(expr, exp.Boolean):
             # SQL布尔字面量(TRUE/FALSE) → int(1/0)，与Excel存储格式一致
             return int(expr.this)
