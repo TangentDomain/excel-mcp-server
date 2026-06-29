@@ -487,6 +487,18 @@ def build_test_cases() -> list[dict]:
     cases.append({"f": "edge", "sql": "SELECT * FROM 边界 ORDER BY qty", "cat": "edge_values"})
     cases.append({"f": "edge", "sql": "SELECT COUNT(name) FROM 边界", "cat": "edge_values"})
 
+    # ── 扩展批7: 综合边界 ──
+    cases.append({"f": "simple", "sql": "SELECT DISTINCT Tags FROM 数据 ORDER BY Tags", "cat": "distinct_orderby"})
+    cases.append({"f": "simple", "sql": "SELECT COUNT(*), SUM(Price), AVG(Price), MAX(Price), MIN(Price) FROM 数据", "cat": "multi_agg"})
+    cases.append({"f": "simple", "sql": "SELECT * FROM 数据 WHERE Price IN (SELECT MAX(Price) FROM 数据)", "cat": "subquery"})
+    cases.append({"f": "simple", "sql": "SELECT Name, CASE WHEN Price > 100 THEN 'high' END AS grade FROM 数据", "cat": "case_no_else"})
+    cases.append({"f": "simple", "sql": "SELECT * FROM 数据 WHERE Price > -1", "cat": "negative_literal"})
+    cases.append({"f": "simple", "sql": "SELECT * FROM 数据 WHERE Price = Price", "cat": "self_compare"})
+    cases.append({"f": "simple", "sql": "SELECT * FROM 数据 WHERE Name LIKE '铁_'", "cat": "like_underscore"})
+    cases.append({"f": "simple", "sql": "SELECT COUNT(DISTINCT Tags) FROM 数据", "cat": "count_distinct"})
+    cases.append({"f": "edge", "sql": "SELECT * FROM 边界 WHERE qty != 0 AND price IS NOT NULL", "cat": "compound_null"})
+    cases.append({"f": "edge", "sql": "SELECT name, COUNT(*) FROM 边界 GROUP BY name", "cat": "groupby_null"})
+
     return cases
 
 
