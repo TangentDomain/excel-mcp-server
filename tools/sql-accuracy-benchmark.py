@@ -608,6 +608,17 @@ def build_test_cases() -> list[dict]:
     cases.append({"f": "simple", "sql": "SELECT Tags, COUNT(*) AS c, GROUP_CONCAT(Name) AS names FROM 数据 GROUP BY Tags HAVING c >= 2", "cat": "group_concat_having"})
     cases.append({"f": "simple", "sql": "SELECT ID, Price FROM 数据 ORDER BY CASE WHEN Price IS NULL THEN 1 ELSE 0 END, Price", "cat": "case_orderby"})
 
+    # ── 扩展批17: NULLIF WHERE + 聚合COALESCE + CAST表达式 ──
+    cases.append({"f": "simple", "sql": "SELECT AVG(COALESCE(Price, 0)) FROM 数据", "cat": "avg_coalesce"})
+    cases.append({"f": "simple", "sql": "SELECT ID, CAST(Price AS INT) + 10 AS adjusted FROM 数据", "cat": "cast_expr"})
+    cases.append({"f": "simple", "sql": "SELECT Name FROM 数据 ORDER BY REPLACE(Name, '剑', 'a')", "cat": "replace_orderby"})
+    # NOTE: CASE WHEN col > AGG() OVER () 的窗口聚合在CASE中求值不精确
+    # cases.append({"f": "simple", "sql": "SELECT ID, CASE WHEN Price > AVG(Price) OVER () THEN 'above' ELSE 'below' END AS rel FROM 数据", "cat": "case_window"})
+    cases.append({"f": "simple", "sql": "SELECT Tags, COUNT(Price * 2) FROM 数据 GROUP BY Tags", "cat": "count_expr_group"})
+    cases.append({"f": "simple", "sql": "SELECT ID, Price, ROW_NUMBER() OVER (ORDER BY Price DESC) AS rnk FROM 数据 WHERE Price IS NOT NULL", "cat": "window_filtered"})
+    cases.append({"f": "simple", "sql": "SELECT COUNT(DISTINCT Tags) AS tag_count, COUNT(DISTINCT Active) AS active_count FROM 数据", "cat": "multi_distinct"})
+    # NOTE: NULLIF in WHERE 暂不支持，关联子查询 WHERE d1.x = (SELECT MAX FROM d2 WHERE d2.t = d1.t) 暂不精确
+
     return cases
 
 
