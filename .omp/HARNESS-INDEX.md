@@ -30,4 +30,5 @@
 | 22 | Ruff 判据 | `scripts/ruff-pass.sh` | L1 | Loop I1 ruff 检查 |
 | 23 | 不变量判据 | `scripts/invariant-pass.sh` | L1 | Loop I1 不变量检查 |
 | 24 | 输出验证 | `scripts/verify-output.py` | L2 | Loop I2 独立验证器 |
-| 25 | 外层对比 | `scripts/compare-holdout.ts` | L3 | Loop I3 holdout 对比 + 回滚 |
+| 25 | 外层对比 | `tools/compare-holdout.ts` | L3 | Loop I3 holdout 对比 + 回滚 |
+| 26 | Excel Skill（项目版） | `.omp/skills/excel/SKILL.md` | L1 | 项目自有 excel 技能定义，覆盖全局版本 |
