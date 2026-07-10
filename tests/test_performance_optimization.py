@@ -17,6 +17,7 @@ from excel_mcp_server_fastmcp.api.excel_operations import ExcelOperations
 
 @pytest.fixture
 def temp_dir():
+    """提供临时目录用于测试文件创建。"""
     with tempfile.TemporaryDirectory() as tmpdir:
         yield tmpdir
 
@@ -117,8 +118,8 @@ class TestDtypeOptimization:
         assert df_opt["big"].dtype == "uint32"
         assert df_opt["negative"].dtype == "int8"
 
-    def test_optimize_dtypes_float_downcast(self):
-        """验证浮点列降级为 float32"""
+    def test_optimize_dtypes_float_no_downcast(self):
+        """验证浮点列保持 float64（R58: 移除 float32 降级，保障聚合精度）"""
         engine = AdvancedSQLQueryEngine()
 
         df = pd.DataFrame(
@@ -129,7 +130,7 @@ class TestDtypeOptimization:
         df["values"] = df["values"].astype("float64")
 
         df_opt = engine._optimize_dtypes(df)
-        assert df_opt["values"].dtype == "float32"
+        assert df_opt["values"].dtype == "float64"
 
     def test_optimize_dtypes_category_conversion(self):
         """验证字符串列保持 object 类型（不再转 category 以兼容 UPDATE 写入）"""

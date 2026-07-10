@@ -1677,8 +1677,7 @@ class AdvancedSQLQueryEngine:
         """
         优化DataFrame数据类型以减少内存占用
 
-        对数值列进行降级(int64->int32/int16/int8, float64->float32),
-        对高基数字符串列不做转换(避免转换开销),对低基数字符串列转为category.
+        R58: 已移除 float64→float32 降级（精度不足），保留 float64 保障聚合精度。
         P3-01增强: 低基数object列自动转category,大幅减少字符串内存占用.
 
         Args:
@@ -4135,7 +4134,10 @@ class AdvancedSQLQueryEngine:
                 right_is_int = isinstance(right, (int, np.integer)) or (isinstance(right, pd.Series) and pd.api.types.is_integer_dtype(right))
                 if left_is_int and right_is_int:
                     if isinstance(left, pd.Series) or isinstance(right, pd.Series):
-                        return np.trunc(pd.to_numeric(left, errors="coerce") / pd.to_numeric(right, errors="coerce")).astype("int64")
+                        div_result = pd.to_numeric(left, errors="coerce") / pd.to_numeric(right, errors="coerce")
+                        # Fix(R42): 除零产生 inf → 转 NaN(SQL NULL)，截断后用 nullable Int64
+                        div_result = div_result.replace([np.inf, -np.inf], np.nan)
+                        return np.trunc(div_result).astype("Int64")
                     # 标量整数除法: 截断向零 (SQLite 语义)
                     return int(left / right) if right != 0 else None
             return self._MATH_BINARY_OPS[op_type](left, right)
@@ -9868,6 +9870,12 @@ class AdvancedSQLQueryEngine:
         """
         if val is None:
             return None
+        # Fix: pd.NA (nullable Int64) → None
+        try:
+            if val is pd.NA:
+                return None
+        except (TypeError, ValueError):
+            pass
         # R48-fix P0-01: datetime/timedelta/pd.Timestamp → ISO格式字符串
         if isinstance(val, (datetime.datetime, datetime.date)):
             return val.isoformat()

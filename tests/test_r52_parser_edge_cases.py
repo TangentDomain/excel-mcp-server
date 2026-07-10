@@ -51,6 +51,7 @@ def edge_xlsx(tmp_path):
 
 @pytest.fixture
 def engine():
+    """提供 AdvancedSQLQueryEngine 实例用于测试。"""
     return AdvancedSQLQueryEngine()
 
 
@@ -261,7 +262,6 @@ class TestNumericEdgeCases:
         assert result["success"] is True
         assert len(result["data"]) >= 2
 
-    @pytest.mark.xfail(reason="Excel浮点精度限制: 1e-300 被存为 0", strict=True)
     def test_very_small_number(self, tmp_path):
         """超小数值（接近0）— Excel 浮点无法精确表示"""
         wb = Workbook()
