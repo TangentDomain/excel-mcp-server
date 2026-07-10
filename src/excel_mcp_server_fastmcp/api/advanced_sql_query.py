@@ -15,8 +15,9 @@
 - 窗口函数: ROW_NUMBER, RANK, DENSE_RANK(OVER PARTITION BY ... ORDER BY ...)
 - 集合操作: UNION, UNION ALL, EXCEPT, INTERSECT
 
-不支持功能:
-- FROM子查询(FROM (SELECT ...) AS alias)
+已支持(原限制已修复):
+- FROM子查询(FROM (SELECT ...) AS alias), SELECT alias.* 限定星号
+- WHERE 引用 SELECT 别名(非窗口), WHERE 引用窗口函数别名(自动重写为子查询)
 """
 
 import csv
@@ -2152,6 +2153,80 @@ class AdvancedSQLQueryEngine:
 
         return ""
 
+    def _get_window_alias_names(self, parsed_sql: exp.Expression) -> set[str]:
+        """提取 SELECT 中所有窗口函数的别名"""
+        names: set[str] = set()
+        for select_expr in parsed_sql.expressions:
+            if isinstance(select_expr, exp.Alias):
+                original = select_expr.this
+                while isinstance(original, exp.Paren):
+                    original = original.this
+                if isinstance(original, exp.Window):
+                    names.add(select_expr.alias)
+        return names
+
+    def _rewrite_where_window_alias(self, parsed_sql: exp.Expression, worksheets_data, _cte_depth: int) -> exp.Expression:
+        """WHERE 引用窗口函数别名时，自动重写为子查询包装。
+
+        SELECT ..., RANK() OVER(...) AS rk FROM t WHERE rk <= 3
+        → SELECT * FROM (SELECT ..., RANK() OVER(...) AS rk FROM t) _sub WHERE rk <= 3
+
+        窗口函数在 WHERE 之后才计算（SQL 执行顺序），无法在 WHERE 中直接引用。
+        重写后内层查询计算窗口列，外层 WHERE 过滤。SQLite 同样不支持此语法，
+        但用户期望自动处理而非报错。
+        """
+        where_clause = parsed_sql.args.get("where")
+        if not where_clause:
+            return parsed_sql
+
+        window_aliases = self._get_window_alias_names(parsed_sql)
+        if not window_aliases:
+            return parsed_sql
+
+        # 收集 WHERE 中引用的列名
+        where_col_names: set[str] = set()
+        for col in where_clause.find_all(exp.Column):
+            where_col_names.add(col.name)
+
+        # 交集 = WHERE 引用了窗口别名
+        referenced = window_aliases & where_col_names
+        if not referenced:
+            return parsed_sql
+
+        # 执行重写：剥离 WHERE 的内层查询 + 带 WHERE 的外层查询
+        inner = parsed_sql.copy()
+        inner_where = inner.args.get("where")
+        if inner_where is None:
+            return parsed_sql
+
+        # 内层：移除 WHERE（但保留 FROM/JOIN/GROUP BY/窗口函数等）
+        inner.set("where", None)
+        # 内层不需要 LIMIT/OFFSET/ORDER BY（移到外层）
+        inner_limit = inner.args.get("limit")
+        inner_offset = inner.args.get("offset")
+        inner_order = inner.args.get("order")
+        inner.set("limit", None)
+        inner.set("offset", None)
+        inner.set("order", None)
+
+        # 构建外层查询：SELECT * FROM (inner) _sub WHERE <原where>
+        outer = sqlglot.parse_one("SELECT * FROM _sub", read="sqlite")
+        # 替换 FROM 为子查询
+        from_clause = outer.args.get("from")
+        if from_clause:
+            from_clause.set("this", exp.Subquery(this=inner, alias=exp.TableAlias(this=exp.to_identifier("_sub"))))
+        # 设置 WHERE
+        outer.set("where", inner_where)
+        # 恢复 LIMIT/OFFSET/ORDER BY 到外层
+        if inner_limit:
+            outer.set("limit", inner_limit)
+        if inner_offset:
+            outer.set("offset", inner_offset)
+        if inner_order:
+            outer.set("order", inner_order)
+
+        return outer
+
     def _check_window_alias_hint(self, col_name: str) -> str:
         """
         检查列名是否是窗口函数别名,如果是则返回友好的错误提示.
@@ -3428,6 +3503,10 @@ class AdvancedSQLQueryEngine:
             # 从parsed_sql中移除with子句,让后续逻辑正常处理
             parsed_sql = parsed_sql.copy()
             parsed_sql.set(_with_key, None)
+        # Fix: WHERE 引用窗口函数别名 → 自动重写为子查询包装
+        # SELECT ..., RANK() OVER(...) AS rk FROM t WHERE rk <= 3
+        # → SELECT * FROM (SELECT ..., RANK() OVER(...) AS rk FROM t) _sub WHERE rk <= 3
+        parsed_sql = self._rewrite_where_window_alias(parsed_sql, worksheets_data, _cte_depth)
 
         # 获取FROM子句中的表名(及可选的子查询)
         from_table, from_subquery = self._get_from_table(parsed_sql)
@@ -3672,6 +3751,25 @@ class AdvancedSQLQueryEngine:
                 for col in df.columns:
                     if col == "_ROW_NUMBER_" or col.startswith("_window_"):
                         continue
+                    if col not in result_data:
+                        result_data[col] = df[col]
+                        ordered_columns.append(col)
+                continue
+            # Fix: 支持 qualified star (t.*) — sqlglot 解析为 Column(this=Star(), table='t')
+            if isinstance(select_expr, exp.Column) and isinstance(select_expr.this, exp.Star):
+                table_part = select_expr.table if hasattr(select_expr, "table") and select_expr.table else None
+                for col in df.columns:
+                    if col == "_ROW_NUMBER_" or col.startswith("_window_"):
+                        continue
+                    # 如果有表限定符，只展开该表的列（匹配 "表名.列名" 格式）
+                    if table_part:
+                        qualified = f"{table_part}.{col}"
+                        if qualified in df.columns:
+                            if qualified not in result_data:
+                                result_data[qualified] = df[qualified]
+                                ordered_columns.append(qualified)
+                            continue
+                        # 也检查无前缀的列（子查询结果通常无前缀）
                     if col not in result_data:
                         result_data[col] = df[col]
                         ordered_columns.append(col)
@@ -5640,11 +5738,54 @@ class AdvancedSQLQueryEngine:
                 lateral_results.append(None)
         return lateral_results
 
+    def _materialize_select_aliases_for_where(self, parsed_sql: exp.Expression, df) -> None:
+        """WHERE 引用 SELECT 别名时，将别名对应的表达式物化为临时列。
+
+        SQLite 允许 WHERE 引用非窗口 SELECT 别名，ExcelMCP 对齐此行为。
+        仅处理非窗口别名（窗口别名由 _rewrite_where_window_alias 处理）。
+        """
+        where_clause = parsed_sql.args.get("where")
+        if not where_clause:
+            return
+
+        # 收集 WHERE 中引用的所有列名
+        where_col_names: set[str] = set()
+        for col in where_clause.find_all(exp.Column):
+            where_col_names.add(col.name)
+
+        if not where_col_names:
+            return
+
+        # 提取 SELECT 别名映射
+        select_aliases = self._extract_select_aliases(parsed_sql)
+        window_names = self._get_window_alias_names(parsed_sql)
+
+        for alias_name, original_expr in select_aliases.items():
+            # 跳过窗口别名（已由重写处理）
+            if alias_name in window_names:
+                continue
+            # 别名不在 WHERE 引用中 → 跳过
+            if alias_name not in where_col_names:
+                continue
+            # 别名已经是 df 中的列 → 无需物化
+            if alias_name in df.columns:
+                continue
+            # 物化表达式为临时列
+            temp_col = self._compute_temp_column(original_expr, df, f"__where_alias_{alias_name}")
+            if temp_col is not None and temp_col != alias_name:
+                df.rename(columns={temp_col: alias_name}, inplace=True)
+                getattr(self, "_pending_tmp_cols", []).append(alias_name)
+
     def _apply_where_clause(self, parsed_sql: exp.Expression, df) -> pd.DataFrame:
         """应用WHERE条件"""
         where_clause = parsed_sql.args.get("where")
         if not where_clause:
             return df
+
+        # Fix: WHERE 引用 SELECT 别名（非窗口）→ 物化为临时列
+        # SQLite 支持此行为，ExcelMCP 对齐
+        self._pending_tmp_cols = []
+        self._materialize_select_aliases_for_where(parsed_sql, df)
 
         # 如果WHERE包含复杂表达式(pandas query不支持的类型),直接使用逐行过滤
         where_expr = where_clause.this
@@ -5655,7 +5796,6 @@ class AdvancedSQLQueryEngine:
 
         # 将SQLGlot表达式转换为pandas查询条件
         # Fix(R52): 使用实例级临时列追踪，避免 df._tmp_columns 触发 pandas UserWarning
-        self._pending_tmp_cols = []
         condition_str = self._sql_condition_to_pandas(where_expr, df)
 
         if condition_str:
