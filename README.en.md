@@ -17,39 +17,55 @@
 
 ### Option 1: Skill Integration (Recommended)
 
-Integrate the Excel skill into your OMP harness. First run auto-creates venv + installs from GitHub; update via `self-update` afterwards.
+Integrate the Excel skill into your AI coding tool. First run auto-creates venv + installs from GitHub; update via `self-update` afterwards.
 
-#### Global Install (all projects)
+#### Claude Code
+
+**Global** (all projects):
 
 ```bash
-# 1. Download skill files (only SKILL.md + bin/excel-cli.py needed)
 git clone https://github.com/TangentDomain/excel-mcp-server.git
-cp -r excel-mcp-server/.omp/skills/excel ~/.omp/agent/skills/excel
+cp -r excel-mcp-server/.omp/skills/excel ~/.claude/skills/excel
 
-# 2. First run — auto-creates venv + installs from GitHub
-python ~/.omp/agent/skills/excel/bin/excel-cli.py query --file data.xlsx --sql "SELECT * FROM Sheet1"
-
-# 3. Subsequent runs can use exe directly (skips bootstrap, faster)
-~/.omp/agent/skills/excel/.venv/Scripts/excel-cli.exe query --file data.xlsx --sql "SELECT * FROM Sheet1"
+# First run — auto-creates venv + installs from GitHub
+python ~/.claude/skills/excel/bin/excel-cli.py query --file data.xlsx --sql "SELECT * FROM Sheet1"
 ```
 
-#### Project-level Install (current project only)
+**Project-level** (current project only, travels with repo):
 
 ```bash
-# In your project root
-cp -r /path/to/excel-mcp-server/.omp/skills/excel .omp/skills/excel
+cp -r /path/to/excel-mcp-server/.omp/skills/excel .claude/skills/excel
+python .claude/skills/excel/bin/excel-cli.py query --file data.xlsx --sql "SELECT * FROM Sheet1"
+```
 
-# Usage same as above, change path to project-relative
-python .omp/skills/excel/bin/excel-cli.py query --file data.xlsx --sql "SELECT * FROM Sheet1"
+#### Cursor
+
+**Global**:
+
+```bash
+git clone https://github.com/TangentDomain/excel-mcp-server.git
+cp -r excel-mcp-server/.omp/skills/excel ~/.cursor/skills-cursor/excel
+
+python ~/.cursor/skills-cursor/excel/bin/excel-cli.py query --file data.xlsx --sql "SELECT * FROM Sheet1"
+```
+
+**Project-level**:
+
+```bash
+cp -r /path/to/excel-mcp-server/.omp/skills/excel .cursor/skills-cursor/excel
+python .cursor/skills-cursor/excel/bin/excel-cli.py query --file data.xlsx --sql "SELECT * FROM Sheet1"
 ```
 
 > **Global vs Project**: Global = install once, use everywhere; Project = travels with the repo, good for team collaboration.
-> Project-level overrides global — same-name skill, project version wins.
 
-#### Updates
+#### Ongoing Usage
 
 ```bash
-excel-cli self-update --check   # Check for new version
+# After venv setup, use exe directly (skips bootstrap, faster)
+~/.claude/skills/excel/.venv/Scripts/excel-cli.exe query --file data.xlsx --sql "SELECT * FROM Sheet1"
+
+# Check for updates
+excel-cli self-update --check
 excel-cli self-update           # Update to latest
 ```
 
