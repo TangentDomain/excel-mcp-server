@@ -1,612 +1,287 @@
 [简体中文](README.md) | [English](README.en.md)
 
-# 🎮 ExcelMCP: 让游戏策划用嘴说话的Excel神器
+# ExcelMCP: 游戏开发 Excel 配置表 MCP 服务器
 
-[![PyPI](https://img.shields.io/pypi/v/excel-mcp-server-fastmcp.svg)](https://pypi.org/project/excel-mcp-server-fastmcp/v1.17.0)
+[![PyPI](https://img.shields.io/pypi/v/excel-mcp-server-fastmcp.svg)](https://pypi.org/project/excel-mcp-server-fastmcp/)
 [![CI](https://github.com/TangentDomain/excel-mcp-server/actions/workflows/ci.yml/badge.svg)](https://github.com/TangentDomain/excel-mcp-server/actions/workflows/ci.yml)
-![Tests](https://img.shields.io/badge/tests-1880-brightgreen.svg)
+![Tests](https://img.shields.io/badge/tests-1447-brightgreen.svg)
 ![Tools](https://img.shields.io/badge/tools-26-green.svg)
-![GitHub stars](https://img.shields.io/github/stars/TangentDomain/excel-mcp-server?style=social&label=Stars)
+![SQL](https://img.shields.io/badge/SQL%20accuracy-100%25-brightgreen.svg)
 
-> **🚀 游戏策划必备：用中文/SQL直接操作Excel，告别手动VBA！**
-> 
-> 🎯 **自然语言** → "把技能攻击力全部加10%"  
-> 🔧 **SQL查询** → "SELECT * FROM skills WHERE class='法师'"  
-> ⚡ **智能操作** → 自动跨表JOIN、批量修改、版本管理
+> 基于 Python FastMCP + openpyxl + sqlglot 的 Excel 配置表 MCP 服务器。
+> SQL-over-Excel 查询、批量操作、结构管理，为游戏开发者设计。
 
 ---
 
-## 🚀 最新更新 (v1.17.0)
+## 快速开始
 
-### ⚡ 性能大升级
-- **整体性能提升 10.3x**：核心查询路径全面优化，大数据量场景响应速度质的飞跃
+### 方式一：Skill 接入（首推）
 
-### ✨ 窗口函数全家桶（新增7个）
-- **窗口聚合函数**：`AVG() OVER` / `SUM() OVER` / `MIN() OVER` / `MAX() OVER` / `COUNT() OVER`
-- **NTH_VALUE**：取窗口中第 N 行的值（如「每个职业伤害排名第2的技能」）
-- **GROUP_CONCAT**：行合并为字符串（如「列出每个职业的所有技能名」）
-- **UPDATE 支持窗口函数**：批量修改也能用窗口计算（如「按伤害排名分批调整数值」）
+通过全局 skill 安装，支持自更新和自举：
 
-### 📊 完整窗口函数清单（17个）
-| 函数 | 说明 | 示例 |
-|------|------|------|
-| ROW_NUMBER | 行号 | 每行唯一编号 |
-| RANK / DENSE_RANK | 排名 | 处理并列名次 |
-| NTILE | 分桶 | 均分为 N 组 |
-| PERCENT_RANK / CUME_DIST | 百分比/累积分布 | 统计分布位置 |
-| LAG / LEAD | 前后行取值 | 同比/环比分析 |
-| FIRST_VALUE / LAST_VALUE | 首尾值 | 分组极值 |
-| NTH_VALUE | 第N行值 | 自定义排名取值 |
-| AVG/SUM/MIN/MAX/COUNT | 窗口聚合 | 分组统计 |
-| GROUP_CONCAT | 字符合并 | 列表拼接 |
-
-### 🔧 其他改进
-- **行号支持**：`_ROW_NUMBER_` 虚拟列，SELECT 和 UPDATE 都可用
-- **IN/NOT IN 修复**：UPDATE 的 IN 子句静默失败问题已修复
-- **写入增强**：列名匹配失败自动降级到传统 openpyxl 路径
-
-### 🎮 游戏场景支持
-- **技能系统**：CTE查询、平衡分析、批量调整、排名统计
-- **装备管理**：套装计算、稀有度分类、评分系统、属性聚合
-- **怪物配置**：AI行为配置、属性缩放、掉落管理、分组统计
-- **关卡设计**：进度统计、难度配置、活动管理、数据透视
-
----
-
-[📖 完整更新日志](docs/CHANGELOG.md) | [🎯 贡献指南](docs/CONTRIBUTING.md)
-
----
-
-## 🎯 一句话介绍
-
-> **"我要把技能攻击力全部加10%,装备按稀有度排序,找出法师职业所有技能"**
-
-**🎯 不写代码！不学公式！用中文直接命令Excel，智能完成游戏配置管理！**
-
----
-
-## 🚀 快速开始(1分钟)
-
-> 💡 **🔥 急用命令？** → [📋 30秒快速参考](docs/tutorials/QUICK_REFERENCE.md)
-
-### 🔥 一键安装，即刻使用！
-
-#### 🎯 推荐:uvx(最简单,无安装)
 ```bash
-# Mac/Linux 一行命令
-curl -LsSf https://astral.sh/uv/install.sh | sh
-
-# Windows PowerShell
-powershell -ExecutionPolicy ByPass -c "irm https://astral.sh/uv/install.ps1 | iex"
+# 安装后通过 CLI 直接调用，支持 self-update 自动更新
+excel-cli <command> [options]
 ```
 
-使用:
+Skill 入口自动管理 venv 并转发到 CLI。详见 [SKILL.md](.omp/skills/excel/SKILL.md)。
+
+### 方式二：MCP Server（AI 客户端集成）
+
 ```bash
+# uvx（推荐，无需安装）
 uvx excel-mcp-server-fastmcp
-```
 
-#### 📦 传统:pip
-```bash
+# pip
 pip install excel-mcp-server-fastmcp
 ```
 
-> 💡 国内用户:`pip install excel-mcp-server-fastmcp -i https://pypi.tuna.tsinghua.edu.cn/simple`
-
-### 🔗 AI 客户端配置(1分钟)
-
-#### Cursor（推荐）
+#### Cursor 配置
 - 设置 → MCP → Add Server
 - Name: `excelmcp`
 - Command: `uvx`
 - Args: `"excel-mcp-server-fastmcp"`
 
-#### Claude Code
+#### Claude Code 配置
 ```bash
-# 在项目中添加MCP服务器
 claude mcp add excelmcp -- uvx excel-mcp-server-fastmcp
 ```
 
-#### 其他客户端
-- Cherry Studio / VSCode + Continue: 同样配置
-- OpenClaw: 内置支持，无需配置
-
-### ✅ 验证成功
-在 AI 客户端说:"帮我读取技能表测试一下"
-看到 Excel 数据?🎉 **配置完成!**
-
----
-
-## 🎮 游戏开发场景演示 (所见即所得！)
-
-### 🎯 策划日常工作示例
-> 🎯 **真实案例**: 以下所有操作都已通过26个MCP工具验证
-> 🎮 **支持游戏**: RPG、MMO、卡牌、塔防、射击、策略等各类游戏  
-> ⚡ **性能表现**: 支持10万+数据批量处理，响应时间 <1秒
+### 方式三：源码直接调用（开发环境）
 
 ```bash
-# 🗣️ 用中文直接命令Excel (无需编程!)
-"帮我把技能表里所有法师技能攻击力加 20%"
-"找出装备表中价格超过 1000 的史诗装备" 
-"把技能表和职业表关联,统计每个职业的技能数量"
-"复制技能表到新文件,命名为技能备份_v2.xlsx"
-```
-
-### 🔢 数值策划任务
-```bash
-# 数据分析
-"计算每个职业的平均攻击力和防御力"
-"找出攻击力最高的前 10 个技能"
-"批量调整所有技能冷却时间,乘以 0.8"
-"生成角色属性平衡报告"
-```
-
-### 🏗️ 关卡策划需求
-```bash
-# 关卡配置
-"读取关卡配置表,找出所有可收集道具"
-"批量修改怪物掉落概率,稀有物品提升 50%"
-"生成关卡进度统计报表"
+uv run python -m excel_mcp_server_fastmcp.cli <command> [options]
 ```
 
 ---
 
-## 📊 核心功能对比
+## 26 个 MCP 工具
 
-### 游戏开发专用对比
+### 查询类（9 个）
 
-| 场景 | ExcelMCP | 传统 Excel | ChatGPT | Python pandas |
-|------|----------|------------|---------|----------------|
-| **学习成本** | 🟢 0(直接说人话) | 🔴 需要公式学习 | 🟡 需要详细描述 | 🔴 需要编程基础 |
-| **跨表操作** | 🟢 自动 JOIN | 🔴 复杂 VLOOKUP | 🔴 不支持 | 🟡 需要代码实现 |
-| **批量修改** | 🟢 一条指令搞定 | 🔴 手动操作 | 🟡 需要详细描述 | 🟡 需要循环处理 |
-| **错误处理** | 🟢 智能提示 | 🔴 容易出错 | 🟡 依赖 AI 能力 | 🔴 需要异常处理 |
-| **游戏优化** | 🟢 专属优化 | 🔴 通用功能 | 🔴 不专业 | 🟡 需要游戏知识 |
-| **响应速度** | 🟢 < 3秒 | 🟢 即时 | 🟡 10-30秒 | 🟢 3-10秒 |
-| **数据规模** | 🟢 10万行×1000列 | 🟢 无限制 | 🔴 有限制 | 🟢 内存限制 |
+| 工具 | 说明 |
+|------|------|
+| `excel_query` | **SQL 查询引擎**（首选）— WHERE/LIKE/IN/JOIN/窗口函数/CTE/UNION 等 |
+| `excel_describe_table` | 查看表结构（列名+类型+样本值），支持双行表头自动检测 |
+| `excel_get_headers` | 获取表头信息（中文+英文） |
+| `excel_get_range` | 按精确坐标读取数据（如 A1:C10） |
+| `excel_search` | 在工作表中搜索单元格文本 |
+| `excel_search_directory` | 跨文件搜索 Excel |
+| `excel_find_last_row` | 定位数据末行（追加数据前必用） |
+| `excel_list_sheets` | 列出所有工作表名称 |
+| `excel_compare_sheets` | 按 ID 列对比两个工作表差异 |
 
-### 优势场景分析
+### 写入类（7 个）
 
-#### 🎮 ExcelMCP 最适合
-- **游戏策划**:数值调整、配置管理、平衡分析
-- **独立开发者**:快速原型、配置迭代、多人协作
-- **数据分析师**:游戏数据分析、用户行为统计
-- **运营人员**:活动配置、道具管理、版本对比
+| 工具 | 说明 |
+|------|------|
+| `excel_update_query` | **SQL UPDATE** 批量修改（支持 dry_run 预览） |
+| `excel_insert_query` | **SQL INSERT** 插入数据（单行/多行） |
+| `excel_delete_query` | **SQL DELETE** 删除数据（必须 WHERE） |
+| `excel_update_range` | 精确坐标写入（默认覆盖，insert_mode=True 插入） |
+| `excel_upsert_row` | 按主键插入或更新单行（幂等安全） |
+| `excel_set_formula` | 写入 Excel 公式 |
+| `excel_run_python` | 执行 Python 脚本（沙箱环境，注入 query/update/insert/delete） |
 
-#### 🔧 传统 Excel 最适合
-- **复杂公式计算**:财务报表、科学计算
-- **可视化图表**:动态图表、复杂报表
-- **宏自动化**:复杂业务流程自动化
+### 结构操作类（7 个）
 
-#### 💡 ChatGPT 最适合
-- **文本处理**:文案生成、翻译、总结
-- **代码编写**:程序开发、算法设计
-- **创意内容**:游戏设计、故事创作
+| 工具 | 说明 |
+|------|------|
+| `excel_create_file` | 创建新 Excel 文件 |
+| `excel_create_sheet` | 创建工作表 |
+| `excel_delete_sheet` | 删除工作表 |
+| `excel_rename_sheet` | 重命名工作表 |
+| `excel_copy_sheet` | 复制工作表 |
+| `excel_structure` | 插入/删除行列 |
+| `excel_rename_column` | 重命名列（表头） |
 
-#### 🐍 Python pandas 最适合
-- **大数据处理**:百万级行数据处理
-- **机器学习**:数据建模、算法训练
-- **自动化脚本**:复杂数据处理流水线
+### 格式化类（2 个）
 
----
+| 工具 | 说明 |
+|------|------|
+| `excel_format_cells` | 设置样式（字体/合并/边框/预设样式） |
+| `excel_set_layout` | 设置行高或列宽 |
 
-## 🛠️ 支持的游戏类型
+### 备份类（1 个）
 
-| 游戏类型 | 支持场景 | 特色功能 |
-|----------|----------|----------|
-| **RPG** | 技能系统、装备套装、属性成长 | CTE 查询、装备加成计算 |
-| **MMO** | 大数据量配置、版本管理 | 流式写入、缓存优化 |
-| **卡牌** | 卡牌效果、概率计算 | 条件格式、数据验证 |
-| **策略** | 单位配置、战斗计算 | 跨文件 JOIN、批量操作 |
-| **休闲** | 关卡配置、道具管理 | 简单查询、快速修改 |
-
----
-
-## 📱 手机端看这里（简化功能对比）
-
-| 使用场景 | ExcelMCP | 传统方式 |
-|----------|----------|----------|
-| **策划想调数值** | 直接说"加攻击力" | 手动改100个单元格 |
-| **跨表统计** | "关联表统计" | VLOOKUP+公式 |
-| **找问题数据** | "找出异常值" | 人工肉眼排查 |
-| **批量修改** | "批量更新" | 复制粘贴重复操作 |
-
-> 💡 **一句话总结**：你用自然语言说需求，ExcelMCP帮你搞定Excel操作
+| 工具 | 说明 |
+|------|------|
+| `excel_backup` | 备份创建/列表/恢复 |
 
 ---
 
-## 💡 使用技巧
+## SQL 功能
 
-### 🎯 高效指令示例
-```bash
-# 数据分析
-"分析技能平衡性,找出伤害过高的技能"
-"计算装备套装加成效果,按总价排序"
-"统计怪物掉落,找出最值钱的掉落"
+### 已支持（169 条差分测试验证，19 类别 100% 通过）
 
-# 批量操作
-"批量修改所有武器耐久度 +20%"
-"复制装备表到不同品质分类"
-"生成职业配装推荐"
+| 类别 | 功能 |
+|------|------|
+| 基础 | SELECT, DISTINCT, AS, `+-*/%`, 一元负号, 整数除法(截断向零), `t.*` qualified star |
+| 条件 | WHERE, LIKE, IN, NOT IN, BETWEEN, AND/OR, 子查询, WHERE 引用 SELECT 别名 |
+| 聚合 | COUNT, SUM, AVG, MAX, MIN, GROUP BY, HAVING |
+| 排序 | ORDER BY, LIMIT, OFFSET, NULLS FIRST/LAST |
+| 窗口 | ROW_NUMBER, RANK, DENSE_RANK, NTILE, LAG, LEAD, FIRST_VALUE, LAST_VALUE, NTH_VALUE, AVG/SUM/MIN/MAX/COUNT OVER, GROUP_CONCAT, PARTITION BY, ROWS BETWEEN, WHERE 引用窗口别名 |
+| 多表 | INNER/LEFT/RIGHT/FULL JOIN（同文件跨 Sheet + 跨文件 `表名@'路径'`） |
+| 高级 | CASE WHEN, CTE(WITH), EXISTS, UNION/UNION ALL, INTERSECT/EXCEPT, NULLIF, COALESCE |
+| 字符串 | UPPER, LOWER, TRIM, LENGTH, CONCAT, REPLACE, SUBSTRING |
+| 数学 | ABS, CEIL, FLOOR, SQRT, POWER, ROUND |
+| NULL | IS NULL, IS NOT NULL, COALESCE, 三值逻辑（与 SQLite 对齐） |
 
-# 版本管理
-"比较技能表新旧版本差异"
-```
+### 关键语义（与 SQLite 3.x 对齐）
 
-### 🚀 一键复制(即用即改)
+- **GROUP BY / ORDER BY**：NULL 排最前（ASC），排最后（DESC）
+- **ROUND**：四舍五入（round half away from zero），非 banker's rounding
+- **整数除法**：截断向零（int(a/b)），与 SQLite 一致
+- **NULL 三值逻辑**：NULL = NULL → UNKNOWN(FALSE)，NULL != 0 → UNKNOWN(FALSE)
+- **LIKE**：`%` 匹配任意字符，`_` 匹配单字符，大小写不敏感
 
-#### 技能表分析
-```bash
-"读取技能表,找出所有冷却时间小于3秒的技能,按伤害排序"
-```
+### SQL 限制
 
-#### 装备批量优化
-```bash
-"给所有史诗级装备攻击力+15%,防御+10%"
-"找出总评分超过80的装备,按评分降序排列"
-```
-
-#### 怪物AI配置
-```bash
-"修改所有Boss级怪物血量+50%,伤害+30%"
-"统计不同类型怪物的平均属性,生成平衡报告"
-```
-
-#### 关卡配置管理
-```bash
-"批量更新关卡难度参数,第5关难度+20%"
-"生成各关卡完成率统计报表,标记完成率低于50%的关卡"
-```
-
-### 🔢 行号定位更新（高级用法）
-
-当表中存在**重复记录**，无法通过字段值唯一确定要更新的行时，可使用 `_ROW_NUMBER_` 虚拟列精确定位：
-
-```sql
--- 按行号列表更新（最常用）
-UPDATE LootList SET PropType = '主武器' WHERE _ROW_NUMBER_ IN (11, 21, 36)
-
--- 按单个行号更新
-UPDATE 数据表 SET 状态 = '已处理' WHERE _ROW_NUMBER_ = 5
-
--- 按行号范围更新
-UPDATE 数据表 SET 值 = 100 WHERE _ROW_NUMBER_ BETWEEN 10 AND 50
-```
-
-> ⚠️ **注意**：`_ROW_NUMBER_` 在 **SELECT 查询和 UPDATE 的 WHERE 条件**中都可用。不能用于 SET 赋值。行号从1开始计数，对应Excel的数据行（不含表头）。
+- 跨文件 JOIN 需用 `表名@'文件路径'` 语法（同文件跨 Sheet 直接用表名）
+- Excel 空字符串 `""` 往返后变为 NULL（xlsx 格式固有限制）
+- WHERE 引用窗口函数别名时自动重写为子查询（透明支持）
+- WHERE 引用 SELECT 别名（非窗口）已支持（物化为临时列）
 
 ---
 
-## 🎮 现在试试！3分钟体验ExcelMCP神奇功能
+## 技术规格
 
-### 🚀 新手体验（3秒上手！）
-```bash
-# 💡 就这么说就行：
-"读取我的技能表，显示前5个技能"
-# 🎯 没错！用中文直接命令Excel，就这么简单！
-```
-
-### 📊 快速分析体验（展示真实力！）
-```bash
-# 🎯 试试这个复杂查询（一条命令搞定）：
-"把技能表和职业表关联，找出法师职业所有技能并按攻击力排序"
-"分析技能表，找出攻击力最高的3个技能"
-```
-
-### 🔧 批量操作体验
-```bash
-# 复制这句测试批量修改：
-"给所有法师技能的冷却时间减少20%"
-```
-
-### 🎯 结果对比
-- ✅ 成功：看到Excel数据被正确读取和修改
-- ❌ 失败：检查Excel文件是否关闭、文件路径是否正确
-"创建配置文件备份"
-"回滚到指定版本"
-```
-
-### 🚀 性能优化
-- **大文件**:使用流式写入,支持 10万+ 行数据
-- **复杂查询**:自动索引优化,响应 < 3 秒
-- **内存占用**:典型文件 < 100MB
-- **支持格式**:.xlsx、.xlsm、.xlsb
+- **版本**: 1.17.0
+- **Python**: >= 3.10
+- **依赖**: FastMCP / openpyxl / sqlglot / pandas
+- **测试**: 1447 passed, 3 skipped, 1 xfailed
+- **SQL 准确率**: 169 条差分测试 100% 通过（与 SQLite 交叉校验）
+- **工具数量**: 26 个 MCP 工具
+- **支持格式**: .xlsx, .xlsm
 
 ---
 
-## 📚 文档资源
+## 架构
 
-### 📖 快速上手
-- [📋 快速参考指南](docs/tutorials/QUICK_REFERENCE.md) - 30秒找到你需要命令（新！）
-- [互动式教程](docs/tutorials/INTERACTIVE_TUTORIAL.md) - 分模块游戏配置实战教程（新！）
-- [基础教程](docs/api/README-gaming.md) - 游戏开发入门指南
-- [性能优化](docs/api/README-performance.md) - 大文件处理技巧
-- [SQL 参考](docs/api/README-sql.md) - 高级查询语法
+```
+server.py                    MCP 工具层 (FastMCP) — 26 个工具
+  └─ api/
+       ├─ advanced_sql_query.py   SQL 查询引擎 (10395 行)
+       ├─ excel_operations.py     通用 Excel 操作 (2776 行)
+       ├─ script_runner.py        Python 脚本沙箱 (281 行)
+       └─ header_analyzer.py      双行表头检测
+  └─ core/
+       ├─ excel_reader.py         读取 (calamine → openpyxl 降级)
+       ├─ excel_writer.py         写入 (传统模式, 1948 行)
+       ├─ excel_manager.py        工作表管理
+       ├─ excel_search.py         搜索
+       ├─ excel_compare.py        比较
+       └─ excel_converter.py      格式转换
+  └─ utils/
+       ├─ validators.py           SecurityValidator + ExcelValidator
+       ├─ formatter.py            结果格式化
+       ├─ formula_cache.py        公式计算缓存
+       └─ concurrent_utils.py     并发工具
+  └─ calibrator/
+       └─ core.py                 SQLite 交叉校准工具
+  └─ verification/
+       └─ runner.py               baseline 驱动验证
+```
 
-### 🎮 示例代码
-- [游戏开发示例](examples/README.md) - 完整技能系统、装备管理案例
-- [批量操作示例](examples/进阶操作/) - 数据批处理、版本对比
-- [实战案例](examples/实战案例/) - 完整游戏数值平衡方案
+### 关键设计
+
+- **双表头支持**：自动检测游戏配表常见的双层表头（中文描述 + 英文字段名），SQL 工具中英文名都可用
+- **性能路径**：calamine (Rust 引擎) 纯数据读取 → openpyxl 格式化/公式读取降级 → StreamingWriter 大文件流式写入
+- **安全**：所有工具路径验证（防穿越/符号链接），SQL 通过 sqlglot AST 解析（非拼接），run-python 沙箱限制文件/进程操作
+- **SQL 校准器**：将 Excel 导入 SQLite 跑同一条 SQL 做对比，定位引擎 bug（开发调试用）
 
 ---
 
-## 🔧 故障排除
+## SQL 校准器（开发调试工具）
 
-### ❌ 常见问题
+将 Excel 导入 SQLite 后跑同一条 SQL，跟 `excel_query` 的返回结果做对比，定位 bug。
 
-**Python 版本问题**
-```bash
-python --version  # 需要 3.10+
-# 升级:https://www.python.org/downloads/
-```
-
-**网络问题**
-```bash
-# 国内镜像源
-pip install -i https://pypi.tuna.tsinghua.edu.cn/simple excel-mcp-server-fastmcp
-```
-
-**配置错误**
-- 检查 JSON 格式是否正确
-- 重启 AI 客户端
-- 验证 uvx:`uvx --version`
-
-### 🆘 获取帮助
-```bash
-# 命令行帮助
-excel-mcp-server-fastmcp --help
-
-# 项目文档
-https://github.com/TangentDomain/excel-mcp-server
-
-# 提交问题
-GitHub Issues → 使用 Bug 报告模板
-```
-
----
-
-## 📈 技术规格
-
-- **响应速度**:小文件 < 1秒,大文件 < 3秒
-- **数据规模**:10万行 × 1000列
-- **工具数量**:38 个游戏专用工具
-- **内存占用**:< 100MB(典型文件)
-- **支持格式**:.xlsx、.xlsm、.xlsb
-
----
-
-## 🔬 SQL 校准器（开发调试工具）
-
-> **开发阶段专用**：将 Excel 导入 SQLite 后跑同一条 SQL，跟 `excel_query` 的返回结果做对比，定位 bug。
-
-### 📦 两种使用方式
-
-#### 方式 1：MCP 工具（AI Agent 调用）
-
-当 ExcelMCP 以 MCP 模式运行时，AI 可直接调用以下 4 个校准工具：
-
-| MCP 工具 | 功能 | 说明 |
-|---------|------|------|
-| `calibrate_import` | 导入 Excel → SQLite | 支持双表头拍平、多 Sheet、`_rowid_` 主键 |
-| `calibrate_query` | 执行 SQL 查询 | 返回格式化结果 + 耗时（毫秒） |
-| `calibrate_tables` | 列出所有表 | 显示表名和行数 |
-| `calibrate_schema` | 查看表结构 | 列名、类型、约束、主键 |
-
-**典型调试流程：**
-```
-1. calibrate_import("/data/宝箱掉落道具清单_v2.xlsx", "debug_db")
-2. calibrate_query("debug_db", "SELECT * FROM 宝箱掉落道具清单 WHERE 物品类型='符文'")
-3. 对比 excel_query 的结果 → 定位差异
-```
-
-#### 方式 2：CLI 命令行（开发者手动用）
+### CLI 使用
 
 ```bash
 # 导入 Excel 到 SQLite
-python -m excel_mcp_server_fastmcp.calibrate import  <xlsx路径> [数据库名]
+python -m excel_mcp_server_fastmcp.calibrate import <xlsx路径> [数据库名]
 
 # 执行查询
-python -m excel_mcp_server_fastmcp.calibrate query   <数据库名> "<SQL>"
+python -m excel_mcp_server_fastmcp.calibrate query <数据库名> "<SQL>"
 
 # 列出所有表
-python -m excel_mcp_server_fastmcp.calibrate tables  [数据库名]
+python -m excel_mcp_server_fastmcp.calibrate tables [数据库名]
 
 # 查看表结构
-python -m excel_mcp_server_fastmcp.calibrate schema  <数据库名> <表名>
+python -m excel_mcp_server_fastmcp.calibrate schema <数据库名> <表名>
 ```
 
-**完整示例：**
-```bash
-# 1. 导入测试文件
-python -m excel_mcp_server_fastmcp.calibrate import /tmp/excelmcp_bugs_report/宝箱掉落道具清单_v2.xlsx test_db
-python -m excel_mcp_server_fastmcp.calibrate import /tmp/excelmcp_bugs_report/ChestProp.xlsx test_db
-
-# 2. 查看有哪些表
-python -m excel_mcp_server_fastmcp.calibrate tables test_db
-
-# 3. 查看表结构
-python -m excel_mcp_server_fastmcp.calibrate schema test_db 宝箱掉落道具清单
-
-# 4. 执行查询
-python -m excel_mcp_server_fastmcp.calibrate query test_db "SELECT 物品类型, COUNT(*) FROM 宝箱掉落道具清单 GROUP BY 物品类型"
-```
-
-### ✨ 核心特性
-
-- **双表头智能拍平**：自动检测游戏配表常见的双层表头（中文分类 + 英文列名），智能合并为单层列名
-- **`_rowid_` 自增主键**：每张表自动添加 `_rowid_` INTEGER PRIMARY KEY，保证行唯一标识
-- **多 Sheet 支持**：一个 xlsx 的多个 Sheet 分别导入为独立的 SQLite 表
-- **类型自动推断**：INTEGER / REAL / TEXT 根据实际数据自动判断
-- **格式化输出**：表格对齐显示，支持 `tabulate` 或纯手工渲染
-- **执行耗时**：每次查询显示精确到毫秒的执行时间
-- **数据库目录**：默认 `/tmp/calibrator_data/`，按 `db_name.db` 命名
-
-### 🧩 Python API 直接调用
+### Python API
 
 ```python
 from excel_mcp_server_fastmcp.calibrator.core import cmd_import, cmd_query, cmd_tables, cmd_schema
 
-# 导入
 result = cmd_import("/path/to/data.xlsx", "my_db")
-# result = {success, message, db_path, tables: [...], total_tables, total_rows}
-
-# 查询
 result = cmd_query("my_db", "SELECT * FROM table1 LIMIT 10")
-# result = {success, headers, rows, row_count, elapsed_ms, formatted}
-
-# 列表
 result = cmd_tables("my_db")
-# result = {success, tables: [{name, count}], formatted}
-
-# 结构
 result = cmd_schema("my_db", "table1")
-# result = {success, table_name, columns: [{cid,name,type,...}], formatted}
 ```
 
 ---
 
-## 🤝 参与贡献
+## 开发
 
-### 🌟 给个 Star 吧!
-如果这个工具对你有帮助,请点亮 ⭐ Star
-- 🔍 **发现工具**:帮助更多游戏开发者找到我们
-- 🔔 **获取更新**:Star 后第一时间收到功能更新
-- 🎮 **推动生态**:每一个 Star 都是我们改进的动力
+```bash
+# 安装依赖
+uv sync --extra dev
 
-### 💪 如何贡献
-- 🐛 **报告 Bug**:使用 [Issue 模板](https://github.com/TangentDomain/excel-mcp-server/issues/new)
-- 💡 **功能建议**:欢迎提出游戏开发新需求
-- 📚 **改进文档**:让其他开发者更容易上手
-- 💻 **提交代码**:查看 [贡献指南](docs/CONTRIBUTING.md)
+# 运行全部测试
+uv run python -m pytest tests/ -q --timeout=60
+
+# 运行不变量测试
+uv run python -m pytest tests/invariants/ -q --timeout=30
+
+# Lint
+ruff check src/ tests/ && ruff format --check src/ tests/
+```
+
+### 测试体系
+
+| 层级 | 目录 | 说明 |
+|------|------|------|
+| L1 结果结构 | `tests/invariants/test_l1_result_structure.py` | API 返回格式不变量 |
+| L2 架构 | `tests/invariants/test_l2_architecture.py` | 代码结构不变量 |
+| L3 SQL 功能 | `tests/invariants/test_l3_*.py` | SQL 准确率差分测试 |
+| L4 限制消除 | `tests/invariants/test_l4_limit_fixes.py` | 引擎限制修复验证 |
+| 对抗测试 | `tests/adversarial/` | 随机 fuzz 读写 |
+| 功能测试 | `tests/test_*.py` | 各模块功能测试 |
+
+详见 [开发者指南](docs/DEVELOPMENT.md)。
 
 ---
 
-## 📄 许可证
+## 常见问题
 
-[MIT License](LICENSE) - 开源友好,可商用
+### MCP 连接失败
+```bash
+uv --version              # 确认 uv 已安装
+uvx excel-mcp-server-fastmcp --force-reinstall  # 重装
+# 重启 AI 客户端
+```
+
+### Excel 文件读取失败
+- 文件路径要完整（不要用 `~/`）
+- 确认文件是 `.xlsx` 格式
+- 文件没有被 Excel 软件打开
+
+### 大文件卡顿
+- 用 WHERE 过滤减少数据量
+- 分批处理：`"先读取前1000行"`
 
 ---
 
-## 🎉 致谢
+## 贡献
 
-感谢所有贡献者和游戏开发者社区!特别感谢:
-- 游戏策划和数值策划的宝贵反馈
-- 测试用户提供的真实使用场景
-- 开发者社区的代码贡献
+- [GitHub Issues](https://github.com/TangentDomain/excel-mcp-server/issues) — 报告 Bug / 功能建议
+- [贡献指南](docs/CONTRIBUTING.md)
+- [更新日志](docs/CHANGELOG.md)
 
----
+## 许可证
 
-## 🔧 常见问题与解决
-
-### 🚨 90%常见问题（必看）
-
-#### 1. MCP连接失败
-```
-问题：AI客户端说"工具不可用"
-解决：
-1. 检查uv是否安装：uv --version
-2. 重新安装：uvx excel-mcp-server-fastmcp --force-reinstall
-3. 重启AI客户端
-```
-
-#### 2. Excel文件读取失败
-```
-问题：提示"无法打开Excel文件"
-解决：
-1. 文件路径要完整：/Users/xxx/Desktop/技能表.xlsx（不要~/Desktop）
-2. 确认文件是.xlsx格式（不支持.xls/.csv）
-3. 文件没有被Excel软件打开
-```
-
-#### 3. 数据格式错误
-```
-问题：修改数据后显示异常
-解决：
-1. 检查是否有合并单元格（建议取消合并）
-2. 确保数值列是纯数字，不要混入文本
-3. 日期格式要统一（建议用YYYY-MM-DD）
-```
-
-#### 4. 大文件卡顿
-```
-问题：10万行以上文件处理慢
-解决：
-1. 分批处理："先读取前1000行测试"
-2. 用WHERE过滤："只处理攻击力>100的技能"
-3. 关闭其他占用内存的程序
-```
-
-#### 5. 中文乱码
-```
-问题：中文显示为问号或乱码
-解决：
-1. 确保Excel文件保存为UTF-8编码
-2. 检查系统语言设置
-3. 使用英文列名避免编码问题
-```
-
-### 🛠️ 快速自查清单
-遇到问题时，按顺序检查：
-1. ✅ Excel文件是否关闭？
-2. ✅ 文件路径是否完整？
-3. ✅ 文件格式是.xlsx？
-4. ✅ MCP配置是否正确？
-5. ✅ uvx命令是否可用？
-
-### 💡 快速诊断
-
-#### 大文件处理优化
-```bash
-# 大文件(10万行以上)处理技巧:
-"使用流式读取,避免内存溢出"
-"分批次处理数据,每次处理1万行"
-"关闭Excel自动计算,提升处理速度"
-```
-
-#### 数据格式问题
-```bash
-# 数字变文本问题:
-"将文本格式的数字转换为数值格式"
-"检查单元格格式,设置为常规或数值"
-```
-
-#### 跨表关联失败
-```bash
-# JOIN查询失败:
-"检查关联字段的数据类型是否一致"
-"确认关联值在两个表中都存在"
-"使用模糊匹配查找可能的不一致"
-```
-
-### ⚡ 性能优化建议
-
-#### 🎯 最佳实践
-- **小文件**(<1万行):直接处理,无需特殊优化
-- **中文件**(1-10万行):启用流式处理,批量操作
-- **大文件**(>10万行):分块处理,避免全量加载
-
-#### 💾 内存管理
-```bash
-# 大文件处理优化:
-"处理后及时清理内存,避免内存泄漏"
-"使用分页查询,每次只加载部分数据"
-"关闭不必要的Excel功能,减少内存占用"
-```
-
-#### 🔄 批量操作优化
-```bash
-# 高效批量操作:
-"批量插入时使用流式写入,性能提升80%"
-"批量更新时按行批量,减少IO次数"
-"复杂查询先筛选再处理,减少数据量"
-```
-
-### 🆘 获取帮助
-
-1. **查看日志**:检查 `.excel_mcp_logs/` 目录下的错误日志
-2. **简化问题**:先用小文件测试,复现问题后再处理大文件
-3. **版本确认**:运行 `excel-mcp-server-fastmcp --version` 确认版本
-4. **提交Issue**:[GitHub Issues](https://github.com/TangentDomain/excel-mcp-server/issues/new)
-
----
-
-**用 AI 重新定义游戏开发配置管理!** 🚀
+[MIT License](LICENSE)

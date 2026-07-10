@@ -1,516 +1,197 @@
 [简体中文](README.md) | [English](README.en.md)
 
-# 🎮 ExcelMCP: The Excel Wizard That Understands Game Devs
+# ExcelMCP: Excel Config Table MCP Server for Game Development
 
-[![PyPI](https://img.shields.io/pypi/v/excel-mcp-server-fastmcp.svg)](https://pypi.org/project/excel-mcp-server-fastmcp/v1.17.0)
+[![PyPI](https://img.shields.io/pypi/v/excel-mcp-server-fastmcp.svg)](https://pypi.org/project/excel-mcp-server-fastmcp/)
 [![CI](https://github.com/TangentDomain/excel-mcp-server/actions/workflows/ci.yml/badge.svg)](https://github.com/TangentDomain/excel-mcp-server/actions/workflows/ci.yml)
-![Tests](https://img.shields.io/badge/tests-1880-brightgreen.svg)
+![Tests](https://img.shields.io/badge/tests-1447-brightgreen.svg)
 ![Tools](https://img.shields.io/badge/tools-26-green.svg)
-![GitHub stars](https://img.shields.io/github/stars/TangentDomain/excel-mcp-server?style=social&label=Stars)
+![SQL](https://img.shields.io/badge/SQL%20accuracy-100%25-brightgreen.svg)
 
-> **🚀 Game Designer's Secret Weapon: Talk to Excel in plain English!**
-> 
-> 🎯 **Natural Language** → "Add 10% attack to all skills"  
-> 🔧 **SQL Queries** → "SELECT * FROM skills WHERE class='Mage'"  
-> ⚡ **Smart Operations** → Auto JOIN, batch edit, version management
+> Excel configuration table MCP server built on Python FastMCP + openpyxl + sqlglot.
+> SQL-over-Excel queries, batch operations, and structure management designed for game developers.
 
 ---
 
-## 🚀 Latest Updates (v1.17.0)
+## Quick Start
 
-### 🐛 Bug Fixes
-- **excel_create_pivot_table fix**: Changed error code from OPERATION_FAILED to SHEET_NOT_FOUND when sheet doesn't exist, consistent with other functions
+### Option 1: Skill Integration (Recommended)
 
-### 📋 Verification
-- **REQ-051 verified**: Edge case test script function names are correct, no changes needed
+Install via global skill with self-update and self-bootstrap support:
 
-### 🎮 Game Scene Support
-- **Skill System**: CTE queries, balance analysis, batch adjustments
-- **Equipment Management**: Set calculation, rarity classification, scoring system
-- **Monster Configuration**: AI behavior configuration, attribute scaling, drop management
-- **Level Design**: Progress statistics, difficulty configuration, event management
-
----
-
-[📖 Complete Changelog](docs/CHANGELOG.md) | [🎯 Contributing](docs/CONTRIBUTING.md)
-
----
-
-## 🎯 One Sentence Introduction
-
-> **"I want to increase all skill attack power by 10%, sort equipment by rarity, and find all mage skills"**
-
-**🎯 No coding! No formulas! Just speak English and let ExcelMCP handle your game configuration!**
-
----
-
-## 🚀 Quick Start (2 minutes)
-
-> 💡 **😱 First time?** → Watch [🎮 3-min Video Tutorial](VIDEO_TUTORIALS.en.md) first  
-> 💡 **🔥 In a hurry?** → [📋 30-sec Quick Reference](docs/tutorials/QUICK_REFERENCE.md)
-
-### 🔥 One-click setup, start instantly!
-
-#### 🎯 Recommended: uvx (Easiest, no installation)
 ```bash
-# Mac/Linux one-line command
-curl -LsSf https://astral.sh/uv/install.sh | sh
-
-# Windows PowerShell
-powershell -ExecutionPolicy ByPass -c "irm https://astral.sh/uv/install.ps1 | iex"
+excel-cli <command> [options]
 ```
 
-Use:
+The skill entry auto-manages venv and forwards to CLI. See [SKILL.md](.omp/skills/excel/SKILL.md).
+
+### Option 2: MCP Server (AI Client Integration)
+
 ```bash
+# uvx (recommended, no install needed)
 uvx excel-mcp-server-fastmcp
-```
 
-#### 📦 Traditional: pip
-```bash
+# pip
 pip install excel-mcp-server-fastmcp
-```
-
-> 💡 **Users in China**: `pip install excel-mcp-server-fastmcp -i https://pypi.tuna.tsinghua.edu.cn/simple`
-
-### 🔗 AI Client Configuration (1 minute)
-
-#### Claude Desktop (Recommended)
-```json
-{
-  "mcpServers": {
-    "excelmcp": {
-      "command": "uvx",
-      "args": ["excel-mcp-server-fastmcp"]
-    }
-  }
-}
 ```
 
 #### Cursor
 - Settings → MCP → Add Server
-- Name: `excelmcp`
-- Command: `uvx`
-- Args: `["excel-mcp-server-fastmcp"]`
+- Name: `excelmcp`, Command: `uvx`, Args: `"excel-mcp-server-fastmcp"`
 
-#### Other Clients
-- Cherry Studio / VSCode + Continue: Same configuration
-- OpenClaw: Built-in support, no configuration needed
-
-### ✅ Verify Success
-In your AI client, say: "Please help me read a skill table to test"
-See Excel data? 🎉 **Setup complete!**
-
----
-
-## 🚀 3-Minute Quick Start
-
-### 🎯 New Users Guide (3-Minute Quick Start)
-
-#### Step 1: Prepare Excel Files
-Put your game configuration tables on desktop:
-```
-~/Desktop/skills_table.xlsx
-~/Desktop/equipment_table.xlsx  
-~/Desktop/monsters_config.xlsx
-```
-
-#### Step 2: Install Tool (1 minute)
+#### Claude Code
 ```bash
-# Install uv (if not installed)
-curl -LsSf https://astral.sh/uv/install.sh | sh
-
-# Install ExcelMCP
-uvx excel-mcp-server-fastmcp
+claude mcp add excelmcp -- uvx excel-mcp-server-fastmcp
 ```
 
-#### Step 3: Start Using (1 minute)
-Open your AI client (Claude Desktop/Cursor/Cherry Studio), configure MCP, then directly say:
-```
-# Basic operations
-"Read skills table"
-"Increase mage skill damage by 20%" 
-"Find all epic equipment"
+### Option 3: Source (Development)
 
-# Advanced operations  
-"Link skills table and classes table, count skills per class"
-"Analyze skill balance, find unbalanced skills"
-```
-
-#### ✅ Success Indicator
-When you receive replies like this, configuration is successful:
-```
-✅ Successfully read skills table
-📊 Table info: 3 sheets, 127 rows of data
-💡 Found skill data, can start analysis...
+```bash
+uv run python -m excel_mcp_server_fastmcp.cli <command> [options]
 ```
 
 ---
 
-## 📱 Mobile View (Simplified Feature Comparison)
+## 26 MCP Tools
 
-| Use Case | ExcelMCP | Traditional Way |
-|----------|----------|-----------------|
-| **Designer wants to adjust values** | Just say "increase damage" | Manually edit 100 cells |
-| **Cross-table statistics** | "Link tables and count" | VLOOKUP + formulas |
-| **Find problem data** | "Find anomalies" | Manual visual inspection |
-| **Batch modifications** | "Batch update" | Copy-paste repetitive operations |
+### Query (9)
 
-> 💡 **One-Sentence Summary**: You describe needs in natural language, ExcelMCP handles Excel operations
+| Tool | Description |
+|------|-------------|
+| `excel_query` | **SQL engine** (primary) — WHERE/LIKE/IN/JOIN/window functions/CTE/UNION |
+| `excel_describe_table` | Table structure (column names + types + sample values) |
+| `excel_get_headers` | Header info (Chinese + English) |
+| `excel_get_range` | Read by exact range (e.g. A1:C10) |
+| `excel_search` | Search cell text in a worksheet |
+| `excel_search_directory` | Search across Excel files |
+| `excel_find_last_row` | Find last data row (use before appending) |
+| `excel_list_sheets` | List all worksheet names |
+| `excel_compare_sheets` | Compare two sheets by ID column |
 
----
+### Write (7)
 
-## 🎮 Game Development Scenarios (See It in Action!)
+| Tool | Description |
+|------|-------------|
+| `excel_update_query` | **SQL UPDATE** batch modify (supports dry_run) |
+| `excel_insert_query` | **SQL INSERT** (single/multi-row) |
+| `excel_delete_query` | **SQL DELETE** (WHERE required) |
+| `excel_update_range` | Write by exact range (overwrite by default, insert_mode=True for insert) |
+| `excel_upsert_row` | Insert or update single row by key (idempotent) |
+| `excel_set_formula` | Write Excel formula |
+| `excel_run_python` | Execute Python script (sandboxed, with query/update/insert/delete injected) |
 
-### 🎯 Game Designer Daily Work Examples
-> 🎯 **Real Cases**: All operations verified with 26 MCP tools
-> 🎮 **Supported Games**: RPG, MMO, Card, Tower Defense, Shooter, Strategy etc.  
-> ⚡ **Performance**: Handles 100K+ data batches, response time <1 second
+### Structure (7)
 
-```bash
-# 🗣️ Speak directly to Excel (no programming needed!)
-"Help me increase all mage skill attack power by 20%"
-"Find all epic equipment with price over 1000 in the equipment table"
-"Connect skill table and class table, count skills per class"
-"Copy skill table to new file named skill_backup_v2.xlsx"
-```
+| Tool | Description |
+|------|-------------|
+| `excel_create_file` | Create new Excel file |
+| `excel_create_sheet` | Create worksheet |
+| `excel_delete_sheet` | Delete worksheet |
+| `excel_rename_sheet` | Rename worksheet |
+| `excel_copy_sheet` | Copy worksheet |
+| `excel_structure` | Insert/delete rows and columns |
+| `excel_rename_column` | Rename column header |
 
-### 🔢 Balance Designer Tasks
-```bash
-# Data analysis
-"Calculate average attack and defense for each class"
-"Find top 10 skills with highest attack power"
-"Batch adjust all skill cooldown times, multiply by 0.8"
-"Generate character attribute balance report"
-```
+### Formatting (2)
 
-### 🏗️ Level Designer Requirements
-```bash
-# Level configuration
-"Read level configuration table, find all collectible items"
-"Batch modify monster drop rates, increase rare items by 50%"
-"Generate level progress statistics report"
-```
+| Tool | Description |
+|------|-------------|
+| `excel_format_cells` | Set cell style (font/merge/border/preset) |
+| `excel_set_layout` | Set row height or column width |
 
----
+### Backup (1)
 
-## 📊 Core Feature Comparison
-
-### Game Development Specific Comparison
-
-| Scenario | ExcelMCP | Traditional Excel | ChatGPT | Python pandas |
-|----------|----------|------------------|---------|----------------|
-| **Learning Curve** | 🟢 0 (Speak naturally) | 🔴 Need formula learning | 🟡 Need clear descriptions | 🔴 Need programming knowledge |
-| **Cross-table Ops** | 🟢 Automatic JOIN | 🔴 Complex VLOOKUP | 🔴 No support | 🟡 Need code implementation |
-| **Batch Modify** | 🟢 One command搞定 | 🔴 Manual operations | 🟡 Need detailed description | 🟡 Need loops processing |
-| **Error Handling** | 🟢 Smart hints | 🔴 Easy to make mistakes | 🟡 Depends on AI capability | 🔴 Need exception handling |
-| **Game Optimization** | 🟢 Specialized | 🔴 General features | 🔴 Not professional | 🟡 Need game knowledge |
-| **Response Speed** | 🟢 < 5 seconds | 🟢 Instant | 🟡 10-30 seconds | 🟢 3-10 seconds |
-| **Data Scale** | 🟢 100K rows × 1K cols | 🟢 Unlimited | 🔴 Limited | 🟢 Memory limited |
-
-### Advantage Scenario Analysis
-
-#### 🎮 ExcelMCP Best For
-- **Game Designers**: Balance adjustment, config management, analysis
-- **Indie Developers**: Rapid prototyping, config iteration, team collaboration
-- **Data Analysts**: Game data analysis, user behavior statistics
-- **Operations Team**: Event configuration, item management, version comparison
-
-#### 🔧 Traditional Excel Best For  
-- **Complex Formulas**: Financial reports, scientific calculations
-- **Visual Charts**: Dynamic charts, complex reports
-- **Macro Automation**: Complex business process automation
-
-#### 💡 ChatGPT Best For
-- **Text Processing**: Copywriting, translation, summarization
-- **Code Writing**: Program development, algorithm design
-- **Creative Content**: Game design, story creation
-
-#### 🐍 Python pandas Best For
-- **Big Data Processing**: Million+ rows data processing
-- **Machine Learning**: Data modeling, algorithm training
-- **Automation Scripts**: Complex data processing pipelines
+| Tool | Description |
+|------|-------------|
+| `excel_backup` | Backup create/list/restore |
 
 ---
 
-## 🛠️ Supported Game Types
+## SQL Features
 
-| Game Type | Supported Scenarios | Special Features |
-|-----------|---------------------|------------------|
-| **RPG** | Skill systems, equipment sets, attribute growth | CTE queries, equipment bonus calculation |
-| **MMO** | Large data configs, version management | Streaming writes, cache optimization |
-| **Card Games** | Card effects, probability calculations | Conditional formatting, data validation |
-| **Strategy** | Unit configs, combat calculations | Cross-file JOIN, batch operations |
-| **Casual** | Level configs, item management | Simple queries, quick modifications |
+### Supported (169 differential tests, 19 categories, 100% pass rate)
 
----
+| Category | Features |
+|----------|----------|
+| Basic | SELECT, DISTINCT, AS, `+-*/%`, unary minus, integer division (trunc toward zero), `t.*` qualified star |
+| Conditions | WHERE, LIKE, IN, NOT IN, BETWEEN, AND/OR, subqueries, WHERE referencing SELECT aliases |
+| Aggregation | COUNT, SUM, AVG, MAX, MIN, GROUP BY, HAVING |
+| Sorting | ORDER BY, LIMIT, OFFSET, NULLS FIRST/LAST |
+| Window | ROW_NUMBER, RANK, DENSE_RANK, NTILE, LAG, LEAD, FIRST_VALUE, LAST_VALUE, NTH_VALUE, AVG/SUM/MIN/MAX/COUNT OVER, GROUP_CONCAT, PARTITION BY, ROWS BETWEEN, WHERE referencing window aliases |
+| Multi-table | INNER/LEFT/RIGHT/FULL JOIN (same-file cross-sheet + cross-file `table@'path'`) |
+| Advanced | CASE WHEN, CTE(WITH), EXISTS, UNION/UNION ALL, INTERSECT/EXCEPT, NULLIF, COALESCE |
+| String | UPPER, LOWER, TRIM, LENGTH, CONCAT, REPLACE, SUBSTRING |
+| Math | ABS, CEIL, FLOOR, SQRT, POWER, ROUND |
+| NULL | IS NULL, IS NOT NULL, COALESCE, three-valued logic (aligned with SQLite) |
 
-## 💡 Usage Tips
+### Key Semantics (aligned with SQLite 3.x)
 
-### 🎯 High-Efficiency Command Examples
-```bash
-# Data analysis
-"Analyze skill balance, find skills with too high damage"
-"Calculate equipment set bonus effects, sort by total value"
-"Count monster drops, find most valuable loot"
+- **GROUP BY / ORDER BY**: NULL sorts first (ASC), last (DESC)
+- **ROUND**: Round half away from zero (not banker's rounding)
+- **Integer division**: Truncation toward zero, same as SQLite
+- **NULL three-valued logic**: NULL = NULL → UNKNOWN(FALSE)
+- **LIKE**: `%` matches any chars, `_` matches single char, case-insensitive
 
-# Batch operations
-"Batch increase all weapon durability by 20%"
-"Copy equipment table to different quality categories"
-"Generate class equipment recommendations"
+### SQL Limitations
 
-# Version management
-"Compare skill table old and new version differences"
-"Create configuration file backup"
-"Rollback to specific version"
-```
-
-### 🚀 One-Click Copy (Ready to Use)
-
-#### Skill Table Analysis
-```bash
-"Read skill table, find all skills with cooldown < 3 seconds, sort by damage"
-```
-
-#### Equipment Batch Optimization
-```bash
-"Increase all epic equipment attack by 15%, defense by 10%"
-"Find all equipment with total score > 80, sort by score descending"
-```
-
-#### Monster AI Configuration
-```bash
-"Increase all Boss monster HP by 50%, damage by 30%"
-"Count average attributes by monster type, generate balance report"
-```
-
-#### Level Configuration Management
-```bash
-"Batch update level difficulty parameters, increase level 5 difficulty by 20%"
-"Generate level completion rate statistics, mark levels with < 50% completion"
-```
-
-### 🚀 Performance Optimization
-- **Large files**: Use streaming writes, supports 100K+ rows
-- **Complex queries**: Auto-index optimization, response < 3 seconds
-- **Memory usage**: Typical files < 100MB
-- **Supported formats**: .xlsx, .xlsm, .xlsb
+- Cross-file JOIN requires `table@'file_path'` syntax
+- Excel empty string `""` round-trips to NULL (xlsx format limitation)
+- WHERE referencing window function aliases is auto-rewritten to subquery (transparent)
+- WHERE referencing SELECT aliases (non-window) is supported via temp column materialization
 
 ---
 
-## 📚 Documentation Resources
+## Technical Specs
 
-### 📖 Quick Start Guides
-- [📋 Quick Reference Guide](docs/tutorials/QUICK_REFERENCE.md) - Find what you need in 30 seconds (New!)
-- [Interactive Tutorial](docs/tutorials/INTERACTIVE_TUTORIAL.md) - Modular game configuration tutorials (New!)
-- [Basic Tutorial](docs/api/README-gaming.md) - Game development getting started
-- [Performance Optimization](docs/api/README-performance.md) - Large file handling techniques
-- [SQL Reference](docs/api/README-sql.md) - Advanced query syntax
-
-### 🎮 Example Code
-- [Game Development Examples](examples/README.md) - Complete skill systems, equipment management cases
-- [Batch Operations](examples/进阶操作/) - Data batch processing, version comparison
-- [Real Cases](examples/实战案例/) - Complete game numerical balance solutions
+- **Version**: 1.17.0
+- **Python**: >= 3.10
+- **Dependencies**: FastMCP / openpyxl / sqlglot / pandas
+- **Tests**: 1447 passed, 3 skipped, 1 xfailed
+- **SQL accuracy**: 169 differential tests 100% pass (cross-validated with SQLite)
+- **Tools**: 26 MCP tools
+- **Formats**: .xlsx, .xlsm
 
 ---
 
-## 🔧 Troubleshooting
+## Development
 
-### 🚨 90% Common Issues (Must Read)
-
-#### 1. MCP Connection Failed
-```
-Problem: AI client says "Tool unavailable"
-Solution:
-1. Check if uv is installed: uv --version
-2. Reinstall: uvx excel-mcp-server-fastmcp --force-reinstall
-3. Restart AI client
-```
-
-#### 2. Excel File Read Failed
-```
-Problem: Shows "Cannot open Excel file"
-Solution:
-1. Use full file path: /Users/xxx/Desktop/skills.xlsx (don't use ~/Desktop)
-2. Confirm file is .xlsx format (not .xls/.csv)
-3. Ensure file is not opened by Excel software
-```
-
-#### 3. Data Format Error
-```
-Problem: Data shows abnormally after modification
-Solution:
-1. Check for merged cells (recommend unmerging)
-2. Ensure numeric columns contain pure numbers, no text mixed
-3. Use consistent date format (recommend YYYY-MM-DD)
-```
-
-#### 4. Large File Lag
-```
-Problem: Processing 100K+ rows is slow
-Solution:
-1. Process in batches: "First read 1000 rows for testing"
-2. Use WHERE filtering: "Only process skills with damage > 100"
-3. Close other memory-intensive programs
-```
-
-#### 5. Chinese Character Garbled
-```
-Problem: Chinese characters show as question marks or garbled
-Solution:
-1. Ensure Excel file saved as UTF-8 encoding
-2. Check system language settings
-3. Use English column names to avoid encoding issues
-```
-
-### 🛠️ Quick Self-Check List
-When encountering problems, check in order:
-1. ✅ Is Excel file closed?
-2. ✅ Is file path complete?
-3. ✅ Is file format .xlsx?
-4. ✅ Is MCP configuration correct?
-5. ✅ Is uvx command available?
-
-### 💡 Quick Diagnosis
-
-#### Large File Processing Optimization
 ```bash
-# Large files (100K+ rows) processing tips:
-"Use streaming read to avoid memory overflow"
-"Process data in batches, 10K rows at a time"
-"Disable Excel auto-calculation to improve processing speed"
+uv sync --extra dev                                          # Install deps
+uv run python -m pytest tests/ -q --timeout=60               # Run all tests
+uv run python -m pytest tests/invariants/ -q --timeout=30     # Invariant tests
+ruff check src/ tests/ && ruff format --check src/ tests/     # Lint
 ```
 
-#### Data Format Issues
-```bash
-# Number to text conversion problems:
-"Convert text-formatted numbers to numeric format"
-"Check cell format, set to General or Number"
-```
-
-#### Cross-table Association Failure
-```bash
-# JOIN query failures:
-"Check if data types of association fields are consistent"
-"Confirm association values exist in both tables"
-"Use fuzzy matching to find possible inconsistencies"
-```
+See [Development Guide](docs/DEVELOPMENT.md).
 
 ---
 
-## 🎮 Try Now! 3-Minute ExcelMCP Magic Demo
+## Troubleshooting
 
-### 🚀 New User Experience (3 seconds to get started!)
+### MCP connection failed
 ```bash
-# 💡 Just say this:
-"Read my skills table, show first 5 skills"
-# 🎯 That's it! Talk to Excel in plain English, it's that simple!
+uv --version
+uvx excel-mcp-server-fastmcp --force-reinstall
+# Restart AI client
 ```
 
-### 📊 Quick Analysis Experience (See the real power!)
-```bash
-# 🎯 Try this complex query (one command does it all):
-"Connect skills table with classes table, find all mage skills and sort by attack power"
-"Analyze skills table, find top 3 highest damage skills"
-```
+### Excel file read failed
+- Use full file path (not `~/`)
+- Confirm `.xlsx` format
+- Close the file in Excel
 
-### 🔧 Batch Operation Experience
-```bash
-# Copy this to test batch modification:
-"Reduce all mage skill cooldowns by 20%"
-```
-
-### 🎯 Expected Results
-- ✅ Success: See Excel data correctly read and modified
-- ❌ Failed: Check if Excel file is closed, file path is correct
+### Large file slow
+- Use WHERE to filter data
+- Process in batches
 
 ---
 
-### ⚡ Performance Optimization Tips
+## Contributing
 
-#### 🎯 Best Practices
-- **Small files** (<10K rows): Direct processing, no special optimization needed
-- **Medium files** (10K-100K rows): Enable streaming processing, batch operations
-- **Large files** (>100K rows): Chunk processing, avoid full loading
+- [GitHub Issues](https://github.com/TangentDomain/excel-mcp-server/issues)
+- [Contributing Guide](docs/CONTRIBUTING.md)
+- [Changelog](docs/CHANGELOG.md)
 
-#### 💾 Memory Management
-```bash
-# Large file processing optimization:
-"Clean up memory promptly after processing to avoid memory leaks"
-"Use pagination queries, load only partial data at a time"
-"Disable unnecessary Excel features to reduce memory usage"
-```
+## License
 
-#### 🔄 Batch Operation Optimization
-```bash
-# Efficient batch operations:
-"Use streaming write for batch insertion, 80% performance improvement"
-"Use row-wise batch updates for batch updates, reduce IO times"
-"Filter data first then process for complex queries, reduce data volume"
-```
-
-### 🆘 Get Help
-
-1. **Check Logs**: Examine error logs in `.excel_mcp_logs/` directory
-2. **Simplify Problems**: Test with small files first, reproduce issues before handling large files
-3. **Confirm Version**: Run `excel-mcp-server-fastmcp --version` to confirm version
-4. **Submit Issue**: [GitHub Issues](https://github.com/TangentDomain/excel-mcp-server/issues/new)
-
----
-
-## 📈 Technical Specifications
-
-- **Response Speed**: < 1s (small files), < 5s (large files)
-- **Data Scale**: 100K rows × 1000 columns
-- **Tool Count**: 26 MCP tools
-- **Memory Usage**: < 100MB (typical files)
-- **Supported Formats**: .xlsx, .xlsm, .xlsb
-
----
-
-## 🤝 Contributing
-
-### 🌟 Give us a Star!
-If this tool helps you, please light up ⭐ Star
-- 🔍 **Discover Tool**: Help more game developers find us
-- 🔔 **Get Updates**: Star to receive feature updates first
-- 🎮 **Drive Ecosystem**: Every Star motivates us to improve
-
-### 💪 How to Contribute
-- 🐛 **Report Bugs**: Use [Issue Template](https://github.com/TangentDomain/excel-mcp-server/issues/new)
-- 💡 **Feature Suggestions**: Welcome new game development needs
-- 📚 **Improve Documentation**: Help other developers get started faster
-- 💻 **Submit Code**: See [Contribution Guide](docs/CONTRIBUTING.md)
-
----
-
-## 📄 License
-
-[MIT License](LICENSE) - Open source, commercial friendly
-
----
-
-## 🎉 Acknowledgments
-
-Thanks to all contributors and the game developer community! Special thanks to:
-- Game designers and balance designers for valuable feedback
-- Test users providing real-world usage scenarios
-- Developer community code contributions
-
----
-
-**Redeveloping game development configuration management with AI!** 🚀
-- **Last Updated**: 2026-03-28
-- **Community Activity**: 🔥 Highly Active
-- **Growth Potential**: 🌱 Growing
-
-## 🤝 How to Contribute
-
-Thanks for your interest! You can contribute to the project in several ways:
-
-1. 🌟 **Star**: If the project is helpful to you, please give us a Star
-2. 🐛 **Issue**: Report bugs or suggest new features
-3. 💻 **Code**: Submit code improvements and fixes
-4. 📚 **Docs**: Improve documentation and usage examples
-5. 📢 **Share**: Share the project with more developers
-
-Empowering game development with AI! 🚀
+[MIT License](LICENSE)
