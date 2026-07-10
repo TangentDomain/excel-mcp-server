@@ -17,13 +17,34 @@
 
 ### Option 1: Skill Integration (Recommended)
 
-Install via global skill with self-update and self-bootstrap support:
+Install the global skill via OMP harness. First run auto-creates venv + installs from GitHub; supports `self-update` afterwards.
+
+**Install** (choose one):
 
 ```bash
-excel-cli <command> [options]
+# Option A: OMP harness user (auto-registers skill)
+# Skill files deploy to ~/.omp/agent/skills/excel/, auto-discovered by harness
+
+# Option B: Manual install
+git clone https://github.com/TangentDomain/excel-mcp-server.git
+cp -r excel-mcp-server/.omp/skills/excel ~/.omp/agent/skills/excel
 ```
 
-The skill entry auto-manages venv and forwards to CLI. See [SKILL.md](.omp/skills/excel/SKILL.md).
+**Usage**:
+
+```bash
+# First run auto-installs dependencies (uv venv + pip install)
+python ~/.omp/agent/skills/excel/bin/excel-cli.py query --file data.xlsx --sql "SELECT * FROM Sheet1"
+
+# After venv setup, use exe directly (skips bootstrap, faster)
+~/.omp/agent/skills/excel/.venv/Scripts/excel-cli.exe query --file data.xlsx --sql "SELECT * FROM Sheet1"
+
+# Check for updates
+excel-cli self-update --check
+excel-cli self-update          # Update to latest
+```
+
+See [SKILL.md](.omp/skills/excel/SKILL.md).
 
 ### Option 2: MCP Server (AI Client Integration)
 

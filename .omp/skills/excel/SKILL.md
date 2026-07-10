@@ -17,15 +17,32 @@ tags:
 
 ### 方式一：Skill 接入（首推）
 
-**通过全局 skill 安装，支持自更新和自举：**
+**安装**（二选一）：
 
 ```bash
-# 安装全局 skill（自动创建 venv + 安装依赖）
-# 安装后可通过 self-update 命令自动更新到最新版本
-excel-cli <command> [options]
+# 方式 A：OMP harness 用户（自动注册 skill）
+# skill 文件部署到 ~/.omp/agent/skills/excel/，harness 自动发现
+
+# 方式 B：手动安装
+git clone https://github.com/TangentDomain/excel-mcp-server.git
+cp -r excel-mcp-server/.omp/skills/excel ~/.omp/agent/skills/excel
 ```
 
-Skill 入口：`~/.omp/agent/skills/excel/bin/excel-cli.py`，自动管理 venv 并转发到 CLI。
+**使用**：
+
+```bash
+# 首次运行自动安装依赖（uv venv + pip install 从 GitHub）
+python ~/.omp/agent/skills/excel/bin/excel-cli.py query --file data.xlsx --sql "SELECT * FROM Sheet1"
+
+# Windows venv 安装后可直接用 exe（跳过自举，更快）
+~/.omp/agent/skills/excel/.venv/Scripts/excel-cli.exe <command> [options]
+
+# 检查更新
+excel-cli self-update --check
+excel-cli self-update          # 更新到最新版
+```
+
+Skill 入口：`~/.omp/agent/skills/excel/bin/excel-cli.py`，首次运行自动创建 venv + 从 GitHub 安装，后续通过 `self-update` 更新。
 
 ### 方式二：源码直接调用（开发环境）
 
