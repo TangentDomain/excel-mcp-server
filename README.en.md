@@ -17,31 +17,40 @@
 
 ### Option 1: Skill Integration (Recommended)
 
-Install the global skill via OMP harness. First run auto-creates venv + installs from GitHub; supports `self-update` afterwards.
+Integrate the Excel skill into your OMP harness. First run auto-creates venv + installs from GitHub; update via `self-update` afterwards.
 
-**Install** (choose one):
+#### Global Install (all projects)
 
 ```bash
-# Option A: OMP harness user (auto-registers skill)
-# Skill files deploy to ~/.omp/agent/skills/excel/, auto-discovered by harness
-
-# Option B: Manual install
+# 1. Download skill files (only SKILL.md + bin/excel-cli.py needed)
 git clone https://github.com/TangentDomain/excel-mcp-server.git
 cp -r excel-mcp-server/.omp/skills/excel ~/.omp/agent/skills/excel
-```
 
-**Usage**:
-
-```bash
-# First run auto-installs dependencies (uv venv + pip install)
+# 2. First run — auto-creates venv + installs from GitHub
 python ~/.omp/agent/skills/excel/bin/excel-cli.py query --file data.xlsx --sql "SELECT * FROM Sheet1"
 
-# After venv setup, use exe directly (skips bootstrap, faster)
+# 3. Subsequent runs can use exe directly (skips bootstrap, faster)
 ~/.omp/agent/skills/excel/.venv/Scripts/excel-cli.exe query --file data.xlsx --sql "SELECT * FROM Sheet1"
+```
 
-# Check for updates
-excel-cli self-update --check
-excel-cli self-update          # Update to latest
+#### Project-level Install (current project only)
+
+```bash
+# In your project root
+cp -r /path/to/excel-mcp-server/.omp/skills/excel .omp/skills/excel
+
+# Usage same as above, change path to project-relative
+python .omp/skills/excel/bin/excel-cli.py query --file data.xlsx --sql "SELECT * FROM Sheet1"
+```
+
+> **Global vs Project**: Global = install once, use everywhere; Project = travels with the repo, good for team collaboration.
+> Project-level overrides global — same-name skill, project version wins.
+
+#### Updates
+
+```bash
+excel-cli self-update --check   # Check for new version
+excel-cli self-update           # Update to latest
 ```
 
 See [SKILL.md](.omp/skills/excel/SKILL.md).
