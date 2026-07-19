@@ -28,7 +28,7 @@ dependencies = [
     "python-calamine>=0.3.0",
     "mcp>=1.0.0,<2.0.0",
     "xlcalculator>=0.5.0,<1.0.0",
-    "sqlglot>=27.29.0,<28.0.0",
+    "sqlglot>=27.29.0,<29.0.0",
 ]
 
 [tool.setuptools.packages.find]
