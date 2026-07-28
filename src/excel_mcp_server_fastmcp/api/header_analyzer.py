@@ -84,6 +84,17 @@ def _cell_str(c: Any) -> str | None:
         v = c
     if v is None:
         return None
+    # 处理 NaN (pandas/numpy 的 float('nan')) — 之前漏了, 导致空单元格被转成 "nan" 字符串
+    # 进而引发: 多个空列都叫 "nan" → 重复列名 → df["nan"] 返回 DataFrame → .dtype 崩溃
+    try:
+        if isinstance(v, float) and v != v:  # NaN 不等于自身
+            return None
+        import math as _math
+
+        if _math.isnan(v) if isinstance(v, (int, float)) else False:
+            return None
+    except (TypeError, ValueError):
+        pass
     s = str(v).strip()
     return s if s else None
 

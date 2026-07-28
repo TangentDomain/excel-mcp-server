@@ -871,18 +871,46 @@ class AdvancedSQLQueryEngine:
 
                     df.columns = header_row
                     # P10: 英文字段名为空时(列名 Unnamed: N), 回退用中文描述做列名
+                    # P11: 修复 MapEvent 表头 5 个空列导致的 bug
+                    #   原因: 第二行表头有空单元格 → _cell_str 返回 None → '' 空串
+                    #         → 5 列都叫 '' 重复列名 → df[''] 返回 DataFrame 而非 Series
+                    #         → 后续 .dtype 访问崩溃 → 整个 sheet 被 except 静默吞掉
+                    #   修复: (a) 空串列名也回退用中文描述; (b) 仍有重复则加后缀去重
+                    # P11: 修复 MapEvent 表头 5 个空列导致的 bug
+                    #   原因: 第二行表头有空单元格 → _cell_str 返回 None → '' 空串
+                    #         → 5 列都叫 '' 重复列名 → df[''] 返回 DataFrame 而非 Series
+                    #         → 后续 .dtype 访问崩溃 → 整个 sheet 被 except 静默吞掉
+                    #   修复: 直接按位置重建列名 (rename 用列名做 key, 重复列名会一起被改, 不安全)
+                    new_columns: list[str] = []
+                    seen_names: dict[str, int] = {}
                     for col_idx in range(len(df.columns)):
                         col_name = str(df.columns[col_idx])
-                        if "unnamed" in col_name.lower():
+                        is_empty_or_unnamed = (col_name == "") or (col_name == "nan") or ("unnamed" in col_name.lower())
+                        if is_empty_or_unnamed:
+                            # 回退 1: 用中文描述(第一行)作为列名
                             if col_idx < len(first_row_values) and first_row_values[col_idx]:
-                                df.rename(columns={df.columns[col_idx]: first_row_values[col_idx]}, inplace=True)
+                                col_name = str(first_row_values[col_idx])
+                            else:
+                                # 回退 2: 用列序号兜底
+                                col_name = f"col_{col_idx}"
+                        # 去重: 若列名仍重复, 加 _dup{N} 后缀
+                        if col_name in seen_names:
+                            seen_names[col_name] += 1
+                            col_name = f"{col_name}_dup{seen_names[col_name]}"
+                        else:
+                            seen_names[col_name] = 0
+                        new_columns.append(col_name)
+                    df.columns = new_columns
                     df = df.reset_index(drop=True)
                     # 类型推断: header=None 读取后数值列是 object 类型,
                     # 需转回 int64/float64 (复刻 pd.read_excel(header=N) 的推断行为, 保障除零等运算语义)
-                    for col in df.columns:
-                        if df[col].dtype == "object":
+                    # 防御: 用 .iloc[:, idx] 取 Series (df[col] 对重复列名返回 DataFrame, 已去重但保持防御)
+                    for col_idx in range(len(df.columns)):
+                        col = df.columns[col_idx]
+                        series = df.iloc[:, col_idx]
+                        if series.dtype == "object":
                             try:
-                                df[col] = pd.to_numeric(df[col], errors="raise")
+                                df[col] = pd.to_numeric(series, errors="raise")
                             except (ValueError, TypeError):
                                 pass  # 含非数字, 保持 object (字符串列)
 
@@ -897,10 +925,13 @@ class AdvancedSQLQueryEngine:
                         self._header_descriptions[sheet] = desc_map
                     df = self._optimize_dtypes(df)
                     worksheets_data[sheet] = df
-
-                except Exception:
+                except Exception as _sheet_err:
                     # 兜底: 该 sheet 失败时跳过 (不影响其它 sheet)
-                    logger.debug(f"加载工作表 {sheet} 时出错, 跳过")
+                    # 但不能静默吞噬 — 至少 warning 级别记录, 方便排查
+                    # (之前是 debug 级别, 导致 MapEvent 加载失败用户完全无感知)
+                    import traceback as _tb
+
+                    logger.warning(f"⚠️ 加载工作表 %s 失败, 已跳过。错误: %s\n%s", sheet, _sheet_err, _tb.format_exc())
 
         except Exception as e:
             logger.error(f"加载Excel数据失败: {e}")
