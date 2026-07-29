@@ -823,18 +823,16 @@ def cmd_backup(args):
 def cmd_self_update(args):
     """检查/更新 CLI 到最新版本。"""
     try:
-        check_result = _check_update()
+        check_dict = _check_update_dict()
 
         if args.check:
-            return check_result
+            return output(check_dict)
 
-        # check_result 的 data 里有 need_update, local_version, remote_version, local_sha, remote_sha
-        data = json.loads(check_result)
-        if not data.get("success"):
-            return check_result
+        if not check_dict.get("success"):
+            return output(check_dict)
 
-        if not data["data"].get("need_update"):
-            return check_result
+        if not check_dict["data"].get("need_update"):
+            return output(check_dict)
 
         return _do_update()
     except Exception as e:
@@ -842,7 +840,12 @@ def cmd_self_update(args):
 
 
 def _check_update():
-    """对比本地版本和 GitHub 最新 commit。"""
+    """检查更新并输出 JSON，返回退出码（兼容旧调用）。"""
+    return output(_check_update_dict())
+
+
+def _check_update_dict():
+    """对比本地版本和 GitHub 最新 commit。返回原始 dict（不打印不 output）。"""
     try:
         # 本地 SHA（从 .last-update 文件读取）
         script_dir = os.path.dirname(os.path.abspath(__file__))
@@ -866,23 +869,21 @@ def _check_update():
 
         need_update = not local_sha or (remote_sha and remote_sha != local_sha)
 
-        return output(
-            _ok(
-                "有新版本" if need_update else f"已是最新版 ({VERSION})",
-                data={
-                    "local_version": VERSION,
-                    "need_update": need_update,
-                    "local_sha": local_sha or "(首次检查)",
-                    "remote_sha": remote_sha,
-                    "commit_message": commit_message,
-                    "commit_date": commit_date,
-                },
-            )
+        return _ok(
+            "有新版本" if need_update else f"已是最新版 ({VERSION})",
+            data={
+                "local_version": VERSION,
+                "need_update": need_update,
+                "local_sha": local_sha or "(首次检查)",
+                "remote_sha": remote_sha,
+                "commit_message": commit_message,
+                "commit_date": commit_date,
+            },
         )
     except urllib.error.HTTPError as e:
-        return output(_fail(f"检查更新失败: HTTP {e.code}", meta={"error": "HTTP_ERROR"}))
+        return _fail(f"检查更新失败: HTTP {e.code}", meta={"error": "HTTP_ERROR"})
     except Exception as e:
-        return output(_fail(f"检查更新失败: {e}", meta={"error": "NETWORK_ERROR"}))
+        return _fail(f"检查更新失败: {e}", meta={"error": "NETWORK_ERROR"})
 
 
 def _do_update():
@@ -1020,6 +1021,7 @@ def _legacy_update():
 
 
 def cmd_version(args):
+    """打印当前 CLI 版本和 Python 版本。"""
 
     print(
         json.dumps(
