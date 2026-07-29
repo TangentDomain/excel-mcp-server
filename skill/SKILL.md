@@ -2,7 +2,7 @@
 name: excel
 description: 游戏开发 Excel 配置表管理 — SQL 查询、批量操作、结构管理、格式化。通过 CLI 可执行文件调用，加载无状态，支持 self-update。
 keywords: ["excel", "xlsx", "配置表", "SQL", "openpyxl", "游戏开发", "怪物表", "物品表", "技能表", "查询", "批量操作", "公式", "工作表", "表格"]
-version: "2.0.0"
+version: "3.1.0"
 tags:
   - excel
   - sql
@@ -13,153 +13,261 @@ tags:
 
 游戏开发专用 Excel 配置表管理。SQL-over-Excel 引擎，26 个工具，支持高级 SQL 查询、批量操作、跨文件 JOIN。
 
-## 调用方式
+## 快速调用
 
-**入口**：`bin/excel-cli.py`（本 skill 目录内）
-
-```bash
-python bin/excel-cli.py <command> [options]
-# 首次运行自动：uv venv → uv pip install git+... → 执行命令
-```
-所有操作通过 CLI 命令调用，输出 JSON。skill 自动管理 venv + 安装。
-
-**自更新**：
+**入口**：`~/.omp/agent/skills/excel/bin/excel-cli.py`，它自动管理 venv 并转发到真正的 CLI。
 
 ```bash
-# 检查最新版本
-excel-cli self-update --check
+CLI=~/.omp/agent/skills/excel/.venv/Scripts/excel-cli.exe
 
-# 执行更新（自动 pip install git+...）
-excel-cli self-update
+# Windows 上直接用 venv 里的 exe（跳过自举，更快）
+"$CLI" query --file "D:/data/怪物表.xlsx" --sql "SELECT * FROM 怪物 WHERE 等级 > 5"
 ```
 
-**输出格式**：`{success: bool, data: Any, message: str, meta: dict}`，退出码 0=成功 1=失败。
+**所有命令共用参数**：`--file <路径>` 是每个命令的必填参数（除 self-update）。路径用绝对路径。
 
-## 场景决策（选对工具）
+**输出格式**（所有命令统一）：JSON `{success: bool, data: Any, message: str, meta: dict}`
 
-### 读数据
-| 你的需求 | 用哪个 | 说明 |
-|---------|--------|------|
-| 按条件筛选/聚合/多表关联/跨文件 | `query --sql "SELECT …"` | SQL 引擎，能处理复杂条件 |
-| 知道精确坐标，如 A1:C10 | `get-range --range "A1:C10"` | 直接读单元格范围 |
-| 快速了解表结构（列名+类型+样本值） | `describe-table` | 看有哪些列、什么类型 |
-| 只需要表头（中文+英文列名） | `get-headers` | 比 describe-table 更轻量 |
-| 搜索某个值在哪 | `search --pattern "xxx"` | 返回行列坐标 |
-| 跨多个 Excel 文件搜索 | `search-directory` | 指定目录搜全部文件 |
-| 找最后一行的行号（追加数据前用） | `find-last-row --column A` | 定位空行位置 |
+## 核心决策树：选对命令
 
-### 写数据
-| 你的需求 | 用哪个 | 注意 |
-|---------|--------|------|
-| 按条件批量改（如所有等级>5的怪加血） | `update-query --sql "UPDATE … SET … WHERE …"` | 支持表达式，可用 `--dry-run` 预览 |
-| 精确位置写入（知道 A1:C10 填什么） | `update-range --range "A1:C10" --data '[[…]]'` | **默认覆盖！追加要加 `--insert-mode`** |
-| 按 ID 改单行（存在更新，不存在插入） | `upsert-row --key-column ID --key-value N --updates '{…}'` | 幂等安全，推荐用于单行 |
-| 批量插入多行 | `insert-query --sql "INSERT INTO … VALUES …"` | SQL INSERT 语法 |
-| 按条件删行 | `delete-query --sql "DELETE FROM … WHERE …"` | **必须带 WHERE** |
-| 按行号删行 | `structure --operation delete_rows --index N --count M` | 直接指定行位置 |
+```
+读数据？
+├─ 筛选/聚合/GROUP BY/JOIN/窗口函数/子查询 → query
+├─ 知道精确坐标 A1:C10                     → get-range
+├─ 不确定有哪些列                          → describe-table（列名+类型+样本）
+├─ 只要表头                                → get-headers
+├─ 搜某个值在哪张表                        → search / search-directory
+└─ 追加数据前找空行                        → find-last-row
 
-### 结构 / 格式 / 其他
-| 需求 | 用哪个 |
-|------|--------|
-| 新建文件 | `create-file` |
-| 增/删/重命名/复制工作表 | `create-sheet / delete-sheet / rename-sheet / copy-sheet` |
-| 插入/删除行或列 | `structure --operation insert_rows / delete_rows / insert_columns / delete_columns` |
-| 改列名 | `rename-column` |
-| 设置行高/列宽 | `set-layout --operation set_row_height / set_column_width` |
-| 格式化单元格（字体/边框/合并/背景色） | `format-cells --range "…" --formatting '{…}'` |
-| 写公式 | `set-formula --cell A1 --formula "=SUM(B1:B10)"` |
-| 复杂逻辑/循环操作 | `run-python --code "…"`（Python 脚本，可用 query/update 变量） |
-| 两表按 ID 对比差异 | `compare-sheets` |
-| 备份/恢复 | `backup --operation create / list / restore` |
+写数据？
+├─ 按条件批量改（WHERE 筛选）              → update-query
+├─ 精确坐标写入                            → update-range（默认覆盖！追加加 --insert-mode）
+├─ 按 ID 改/插单行（幂等）                  → upsert-row（推荐单行操作）
+├─ SQL INSERT 插入                         → insert-query
+├─ 按条件删行                              → delete-query（必须 WHERE）
+└─ 按行号删/插入行列                       → structure
 
-## 防错自查清单
+其他？
+├─ 工作表管理 → create-sheet / delete-sheet / rename-sheet / copy-sheet
+├─ 格式化     → format-cells（字体/边框/合并/背景色）
+├─ 行高列宽   → set-layout
+├─ 公式       → set-formula
+├─ 复杂逻辑   → run-python（可用 query/update/insert/delete 函数 + ExcelOperations）
+├─ 两表对比   → compare-sheets
+└─ 备份恢复   → backup
+```
 
-| # | 自查问题 | 常见错误 | 正确做法 |
-|---|---------|---------|---------|
-| 1 | 追加还是覆盖？ | update-range 追加忘了 --insert-mode | 追加→`--insert-mode`+先 `find-last-row`；覆盖→默认 |
-| 2 | 一行还是批量？ | 改单行用 update-query | 单行→`upsert-row`；批量/条件→`update-query` |
-| 3 | 范围含工作表名？ | 多表文件 cell_range="A1:C10" 报错 | 用 `"Sheet名!A1:C10"` |
+## 完整命令签名
+
+> `*` = 必填，`[]` = 可选
+
+### 查询类
+
+| 命令 | 签名 | 说明 |
+|------|------|------|
+| `query` | `--file*` 路径 `--sql*` "..." [`--format` 格式] [`--no-headers`] | SQL 查询（优先使用） |
+| `describe-table` | `--file*` 路径 [`--sheet` S] | 查看表结构（列名+类型+样本值） |
+| `get-headers` | `--file*` 路径 [`--header-row` N] [`--max-columns` N] [`--sheet` S] | 获取表头信息（中文+英文） |
+| `list-sheets` | `--file*` 路径 | 列出所有工作表名称 |
+| `get-range` | `--file*` 路径 `--range*` 范围 [`--formatting` JSON] [`--sheet` S] | 获取指定单元格范围的数据 |
+| `search` | `--file*` 路径 `--pattern*` "关键词" [`--case-sensitive`] [`--range` 范围] [`--regex`] [`--sheet` S] [`--whole-word`] | 在 Excel 中搜索单元格 |
+| `search-directory` | `--dir*` 路径 `--pattern*` "关键词" [`--extensions` 列表] [`--max-files` 路径] [`--recursive`] | 在目录下搜索 Excel 文件 |
+| `find-last-row` | `--file*` 路径 `--sheet*` S [`--column` 列] | 查找最后一行 |
+| `compare-sheets` | `--file1*` 路径 `--file2*` 路径 `--sheet1*` S `--sheet2*` S [`--header-row` N] [`--id-column` 列] | 按 ID 列比较两个工作表差异 |
+
+### 写入类
+
+| 命令 | 签名 | 说明 |
+|------|------|------|
+| `update-query` | `--file*` 路径 `--sql*` "..." [`--dry-run`] | SQL UPDATE 批量修改 |
+| `insert-query` | `--file*` 路径 `--sql*` "..." [`--dry-run`] | SQL INSERT 插入数据 |
+| `delete-query` | `--file*` 路径 `--sql*` "..." [`--dry-run`] | SQL DELETE 删除数据 |
+| `update-range` | `--file*` 路径 `--data*` '[[...]]' `--range*` 范围 [`--insert-mode`] [`--no-preserve-formulas` "公式"] [`--preserve-formulas` "公式"] [`--sheet` S] | 精确坐标写入数据 |
+| `upsert-row` | `--file*` 路径 `--key-column*` 列 `--key-value*` 值 `--sheet*` S `--updates*` '{...}' [`--header-row` N] | 按 key_column+key_value 插入或更新行 |
+| `set-formula` | `--file*` 路径 `--cell*` A1 `--formula*` "公式" `--sheet*` S | 写入 Excel 公式 |
+
+### 结构类
+
+| 命令 | 签名 | 说明 |
+|------|------|------|
+| `create-file` | `--file*` 路径 [`--sheets` S] | 创建新 Excel 文件（**`--sheets` 实测无效，只创建默认 Sheet1**；要预设多 sheet，用 `create-file` 建文件后逐个 `create-sheet`，再 `delete-sheet Sheet1`） |
+| `create-sheet` | `--file*` 路径 `--name*` "名称" [`--index` N] | 创建新工作表 |
+| `delete-sheet` | `--file*` 路径 `--name*` "名称" | 删除工作表 |
+| `rename-sheet` | `--file*` 路径 `--new-name*` "名称" `--old-name*` "名称" | 重命名工作表 |
+| `copy-sheet` | `--file*` 路径 `--source*` 源表 [`--index` N] [`--new-name` "名称"] | 复制工作表 |
+| `structure` | `--file*` 路径 `--index*` N `--operation*` 操作 `--sheet*` S [`--count` N] | 插入或删除行和列 |
+| `rename-column` | `--file*` 路径 `--new-header*` "列名" `--old-header*` "列名" `--sheet*` S [`--header-row` N] | 修改列名（表头） |
+
+### 格式化类
+
+| 命令 | 签名 | 说明 |
+|------|------|------|
+| `format-cells` | `--file*` 路径 `--range*` 范围 `--sheet*` S [`--formatting` JSON] [`--preset` 预设] | 设置单元格样式 |
+| `set-layout` | `--file*` 路径 `--index*` N `--operation*` 操作 `--sheet*` S `--value*` 值 [`--count` N] | 设置行高或列宽 |
+
+### 运行类
+
+| 命令 | 签名 | 说明 |
+|------|------|------|
+| `run-python` | `--file*` 路径 `--code*` "..." [`--sheet` S] [`--timeout` N] | 直接执行 Python 代码操作 Excel |
+
+### 运维类
+
+| 命令 | 签名 | 说明 |
+|------|------|------|
+| `backup` | `--file*` 路径 `--operation*` 操作 [`--backup-dir` 路径] [`--backup-id` "ID"] | 备份与恢复 |
+| `self-update` |  [`--check`] | 检查/更新 CLI 到最新版本 |
+
+<!-- AUTO-GENERATED by tools/api-doc-gen.py -->
+
+## 使用方法论（避免常见错误）
+
+### 第一步：永远先 describe-table
+
+**不要假设你知道列名。** 每次操作新文件前先跑：
+
+```bash
+# 先看有哪些 Sheet
+"$CLI" list-sheets --file F
+# 再看目标 Sheet 的结构（自动检测双行表头）
+"$CLI" describe-table --file F [--sheet Sheet名]
+```
+
+返回的 `columns[].name` 就是 SQL 可用的列名。**用 describe-table 返回的列名写 SQL**，不要猜。
+
+### 第二步：Sheet 名 ≠ 文件名
+
+`Props.xlsx` 的 Sheet 可能叫 `PropList`、`PropName`。SQL 中 `FROM` 后面跟的是 **Sheet 名**，不是文件名：
+
+```bash
+# ❌ 错误：用文件名当表名
+"$CLI" query --file "Props.xlsx" --sql "SELECT * FROM Props"
+
+# ✅ 正确：先查 Sheet 名，再用 Sheet 名
+"$CLI" query --file "Props.xlsx" --sql "SELECT * FROM PropList"
+```
+
+### 第三步：数值列可能是文本存储
+
+游戏配置表中数值常以文本存储（如 `Hp = "2000"` 而非 `2000`）。排序/比较时用 `CAST`：
+
+```bash
+# ❌ 文本排序："100" < "20" < "3"（字典序）
+"$CLI" query --file F --sql "SELECT ID, Hp FROM Monster ORDER BY Hp DESC LIMIT 5"
+
+# ✅ 数值排序：CAST 转换后正确排序
+"$CLI" query --file F --sql "SELECT ID, CAST(Hp AS INT) AS hp FROM Monster ORDER BY hp DESC LIMIT 5"
+```
+
+### 第四步：多表文件指定 --sheet
+
+一个 xlsx 有多个 Sheet 时，用 `--sheet` 指定目标：
+
+```bash
+"$CLI" query --file "Monster.xlsx" --sheet Monster --sql "SELECT * FROM Monster LIMIT 5"
+```
+
+### 第五步：写操作安全链
+
+```bash
+# 1. 备份
+"$CLI" backup --file F --operation create
+# 2. dry-run 预览
+"$CLI" update-query --file F --sql "UPDATE 表 SET 列=值 WHERE 条件" --dry-run
+# 3. 确认无误后执行
+"$CLI" update-query --file F --sql "UPDATE 表 SET 列=值 WHERE 条件"
+# 4. 验证结果
+"$CLI" query --file F --sql "SELECT * FROM 表 WHERE 条件"
+```
+
+### 已知限制
+
+- `SELECT alias.* FROM (subquery) AS alias` 不支持 → 手动列出列名
+- 空字段名的列会显示为 `Unnamed__N` → 用列序号或 describe-table 确认
+- 数值以文本存储时需 CAST → 见第三步
+- Excel 空字符串往返变为 NULL → xlsx 格式固有限制
+- `run-python` 沙箱受限：`open`/`json`/`os`/`subprocess`/`sys` 等被禁，仅 ~40 个安全内置（abs/all/dict/list/len/print/range/str 等）+ 注入的 `query/update/insert/delete/ExcelOperations`。**大数据写入走 `update-range` 内联 JSON（<8KB）或拆批 upsert-row；超 8KB 时改用外部 `python -c` + openpyxl 直接写文件**（沙箱内 `load_workbook` 读大文件易卡死，run-python 不适合批量数据导入）
+
+### self-update 坑（uv venv 环境）
+
+| 坑 | 表现 | 解决 |
+|---|---|---|
+| uv venv 无 pip 模块 | `self-update` 报 `No module named pip` | 已修复（cli 内部优先用 uv pip install --no-deps，回退 pip） |
+| numpy 编译失败 | `uv pip install --reinstall` 重装依赖时 numpy 1.26.4 在 Windows+Python3.13 编译失败（Meson UnicodeDecodeError） | 已修复（self-update 用 `--no-deps` 只更新包本身不碰依赖） |
+| uv 不在 PATH | venv 子进程 PATH 不含全局 bin，`shutil.which('uv')` 返回 None | 已修复（cli 内部搜索 `~/.local/bin/uv.exe` 等候选路径） |
+
+> 如果 self-update 仍失败，手动安装：`uv pip install --no-deps --python <venv>/Scripts/python.exe "git+https://github.com/TangentDomain/excel-mcp-server"`
+
+### 双行表头空列（P11 已修复）
+
+双行表头的第二行（英文字段名）有空单元格时（如 MapEvent.xlsx 的"拉表"列），旧版 query 引擎会把 NaN 转成 `"nan"` 字符串导致重复列名，整个 sheet 被静默跳过（报"表不存在"）。**已修复**（v1.0.0+），空列名回退用第一行中文描述并自动去重。但仍建议先用 `describe-table` 确认实际列名。
+
+## 防错自查（调用前检查）
+
+| # | 自查 | 错误信号 | 修正 |
+|---|------|---------|------|
+| 1 | 追加还是覆盖？ | 返回含"覆盖模式" | 追加加 `--insert-mode`，覆盖是默认 |
+| 2 | 单行还是批量？ | 改一行却用 update-query | 单行用 `upsert-row` |
+| 3 | 多表文件范围 | `range="A1:C10"` 报错 | 用 `"Sheet名!A1:C10"` |
 | 4 | SQL 类型对吗？ | SELECT 传给 update-query | 查→query / 改→update-query / 增→insert-query / 删→delete-query |
-| 5 | 写入后验证了？ | 写完不验证 | 写入→query 验证→有备份可恢复 |
+| 5 | 写完验证了？ | 写完就结束 | 写入→query 验证 |
+| 6 | Sheet名对吗？ | "表 XX 不存在" | 先 `list-sheets`，用 Sheet 名不是文件名 |
+| 7 | 数值排序对吗？ | 排序结果不对 | 文本列用 `CAST(col AS INT)` 再排序 |
 
 ## 双行表头
 
-当 Excel 有双行表头（第 1 行中文 + 第 2 行英文）时：
-- **SQL 工具**（query/update-query/insert-query/delete-query）：中英文名都能用
-- **describe-table 返回的列名**：第 2 行英文名
+双行表头（第1行中文描述 + 第2行英文字段名）时：
+- **SQL 工具**：中文英文列名都能用
+- **describe-table 自动检测**：返回第2行英文名作为列名
 - **upsert-row 的 --key-column**：中英文都能用
-- **建议**：直接用 describe-table 返回的英文名
+- **建议**：用 describe-table 返回的英文名
 
-## 完整命令参考
+## SQL 功能与准确率
 
-### 查询类
-```bash
-query --file F --sql "SELECT * FROM 表 WHERE 条件" [--no-headers] [--format table|json]
-list-sheets --file F
-get-headers --file F [--sheet S] [--header-row 1] [--max-columns N]
-get-range --file F --range "A1:C10" [--sheet S] [--formatting]
-describe-table --file F [--sheet S]
-search --file F --pattern "文本" [--sheet S] [--case-sensitive] [--whole-word] [--regex]
-search-directory --dir D --pattern "文本" [--extensions ".xlsx,.xls"]
-find-last-row --file F --sheet S --column A
-compare-sheets --file1 F1 --sheet1 S1 --file2 F2 --sheet2 S2 [--id-column 1]
-```
+### 已支持（132 条差分测试验证，18 类别 100%）
 
-### 写入类
-```bash
-update-query --file F --sql "UPDATE 表 SET 列=值 WHERE 条件" [--dry-run]
-insert-query --file F --sql "INSERT INTO 表 (列) VALUES (值)" [--dry-run]
-delete-query --file F --sql "DELETE FROM 表 WHERE 条件" [--dry-run]
-update-range --file F --range "A1:B2" --data '[["a","b"],["c","d"]]' [--insert-mode] [--sheet S]
-upsert-row --file F --sheet S --key-column ID --key-value 3 --updates '{"血量":900}'
-set-formula --file F --sheet S --cell A1 --formula "=SUM(B1:B10)"
-run-python --file F --code "query('SELECT * FROM 表')" [--sheet S] [--timeout 30]
-```
+| 类别 | 功能 |
+|------|------|
+| 基础 | SELECT, DISTINCT, AS, `+-*/%`, 一元负号, 整数除法(截断向零) |
+| 条件 | WHERE, LIKE, IN, NOT IN, BETWEEN, AND/OR, 子查询 |
+| 聚合 | COUNT, SUM, AVG, MAX, MIN, GROUP BY, HAVING |
+| 排序 | ORDER BY, LIMIT, OFFSET, NULLS FIRST/LAST |
+| 窗口 | ROW_NUMBER, RANK, DENSE_RANK (含 PARTITION BY) |
+| 多表 | INNER/LEFT/RIGHT/FULL JOIN (同文件跨Sheet) |
+| 高级 | CASE WHEN (简单/搜索/嵌入表达式), CTE(WITH), EXISTS, UNION/UNION ALL |
+| 字符串 | UPPER, LOWER, TRIM, LENGTH, CONCAT, REPLACE, SUBSTRING |
+| NULL | IS NULL, IS NOT NULL, COALESCE |
 
-### 结构操作
-```bash
-create-file --file F [--sheets '["表1","表2"]']
-create-sheet --file F --name 新表 [--index 0]
-delete-sheet --file F --name 表名
-rename-sheet --file F --old-name 旧 --new-name 新
-copy-sheet --file F --source 源表 [--new-name 副本]
-structure --file F --sheet S --operation insert_rows --index 2 --count 3
-rename-column --file F --sheet S --old-header 旧名 --new-header 新名
-```
+### 关键语义（与 SQLite 对齐）
 
-### 格式化
-```bash
-format-cells --file F --sheet S --range "A1:C10" [--formatting '{"bold":true}'] [--preset header]
-set-layout --file F --sheet S --operation set_row_height --index 1 --value 30
-```
+- **GROUP BY / ORDER BY**：NULL 排最前（ASC），排最后（DESC）
+- **ROUND**：四舍五入（round half away from zero），非 banker's rounding
+- **整数除法**：`int / int` 截断向零（`-1/2 = 0`，非 `-0.5`）
+- **LENGTH(NULL)**：返回 NULL
+- **float32 降级**：已移除，保留 float64 保障聚合精度
 
-### 备份
-```bash
-backup --file F --operation create
-backup --file F --operation list
-backup --file F --operation restore --backup-id 20260623_120000
-```
+### SQL 限制
 
-### 自更新
-```bash
-self-update    # 从 GitHub 拉取最新版本
-```
-
-## SQL 已支持功能
-
-基础: SELECT, DISTINCT, 别名(AS), 数学表达式(+-*/%)
-条件: WHERE, LIKE, IN, BETWEEN, 子查询
-聚合: COUNT, SUM, AVG, MAX, MIN, GROUP BY, HAVING
-多表: INNER/LEFT/RIGHT/FULL JOIN, 跨文件 JOIN
-窗口: ROW_NUMBER, RANK, DENSE_RANK
-高级: CASE WHEN, CTE(WITH), EXISTS, UNION, UNION ALL
-字符串: UPPER, LOWER, TRIM, LENGTH, CONCAT, REPLACE, SUBSTRING
-排序: ORDER BY, LIMIT, OFFSET
-
-SQL 真值来源：SQLite 3.x，calibrator 交叉校验保证对齐。
+- 不支持 WHERE 引用窗口函数别名
+- 不支持 SELECT 别名在 WHERE 中引用
+- 跨文件 JOIN 需用 `表名@'文件路径'` 语法（同文件跨 Sheet 直接用表名）
+- Excel 空字符串 `""` 往返后变为 NULL（xlsx 格式限制）
 
 ## 边界
 
-- **不负责**：数据库管理（MySQL/PostgreSQL）、CSV 处理、Excel 透视表创建
-- **只处理**：.xlsx / .xls 文件的配置表读写查询
-- **SQL 限制**：不支持 WHERE 引用窗口函数别名、SELECT 别名在 WHERE 中
+- **只处理**：`.xlsx` / `.xls` 配置表的读写查询
+- **不负责**：数据库管理、CSV 处理、Excel 透视表
+
+## 🔧 自我维护
+
+**这个 skill 是自治模块——自己为自己的行为负责。** agent 用它时发现以下信号，**当场提议改本 SKILL.md**，不等用户开口：
+
+| 信号 | 改哪里 |
+|------|--------|
+| 命令报错 / 参数过期 / 路径错了 | 改正文命令、`bin/` 脚本 |
+| 流程走不通 / 步骤缺失 | 改「工作流」段 |
+| 踩了坑（环境/代理/权限） | 写进「故障排查」或「注意事项」段 |
+| 没覆盖用户要的能力 | 补章节，或提议新 skill |
+| 触发不准（漏触发/误触发） | 改 frontmatter `keywords` / `description` |
+
+SOP：识别 → 当场提议 → 用户确认 → 改 SKILL.md → 验证 → `feedback(excel): <改了什么>` commit + push。详见 RULES.md「Skill 自治原则」。
