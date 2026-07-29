@@ -897,7 +897,18 @@ def _do_update():
 
         repo_url = f"git+https://github.com/{GITHUB_REPO}"
         install_cmds = []
-        uv_path = shutil.which("uv")
+        uv_path = shutil.which("uv") or shutil.which("uv.exe")
+        if not uv_path:
+            # shutil.which 依赖 PATH，venv 子进程可能 PATH 不含全局 bin
+            for candidate in [
+                os.path.join(os.environ.get("APPDATA", ""), "Python", "Scripts", "uv.exe"),
+                os.path.join(os.path.dirname(sys.base_prefix), "Scripts", "uv.exe"),
+                os.path.join(os.environ.get("USERPROFILE", ""), ".local", "bin", "uv.exe"),
+                os.path.join(os.environ.get("USERPROFILE", ""), ".cargo", "bin", "uv.exe"),
+            ]:
+                if os.path.isfile(candidate):
+                    uv_path = candidate
+                    break
         if uv_path:
             # --no-deps 避免重装 numpy 等需要编译的依赖（uv venv 已有）
             install_cmds.append([uv_path, "pip", "install", "--no-deps", "--python", sys.executable, repo_url])
