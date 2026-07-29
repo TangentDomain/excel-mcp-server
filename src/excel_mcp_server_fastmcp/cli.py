@@ -899,8 +899,9 @@ def _do_update():
         install_cmds = []
         uv_path = shutil.which("uv")
         if uv_path:
-            install_cmds.append([uv_path, "pip", "install", "--python", sys.executable, repo_url])
-        install_cmds.append([sys.executable, "-m", "pip", "install", "--upgrade", repo_url])
+            # --no-deps 避免重装 numpy 等需要编译的依赖（uv venv 已有）
+            install_cmds.append([uv_path, "pip", "install", "--no-deps", "--python", sys.executable, repo_url])
+        install_cmds.append([sys.executable, "-m", "pip", "install", "--no-deps", "--upgrade", repo_url])
 
         try:
             last_err = ""
