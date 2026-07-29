@@ -891,18 +891,26 @@ def _do_update():
     is_venv = hasattr(sys, "real_prefix") or (hasattr(sys, "base_prefix") and sys.base_prefix != sys.prefix)
 
     if is_venv:
-        # venv 模式：pip install --upgrade
+        # venv 模式：优先 uv pip（uv 创建的 venv 无 pip 模块），回退 pip install
+        import shutil
         import subprocess
 
+        repo_url = f"git+https://github.com/{GITHUB_REPO}"
+        install_cmds = []
+        uv_path = shutil.which("uv")
+        if uv_path:
+            install_cmds.append([uv_path, "pip", "install", "--python", sys.executable, repo_url])
+        install_cmds.append([sys.executable, "-m", "pip", "install", "--upgrade", repo_url])
+
         try:
-            result = subprocess.run(
-                [sys.executable, "-m", "pip", "install", "--upgrade", f"git+https://github.com/{GITHUB_REPO}"],
-                capture_output=True,
-                text=True,
-                timeout=120,
-            )
-            if result.returncode != 0:
-                return output(_fail(f"pip 安装失败: {result.stderr}", meta={"error": "PIP_INSTALL_FAILED"}))
+            last_err = ""
+            for cmd in install_cmds:
+                result = subprocess.run(cmd, capture_output=True, text=True, timeout=180)
+                if result.returncode == 0:
+                    break
+                last_err = result.stderr
+            else:
+                return output(_fail(f"安装失败: {last_err}", meta={"error": "INSTALL_FAILED"}))
 
             # 更新成功后写 .last-update
             try:
